@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-13T13:26:10.373Z",
+ "generatedAt": "2026-11-14T19:29:38.332Z",
  "sources": {
   "docs": [
    "https://opencode.ai/v2/docs/console/go/",
@@ -1134,7 +1134,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 131072,
+     "maxOutput": 1048576,
      "cost": {
       "input": 3,
       "output": 15,
@@ -1183,7 +1183,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 131072,
+     "maxOutput": 1048576,
      "cost": {
       "input": 2,
       "output": 10,
@@ -5704,7 +5704,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 131072,
+     "maxOutput": 1048576,
      "cost": {
       "input": 3,
       "output": 15,

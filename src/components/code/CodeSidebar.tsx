@@ -142,8 +142,9 @@ interface SessionRowProps {
 
 /**
  * One real Code session row. A conversation with an active turn (foreground or
- * background) shows a spinner in a fixed slot; the active row is still
- * distinguished by its surface and `aria-current`.
+ * background) shows a spinner in the row-actions slot — the same one the "…"
+ * menu uses, which is painted above it and fades it out on hover; the active row
+ * is still distinguished by its surface and `aria-current`.
  */
 function SessionRow({
   conversation,
@@ -189,15 +190,6 @@ function SessionRow({
         {conversation.pinned ? (
           <Pin aria-hidden className="size-3 shrink-0 text-foreground-subtle" strokeWidth={1.75} />
         ) : null}
-        <span className="flex size-3 shrink-0 items-center justify-center">
-          {running ? (
-            <Spinner
-              size="xs"
-              label={t('code:sidebar.session.running')}
-              className="text-accent"
-            />
-          ) : null}
-        </span>
         <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
         {shared ? (
           <span
@@ -210,6 +202,16 @@ function SessionRow({
         ) : null}
       </button>
 
+      {/* The running turn reuses the row-actions slot: the "…" trigger is painted
+          above this spinner and fades it out on hover (≥ lg). Below that width the
+          trigger is always visible, so it hides its glyph instead of stacking two
+          icons on the same spot. */}
+      {running ? (
+        <span className="pointer-events-none absolute right-1 top-1/2 z-0 flex size-6 -translate-y-1/2 items-center justify-center text-accent transition-opacity duration-150 lg:group-hover:opacity-0 motion-reduce:transition-none">
+          <Spinner size="xs" label={t('code:sidebar.session.running')} />
+        </span>
+      ) : null}
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -217,13 +219,13 @@ function SessionRow({
             aria-label={t('code:sidebar.session.options', { title: conversation.title })}
             onClick={(event) => event.stopPropagation()}
             className={cn(
-              'absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md',
+              'absolute right-1 top-1/2 z-10 flex size-6 -translate-y-1/2 items-center justify-center rounded-md',
               'text-foreground-subtle transition-colors duration-150 hover:bg-surface-active hover:text-foreground',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
               'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 lg:data-[state=open]:opacity-100',
             )}
           >
-            <Ellipsis className="size-4" />
+            <Ellipsis className={cn('size-4', running && 'hidden lg:block')} />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-44">

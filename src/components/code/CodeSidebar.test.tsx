@@ -427,9 +427,15 @@ describe('CodeSidebar — Workspaces reais', () => {
 
     const idle = await screen.findByRole('button', { name: 'Sessão ativa' });
     const running = screen.getByRole('button', { name: 'Sessão em execução' });
+    const runningRow = running.closest('div') as HTMLElement;
 
     expect(within(idle).queryByRole('status')).toBeNull();
-    expect(within(running).getByRole('status', { name: 'Executando' })).toBeTruthy();
+    // The spinner shares the row-actions slot: it lives outside the session
+    // button so the "…" trigger can be painted above it on hover.
+    expect(within(running).queryByRole('status')).toBeNull();
+    const status = within(runningRow).getByRole('status', { name: 'Executando' });
+    expect(within(runningRow).getAllByRole('status')).toHaveLength(1);
+    expect(status.parentElement?.className).toContain('right-1');
 
     // The old active-session dot is gone from every row.
     expect(idle.querySelector('span[aria-hidden="true"].rounded-full')).toBeNull();
