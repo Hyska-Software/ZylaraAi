@@ -843,14 +843,10 @@ export const api = {
   killJob: (jobId: string) => invoke<JobView>('kill_job', { jobId }),
 
   /**
-   * Starts a turn. `onEvent` receives every streamed event; the promise
-   * resolves with the persisted user/assistant messages when the turn ends.
+   * Starts a turn. The promise resolves with the persisted user/assistant
+   * messages when the turn ends; live events arrive on `zylara:turn-event`.
    */
-  runTurn: (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-    const channel = new Channel<TurnEvent>();
-    channel.onmessage = onEvent;
-    return invoke<TurnResult>('run_turn', { payload, onEvent: channel });
-  },
+  runTurn: (payload: TurnPayload) => invoke<TurnResult>('run_turn', { payload }),
 };
 
 export type Api = typeof api;

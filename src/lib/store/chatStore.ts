@@ -41,7 +41,7 @@ export interface StreamingState {
   conversationId: string;
   assistantId: string;
   userMessageId: string | null;
-  phase: 'starting' | 'reasoning' | 'text' | 'tool' | 'retrying';
+  phase: 'starting' | 'queued' | 'reasoning' | 'text' | 'tool' | 'retrying';
   step: number;
   startedAt: number;
   /** `user` (turno do usuário) ou `goal_round` (rodada automática do objetivo). */
@@ -152,6 +152,8 @@ interface ChatState {
   drainMessageQueues: () => Promise<void>;
   /** Applies a turn event mirrored on the global bus (reload/reattach). */
   applyExternalTurnEvent: (payload: TurnEventBusPayload) => Promise<void>;
+  /** Routes one bus envelope: local turn reducer or the external reattach path. */
+  handleTurnEvent: (payload: TurnEventBusPayload) => void;
   /** Rebuilds streams/messages of turns still running in Rust after a reload. */
   reattachTurns: () => Promise<void>;
   /** Reloads a conversation's messages without touching an active stream. */
@@ -215,13 +217,23 @@ export interface SendOptions {
 const EMPTY: ChatMessage[] = [];
 
 /**
- * Turns started by this renderer. Their events arrive through the invoke
- * channel; the global bus listener must ignore them to avoid double-applying.
+ * Turns started by this renderer. The bus envelope feeds their closure
+ * reducer (buffers, flush, settlement); all other turns use the reattach path.
  */
-const localTurnIds = new Set<string>();
+const localTurnHandlers = new Map<string, (payload: TurnEventBusPayload) => void>();
 /** Highest global-bus sequence applied per turn (reattach + live dedupe). */
 const appliedTurnSeq = new Map<string, number>();
 const terminalTurnIds = new Set<string>();
+/** Cadence of the turn watchdog that reconciles a local turn from the DB. */
+const TURN_WATCHDOG_INTERVAL_MS = 2_500;
+/** Consecutive polls without an active backend turn before finalizing. */
+const TURN_WATCHDOG_MISSES = 2;
+/**
+ * A dispatched turn has no registry entry until Rust deserializes the invoke.
+ * Wait for evidence (any journaled event or the first `queued` envelope) or
+ * this grace period before treating the registry absence as a dead turn.
+ */
+const TURN_WATCHDOG_START_GRACE_MS = 30_000;
 /** Dedupe window per conversation+category to avoid notification spam. */
 const notificationThrottle = new Map<string, number>();
 const NOTIFICATION_DEDUPE_MS = 5_000;
@@ -760,6 +772,35 @@ export const useChatStore = create<ChatState>()((set, get) => {
     }
   };
 
+  /**
+   * A `streaming` row without a live backend turn is a leftover from a dead
+   * turn (reload, cancelled invoice, lost terminal event). Mark it resumable
+   * and drop any phantom stream, so `send` is not silently queued behind it.
+   */
+  const reconcileStreamForConversation = async (conversationId: string) => {
+    const stream = selectConversationStream(get(), conversationId);
+    const list = get().messagesByConversation[conversationId] ?? [];
+    const stale = [...list]
+      .reverse()
+      .find((message) => message.role === 'assistant' && message.status === 'streaming');
+    if (!stream && !stale) return;
+    if (stream && localTurnHandlers.has(stream.turnId)) return;
+    let active: Awaited<ReturnType<typeof api.listActiveTurns>>;
+    try {
+      active = await api.listActiveTurns();
+    } catch {
+      return;
+    }
+    if (!Array.isArray(active)) return;
+    if (active.some((turn) => turn.conversationId === conversationId)) return;
+    if (stale) {
+      patchMessage(conversationId, stale.id, (message) =>
+        message.status === 'streaming' ? { ...message, status: 'cancelled' } : message,
+      );
+    }
+    if (selectConversationStream(get(), conversationId)) setStream(conversationId, null);
+  };
+
   const runTurn = async (
     payload: TurnPayload,
     context: {
@@ -774,7 +815,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
       queueItem?: MessageQueueItem;
     },
   ) => {
-    let local_turn_id: string | null = payload.turnId ?? null;
+    const turnId = payload.turnId ?? null;
+    const dispatchedAt = Date.now();
     let reasoningBuffer = '';
     let textBuffer = '';
     let flushHandle: ReturnType<typeof setTimeout> | undefined;
@@ -887,6 +929,11 @@ export const useChatStore = create<ChatState>()((set, get) => {
         }
       }
       switch (event.type) {
+        case 'queued':
+          // Accepted by Rust but still waiting for a concurrency/workspace
+          // slot: keep the placeholder honest instead of "Generating…".
+          patchStream(context.conversationId, (stream) => ({ ...stream, phase: 'queued' }));
+          break;
         case 'turn_started': {
           started = true;
           if (context.optimisticUserId) {
@@ -900,6 +947,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
             ...stream,
             assistantId: event.assistantMessageId,
             userMessageId: event.userMessageId,
+            phase: 'starting',
           }));
           break;
         }
@@ -1059,7 +1107,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         case 'done':
           flush();
           finished = true;
-          if (local_turn_id) terminalTurnIds.add(local_turn_id);
+          if (turnId) terminalTurnIds.add(turnId);
           applyResult(event.result);
           // In-app completion notice for agent threads the user is not looking
           // at. The `notificationsEnabled` setting already existed for this;
@@ -1102,7 +1150,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           flush();
           finished = true;
           terminal = 'cancelled';
-          if (local_turn_id) terminalTurnIds.add(local_turn_id);
+          if (turnId) terminalTurnIds.add(turnId);
           goalSkips.add(payload.turnId ?? '');
           void syncCacheStats(context.conversationId);
           patchMessage(context.conversationId, context.assistantId, (message) => ({
@@ -1139,7 +1187,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           flush();
           finished = true;
           terminal = 'error';
-          if (local_turn_id) terminalTurnIds.add(local_turn_id);
+          if (turnId) terminalTurnIds.add(turnId);
           void syncCacheStats(context.conversationId);
           goalSkips.add(payload.turnId ?? '');
           patchMessage(context.conversationId, context.assistantId, (message) => ({
@@ -1383,8 +1431,136 @@ export const useChatStore = create<ChatState>()((set, get) => {
       void syncArtifacts(context.conversationId);
     };
 
+    const safe = async <T>(run: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await run();
+      } catch {
+        return null;
+      }
+    };
+
+    /**
+     * A lost invoke/channel/bus message must never leave the placeholder
+     * spinning. The turn journal is authoritative: replay missing envelopes
+     * and finalize a turn that vanished from the registry without a terminal.
+     */
+    const reconcileFromDb = async () => {
+      const detail = await safe(() => api.getConversation(context.conversationId));
+      const rows = detail?.messages ?? [];
+      const row =
+        rows.find((message) => message.id === context.assistantId) ??
+        [...rows].reverse().find((message) => message.role === 'assistant');
+      const conversation = detail?.conversation ?? null;
+      if (conversation) {
+        set((state) => ({
+          conversations: state.conversations.map((entry) =>
+            entry.id === conversation.id ? conversation : entry,
+          ),
+        }));
+      }
+      if (row && row.status !== 'streaming') {
+        finalizeAssistant(context.conversationId, row);
+        if (row.error) {
+          const description = row.error.hint ?? row.error.message;
+          if (get().activeId === context.conversationId) {
+            set({
+              error: description,
+              errorCode: row.error.code ?? null,
+              errorHint: row.error.hint ?? null,
+            });
+          }
+          toast.error(t('chat:toasts.responseFailed'), { description });
+        }
+      } else {
+        patchMessage(context.conversationId, context.assistantId, (message) =>
+          message.status === 'streaming' ? { ...message, status: 'cancelled' } : message,
+        );
+        if (selectConversationStream(get(), context.conversationId)?.turnId === turnId) {
+          setStream(context.conversationId, null);
+        }
+        toast.error(t('chat:toasts.turnLost'));
+      }
+      if (turnId) {
+        terminalTurnIds.add(turnId);
+        localTurnHandlers.delete(turnId);
+        void settleTurn(context.conversationId, turnId);
+      }
+      void refreshList();
+      void syncArtifacts(context.conversationId);
+    };
+
+    /** Applies only contiguous sequences; gaps stay buffered for the watchdog. */
+    const pendingEvents = new Map<number, TurnEventBusPayload>();
+    const applyEnvelope = (envelope: TurnEventBusPayload) => {
+      if (!turnId || envelope.turnId !== turnId) return;
+      if (terminalTurnIds.has(turnId)) return;
+      const next = (appliedTurnSeq.get(turnId) ?? 0) + 1;
+      if (envelope.seq < next) return;
+      pendingEvents.set(envelope.seq, envelope);
+      let cursor = next;
+      while (pendingEvents.has(cursor)) {
+        const pending = pendingEvents.get(cursor)!;
+        pendingEvents.delete(cursor);
+        appliedTurnSeq.set(turnId, cursor);
+        handleEvent(pending.event);
+        cursor += 1;
+      }
+    };
+    if (turnId) localTurnHandlers.set(turnId, applyEnvelope);
+
+    let watchdog: ReturnType<typeof setInterval> | undefined;
+    let ticking = false;
+    let misses = 0;
+    const tick = async () => {
+      if (finished || ticking || !turnId) return;
+      ticking = true;
+      try {
+        let after = appliedTurnSeq.get(turnId) ?? 0;
+        for (let page = 0; page < 20; page += 1) {
+          const records = await safe(() => api.listTurnEvents(turnId, after));
+          if (!records?.length) break;
+          for (const record of records) {
+            applyEnvelope({ ...record, conversationId: context.conversationId });
+          }
+          after = records[records.length - 1].seq;
+          if (records.length < 5_000 || finished) return;
+        }
+        if (finished) return;
+        if ((appliedTurnSeq.get(turnId) ?? 0) === 0) {
+          patchStream(context.conversationId, (stream) => ({ ...stream, phase: 'queued' }));
+        }
+        const active = await safe(() => api.listActiveTurns());
+        if (!Array.isArray(active)) return;
+        if (active.some((turn) => turn.turnId === turnId)) {
+          misses = 0;
+          return;
+        }
+        if (
+          (appliedTurnSeq.get(turnId) ?? 0) === 0 &&
+          Date.now() - dispatchedAt < TURN_WATCHDOG_START_GRACE_MS
+        ) {
+          // The invoke may still be queued in the IPC/turn startup path.
+          misses = 0;
+          return;
+        }
+        misses += 1;
+        if (misses >= TURN_WATCHDOG_MISSES) {
+          await reconcileFromDb();
+          finished = true;
+          clearInterval(watchdog);
+        }
+      } finally {
+        ticking = false;
+      }
+    };
+
     try {
-      const result = await api.runTurn(payload, handleEvent);
+      if (turnId) {
+        watchdog = setInterval(() => {
+          void tick();
+        }, TURN_WATCHDOG_INTERVAL_MS);
+      }
+      const result = await api.runTurn(payload);
       flush();
       if (!finished) {
         finished = true;
@@ -1417,6 +1593,15 @@ export const useChatStore = create<ChatState>()((set, get) => {
         toast.error(t('chat:toasts.resumeFailed'), { description: message });
         return;
       }
+      // A queued turn stopped before the harness persisted anything: remove
+      // the optimistic pair instead of leaving an orphan error bubble.
+      if (message.includes('TURN_CANCELLED')) {
+        removeMessage(context.conversationId, context.optimisticUserId ?? '');
+        removeMessage(context.conversationId, context.assistantId);
+        setStream(context.conversationId, null);
+        toast.info(t('chat:toasts.turnCancelled'));
+        return;
+      }
       // Rodada de objetivo que nem começou (preflight/harness recusou): não
       // deixa mensagens otimistas órfãs no transcript.
       if (context.removeOnFailure && !started) {
@@ -1442,9 +1627,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
       void syncArtifacts(context.conversationId);
     } finally {
       clearTimeout(flushHandle);
-      if (local_turn_id) {
-        localTurnIds.delete(local_turn_id);
-        local_turn_id = null;
+      clearInterval(watchdog);
+      if (turnId) {
+        terminalTurnIds.add(turnId);
+        localTurnHandlers.delete(turnId);
       }
       // The invoke resolves only after Rust releases the conversation slot, so
       // this is the authoritative point to drain the queue (the `done` event
@@ -1499,7 +1685,6 @@ export const useChatStore = create<ChatState>()((set, get) => {
   ) => {
     const { conversationId, content, attachments, selection, reasoning, options, queueItem } = input;
     const turnId = newId();
-    localTurnIds.add(turnId);
     const now = Date.now();
     const optimisticUserId = `optimistic-user-${turnId}`;
     const optimisticAssistantId = `optimistic-assistant-${turnId}`;
@@ -1883,6 +2068,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         await syncArtifacts(id);
         void syncCacheStats(id);
         syncCodeSession(get().conversations.find((conversation) => conversation.id === id));
+        void reconcileStreamForConversation(id);
         return;
       }
       // A conversation with a live turn keeps its in-memory messages: the
@@ -1902,6 +2088,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         syncCodeSession(targetConversation);
         await syncArtifacts(id);
         void syncCacheStats(id);
+        void reconcileStreamForConversation(id);
         return;
       }
       set({
@@ -1964,6 +2151,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         }
         await syncArtifacts(id);
         void syncCacheStats(id);
+        void reconcileStreamForConversation(id);
       } catch (error) {
         set({ loadingConversationId: null, error: String(error) });
       }
@@ -2512,7 +2700,6 @@ export const useChatStore = create<ChatState>()((set, get) => {
       // Regenerating keeps the model the conversation was started with.
       const selection = lockedSelectionFor(state) ?? app.selection;
       const turnId = newId();
-      localTurnIds.add(turnId);
       try {
         await api.truncateConversation(conversationId, lastAssistant.id);
       } catch (error) {
@@ -2592,7 +2779,6 @@ export const useChatStore = create<ChatState>()((set, get) => {
       const lastUser = [...messages].reverse().find((message) => message.role === 'user');
       const selection = lockedSelectionFor(state) ?? useAppStore.getState().selection;
       const turnId = newId();
-      localTurnIds.add(turnId);
       const stream: StreamingState = {
         turnId,
         conversationId,
@@ -2689,10 +2875,24 @@ export const useChatStore = create<ChatState>()((set, get) => {
       if (streaming.turnKind === 'goal_round') {
         void useCodeStore.getState().updateGoal(streaming.conversationId, 'pause');
       }
+      let cancelled = false;
       try {
-        await api.cancelTurn(streaming.turnId);
+        cancelled = await api.cancelTurn(streaming.turnId);
       } catch (error) {
         console.error('cancel failed', error);
+      }
+      // The registry no longer knows the turn (it ended between the click and
+      // the invoke): the terminal event will never arrive, clear it locally.
+      if (!cancelled) {
+        patchMessage(streaming.conversationId, streaming.assistantId, (message) =>
+          message.status === 'streaming' ? { ...message, status: 'cancelled' } : message,
+        );
+        if (
+          selectConversationStream(get(), streaming.conversationId)?.turnId ===
+          streaming.turnId
+        ) {
+          setStream(streaming.conversationId, null);
+        }
       }
     },
 
@@ -2721,10 +2921,22 @@ export const useChatStore = create<ChatState>()((set, get) => {
       if (streaming.turnKind === 'goal_round') {
         void useCodeStore.getState().updateGoal(streaming.conversationId, 'pause');
       }
+      let cancelled = false;
       try {
-        await api.cancelTurn(streaming.turnId);
+        cancelled = await api.cancelTurn(streaming.turnId);
       } catch (error) {
         console.error('cancel failed', error);
+      }
+      if (!cancelled) {
+        patchMessage(streaming.conversationId, streaming.assistantId, (message) =>
+          message.status === 'streaming' ? { ...message, status: 'cancelled' } : message,
+        );
+        if (
+          selectConversationStream(get(), streaming.conversationId)?.turnId ===
+          streaming.turnId
+        ) {
+          setStream(streaming.conversationId, null);
+        }
       }
     },
 
@@ -2787,7 +2999,6 @@ export const useChatStore = create<ChatState>()((set, get) => {
             : current.reasoning;
 
       const turnId = newId();
-      localTurnIds.add(turnId);
       const now = Date.now();
       const optimisticUserId = `optimistic-user-${turnId}`;
       const optimisticAssistantId = `optimistic-assistant-${turnId}`;
@@ -2914,8 +3125,17 @@ export const useChatStore = create<ChatState>()((set, get) => {
       await get().runGoalRound(conversationId);
     },
 
+    handleTurnEvent: (payload) => {
+      if (terminalTurnIds.has(payload.turnId)) return;
+      const handler = localTurnHandlers.get(payload.turnId);
+      if (handler) {
+        handler(payload);
+        return;
+      }
+      void get().applyExternalTurnEvent(payload);
+    },
+
     applyExternalTurnEvent: async (payload) => {
-      if (localTurnIds.has(payload.turnId)) return;
       if (terminalTurnIds.has(payload.turnId)) return;
       const lastSeq = appliedTurnSeq.get(payload.turnId) ?? 0;
       if (payload.seq <= lastSeq) return;
@@ -2929,6 +3149,11 @@ export const useChatStore = create<ChatState>()((set, get) => {
       }
       const conversation = get().conversations.find((entry) => entry.id === conversationId);
       let stream = selectConversationStream(get(), conversationId);
+      if (event.type === 'queued') {
+        // No message row exists yet: never invent a phantom stream for it.
+        if (stream) setStream(conversationId, { ...stream, phase: 'queued' });
+        return;
+      }
       if (event.type === 'turn_started') {
         stream = {
           turnId,
@@ -2982,10 +3207,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
         const assistant = [...list]
           .reverse()
           .find((message) => message.role === 'assistant' && message.status === 'streaming');
+        // Between `queued` and `turn_started` there is no assistant row yet;
+        // a later terminal event still reconciles through the journal.
+        if (!assistant) return;
         stream = {
           turnId,
           conversationId,
-          assistantId: assistant?.id ?? `external-assistant-${turnId}`,
+          assistantId: assistant.id,
           userMessageId: null,
           phase: 'starting',
           step: 1,
@@ -3188,7 +3416,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         return;
       }
       for (const turn of active) {
-        if (localTurnIds.has(turn.turnId)) continue;
+        if (localTurnHandlers.has(turn.turnId)) continue;
         await loadConversationIntoCache(turn.conversationId);
         let records: Awaited<ReturnType<typeof api.listTurnEvents>> = [];
         try {
@@ -3217,10 +3445,14 @@ export const useChatStore = create<ChatState>()((set, get) => {
             .find(
               (message) => message.role === 'assistant' && message.status === 'streaming',
             );
+          // A queued turn (no assistant row yet) or a turn that already
+          // finalized its row must not get a phantom stream: live events
+          // attach on `turn_started`, and the watchdog reconciles the rest.
+          if (!assistant) continue;
           setStream(turn.conversationId, {
             turnId: turn.turnId,
             conversationId: turn.conversationId,
-            assistantId: assistant?.id ?? `external-assistant-${turn.turnId}`,
+            assistantId: assistant.id,
             userMessageId: null,
             phase: 'starting',
             step: 1,

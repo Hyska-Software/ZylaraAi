@@ -46,6 +46,28 @@ pub(crate) fn workspace_execution_lock(key: &str) -> std::sync::Arc<tokio::sync:
     lock
 }
 
+/// Acquires the per-workspace turn mutex, aborting when the turn is cancelled
+/// while it waits behind another session.
+pub(crate) async fn acquire_workspace_execution(
+    key: &str,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> anyhow::Result<tokio::sync::OwnedMutexGuard<()>> {
+    let lock = workspace_execution_lock(key);
+    // A free lock is taken even when the token is already cancelled: the turn
+    // loop owns cancellation once it can run (goal pause, persisted state).
+    if let Ok(guard) = lock.clone().try_lock_owned() {
+        return Ok(guard);
+    }
+    let acquire = lock.lock_owned();
+    tokio::pin!(acquire);
+    tokio::select! {
+        guard = &mut acquire => Ok(guard),
+        _ = cancel.cancelled() => Err(anyhow::anyhow!(
+            crate::i18n::t("turn.errors.cancelledBeforeStart")
+        )),
+    }
+}
+
 /// Upper bound for one stored memory. Keeps the volatile context block small
 /// and prevents a runaway model from dumping an entire transcript into memory.
 pub const AGENT_MEMORY_MAX_CHARS: usize = 4 * 1024;
@@ -1867,6 +1889,29 @@ mod tests {
         let other = workspace_execution_lock("task:beta");
         assert!(std::sync::Arc::ptr_eq(&first, &second));
         assert!(!std::sync::Arc::ptr_eq(&first, &other));
+    }
+
+    #[tokio::test]
+    async fn waiting_for_a_workspace_lock_can_be_cancelled() {
+        let held = workspace_execution_lock("task:cancel-wait")
+            .lock_owned()
+            .await;
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let waiter = {
+            let cancel = cancel.clone();
+            tokio::spawn(async move {
+                acquire_workspace_execution("task:cancel-wait", &cancel).await
+            })
+        };
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        assert!(!waiter.is_finished());
+        cancel.cancel();
+        let error = waiter
+            .await
+            .expect("join")
+            .expect_err("cancelled while waiting");
+        assert!(error.to_string().contains("TURN_CANCELLED"));
+        drop(held);
     }
 
     #[test]

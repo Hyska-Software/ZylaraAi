@@ -55,7 +55,7 @@ import { openExternalUrl } from './external';
 import { Markdown } from './Markdown';
 import { ToolCallRow } from './ToolCallRow';
 
-export type AgentStepsPhase = 'starting' | 'reasoning' | 'text' | 'tool' | 'retrying';
+export type AgentStepsPhase = 'starting' | 'queued' | 'reasoning' | 'text' | 'tool' | 'retrying';
 
 export interface AgentStepsProps {
   message: ChatMessage;

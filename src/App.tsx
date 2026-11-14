@@ -397,7 +397,7 @@ export default function App() {
     let unlisten: (() => void) | undefined;
     void listen<TurnEventBusPayload>('zylara:turn-event', (event) => {
       if (disposed) return;
-      void useChatStore.getState().applyExternalTurnEvent(event.payload);
+      void useChatStore.getState().handleTurnEvent(event.payload);
     })
       .then((fn) => {
         if (disposed) fn();

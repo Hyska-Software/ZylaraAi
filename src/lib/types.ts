@@ -1902,6 +1902,7 @@ export interface TurnResult {
 }
 
 export type TurnEvent =
+  | { type: 'queued' }
   | { type: 'turn_started'; turnId: string; userMessageId: string; assistantMessageId: string }
   | { type: 'step_started'; step: number }
   | {

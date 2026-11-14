@@ -1,7 +1,7 @@
 //! Streaming events emitted by the harness to the React renderer.
 //!
-//! Serialised as `{ "type": "...", ...camelCaseFields }` and delivered over a
-//! `tauri::ipc::Channel`.
+//! Serialised as `{ "type": "...", ...camelCaseFields }` and delivered on the
+//! `zylara:turn-event` bus envelope `{ turnId, seq, conversationId, event }`.
 
 use serde::Serialize;
 
@@ -16,6 +16,9 @@ use crate::domain::{
     rename_all_fields = "camelCase"
 )]
 pub enum TurnEvent {
+    /// The turn was accepted (registered) and may still be waiting for a
+    /// concurrency slot or the workspace lock. Emitted before any wait.
+    Queued,
     /// The user message was persisted and the assistant placeholder created.
     TurnStarted {
         turn_id: String,
@@ -208,6 +211,12 @@ pub enum TurnEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queued_event_serializes_as_a_bare_tag() {
+        let value = serde_json::to_value(TurnEvent::Queued).expect("serialize queued");
+        assert_eq!(value, serde_json::json!({ "type": "queued" }));
+    }
 
     #[test]
     fn subagent_events_serialize_with_camel_case_and_nested_payload() {

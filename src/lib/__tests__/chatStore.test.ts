@@ -72,6 +72,20 @@ import { catalog } from '@/lib/catalog';
 import { toast } from 'sonner';
 import type { GoalView } from '@/lib/types';
 
+const busSeqByTurn = new Map<string, number>();
+/** Mirrors the Tauri bus envelope for a turn started by this renderer. */
+function emitBus(payload: TurnPayload, event: TurnEvent) {
+  const turnId = payload.turnId!;
+  const seq = (busSeqByTurn.get(turnId) ?? 0) + 1;
+  busSeqByTurn.set(turnId, seq);
+  useChatStore.getState().handleTurnEvent({
+    turnId,
+    seq,
+    conversationId: payload.conversationId,
+    event,
+  });
+}
+
 const conversation = (overrides: Partial<Conversation> = {}): Conversation => ({
   id: 'conv-1',
   title: 'Nova conversa',
@@ -250,20 +264,20 @@ describe('chatStore.send', () => {
     ]);
 
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         payloads.push(payload);
-        onEvent({ type: 'turn_started', turnId: payload.turnId!, userMessageId: 'user-1', assistantMessageId: 'assistant-1' });
-        onEvent({ type: 'step_started', step: 1 });
-        onEvent({ type: 'reasoning_delta', delta: 'pensando…' });
-        onEvent({ type: 'reasoning_done' });
-        onEvent({ type: 'text_delta', delta: 'Olá ' });
-        onEvent({ type: 'text_delta', delta: 'mundo' });
-        onEvent({
+        emitBus(payload, { type: 'turn_started', turnId: payload.turnId!, userMessageId: 'user-1', assistantMessageId: 'assistant-1' });
+        emitBus(payload, { type: 'step_started', step: 1 });
+        emitBus(payload, { type: 'reasoning_delta', delta: 'pensando…' });
+        emitBus(payload, { type: 'reasoning_done' });
+        emitBus(payload, { type: 'text_delta', delta: 'Olá ' });
+        emitBus(payload, { type: 'text_delta', delta: 'mundo' });
+        emitBus(payload, {
           type: 'tool_call_started',
           toolCall: { id: 'tool-1', name: 'web_search', arguments: '', status: 'running' },
         });
-        onEvent({ type: 'tool_call_args', id: 'tool-1', delta: '{"query":"mcp"}' });
-        onEvent({
+        emitBus(payload, { type: 'tool_call_args', id: 'tool-1', delta: '{"query":"mcp"}' });
+        emitBus(payload, {
           type: 'tool_call_finished',
           id: 'tool-1',
           status: 'done',
@@ -271,8 +285,8 @@ describe('chatStore.send', () => {
           summary: '1 resultado',
           citations: [{ id: 'cit-1', title: 'MCP', url: 'https://modelcontextprotocol.io' }],
         });
-        onEvent({ type: 'usage', usage: { inputTokens: 10, outputTokens: 5 } });
-        onEvent({ type: 'title_updated', conversationId: 'conv-1', title: 'O que é MCP' });
+        emitBus(payload, { type: 'usage', usage: { inputTokens: 10, outputTokens: 5 } });
+        emitBus(payload, { type: 'title_updated', conversationId: 'conv-1', title: 'O que é MCP' });
         const result = {
           userMessage: userMessage(),
           assistantMessage: assistantMessage({
@@ -295,7 +309,7 @@ describe('chatStore.send', () => {
           error: null,
           conversation: conversation({ title: 'O que é MCP', messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -352,14 +366,14 @@ describe('chatStore.send', () => {
     let finishedAt: number | null = null;
 
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({
+        emitBus(payload, {
           type: 'tool_call_started',
           toolCall: {
             id: 'tool-1',
@@ -369,14 +383,14 @@ describe('chatStore.send', () => {
             startedAt: 1,
           },
         });
-        onEvent({ type: 'tool_call_executing', id: 'tool-1', startedAt: 1_000 });
+        emitBus(payload, { type: 'tool_call_executing', id: 'tool-1', startedAt: 1_000 });
         executingStartedAt =
           useChatStore
             .getState()
             .messagesByConversation['conv-1']
             ?.find((message) => message.id === 'assistant-1')
             ?.toolCalls.find((tool) => tool.id === 'tool-1')?.startedAt ?? null;
-        onEvent({
+        emitBus(payload, {
           type: 'tool_call_finished',
           id: 'tool-1',
           status: 'done',
@@ -396,7 +410,7 @@ describe('chatStore.send', () => {
           error: null,
           conversation: conversation({ title: 'Timestamps', messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -416,17 +430,17 @@ describe('chatStore.send', () => {
       release = resolve;
     });
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({ type: 'step_started', step: 1 });
-        onEvent({ type: 'text_delta', delta: 'Primeiro.' });
-        onEvent({ type: 'step_started', step: 2 });
-        onEvent({ type: 'text_delta', delta: 'Segundo.' });
+        emitBus(payload, { type: 'step_started', step: 1 });
+        emitBus(payload, { type: 'text_delta', delta: 'Primeiro.' });
+        emitBus(payload, { type: 'step_started', step: 2 });
+        emitBus(payload, { type: 'text_delta', delta: 'Segundo.' });
         await gate;
         const result = {
           userMessage: userMessage(),
@@ -435,7 +449,7 @@ describe('chatStore.send', () => {
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -456,15 +470,15 @@ describe('chatStore.send', () => {
       release = resolve;
     });
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({ type: 'step_started', step: 1 });
-        onEvent({ type: 'text_delta', delta: 'Primeiro.' });
+        emitBus(payload, { type: 'step_started', step: 1 });
+        emitBus(payload, { type: 'text_delta', delta: 'Primeiro.' });
         await gate;
         const result = {
           userMessage: userMessage(),
@@ -473,7 +487,7 @@ describe('chatStore.send', () => {
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -491,22 +505,22 @@ describe('chatStore.send', () => {
       release = resolve;
     });
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({ type: 'step_started', step: 1 });
-        onEvent({ type: 'text_delta', delta: 'Primeiro.' });
+        emitBus(payload, { type: 'step_started', step: 1 });
+        emitBus(payload, { type: 'text_delta', delta: 'Primeiro.' });
         // Passo intermediário sem narração: a fronteira fica pendente e o
         // próximo texto recebe exatamente um separador. Delta vazio não
         // consome a fronteira.
-        onEvent({ type: 'step_started', step: 2 });
-        onEvent({ type: 'text_delta', delta: '' });
-        onEvent({ type: 'step_started', step: 3 });
-        onEvent({ type: 'text_delta', delta: 'Segundo.' });
+        emitBus(payload, { type: 'step_started', step: 2 });
+        emitBus(payload, { type: 'text_delta', delta: '' });
+        emitBus(payload, { type: 'step_started', step: 3 });
+        emitBus(payload, { type: 'text_delta', delta: 'Segundo.' });
         await gate;
         const result = {
           userMessage: userMessage(),
@@ -515,7 +529,7 @@ describe('chatStore.send', () => {
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -529,18 +543,18 @@ describe('chatStore.send', () => {
 
   it('cancelado preserva a narração separada e o status', async () => {
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({ type: 'step_started', step: 1 });
-        onEvent({ type: 'text_delta', delta: 'Primeiro.' });
-        onEvent({ type: 'step_started', step: 2 });
-        onEvent({ type: 'text_delta', delta: 'Segundo.' });
-        onEvent({ type: 'cancelled' });
+        emitBus(payload, { type: 'step_started', step: 1 });
+        emitBus(payload, { type: 'text_delta', delta: 'Primeiro.' });
+        emitBus(payload, { type: 'step_started', step: 2 });
+        emitBus(payload, { type: 'text_delta', delta: 'Segundo.' });
+        emitBus(payload, { type: 'cancelled' });
         return {
           userMessage: userMessage(),
           // O backend guarda só o último passo em cancelamento; a tela não
@@ -560,18 +574,18 @@ describe('chatStore.send', () => {
 
   it('erro preserva a narração separada e o status coerente', async () => {
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({ type: 'step_started', step: 1 });
-        onEvent({ type: 'text_delta', delta: 'Primeiro.' });
-        onEvent({ type: 'step_started', step: 2 });
-        onEvent({ type: 'text_delta', delta: 'Segundo.' });
-        onEvent({ type: 'error', message: 'gateway falhou', code: 'PROVIDER_ERROR' });
+        emitBus(payload, { type: 'step_started', step: 1 });
+        emitBus(payload, { type: 'text_delta', delta: 'Primeiro.' });
+        emitBus(payload, { type: 'step_started', step: 2 });
+        emitBus(payload, { type: 'text_delta', delta: 'Segundo.' });
+        emitBus(payload, { type: 'error', message: 'gateway falhou', code: 'PROVIDER_ERROR' });
         return {
           userMessage: userMessage(),
           assistantMessage: assistantMessage({ content: 'Segundo.' }),
@@ -590,9 +604,9 @@ describe('chatStore.send', () => {
 
   it('records an error and keeps partial content when the turn rejects', async () => {
     mocks.api.runTurn.mockImplementation(
-      async (_payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({ type: 'turn_started', turnId: 'turn-1', userMessageId: 'user-1', assistantMessageId: 'assistant-1' });
-        onEvent({ type: 'text_delta', delta: 'parcial' });
+      async (payload: TurnPayload) => {
+        emitBus(payload, { type: 'turn_started', turnId: 'turn-1', userMessageId: 'user-1', assistantMessageId: 'assistant-1' });
+        emitBus(payload, { type: 'text_delta', delta: 'parcial' });
         throw new Error('gateway fora do ar');
       },
     );
@@ -616,31 +630,31 @@ describe('chatStore.send', () => {
     });
 
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({ type: 'step_started', step: 1 });
-        onEvent({ type: 'reasoning_delta', delta: 'Vou pesquisar.' });
-        onEvent({ type: 'reasoning_done' });
-        onEvent({
+        emitBus(payload, { type: 'step_started', step: 1 });
+        emitBus(payload, { type: 'reasoning_delta', delta: 'Vou pesquisar.' });
+        emitBus(payload, { type: 'reasoning_done' });
+        emitBus(payload, {
           type: 'tool_call_started',
           toolCall: { id: 'tool-1', name: 'web_search', arguments: '', status: 'running' },
         });
         await gate;
-        onEvent({
+        emitBus(payload, {
           type: 'tool_call_finished',
           id: 'tool-1',
           status: 'done',
           result: '{"results":[]}',
           summary: '0 resultados',
         });
-        onEvent({ type: 'step_started', step: 2 });
-        onEvent({ type: 'reasoning_delta', delta: 'Concluído.' });
-        onEvent({ type: 'reasoning_done' });
+        emitBus(payload, { type: 'step_started', step: 2 });
+        emitBus(payload, { type: 'reasoning_delta', delta: 'Concluído.' });
+        emitBus(payload, { type: 'reasoning_done' });
         const trace = [
           { reasoning: 'Vou pesquisar.', toolCalls: 1 },
           { reasoning: 'Concluído.', toolCalls: 0 },
@@ -666,8 +680,8 @@ describe('chatStore.send', () => {
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'message_updated', message: finalMessage });
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'message_updated', message: finalMessage });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -701,9 +715,9 @@ describe('chatStore.regenerate', () => {
     });
 
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({ type: 'turn_started', turnId: payload.turnId!, userMessageId: 'user-1', assistantMessageId: 'assistant-2' });
-        onEvent({ type: 'text_delta', delta: 'nova resposta' });
+      async (payload: TurnPayload) => {
+        emitBus(payload, { type: 'turn_started', turnId: payload.turnId!, userMessageId: 'user-1', assistantMessageId: 'assistant-2' });
+        emitBus(payload, { type: 'text_delta', delta: 'nova resposta' });
         const result = {
           userMessage: userMessage(),
           assistantMessage: assistantMessage({ id: 'assistant-2', content: 'nova resposta' }),
@@ -711,7 +725,7 @@ describe('chatStore.regenerate', () => {
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -770,16 +784,16 @@ describe('chatStore.resumeMessage', () => {
 
     let seen: TurnPayload | null = null;
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         seen = payload;
-        onEvent({
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({ type: 'step_started', step: 3 });
-        onEvent({ type: 'text_delta', delta: 'Concluído.' });
+        emitBus(payload, { type: 'step_started', step: 3 });
+        emitBus(payload, { type: 'text_delta', delta: 'Concluído.' });
         const final = assistantMessage({ id: 'assistant-1', content: 'Concluído.' });
         const result = {
           userMessage: userMessage(),
@@ -788,8 +802,8 @@ describe('chatStore.resumeMessage', () => {
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'message_updated', message: final });
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'message_updated', message: final });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -973,6 +987,11 @@ describe('chatStore other actions', () => {
       streaming: null,
     });
     useUiStore.setState({ layoutMode: 'agent' });
+    // The stream is live in the backend: opening the thread must keep the
+    // in-memory execution details instead of treating it as a stale row.
+    mocks.api.listActiveTurns.mockResolvedValue([
+      { turnId: 'turn-live', conversationId: 'conv-1', startedAt: 1 },
+    ]);
     // The persisted row is still the empty checkpoint placeholder: reloading it
     // would erase reasoning/tool steps that only exist in the live stream.
     mocks.api.getConversation.mockResolvedValue({
@@ -1117,17 +1136,17 @@ describe('chatStore artifact change detection', () => {
     });
 
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({ type: 'artifact_created', artifact: artifact({ id: 'late', createdAt: 20 }) });
-        onEvent({ type: 'artifact_created', artifact: artifact({ id: 'early', createdAt: 10 }) });
+        emitBus(payload, { type: 'artifact_created', artifact: artifact({ id: 'late', createdAt: 20 }) });
+        emitBus(payload, { type: 'artifact_created', artifact: artifact({ id: 'early', createdAt: 10 }) });
         // A background turn of another conversation must not leak into this chat.
-        onEvent({
+        emitBus(payload, {
           type: 'artifact_created',
           artifact: artifact({ id: 'foreign', conversationId: 'conv-2', createdAt: 5 }),
         });
@@ -1139,7 +1158,7 @@ describe('chatStore artifact change detection', () => {
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -1159,8 +1178,8 @@ describe('chatStore artifact change detection', () => {
 
   it('reconciles with the backend when the turn finishes, recovering missed events', async () => {
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
@@ -1175,7 +1194,7 @@ describe('chatStore artifact change detection', () => {
         };
         // No `artifact_created` event at all: only the authoritative resync
         // can reveal the artifact.
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -1738,9 +1757,9 @@ describe('model lock', () => {
 
     const payloads: TurnPayload[] = [];
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         payloads.push(payload);
-        onEvent({
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-2',
@@ -1759,7 +1778,7 @@ describe('model lock', () => {
             messageCount: 4,
           }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -1904,9 +1923,9 @@ describe('model lock', () => {
 
     const payloads: TurnPayload[] = [];
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         payloads.push(payload);
-        onEvent({
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-2',
@@ -1919,7 +1938,7 @@ describe('model lock', () => {
           error: null,
           conversation: conversation({ messageCount: 4 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -1949,9 +1968,9 @@ describe('model lock', () => {
 
     const payloads: TurnPayload[] = [];
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         payloads.push(payload);
-        onEvent({
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
@@ -1964,7 +1983,7 @@ describe('model lock', () => {
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -2056,7 +2075,7 @@ describe('chatStore — sessões separadas Chat/Code', () => {
     useUiStore.setState({ layoutMode: 'code' });
     mocks.api.createConversation.mockResolvedValue(conversation({ id: 'code-send', mode: 'code' }));
     mocks.api.runTurn.mockImplementation(
-      async (_payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         const result = {
           userMessage: userMessage(),
           assistantMessage: assistantMessage({ id: 'assistant-2' }),
@@ -2064,7 +2083,7 @@ describe('chatStore — sessões separadas Chat/Code', () => {
           error: null,
           conversation: conversation({ id: 'code-send', mode: 'code' }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -2234,15 +2253,15 @@ describe('chatStore — rodadas do objetivo (Goal)', () => {
     seedGoalSession();
     const payloads: TurnPayload[] = [];
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         payloads.push(payload);
-        onEvent({
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent(doneEvent());
+        emitBus(payload, doneEvent());
         return { userMessage: userMessage(), assistantMessage: assistantMessage() };
       },
     );
@@ -2289,15 +2308,15 @@ describe('chatStore — rodadas do objetivo (Goal)', () => {
       .mockResolvedValueOnce({ ok: true, goal: goal() })
       .mockResolvedValue({ ok: false, reason: 'completed' });
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         payloads.push(payload);
-        onEvent({
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent(doneEvent());
+        emitBus(payload, doneEvent());
         return { userMessage: userMessage(), assistantMessage: assistantMessage() };
       },
     );
@@ -2328,15 +2347,15 @@ describe('chatStore — rodadas do objetivo (Goal)', () => {
       mocks.api.goalCanContinue.mockResolvedValue({ ok: false, reason: 'not_armed' });
       const payloads: TurnPayload[] = [];
       mocks.api.runTurn.mockImplementation(
-        async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+        async (payload: TurnPayload) => {
           payloads.push(payload);
-          onEvent({
+          emitBus(payload, {
             type: 'turn_started',
             turnId: payload.turnId!,
             userMessageId: 'user-1',
             assistantMessageId: 'assistant-1',
           });
-          onEvent(doneEvent());
+          emitBus(payload, doneEvent());
           return { userMessage: userMessage(), assistantMessage: assistantMessage() };
         },
       );
@@ -2377,14 +2396,14 @@ describe('chatStore — rodadas do objetivo (Goal)', () => {
     });
     let live: SubagentLiveState | undefined;
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_started',
           taskCallId: 'task-1',
           conversationId: 'child-1',
@@ -2395,17 +2414,17 @@ describe('chatStore — rodadas do objetivo (Goal)', () => {
           modelId: 'deepseek-v4.1-flash',
           effort: 'high',
         });
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_event',
           taskCallId: 'task-1',
           event: { type: 'step_started', step: 2 },
         });
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_event',
           taskCallId: 'task-1',
           event: { type: 'text_delta', delta: 'Achei src/app.ts' },
         });
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_event',
           taskCallId: 'task-1',
           event: {
@@ -2420,7 +2439,7 @@ describe('chatStore — rodadas do objetivo (Goal)', () => {
           },
         });
         live = useChatStore.getState().streaming?.subagents?.['task-1'];
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_finished',
           taskCallId: 'task-1',
           conversationId: 'child-1',
@@ -2435,7 +2454,7 @@ describe('chatStore — rodadas do objetivo (Goal)', () => {
           error: null,
           conversation: conversation(),
         };
-        onEvent({
+        emitBus(payload, {
           type: 'done',
           result,
         });
@@ -2467,12 +2486,12 @@ describe('chatStore — concorrência entre agentes', () => {
       finish: (content: string) => void;
     }> = [];
     mocks.api.runTurn.mockImplementation(
-      (payload: TurnPayload, onEvent: (event: TurnEvent) => void) =>
+      (payload: TurnPayload) =>
         new Promise((resolve) => {
           pending.push({
             payload,
             finish: (content) => {
-              onEvent({
+              emitBus(payload, {
                 type: 'turn_started',
                 turnId: payload.turnId!,
                 userMessageId: `user-${payload.conversationId}`,
@@ -2497,7 +2516,7 @@ describe('chatStore — concorrência entre agentes', () => {
                   title: `Conversa ${payload.conversationId}`,
                 }),
               };
-              onEvent({ type: 'done', result });
+              emitBus(payload, { type: 'done', result });
               resolve(result);
             },
           });
@@ -2740,6 +2759,201 @@ describe('chatStore — reattach de turnos', () => {  it('reconstrói um turno a
   });
 });
 
+describe('chatStore — resiliência do transporte de turno', () => {
+  /** One watchdog tick plus a margin (the interval is 2.5 s). */
+  const TURN_WATCHDOG_STEP_MS = 2_600;
+
+  it('aplica o bus e finaliza o turno local mesmo com o invoke pendente', async () => {
+    const activeConversation = conversation({ id: 'conv-1', messageCount: 0 });
+    useChatStore.setState({
+      conversations: [activeConversation],
+      activeId: 'conv-1',
+      messagesByConversation: { 'conv-1': [] },
+      streamsByConversation: {},
+      streaming: null,
+    });
+    let payload: TurnPayload | null = null;
+    mocks.api.runTurn.mockImplementation((seen: TurnPayload) => {
+      payload = seen;
+      return new Promise(() => {});
+    });
+    const final = assistantMessage({ id: 'assistant-1', content: 'Olá mundo.' });
+
+    expect(await useChatStore.getState().send('oi')).toBe(true);
+    expect(payload).not.toBeNull();
+
+    emitBus(payload!, { type: 'queued' });
+    expect(useChatStore.getState().streaming?.phase).toBe('queued');
+    emitBus(payload!, {
+      type: 'turn_started',
+      turnId: payload!.turnId!,
+      userMessageId: 'user-1',
+      assistantMessageId: 'assistant-1',
+    });
+    expect(useChatStore.getState().streaming?.phase).toBe('starting');
+    emitBus(payload!, { type: 'text_delta', delta: 'Olá ' });
+    emitBus(payload!, { type: 'text_delta', delta: 'mundo.' });
+    // The same envelope delivered twice must not duplicate the delta.
+    useChatStore.getState().handleTurnEvent({
+      turnId: payload!.turnId!,
+      seq: 4,
+      conversationId: 'conv-1',
+      event: { type: 'text_delta', delta: 'mundo.' },
+    });
+
+    await vi.waitFor(() => {
+      const assistant = useChatStore
+        .getState()
+        .messagesByConversation['conv-1']
+        ?.find((message) => message.id === 'assistant-1');
+      expect(assistant?.content).toBe('Olá mundo.');
+    });
+
+    emitBus(payload!, {
+      type: 'done',
+      result: {
+        userMessage: userMessage(),
+        assistantMessage: final,
+        usage: null,
+        error: null,
+        conversation: conversation({ messageCount: 2 }),
+      },
+    });
+
+    expect(useChatStore.getState().streaming).toBeNull();
+    const settled = useChatStore
+      .getState()
+      .messagesByConversation['conv-1']
+      ?.find((message) => message.id === 'assistant-1');
+    expect(settled?.content).toBe('Olá mundo.');
+    expect(settled?.status).toBe('complete');
+  });
+
+  it('o watchdog finaliza pelo banco quando o turno some do backend', async () => {
+    vi.useFakeTimers();
+    try {
+      const activeConversation = conversation({ id: 'conv-1', messageCount: 0 });
+      useChatStore.setState({
+        conversations: [activeConversation],
+        activeId: 'conv-1',
+        messagesByConversation: { 'conv-1': [] },
+        streamsByConversation: {},
+        streaming: null,
+      });
+      let payload: TurnPayload | null = null;
+      mocks.api.runTurn.mockImplementation((seen: TurnPayload) => {
+        payload = seen;
+        return new Promise(() => {});
+      });
+      let polls = 0;
+      mocks.api.listActiveTurns.mockImplementation(async () => {
+        polls += 1;
+        return polls <= 1 && payload
+          ? [{ turnId: payload.turnId!, conversationId: 'conv-1', startedAt: 1 }]
+          : [];
+      });
+      const final = assistantMessage({ id: 'assistant-1', content: 'Resposta recuperada.' });
+      mocks.api.getConversation.mockResolvedValue({
+        conversation: activeConversation,
+        messages: [userMessage(), final],
+      });
+
+      expect(await useChatStore.getState().send('oi')).toBe(true);
+      expect(payload).not.toBeNull();
+      // `queued` is the evidence that Rust registered the turn; without any
+      // journaled event the watchdog waits for its startup grace period.
+      emitBus(payload!, { type: 'queued' });
+
+      await vi.advanceTimersByTimeAsync(TURN_WATCHDOG_STEP_MS);
+      await vi.advanceTimersByTimeAsync(TURN_WATCHDOG_STEP_MS);
+      await vi.advanceTimersByTimeAsync(TURN_WATCHDOG_STEP_MS);
+
+      expect(useChatStore.getState().streaming).toBeNull();
+      const recovered = useChatStore
+        .getState()
+        .messagesByConversation['conv-1']
+        ?.find((message) => message.id === 'assistant-1');
+      expect(recovered?.content).toBe('Resposta recuperada.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Stop limpa o stream quando o backend não conhece mais o turno', async () => {
+    const streaming = {
+      turnId: 'turn-gone',
+      conversationId: 'conv-1',
+      assistantId: 'assistant-1',
+      userMessageId: 'user-1',
+      phase: 'text' as const,
+      step: 1,
+      startedAt: 1,
+      turnKind: 'user' as const,
+    };
+    useChatStore.setState({
+      conversations: [conversation()],
+      activeId: 'conv-1',
+      messagesByConversation: {
+        'conv-1': [userMessage(), assistantMessage({ status: 'streaming', content: '' })],
+      },
+      streamsByConversation: { 'conv-1': streaming },
+      streaming,
+    });
+    mocks.api.cancelTurn.mockResolvedValue(false);
+
+    await useChatStore.getState().stop();
+
+    expect(useChatStore.getState().streaming).toBeNull();
+    const assistant = useChatStore
+      .getState()
+      .messagesByConversation['conv-1']
+      ?.find((message) => message.id === 'assistant-1');
+    expect(assistant?.status).toBe('cancelled');
+  });
+
+  it('abrir uma conversa sem turno ativo descarta o stream órfão', async () => {
+    const staleConversation = conversation({ id: 'conv-1', messageCount: 2 });
+    const staleAssistant = assistantMessage({
+      id: 'assistant-1',
+      content: '',
+      status: 'streaming',
+    });
+    const staleStream = {
+      turnId: 'turn-stale',
+      conversationId: 'conv-1',
+      assistantId: 'assistant-1',
+      userMessageId: 'user-1',
+      phase: 'tool' as const,
+      step: 1,
+      startedAt: 1,
+      turnKind: 'user' as const,
+    };
+    useChatStore.setState({
+      conversations: [staleConversation],
+      activeId: 'conv-2',
+      messagesByConversation: { 'conv-1': [userMessage(), staleAssistant] },
+      streamsByConversation: { 'conv-1': staleStream },
+      streaming: null,
+    });
+    mocks.api.listActiveTurns.mockResolvedValue([]);
+    mocks.api.getConversation.mockResolvedValue({
+      conversation: staleConversation,
+      messages: [userMessage(), staleAssistant],
+    });
+
+    await useChatStore.getState().openConversation('conv-1');
+    await vi.waitFor(() => {
+      expect(useChatStore.getState().streamsByConversation['conv-1']).toBeUndefined();
+    });
+
+    const assistant = useChatStore
+      .getState()
+      .messagesByConversation['conv-1']
+      ?.find((message) => message.id === 'assistant-1');
+    expect(assistant?.status).toBe('cancelled');
+  });
+});
+
 describe('chatStore — notificações de agente', () => {
   it('avisa quando um turno de agente termina fora do layout Agentes', async () => {
     const agentConversation = conversation({
@@ -2760,7 +2974,7 @@ describe('chatStore — notificações de agente', () => {
       settings: { ...useAppStore.getState().settings, notificationsEnabled: true },
     });
     mocks.api.runTurn.mockImplementation(
-      async (_payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
+      async (payload: TurnPayload) => {
         const result = {
           userMessage: userMessage(),
           assistantMessage: assistantMessage({ content: 'Pronto' }),
@@ -2768,7 +2982,7 @@ describe('chatStore — notificações de agente', () => {
           error: null,
           conversation: agentConversation,
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -2863,14 +3077,14 @@ describe('chatStore — narração separada por resposta (Code e Agentes)', () =
     // assertions run against the streamed (not yet persisted) message.
     const holder: { release?: () => void } = {};
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        for (const event of narrationEvents()) onEvent(event);
+        for (const event of narrationEvents()) emitBus(payload, event);
         await new Promise<void>((resolve) => {
           holder.release = resolve;
         });
@@ -2881,7 +3095,7 @@ describe('chatStore — narração separada por resposta (Code e Agentes)', () =
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -2911,14 +3125,14 @@ describe('chatStore — narração separada por resposta (Code e Agentes)', () =
     useUiStore.setState({ layoutMode: 'chat' });
     const holder: { release?: () => void } = {};
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        for (const event of narrationEvents()) onEvent(event);
+        for (const event of narrationEvents()) emitBus(payload, event);
         await new Promise<void>((resolve) => {
           holder.release = resolve;
         });
@@ -2929,7 +3143,7 @@ describe('chatStore — narração separada por resposta (Code e Agentes)', () =
           error: null,
           conversation: conversation({ messageCount: 2 }),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -2951,14 +3165,14 @@ describe('chatStore — narração separada por resposta (Code e Agentes)', () =
     useUiStore.setState({ layoutMode: 'code' });
     let live: SubagentLiveState | undefined;
     mocks.api.runTurn.mockImplementation(
-      async (payload: TurnPayload, onEvent: (event: TurnEvent) => void) => {
-        onEvent({
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
           type: 'turn_started',
           turnId: payload.turnId!,
           userMessageId: 'user-1',
           assistantMessageId: 'assistant-1',
         });
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_started',
           taskCallId: 'task-1',
           conversationId: 'child-1',
@@ -2969,17 +3183,17 @@ describe('chatStore — narração separada por resposta (Code e Agentes)', () =
           modelId: 'deepseek-v4.1-flash',
           effort: 'high',
         });
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_event',
           taskCallId: 'task-1',
           event: { type: 'step_started', step: 1 },
         });
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_event',
           taskCallId: 'task-1',
           event: { type: 'text_delta', delta: 'Achei src/app.ts' },
         });
-        onEvent({
+        emitBus(payload, {
           type: 'subagent_event',
           taskCallId: 'task-1',
           event: {
@@ -3001,7 +3215,7 @@ describe('chatStore — narração separada por resposta (Code e Agentes)', () =
           error: null,
           conversation: conversation(),
         };
-        onEvent({ type: 'done', result });
+        emitBus(payload, { type: 'done', result });
         return result;
       },
     );
@@ -3026,9 +3240,9 @@ describe('chatStore — fila por conversa e Enviar agora', () => {
   function controlledTurns(mode: 'chat' | 'code' = 'chat'): ControlledTurn[] {
     const pending: ControlledTurn[] = [];
     mocks.api.runTurn.mockImplementation(
-      (payload: TurnPayload, onEvent: (event: TurnEvent) => void) =>
+      (payload: TurnPayload) =>
         new Promise((resolve) => {
-          onEvent({
+          emitBus(payload, {
             type: 'turn_started',
             turnId: payload.turnId!,
             userMessageId: `user-${payload.turnId}`,
@@ -3053,11 +3267,11 @@ describe('chatStore — fila por conversa e Enviar agora', () => {
             payload,
             finish: (content) => {
               const value = result(content);
-              onEvent({ type: 'done', result: value });
+              emitBus(payload, { type: 'done', result: value });
               resolve(value);
             },
             cancel: () => {
-              onEvent({ type: 'cancelled' });
+              emitBus(payload, { type: 'cancelled' });
               resolve(result(''));
             },
           });

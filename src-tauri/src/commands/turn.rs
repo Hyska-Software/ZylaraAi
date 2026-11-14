@@ -3,7 +3,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::domain::{TurnKind, TurnPayload, TurnResult};
@@ -11,13 +10,12 @@ use crate::events::TurnEvent;
 use crate::harness::{self, EventEmitter, HarnessDeps};
 use crate::state::AppState;
 
-/// Persists every turn event and mirrors it on the global event bus. The
-/// per-invoke channel stays the fast path; the bus is what lets a reloaded
-/// renderer reattach without losing the stream.
+/// Persists every turn event and mirrors it on the global event bus. The bus
+/// is the only live transport: a reloaded renderer reattaches from the same
+/// journal, and the renderer watchdog can replay it whenever a message is lost.
 struct PersistingEmitter {
     db: Arc<crate::db::Db>,
     app: AppHandle,
-    channel: Channel<TurnEvent>,
     turn_id: String,
     conversation_id: String,
     seq: AtomicU64,
@@ -39,10 +37,9 @@ impl EventEmitter for PersistingEmitter {
             "turnId": self.turn_id,
             "seq": seq,
             "conversationId": self.conversation_id,
-            "event": event.clone(),
+            "event": event,
         });
         let _ = self.app.emit("zylara:turn-event", payload);
-        let _ = self.channel.send(event);
     }
 }
 
@@ -51,7 +48,6 @@ pub async fn run_turn(
     app: AppHandle,
     state: State<'_, AppState>,
     payload: TurnPayload,
-    on_event: Channel<TurnEvent>,
 ) -> Result<TurnResult, String> {
     // Rodada de objetivo: uma por conversa. O preflight (`goal_can_continue`)
     // também checa isso; aqui é a barreira final contra dois clientes/duplo
@@ -74,6 +70,16 @@ pub async fn run_turn(
         );
     };
     let _turn_guard = state.turn_guard(&turn_id);
+    // The renderer paints the optimistic placeholder before invoking; this
+    // event proves the turn was accepted even if it still waits for a slot.
+    let emitter = Arc::new(PersistingEmitter {
+        db: state.db.clone(),
+        app: app.clone(),
+        turn_id: turn_id.clone(),
+        conversation_id: payload.conversation_id.clone(),
+        seq: AtomicU64::new(0),
+    });
+    EventEmitter::emit(emitter.as_ref(), TurnEvent::Queued);
     let settings = crate::config::load_settings(&app);
     let conversation = state
         .db
@@ -126,14 +132,6 @@ pub async fn run_turn(
         refresh_override: None,
         model_source: None,
     };
-    let emitter = Arc::new(PersistingEmitter {
-        db: state.db.clone(),
-        app: app.clone(),
-        channel: on_event,
-        turn_id: turn_id.clone(),
-        conversation_id: payload.conversation_id.clone(),
-        seq: AtomicU64::new(0),
-    });
     let result = harness::run_turn(deps, payload.clone(), settings, emitter, cancel).await;
     state.finish_turn(&turn_id);
     // `run_turn` returns `Ok` for failures that were already persisted (with a

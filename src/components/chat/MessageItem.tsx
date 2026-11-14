@@ -81,7 +81,7 @@ interface MessageItemProps {
   /** Audit/subagent views hide edit/regenerate/feedback actions. */
   readOnly?: boolean;
   /** Streaming phase owned by the caller (global chat or a subagent tab). */
-  streamPhase?: 'starting' | 'reasoning' | 'text' | 'tool' | 'retrying' | null;
+  streamPhase?: 'starting' | 'queued' | 'reasoning' | 'text' | 'tool' | 'retrying' | null;
   /** Turn start timestamp owned by the caller (used by AgentSteps). */
   streamStartedAt?: number | null;
 }
@@ -315,7 +315,7 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
         {awaitingText ? (
           <div className="flex items-center gap-2 py-1 text-[13px] text-foreground-subtle">
             <Spinner size="xs" />
-            <span>{t('message.generating')}</span>
+            <span>{phase === 'queued' ? t('message.queued') : t('message.generating')}</span>
           </div>
         ) : null}
 

@@ -1891,7 +1891,7 @@ pub async fn run_turn(
         None
     } else {
         match workspace_lock_key {
-            Some(key) => Some(crate::agents::workspace_execution_lock(&key).lock_owned().await),
+            Some(key) => Some(crate::agents::acquire_workspace_execution(&key, &cancel).await?),
             None => None,
         }
     };

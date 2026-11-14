@@ -1,0 +1,7 @@
+# Shell scripts run inside Linux containers for the local Docker build. A CRLF
+# checkout breaks them (`set: pipefail\r: invalid option name`), so keep LF in
+# the working tree too, not only in the repository blob.
+*.sh text eol=lf
+
+# Container entrypoint that ships in the graphical image.
+docker/computer/entrypoint.sh text eol=lf
