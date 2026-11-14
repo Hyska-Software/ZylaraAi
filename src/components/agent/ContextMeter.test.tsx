@@ -457,6 +457,35 @@ describe('ContextMeter — custo da sessão', () => {
     expect(icon?.getAttribute('aria-hidden')).toBe('true');
   });
 
+  it('pinta o ícone de custo com o mesmo token de cor do ícone de cache', () => {
+    render(<ContextMeter stats={makeStats()} cache={makeCache()} cost={makeCost()} />);
+
+    const button = trigger();
+    const zap = button.querySelector('.lucide-zap');
+    const dollar = button.querySelector('.lucide-dollar-sign');
+    expect(zap?.getAttribute('class')).toContain('text-success');
+    expect(dollar?.getAttribute('class')).toContain('text-success');
+  });
+
+  it('não reserva largura no valor: o chip cresce com números grandes e sem vão após o ícone', () => {
+    const { rerender } = render(<ContextMeter stats={makeStats()} cost={makeCost()} />);
+
+    function costValue(): HTMLElement {
+      const value = trigger().querySelector('.lucide-dollar-sign')?.nextElementSibling;
+      expect(value).toBeTruthy();
+      return value as HTMLElement;
+    }
+
+    expect(costValue().className).not.toContain('min-w-');
+    expect(costValue().className).not.toContain('text-right');
+    expect(costValue().className).toContain('whitespace-nowrap');
+
+    rerender(
+      <ContextMeter stats={makeStats()} cost={makeCost({ totalUsd: 1234.5678, priced: true })} />,
+    );
+    expect(costValue().textContent).toBe('$1234.57');
+  });
+
   it('mantém o description do cache e concatena o custo quando os dois existem', () => {
     render(<ContextMeter stats={makeStats()} cache={makeCache()} cost={makeCost()} />);
 

@@ -7,7 +7,12 @@ import type { SessionCostView } from '@/lib/sessionCost';
 import type { CacheConversationUi } from '@/lib/store/cacheStore';
 import type { ContextBreakdown, ContextStats } from '@/lib/types';
 import { cn, formatCost, formatTokens } from '@/lib/utils';
-import { CacheChipSegment, CacheDiagnostics, cacheStateSentence } from './CacheHitChip';
+import {
+  CacheChipSegment,
+  CacheDiagnostics,
+  cacheIconTone,
+  cacheStateSentence,
+} from './CacheHitChip';
 
 export interface ContextMeterProps {
   stats: ContextStats;
@@ -216,10 +221,14 @@ export function ContextMeter({ stats, cache, cost, compacted, className }: Conte
                 className="flex shrink-0 items-center gap-0.5"
                 title={t('context.cost.title')}
               >
-                <DollarSign aria-hidden className="size-3 shrink-0" strokeWidth={2} />
+                <DollarSign
+                  aria-hidden
+                  className={cn('size-3 shrink-0', hasCache && cacheIconTone(cache))}
+                  strokeWidth={2}
+                />
                 <span
                   className={cn(
-                    'min-w-[2.75rem] text-right tabular-nums',
+                    'whitespace-nowrap tabular-nums',
                     !cost.priced && 'text-foreground-subtle',
                   )}
                 >

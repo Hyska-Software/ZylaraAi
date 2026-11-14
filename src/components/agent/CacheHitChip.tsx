@@ -133,6 +133,15 @@ function toneFor(state: CacheState | null, hit: number | null): CacheTone {
 }
 
 /**
+ * Icon color token of the cache segment, shared by the `Zap` glyph and the cost
+ * `$` glyph so both read with the same tone class.
+ */
+export function cacheIconTone(cache: CacheConversationUi | null | undefined): string {
+  const view = cacheView(cache);
+  return TONE_CLASSES[toneFor(view.state, view.hit)].icon;
+}
+
+/**
  * Nome acessível do gatilho. O `%` é sempre o reportado pelo provedor; sem
  * reporte o nome é honesto (`sem dados`) em vez de inventar `0%`.
  */
@@ -230,7 +239,7 @@ export function CacheChipSegment({
   cache: CacheConversationUi | null | undefined;
 }) {
   const view = cacheView(cache);
-  const tone = TONE_CLASSES[toneFor(view.state, view.hit)];
+  const iconTone = cacheIconTone(cache);
   return (
     <>
       <span aria-hidden className="h-3 w-px shrink-0 bg-border" />
@@ -238,7 +247,7 @@ export function CacheChipSegment({
         aria-hidden
         className="flex w-11 shrink-0 items-center justify-end gap-0.5 tabular-nums"
       >
-        <Zap className={cn('size-3 shrink-0', tone.icon)} strokeWidth={2} />
+        <Zap className={cn('size-3 shrink-0', iconTone)} strokeWidth={2} />
         <span className={cn(view.hit == null && 'text-foreground-subtle')}>
           {formatCacheHit(view.hit)}
         </span>
