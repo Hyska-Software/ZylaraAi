@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-14T19:29:38.332Z",
+ "generatedAt": "2026-11-14T21:24:15.235Z",
  "sources": {
   "docs": [
    "https://opencode.ai/v2/docs/console/go/",
@@ -3237,7 +3237,7 @@
      },
      "releaseDate": "2026-11-05",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Inkling 2 Small, free for a limited time",
      "tags": [
       "free",

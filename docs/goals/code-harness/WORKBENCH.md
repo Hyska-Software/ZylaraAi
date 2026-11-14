@@ -65,8 +65,9 @@ Estrutura (de cima para baixo):
 2. **Workspaces** (seção com `+` para abrir pasta):
    - cada workspace: ícone (pasta ou repo), nome, indicador `⎇ branch` + `●` sujo, contador de
      sessões ativas; expande para listar sessões (agrupadas por status, não por data).
-   - ações (menu de contexto, `⋯` ou clique direito): **Nova sessão**, Renomear, **Abrir no
-     Explorer**, Copiar caminho, Remover do Lumina (não apaga a pasta), Atualizar.
+   - ações (menu de contexto, `⋯` ou clique direito): **Nova sessão**, **Abrir terminal** (shell no
+     caminho do projeto, sem criar sessão), Renomear, **Abrir no Explorer**, Copiar caminho, Remover do
+     Lumina (não apaga a pasta), Atualizar.
    - estado vazio: "Nenhum workspace aberto" + "Abrir pasta…" + explicação de uma linha.
 3. **Sessões sem workspace** (se existirem, herdadas da fase 1): grupo "Sem workspace" com CTA
    "Vincular a um workspace".
@@ -363,6 +364,9 @@ helper/SSH. PR continua fora do escopo desta fase.
 - Aba com abas de terminal (múltiplos), botão novo terminal (`+`), cwd = workspace, shell do usuário.
   As abas/processos sobrevivem a trocar entre Arquivos/Alterações, recolher o painel e redimensionar
   a janela; cada conversa tem o seu próprio conjunto de terminais.
+- O terminal também abre pelo menu do workspace na sidebar (**Abrir terminal**): a shell roda no
+  caminho do projeto e a aba entra na faixa de abas central **sem criar sessão** — o cwd vem do
+  workspace, não da conversa.
 - Renderização `@xterm/xterm` + fit; scrollback 5.000 linhas; tema pelos tokens do app (inclusive a
   paleta ANSI clara/escura).
 - Ações: novo, fechar, limpar, matar processo; aviso de estado (Rodando/Encerrado) no rodapé. Ao encerrar, a aba mostra

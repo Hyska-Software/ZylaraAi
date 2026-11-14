@@ -71,7 +71,8 @@ passando por timeout/cancelamento/spill do runner.
 ## Terminal do painel em Docker
 
 - `open_terminal` lê `Settings`; no modo Docker o PTY roda
-  `docker run --rm -it` com o workspace da conversa em `/workspace`.
+  `docker run --rm -it` com o workspace da conversa (ou o workspace aberto pelo menu da
+  sidebar, sem sessão) em `/workspace`.
 - O shell tenta `bash` e cai para `sh`; variáveis sensíveis do app não entram no
   container.
 - Fechar/encerrar a aba mata o processo e remove o container (`docker rm -f`).

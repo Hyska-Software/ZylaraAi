@@ -1449,7 +1449,10 @@ describe('CodeSessionHeader — terminais nas abas', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: /Terminal/ }));
 
     await waitFor(() =>
-      expect(terminalMock.manager.open).toHaveBeenCalledWith('c-1', 'center'),
+      expect(terminalMock.manager.open).toHaveBeenCalledWith(
+        { conversationId: 'c-1' },
+        'center',
+      ),
     );
     expect(useUiStore.getState().codeView).toBe('terminal');
     // The right panel's Terminal tab is independent and stays where it was.
@@ -1527,7 +1530,10 @@ describe('CodeSessionHeader — terminais nas abas', () => {
       window.dispatchEvent(new CustomEvent('zylara:code-new-terminal'));
     });
     await waitFor(() =>
-      expect(terminalMock.manager.open).toHaveBeenCalledWith('c-1', 'center'),
+      expect(terminalMock.manager.open).toHaveBeenCalledWith(
+        { conversationId: 'c-1' },
+        'center',
+      ),
     );
 
     act(() => {

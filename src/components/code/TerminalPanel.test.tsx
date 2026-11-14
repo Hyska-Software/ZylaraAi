@@ -127,7 +127,12 @@ describe('TerminalPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
 
     await waitFor(() => {
-      expect(apiMock.openTerminal).toHaveBeenCalledWith('conv-1', 100, 24, expect.any(Function));
+      expect(apiMock.openTerminal).toHaveBeenCalledWith(
+        { conversationId: 'conv-1' },
+        100,
+        24,
+        expect.any(Function),
+      );
     });
     expect(await screen.findByRole('tab', { name: 'Terminal 1' })).toBeTruthy();
     expect(screen.getByText('C:/projetos/zylara')).toBeTruthy();
@@ -276,7 +281,7 @@ describe('TerminalPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Reiniciar terminal' }));
 
     await waitFor(() => expect(apiMock.openTerminal).toHaveBeenCalledTimes(2));
-    expect(apiMock.openTerminal.mock.calls[1]?.[0]).toBe('conv-1');
+    expect(apiMock.openTerminal.mock.calls[1]?.[0]).toEqual({ conversationId: 'conv-1' });
   });
 
   it('usa a conversa ativa do app quando o chamador não informa alvo', async () => {
@@ -286,7 +291,12 @@ describe('TerminalPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
 
     await waitFor(() =>
-      expect(apiMock.openTerminal).toHaveBeenCalledWith('conv-9', 100, 24, expect.any(Function)),
+      expect(apiMock.openTerminal).toHaveBeenCalledWith(
+        { conversationId: 'conv-9' },
+        100,
+        24,
+        expect.any(Function),
+      ),
     );
   });
 

@@ -557,6 +557,7 @@
       "optionsAria": "Options for workspace {{name}}",
       "optionsTitle": "Workspace options",
       "newSession": "New session",
+      "openTerminal": "Open terminal",
       "refresh": "Refresh",
       "openExplorer": "Open in Explorer",
       "copyPath": "Copy path",

@@ -3,7 +3,8 @@
 //! Terminal iniciado **pelo usuário** no painel/centro do layout Code
 //! (`WORKBENCH.md` §7.3). Backend com `portable-pty` (ConPTY no Windows):
 //! entrada/saída em streaming por `tauri::ipc::Channel<TerminalEvent>`, resize,
-//! kill de processo e cwd no workspace da conversa que o abriu. Contrato:
+//! kill de processo e cwd no workspace da conversa que o abriu — ou no workspace
+//! aberto pelo menu da sidebar, que abre a shell sem criar sessão. Contrato:
 //! `HARNESS.md` §8.3.
 //!
 //! Segurança: o terminal herda o ambiente do app (é um shell do usuário), mas
@@ -42,7 +43,9 @@ use crate::events::TerminalEvent;
 const MAX_TERMINALS: usize = 4;
 
 struct TerminalSession {
-    conversation_id: String,
+    /// Session that opened the terminal; `None` when the user opened it straight
+    /// from a workspace in the sidebar (no conversation exists for that shell).
+    conversation_id: Option<String>,
     title: String,
     cwd: String,
     cols: u16,
@@ -104,7 +107,8 @@ pub struct TerminalRegistry {
 #[serde(rename_all = "camelCase")]
 pub struct TerminalInfo {
     pub id: String,
-    pub conversation_id: String,
+    /// Session that owns the terminal; `None` for workspace-opened terminals.
+    pub conversation_id: Option<String>,
     pub title: String,
     pub cwd: String,
     pub cols: u16,
@@ -206,29 +210,58 @@ fn terminal_command(cwd: &std::path::Path, settings: &Settings) -> (CommandBuild
     (builder, container)
 }
 
-fn terminal_cwd(db: &Db, conversation_id: &str) -> Result<PathBuf, String> {
-    let conversation = db
-        .get_conversation(conversation_id)
-        .map_err(|error| format!("TERMINAL_CONVERSATION: {error}"))?
-        .ok_or_else(|| {
-            crate::i18n::t_args(
-                "terminal.errors.conversationNotFound",
-                &[("conversation_id", conversation_id)],
-            )
-        })?;
-    let workspace_id = conversation
-        .workspace_id
-        .ok_or_else(|| crate::i18n::t("terminal.errors.noWorkspace"))?;
-    let workspace = db
-        .get_workspace(&workspace_id)
-        .map_err(|error| format!("TERMINAL_CONVERSATION: {error}"))?
-        .ok_or_else(|| {
-            crate::i18n::t_args(
-                "terminal.errors.workspaceMissing",
-                &[("workspace_id", &workspace_id)],
-            )
-        })?;
-    let path = PathBuf::from(workspace.path);
+/// Folder a new terminal must run in.
+///
+/// A session target inherits the workspace bound to the conversation (the
+/// original flow). A workspace target exists so the sidebar can open a shell in
+/// a project without creating a session first. The conversation wins when both
+/// are informed, so a session never leaves its own workspace.
+fn terminal_cwd(
+    db: &Db,
+    conversation_id: Option<&str>,
+    workspace_id: Option<&str>,
+) -> Result<PathBuf, String> {
+    if let Some(conversation_id) = conversation_id {
+        let conversation = db
+            .get_conversation(conversation_id)
+            .map_err(|error| format!("TERMINAL_CONVERSATION: {error}"))?
+            .ok_or_else(|| {
+                crate::i18n::t_args(
+                    "terminal.errors.conversationNotFound",
+                    &[("conversation_id", conversation_id)],
+                )
+            })?;
+        let workspace_id = conversation
+            .workspace_id
+            .ok_or_else(|| crate::i18n::t("terminal.errors.noWorkspace"))?;
+        let workspace = db
+            .get_workspace(&workspace_id)
+            .map_err(|error| format!("TERMINAL_CONVERSATION: {error}"))?
+            .ok_or_else(|| {
+                crate::i18n::t_args(
+                    "terminal.errors.workspaceMissing",
+                    &[("workspace_id", &workspace_id)],
+                )
+            })?;
+        return ensure_terminal_dir(PathBuf::from(workspace.path));
+    }
+    if let Some(workspace_id) = workspace_id {
+        let workspace = db
+            .get_workspace(workspace_id)
+            .map_err(|error| format!("TERMINAL_CONVERSATION: {error}"))?
+            .ok_or_else(|| {
+                crate::i18n::t_args(
+                    "terminal.errors.workspaceMissing",
+                    &[("workspace_id", workspace_id)],
+                )
+            })?;
+        return ensure_terminal_dir(PathBuf::from(workspace.path));
+    }
+    Err(crate::i18n::t("terminal.errors.noWorkspace"))
+}
+
+/// Rejects a folder that vanished (deleted/moved after the workspace was added).
+fn ensure_terminal_dir(path: PathBuf) -> Result<PathBuf, String> {
     if !path.is_dir() {
         return Err(crate::i18n::t_args(
             "terminal.errors.folderUnavailable",
@@ -298,12 +331,17 @@ impl TerminalRegistry {
         Self::default()
     }
 
-    /// Abre um terminal novo e começa a transmitir a saída pelo `channel`.
+    /// Opens a new terminal and starts streaming its output through `channel`.
+    ///
+    /// `conversation_id` binds the shell to a session (cwd = the session
+    /// workspace); `workspace_id` opens a shell straight in a project, which is
+    /// what the sidebar menu uses to avoid creating a session.
     pub fn open(
         &self,
         db: &Db,
         settings: &Settings,
-        conversation_id: &str,
+        conversation_id: Option<&str>,
+        workspace_id: Option<&str>,
         cols: u16,
         rows: u16,
         channel: Channel<TerminalEvent>,
@@ -326,7 +364,7 @@ impl TerminalRegistry {
 
         let cols = cols.clamp(20, 500);
         let rows = rows.clamp(5, 200);
-        let cwd = terminal_cwd(db, conversation_id)?;
+        let cwd = terminal_cwd(db, conversation_id, workspace_id)?;
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -376,7 +414,7 @@ impl TerminalRegistry {
         let cwd_display = cwd.to_string_lossy().to_string();
         let info = TerminalInfo {
             id: id.clone(),
-            conversation_id: conversation_id.to_string(),
+            conversation_id: conversation_id.map(str::to_string),
             title: title.clone(),
             cwd: cwd_display.clone(),
             cols,
@@ -428,7 +466,7 @@ impl TerminalRegistry {
         self.sessions.lock().insert(
             id,
             TerminalSession {
-                conversation_id: conversation_id.to_string(),
+                conversation_id: conversation_id.map(str::to_string),
                 title,
                 cwd: cwd_display,
                 cols,
@@ -514,7 +552,7 @@ impl TerminalRegistry {
         let mut sessions = self.sessions.lock();
         let ids: Vec<String> = sessions
             .iter()
-            .filter(|(_, session)| session.conversation_id == conversation_id)
+            .filter(|(_, session)| session.conversation_id.as_deref() == Some(conversation_id))
             .map(|(id, _)| id.clone())
             .collect();
         let mut closed = 0;
@@ -534,7 +572,7 @@ impl TerminalRegistry {
             .lock()
             .iter()
             .filter(|(_, session)| match conversation_id {
-                Some(id) => session.conversation_id == id,
+                Some(id) => session.conversation_id.as_deref() == Some(id),
                 None => true,
             })
             .map(|(id, session)| TerminalInfo {
@@ -630,6 +668,49 @@ mod tests {
         let mut decoder = Utf8StreamDecoder::new();
         let output = format!("{}a{}", decoder.push(&[0xff]), decoder.finish());
         assert_eq!(output, "\u{FFFD}a");
+    }
+
+    #[test]
+    fn terminal_cwd_accepts_a_workspace_without_a_conversation() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = Db::open_in_memory().expect("db");
+        let workspace = db
+            .create_workspace("demo", &dir.path().to_string_lossy())
+            .expect("workspace");
+
+        // Workspace target: the sidebar menu opens a shell with no session.
+        let cwd = terminal_cwd(&db, None, Some(&workspace.id)).expect("cwd");
+        assert_eq!(cwd, dir.path());
+        assert!(terminal_cwd(&db, Some("conv-missing"), Some(&workspace.id)).is_err());
+        assert!(terminal_cwd(&db, None, Some("ws-missing")).is_err());
+        // Neither target is a configuration error, never a silent default.
+        assert!(terminal_cwd(&db, None, None).is_err());
+    }
+
+    #[test]
+    fn terminal_cwd_prefers_the_conversation_over_the_workspace() {
+        let conversation_dir = tempfile::tempdir().expect("conversation dir");
+        let other_dir = tempfile::tempdir().expect("other dir");
+        let db = Db::open_in_memory().expect("db");
+        let workspace = db
+            .create_workspace("demo", &conversation_dir.path().to_string_lossy())
+            .expect("workspace");
+        let other = db
+            .create_workspace("other", &other_dir.path().to_string_lossy())
+            .expect("other workspace");
+        let conversation = db
+            .create_conversation_with_mode(
+                "Sessão",
+                "opencode-go",
+                "deepseek-v4.1-flash",
+                crate::domain::CONVERSATION_MODE_CODE,
+            )
+            .expect("conversation");
+        db.set_conversation_workspace(&conversation.id, Some(&workspace.id))
+            .expect("bind");
+
+        let cwd = terminal_cwd(&db, Some(&conversation.id), Some(&other.id)).expect("cwd");
+        assert_eq!(cwd, conversation_dir.path());
     }
 
     #[test]

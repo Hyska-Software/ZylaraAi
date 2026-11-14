@@ -98,6 +98,7 @@ import type {
   SkillVersion,
   TerminalEvent,
   TerminalInfo,
+  TerminalTarget,
   ThemeInfo,
   ThemeInstallResult,
   TurnEvent,
@@ -611,8 +612,9 @@ export const api = {
     invoke<boolean>('respond_question', { requestId, answers, skipped }),
 
   /* -------- terminal PTY (layout Code) -------- */
+  /** Opens a PTY in `target`'s folder (session workspace or a bare workspace). */
   openTerminal: (
-    conversationId: string,
+    target: TerminalTarget,
     cols: number,
     rows: number,
     onEvent: (event: TerminalEvent) => void,
@@ -620,7 +622,8 @@ export const api = {
     const channel = new Channel<TerminalEvent>();
     channel.onmessage = onEvent;
     return invoke<TerminalInfo>('open_terminal', {
-      conversationId,
+      conversationId: target.conversationId ?? null,
+      workspaceId: target.workspaceId ?? null,
       cols,
       rows,
       onEvent: channel,

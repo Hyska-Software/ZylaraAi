@@ -491,13 +491,23 @@ export type JobStatus = 'running' | 'done' | 'failed' | 'killed';
 /** Terminal PTY aberto na sessão de código (layout Code). */
 export interface TerminalInfo {
   id: string;
-  conversationId: string;
+  /** Session that owns the terminal; `null` when it was opened by workspace. */
+  conversationId: string | null;
   title: string;
   cwd: string;
   cols: number;
   rows: number;
   running: boolean;
   exitCode: number | null;
+}
+
+/**
+ * Folder a new terminal must run in: a session (its workspace) or a workspace
+ * opened directly from the sidebar, which spawns the shell without a session.
+ */
+export interface TerminalTarget {
+  conversationId?: string | null;
+  workspaceId?: string | null;
 }
 
 export type TerminalEvent =

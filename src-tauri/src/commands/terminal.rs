@@ -15,12 +15,16 @@ fn map_err(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
 
-/// Abre um terminal no workspace da conversa e transmite a saída pelo channel.
+/// Opens a terminal PTY and streams its output through the channel.
+///
+/// `conversation_id` runs the shell in the session workspace; `workspace_id`
+/// does the same straight from a project (sidebar menu), with no session.
 #[tauri::command]
 pub async fn open_terminal(
     app: AppHandle,
     state: State<'_, AppState>,
-    conversation_id: String,
+    conversation_id: Option<String>,
+    workspace_id: Option<String>,
     cols: u16,
     rows: u16,
     on_event: Channel<TerminalEvent>,
@@ -31,7 +35,8 @@ pub async fn open_terminal(
         .open(
             &state.db,
             &settings,
-            &conversation_id,
+            conversation_id.as_deref(),
+            workspace_id.as_deref(),
             cols,
             rows,
             on_event,

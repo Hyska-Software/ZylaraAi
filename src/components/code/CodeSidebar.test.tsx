@@ -29,6 +29,14 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/api', () => ({ api: mocks }));
 
+/** Terminal flows live behind their own module (the sidebar itself never spawns a PTY). */
+const terminalOpen = vi.hoisted(() => ({ openWorkspaceTerminal: vi.fn() }));
+
+vi.mock('./terminalOpen', () => ({
+  openWorkspaceTerminal: terminalOpen.openWorkspaceTerminal,
+  openTerminal: vi.fn(),
+}));
+
 // Imported after the API mock.
 import { useAppStore, useChatStore, useUiStore } from '@/lib/store';
 import type { StreamingState } from '@/lib/store';
@@ -662,6 +670,16 @@ describe('CodeSidebar — menu do workspace', () => {
     await waitFor(() =>
       expect(mocks.setConversationWorkspace).toHaveBeenCalledWith('c-new', 'ws-1'),
     );
+  });
+
+  it('abre um terminal no workspace sem abrir uma sessão', async () => {
+    await renderWithWorkspace();
+
+    openMenu(screen.getByRole('button', { name: 'Opções do workspace zylara-core' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Abrir terminal' }));
+
+    await waitFor(() => expect(terminalOpen.openWorkspaceTerminal).toHaveBeenCalledWith('ws-1'));
+    expect(mocks.createConversation).not.toHaveBeenCalled();
   });
 
   it('abre a pasta no Explorer', async () => {

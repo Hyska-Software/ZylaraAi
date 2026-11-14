@@ -20,7 +20,7 @@ import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
 import { normalizeTerminalFontSize } from '@/lib/terminalSettings';
-import type { TerminalEvent, TerminalInfo } from '@/lib/types';
+import type { TerminalEvent, TerminalInfo, TerminalTarget } from '@/lib/types';
 import {
   buildTerminalTheme,
   prefersReducedMotion,
@@ -65,8 +65,8 @@ export interface TerminalSnapshot {
 
 interface TerminalInstance {
   id: string;
-  /** Session that opened the terminal; only used to restart in the same folder. */
-  conversationId: string;
+  /** Folder the terminal was opened in; only used to restart in the same place. */
+  target: TerminalTarget;
   surface: TerminalSurface;
   title: string;
   cwd: string;
@@ -306,10 +306,7 @@ class TerminalManager {
     runtime.containers[surface] = null;
   }
 
-  async open(
-    conversationId: string,
-    surface: TerminalSurface = 'panel',
-  ): Promise<string | null> {
+  async open(target: TerminalTarget, surface: TerminalSurface = 'panel'): Promise<string | null> {
     const runtime = this.runtime;
     if (runtime.loadingBySurface[surface]) return null;
     if (runtime.instances.size >= TERMINAL_TAB_LIMIT) {
@@ -342,7 +339,7 @@ class TerminalManager {
     const host = terminalHost();
     const instance: TerminalInstance = {
       id: '',
-      conversationId,
+      target,
       surface,
       title: '',
       cwd: '',
@@ -374,7 +371,7 @@ class TerminalManager {
       instance.rows = term.rows || 24;
 
       const info = await api.openTerminal(
-        conversationId,
+        target,
         instance.cols,
         instance.rows,
         (event) => this.handleEvent(instance, event),
@@ -536,12 +533,12 @@ class TerminalManager {
     const instance = runtime.instances.get(id);
     if (!instance) return;
     const surface = instance.surface;
-    // The new shell must run in the folder of the session that opened this
-    // terminal, even when the user is looking at another session/workspace.
-    const conversationId = instance.conversationId;
+    // The new shell must run in the folder of the terminal that was closed,
+    // even when the user is looking at another session/workspace.
+    const target = instance.target;
     const wasActive = runtime.activeIds[surface] === id;
     await this.close(id);
-    await this.open(conversationId, surface);
+    await this.open(target, surface);
     // Restart is only offered for the active terminal; the new terminal is
     // already active. No extra focus dance is needed.
     if (!wasActive) schedule(() => this.focusActive(runtime, surface));
@@ -551,7 +548,7 @@ class TerminalManager {
   async closeConversation(conversationId: string): Promise<void> {
     const runtime = this.runtime;
     const ids = runtime.order.filter(
-      (id) => runtime.instances.get(id)?.conversationId === conversationId,
+      (id) => runtime.instances.get(id)?.target.conversationId === conversationId,
     );
     if (ids.length === 0) return;
     await Promise.all(ids.map((id) => this.close(id)));

@@ -491,8 +491,9 @@ indisponíveis em subagentes).
    (`harness/code/compaction.rs`, template de 8 seções, persistido em `session_summaries` e
    aplicado nos turnos seguintes).
 9. **Terminal PTY**: src-tauri/src/terminal/** (portable-pty/ConPTY) com open_terminal/write_terminal/
-esize_terminal/close_terminal/list_terminals e Channel<TerminalEvent>; o painel abre em xterm.js no cwd do workspace (terminal do usuário; o agente usa 
-un_command/jobs).
+ resize_terminal/close_terminal/list_terminals e Channel<TerminalEvent>; o painel abre em xterm.js no cwd do workspace
+ (terminal do usuário; o agente usa run_command/jobs). `open_terminal` aceita a conversa **ou** o workspace: o
+ workspace sozinho abre a shell sem criar sessão (menu "Abrir terminal" da sidebar).
 10. **Fecho do turno**: `file_journal` → `workspace_changes`, `context_stats`, `turn/ended` em
    `code_events` e cancelamento das aprovações pendentes da sessão. O transcript do Code
    termina cada turno com o card de resumo de arquivos alterados (dados das presentations

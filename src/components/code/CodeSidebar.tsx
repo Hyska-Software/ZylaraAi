@@ -23,6 +23,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   SquarePen,
+  SquareTerminal,
   Trash2,
   Unlink,
   X,
@@ -66,6 +67,7 @@ import { cn, compareConversationPosition, copyText, modKey } from '@/lib/utils';
 import { useIsCompact } from '@/components/layout/hooks';
 import { AddChatSessionDialog } from './AddChatSessionDialog';
 import { terminalManager } from './terminalManager';
+import { openWorkspaceTerminal } from './terminalOpen';
 import { NO_WORKSPACE_KEY, useWorkspaces } from './useWorkspaces';
 
 export interface CodeSidebarProps {
@@ -271,6 +273,7 @@ function workspaceIcon(workspace: Workspace) {
 interface WorkspaceMenuProps {
   workspace: Workspace;
   onNewSession: () => void;
+  onOpenTerminal: () => void;
   onRename: () => void;
   onOpenExplorer: () => void;
   onCopyPath: () => void;
@@ -282,6 +285,7 @@ interface WorkspaceMenuProps {
 function WorkspaceMenu({
   workspace,
   onNewSession,
+  onOpenTerminal,
   onRename,
   onOpenExplorer,
   onCopyPath,
@@ -312,6 +316,9 @@ function WorkspaceMenu({
         </DropdownMenuLabel>
         <DropdownMenuItem icon={<SquarePen className="size-4" />} onSelect={onNewSession}>
           {t('code:sidebar.workspace.newSession')}
+        </DropdownMenuItem>
+        <DropdownMenuItem icon={<SquareTerminal className="size-4" />} onSelect={onOpenTerminal}>
+          {t('code:sidebar.workspace.openTerminal')}
         </DropdownMenuItem>
         <DropdownMenuItem icon={<RefreshCw className="size-4" />} onSelect={onRefresh}>
           {t('code:sidebar.workspace.refresh')}
@@ -350,6 +357,7 @@ interface WorkspaceRowProps {
   onToggle: () => void;
   onSelect: () => void;
   onNewSession: () => void;
+  onOpenTerminal: () => void;
   onRename: () => void;
   onOpenExplorer: () => void;
   onCopyPath: () => void;
@@ -377,6 +385,7 @@ function WorkspaceRow({
   onToggle,
   onSelect,
   onNewSession,
+  onOpenTerminal,
   onRename,
   onOpenExplorer,
   onCopyPath,
@@ -493,6 +502,7 @@ function WorkspaceRow({
         <WorkspaceMenu
           workspace={workspace}
           onNewSession={onNewSession}
+          onOpenTerminal={onOpenTerminal}
           onRename={onRename}
           onOpenExplorer={onOpenExplorer}
           onCopyPath={onCopyPath}
@@ -989,6 +999,15 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     if (isCompact) onClose?.();
   };
 
+  /**
+   * Opens a terminal in the workspace folder without creating a session: the
+   * PTY runs in the project path and its tab joins the central tab strip.
+   */
+  const handleOpenTerminalIn = async (workspace: Workspace) => {
+    const terminalId = await openWorkspaceTerminal(workspace.id);
+    if (terminalId && isCompact) onClose?.();
+  };
+
   const handleSelectWorkspace = (workspace: Workspace) => {
     setActiveWorkspace(workspace.id);
     if (collapsed.has(workspace.id)) toggleWorkspace(workspace.id);
@@ -1323,6 +1342,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
                         onToggle={() => toggleWorkspace(workspace.id)}
                         onSelect={() => handleSelectWorkspace(workspace)}
                         onNewSession={() => void handleNewSessionIn(workspace)}
+                        onOpenTerminal={() => void handleOpenTerminalIn(workspace)}
                         onRename={() => handleStartRename(workspace)}
                         onOpenExplorer={() => void handleOpenExplorer(workspace)}
                         onCopyPath={() => void handleCopyPath(workspace)}
