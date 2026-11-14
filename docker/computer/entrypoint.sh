@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# A one-off command (`docker run <image> sh -lc …`) must not boot the desktop:
+# health checks and image validation expect the container to exit on its own.
+if [ "$#" -gt 0 ]; then
+    exec "$@"
+fi
+
 # The two RFB servers are reachable only inside the container. The host bridges
 # them over an authenticated, short-lived local WebSocket via docker exec.
 Xvfb :99 -screen 0 1440x900x24 -ac +extension RANDR >/tmp/xvfb.log 2>&1 &

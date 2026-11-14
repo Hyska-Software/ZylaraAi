@@ -5,11 +5,14 @@
 //! - `project`: detecção do perfil do projeto (comandos de test/lint/build).
 //! - `git`: operações de git via CLI do usuário (status/diff/log/stage/commit/branches).
 //! - `journal`: object store por hash, captura de arquivos por turno e diff unificado.
+//! - `docker`: saúde do daemon Docker (classificação do erro de transporte e
+//!   auto-start limitado do Docker Desktop).
 //!
 //! Contrato e limites: `docs/goals/code-harness/HARNESS.md` §7–§9.
 
 #![allow(dead_code)]
 
+pub mod docker;
 pub mod exec;
 pub mod git;
 pub mod journal;

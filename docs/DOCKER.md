@@ -97,13 +97,22 @@ passando por timeout/cancelamento/spill do runner.
   RFB) para build local. O pacote do GHCR precisa estar público para o pull
   anônimo; imagens privadas exigem `docker login ghcr.io`.
 - Produção: pinar `image@sha256:...`; o validador mostra id/arquitetura e roda um
-  smoke test `sh -lc true`.
+  smoke test com `--entrypoint /bin/sh` (a imagem gráfica inicia o desktop no
+  entrypoint e não termina sozinha).
 
 ## Comandos Tauri
 
 - `docker_status` — daemon, versão, imagens;
-- `docker_pull_image` — pull explícito com timeout;
-- `docker_validate_image` — inspect + smoke run;
+- `docker_pull_image` — pull explícito com timeout; antes do pull o backend
+  garante o engine (abre o Docker Desktop e espera até 120 s) e devolve
+  `DOCKER_DAEMON_UNAVAILABLE`/`DOCKER_DAEMON_START_TIMEOUT`/
+  `DOCKER_DAEMON_LAUNCH_FAILED` quando o problema é o daemon, não a imagem;
+- `docker_start_daemon` — ação explícita da UI para abrir o Docker Desktop e
+  aguardar o engine (`{ running, started, serverVersion }`);
+- `docker_validate_image` — inspect + smoke run (mesma checagem de daemon). O
+  smoke roda com `--entrypoint /bin/sh` e procura o marcador `zylara-smoke-ok`
+  no stdout: a imagem gráfica não termina sozinha, então `docker run <imagem> sh
+  -lc true` ficaria bloqueado até o timeout de 60 s;
 - `docker_cleanup` — remove containers com label `zylara.owner=zylara`.
 - No boot, o app encerra sessões de computer use órfãs e remove containers
   Zylara deixados pelo processo anterior. A limpeza não roda periodicamente para
@@ -124,6 +133,8 @@ passando por timeout/cancelamento/spill do runner.
 - Perfil por workspace e `.devcontainer`/compose ainda não implementados.
 - `--read-only` pode exigir imagem compatível (caches em `/tmp`/workspace).
 - Windows usa Docker Desktop (containers Linux); não há suporte a containers
-  Windows.
+  Windows. O auto-start do engine só cobre o Docker Desktop (Windows/macOS): no
+  Linux o app apenas detecta e orienta a iniciar o daemon.
 - Não há pull automático: o download da imagem gráfica é explícito na UI
-  (Configurações → Agentes ou erro do painel Tela).
+  (Configurações → Agentes ou erro do painel Tela). O que existe é auto-start do
+  engine nessas ações explícitas, nunca no boot.

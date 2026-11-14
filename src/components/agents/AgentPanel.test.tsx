@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   updateAgent: vi.fn(),
   computerPreview: vi.fn(),
   dockerPullImage: vi.fn(),
+  dockerStartDaemon: vi.fn(),
   browserSessionStatus: vi.fn(),
   browserFrame: vi.fn(),
   browserStartStream: vi.fn(),
@@ -113,6 +114,11 @@ beforeEach(() => {
   mocks.browserInsertText.mockResolvedValue(undefined);
   mocks.releaseComputerControl.mockResolvedValue(undefined);
   mocks.dockerPullImage.mockResolvedValue('ghcr.io/hyska-software/zylara-computer:latest');
+  mocks.dockerStartDaemon.mockResolvedValue({
+    running: true,
+    started: true,
+    serverVersion: '27.0.0',
+  });
   mocks.updateAgent.mockImplementation(async (_id: string, input: AgentInput) => ({
     ...agent,
     ...input,
@@ -212,6 +218,35 @@ describe('AgentPanel — Tela', () => {
         'ghcr.io/hyska-software/zylara-computer:latest',
       ),
     );
+  });
+
+  it('oferece iniciar o Docker quando o motor não está respondendo', async () => {
+    const dockerAgent: Agent = {
+      ...agent,
+      workspaceId: 'ws-1',
+      computerEnvironment: 'private_desktop',
+    };
+    useAgentStore.setState({
+      agentsById: { [dockerAgent.id]: dockerAgent },
+      orderedIds: [dockerAgent.id],
+    });
+    mocks.computerPreview.mockRejectedValue(
+      'COMPUTER_DOCKER_DAEMON_DOWN: o motor do Docker não está respondendo — inicie o Docker Desktop e tente de novo',
+    );
+
+    render(
+      <AgentPanelScreen
+        context={{
+          ...context,
+          agent: dockerAgent,
+          conversation: { id: 'conv-1', workspaceId: 'ws-1' } as never,
+        }}
+      />,
+    );
+
+    expect(await screen.findByText('O Docker Engine não está em execução')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar Docker' }));
+    await waitFor(() => expect(mocks.dockerStartDaemon).toHaveBeenCalled());
   });
 });
 

@@ -719,6 +719,12 @@
     "copyError": "No se pudo copiar el comando",
     "downloaded": "Imagen descargada",
     "downloadError": "No se pudo descargar la imagen",
+    "daemonTitle": "Docker Engine no está en ejecución",
+    "daemonHint": "El Escritorio privado se ejecuta dentro de Docker. Zylara puede abrir Docker Desktop y esperar al motor, y luego descargar la imagen.",
+    "daemonStarted": "Docker Engine listo",
+    "startDocker": "Iniciar Docker",
+    "startingDocker": "Iniciando Docker…",
+    "startDockerError": "No se pudo iniciar Docker",
     "title": "La imagen del Escritorio privado no está disponible",
     "missingImage": "La imagen gráfica {{image}} no se encontró en el Docker local. Descarga la imagen publicada o configura otra en Configuración → Agentes.",
     "steps": {

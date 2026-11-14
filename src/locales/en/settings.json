@@ -700,6 +700,10 @@
       "downloadAria": "Download computer use image",
       "downloaded": "Computer use image downloaded",
       "downloadFailed": "Could not download the image",
+      "daemonDown": "The Docker Engine is not running, so the image could not be downloaded",
+      "startDocker": "Start Docker",
+      "startingDocker": "Starting Docker…",
+      "startDockerError": "Could not start Docker",
       "usePublished": "Use published image",
       "container": {
         "label": "Computer use container",

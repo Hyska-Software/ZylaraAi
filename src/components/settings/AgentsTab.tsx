@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Download } from 'lucide-react';
+import { AlertTriangle, Download, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button, Input, Spinner, Switch } from '@/components/ui';
 import { api } from '@/lib/api';
-import { DEFAULT_COMPUTER_DOCKER_IMAGE } from '@/lib/computerDocker';
+import { DEFAULT_COMPUTER_DOCKER_IMAGE, isDockerDaemonError } from '@/lib/computerDocker';
 import { useAppStore } from '@/lib/store';
 import { SettingRow, SettingsBlock, SettingsSection } from './shared';
 
@@ -35,6 +35,10 @@ export function AgentsTab() {
     settings.computerDockerImage ?? DEFAULT_COMPUTER_DOCKER_IMAGE,
   );
   const [computerImageBusy, setComputerImageBusy] = useState(false);
+  const [computerDaemonBusy, setComputerDaemonBusy] = useState(false);
+  // Set when a download failed because the engine is not running: the fix is
+  // starting Docker, not retrying the pull.
+  const [computerDaemonDown, setComputerDaemonDown] = useState(false);
   const [dockerBusy, setDockerBusy] = useState(false);
 
   useEffect(
@@ -65,6 +69,43 @@ export function AgentsTab() {
       ),
     [settings.computerDockerImage],
   );
+
+  /** Downloads the graphical image, reporting whether the engine is the blocker. */
+  const pullComputerImage = async (image: string) => {
+    setComputerImageBusy(true);
+    setComputerDaemonDown(false);
+    try {
+      await api.dockerPullImage(image);
+      toast.success(t('agents.computer.downloaded'), { description: image });
+    } catch (error) {
+      const message = String(error);
+      const daemonDown = isDockerDaemonError(message);
+      setComputerDaemonDown(daemonDown);
+      toast.error(
+        daemonDown ? t('agents.computer.daemonDown') : t('agents.computer.downloadFailed'),
+        { description: message },
+      );
+    } finally {
+      setComputerImageBusy(false);
+    }
+  };
+
+  /** Starts Docker Desktop (the backend waits for the engine) and retries the pull. */
+  const startComputerDaemon = async () => {
+    setComputerDaemonBusy(true);
+    try {
+      await api.dockerStartDaemon();
+      setComputerDaemonDown(false);
+      const image = computerDockerImage.trim();
+      if (image) await pullComputerImage(image);
+    } catch (error) {
+      toast.error(t('agents.computer.startDockerError'), {
+        description: String(error),
+      });
+    } finally {
+      setComputerDaemonBusy(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -383,18 +424,7 @@ export function AgentsTab() {
                   if (image !== settings.computerDockerImage) {
                     void saveSettings({ computerDockerImage: image });
                   }
-                  setComputerImageBusy(true);
-                  void api
-                    .dockerPullImage(image)
-                    .then(() =>
-                      toast.success(t('agents.computer.downloaded'), { description: image }),
-                    )
-                    .catch((error) =>
-                      toast.error(t('agents.computer.downloadFailed'), {
-                        description: String(error),
-                      }),
-                    )
-                    .finally(() => setComputerImageBusy(false));
+                  void pullComputerImage(image);
                 }}
               >
                 {computerImageBusy ? (
@@ -404,6 +434,24 @@ export function AgentsTab() {
                 )}
                 {t('agents.computer.download')}
               </Button>
+              {computerDaemonDown ? (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={computerDaemonBusy || computerImageBusy}
+                  aria-label={t('agents.computer.startDocker')}
+                  onClick={() => void startComputerDaemon()}
+                >
+                  {computerDaemonBusy ? (
+                    <Spinner className="mr-1.5 size-3.5" />
+                  ) : (
+                    <Play className="mr-1.5 size-3.5" />
+                  )}
+                  {computerDaemonBusy
+                    ? t('agents.computer.startingDocker')
+                    : t('agents.computer.startDocker')}
+                </Button>
+              ) : null}
               {computerDockerImage.trim() !== DEFAULT_COMPUTER_DOCKER_IMAGE ? (
                 <Button
                   size="sm"

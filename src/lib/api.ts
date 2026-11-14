@@ -56,6 +56,7 @@ import type {
   ConversationDetail,
   ConversationMode,
   CreateGoalInput,
+  DockerDaemonStatus,
   DockerImageInfo,
   DockerStatus,
   FileChange,
@@ -142,6 +143,7 @@ export const api = {
     invoke<boolean>('notify_desktop', { title, body }),
   dockerStatus: () => invoke<DockerStatus>('docker_status'),
   dockerPullImage: (image: string) => invoke<string>('docker_pull_image', { image }),
+  dockerStartDaemon: () => invoke<DockerDaemonStatus>('docker_start_daemon'),
   dockerValidateImage: (image: string) =>
     invoke<DockerImageInfo>('docker_validate_image', { image }),
   dockerCleanup: () => invoke<number>('docker_cleanup'),

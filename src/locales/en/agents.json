@@ -719,6 +719,12 @@
     "copyError": "Could not copy the command",
     "downloaded": "Image downloaded",
     "downloadError": "Could not download the image",
+    "daemonTitle": "Docker Engine is not running",
+    "daemonHint": "The private desktop runs inside Docker. Zylara can start Docker Desktop for you and wait for the engine, then download the image.",
+    "daemonStarted": "Docker Engine is ready",
+    "startDocker": "Start Docker",
+    "startingDocker": "Starting Docker…",
+    "startDockerError": "Could not start Docker",
     "title": "Private Desktop image is not available",
     "missingImage": "The graphical image {{image}} was not found in the local Docker. Download the published image or configure another one in Settings → Agents.",
     "steps": {

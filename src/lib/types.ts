@@ -1480,6 +1480,12 @@ export interface DockerStatus {
   error: string | null;
 }
 
+export interface DockerDaemonStatus {
+  running: boolean;
+  started: boolean;
+  serverVersion: string | null;
+}
+
 export interface DockerImageInfo {
   image: string;
   id: string;

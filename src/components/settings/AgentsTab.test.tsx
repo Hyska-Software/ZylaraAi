@@ -7,6 +7,7 @@ import type { Settings } from '@/lib/types';
 const mocks = vi.hoisted(() => ({
   saveSettings: vi.fn(),
   dockerPullImage: vi.fn(),
+  dockerStartDaemon: vi.fn(),
   dockerCleanup: vi.fn(),
   platformDiagnostics: vi.fn(),
 }));
@@ -15,6 +16,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     saveSettings: mocks.saveSettings,
     dockerPullImage: mocks.dockerPullImage,
+    dockerStartDaemon: mocks.dockerStartDaemon,
     dockerCleanup: mocks.dockerCleanup,
     platformDiagnostics: mocks.platformDiagnostics,
   },
@@ -62,6 +64,11 @@ beforeEach(() => {
     keys: [],
   }));
   mocks.dockerPullImage.mockResolvedValue('ghcr.io/hyska-software/zylara-computer:latest');
+  mocks.dockerStartDaemon.mockResolvedValue({
+    running: true,
+    started: true,
+    serverVersion: '27.0.0',
+  });
   useAppStore.setState({ settings: settings() });
 });
 
@@ -140,5 +147,21 @@ describe('AgentsTab', () => {
         'ghcr.io/hyska-software/zylara-computer:latest',
       ),
     );
+  });
+
+  it('oferece iniciar o Docker quando o download falha com o motor parado', async () => {
+    mocks.dockerPullImage.mockRejectedValueOnce(
+      'DOCKER_DAEMON_UNAVAILABLE: o motor do Docker não está respondendo',
+    );
+    render(<AgentsTab />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Baixar imagem do computer use' }));
+
+    const start = await screen.findByRole('button', { name: 'Iniciar Docker' });
+    fireEvent.click(start);
+
+    await waitFor(() => expect(mocks.dockerStartDaemon).toHaveBeenCalled());
+    // The download is retried once the engine answers.
+    await waitFor(() => expect(mocks.dockerPullImage).toHaveBeenCalledTimes(2));
   });
 });

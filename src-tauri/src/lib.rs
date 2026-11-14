@@ -237,6 +237,7 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             commands::turn::list_turn_events,
             commands::docker::docker_status,
             commands::docker::docker_pull_image,
+            commands::docker::docker_start_daemon,
             commands::docker::docker_validate_image,
             commands::docker::docker_cleanup,
             commands::notifications::notify_desktop,

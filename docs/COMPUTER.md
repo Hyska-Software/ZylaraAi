@@ -74,6 +74,10 @@ não há grant persistente. Sem canal de aprovação a tool falha fechada
   `docker/computer/` (Xvfb + openbox + Chromium + xdotool + scrot + RFB).
   O app oferece **Baixar imagem** em Configurações → Agentes → Desktop privado e
   no erro do painel Tela; não faz pull automático.
+- Motor parado não é erro de imagem: antes de baixar/validar a imagem e antes do
+  `docker run` do desktop, o backend confere o engine e, se o Docker Desktop
+  estiver instalado, abre o app e espera até 120 s pelo daemon (`workspace::docker`).
+  A UI também expõe **Iniciar Docker** com o código `DOCKER_DAEMON_UNAVAILABLE`.
 - Container `<computerDockerContainer>-<conversationId>` iniciado no primeiro
   screenshot, com `--cap-drop ALL`, `no-new-privileges`, limites e
   `--network none`.

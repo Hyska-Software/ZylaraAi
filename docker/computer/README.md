@@ -46,6 +46,10 @@ As imagens anteriores não têm os dois servidores e `socat`: atualize a imagem
 publicada ou faça o build local acima e encerre/reinicie a sessão. Não há pull
 automático. O pacote `@novnc/novnc` (MPL-2.0) é o cliente integrado do renderer.
 
+Com argumentos, o entrypoint executa o comando em vez de subir o desktop
+(`docker run <imagem> sh -lc 'comando'`), o que mantém checagens de saúde e
+validação de imagem rápidas. Sem argumentos, sobe Xvfb/openbox/x11vnc.
+
 ## Produção
 
 - faça build com digest fixo e registre `image@sha256:...`;

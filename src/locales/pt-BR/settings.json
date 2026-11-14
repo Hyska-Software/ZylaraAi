@@ -701,6 +701,10 @@
       "downloadAria": "Baixar imagem do computer use",
       "downloaded": "Imagem do computer use baixada",
       "downloadFailed": "Não foi possível baixar a imagem",
+      "daemonDown": "O Docker Engine não está em execução, então a imagem não pôde ser baixada",
+      "startDocker": "Iniciar Docker",
+      "startingDocker": "Iniciando Docker…",
+      "startDockerError": "Não foi possível iniciar o Docker",
       "usePublished": "Usar imagem publicada",
       "container": {
         "label": "Container do computer use",

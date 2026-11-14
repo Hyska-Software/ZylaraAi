@@ -1175,6 +1175,14 @@ pub async fn ensure_container(
             return Ok(());
         }
     }
+    // A stopped engine looks like a container problem here: bring Docker
+    // Desktop up (bounded) so the start below has a chance instead of failing
+    // with the raw named-pipe error.
+    if crate::workspace::docker::error_is_daemon_down(&inspect.stderr) {
+        crate::workspace::docker::ensure(data_dir, Duration::from_secs(120))
+            .await
+            .map_err(|_| anyhow::anyhow!(crate::i18n::t("computer.errors.dockerDaemon")))?;
+    }
     let mut args = vec![
         "run".to_string(),
         "-d".to_string(),
