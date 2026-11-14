@@ -560,6 +560,13 @@ pub struct ContextStats { pub used: u32, pub window: u32, pub output_cap: u32, p
   início do turno, antes de cada passo, logo após cada passo com `usage.input_tokens` e no fecho;
   a cadência natural por passo satisfaz o limite de coalescência ≤ 1/s em produção. O último
   evento persistido é o que o snapshot devolve ao reabrir a sessão.
+- **Custo em tempo real**: `TurnEvent::Usage` é emitido a cada request que reportou uso
+  (`emit_live_usage`), com o **total acumulado** do turno — passos já mergeados em `total_usage`
+  **mais** os subagentes concluídos (`subagent_usage`, merge só no clone, sem dupla contagem) — na
+  mesma cadência do `cache_stats`. O evento de fecho continua sendo o valor autoritativo persistido
+  em `assistant_message.usage` (com `durationMs`). O renderer precifica com o catálogo
+  (`src/lib/sessionCost.ts`) e o `CodeContextMeterChip` relê o valor derivado no máximo a cada 10 s
+  enquanto o turno roda (rede de segurança para evento perdido; ocioso não mantém timer).
 - Compactação é registrada em `context/compacted` (`{messages, tokensFreed}`), separada do medidor;
   o contador `compacted` do `ContextStats` é o total de mensagens resumidas e é somado ao breakdown
   seguinte. A persistência do medidor é **best-effort**: falha de append em `context/stats` é

@@ -1789,6 +1789,27 @@ fn emit_context_stats(
     emitter.emit(TurnEvent::ContextStats { stats });
 }
 
+/// Emits the turn's **accumulated** `usage` while the turn is still running.
+///
+/// The payload is the same total persisted at the end (`total_usage` merged with
+/// the subagents that already finished), so the renderer can price every request
+/// with the official catalog instead of waiting for the closing event: the
+/// session cost then moves with the same cadence as the context meter and the
+/// cache chip. Children are merged into a clone, never into `total_usage`, so the
+/// end-of-turn merge does not count them twice.
+fn emit_live_usage(
+    on_event: &Arc<dyn EventEmitter>,
+    total_usage: &UsageInfo,
+    subagent_usage: &Arc<parking_lot::Mutex<UsageInfo>>,
+) {
+    let mut usage = total_usage.clone();
+    {
+        let children = subagent_usage.lock();
+        merge_usage(&mut usage, &children);
+    }
+    emit(on_event, TurnEvent::Usage { usage });
+}
+
 /// Runs a full conversational turn:
 /// 1. persists the user message,
 /// 2. builds context (system prompt + attachments + history),
@@ -3394,6 +3415,13 @@ pub async fn run_turn(
                 );
             }
         }
+        // Custo em tempo real: o `usage` acumulado do turno (passos + subagentes
+        // já concluídos) chega ao medidor a cada request, junto com o cache e o
+        // contexto. Antes ele só era emitido no fecho, então o `$` do header
+        // ficava parado durante o turno inteiro.
+        if step_usage.is_some() {
+            emit_live_usage(&on_event, &total_usage, &subagent_usage);
+        }
 
         if let Some(failure) = failure {
             turn_failure = Some(failure);
@@ -3805,6 +3833,12 @@ pub async fn run_turn(
                     &mut last_usage_cache,
                 );
                 emit(&on_event, TurnEvent::CacheStats { sample });
+            }
+            // Custo em tempo real do passo final forçado: mesma cadência do
+            // `cache_stats` acima (`F1.1`), para o medidor não congelar entre o
+            // último passo de tool e o fecho do turno.
+            if forced_attempt.usage.is_some() {
+                emit_live_usage(&on_event, &total_usage, &subagent_usage);
             }
             let forced_reasoning = forced_attempt.reasoning;
             let forced_text = forced_attempt.text;
@@ -10563,6 +10597,109 @@ mod agent_loop_tests {
                 + persisted.breakdown.messages,
             persisted.used
         );
+    }
+
+    /// Custo **em tempo real**: o `usage` acumulado do turno é emitido a cada
+    /// request que reportou uso (mesma cadência do `cache_stats`/`context_stats`),
+    /// então o `$` do medidor não espera o fecho do turno para subir. O evento de
+    /// fecho continua sendo o total autoritativo persistido.
+    #[tokio::test]
+    async fn usage_events_update_the_session_cost_per_step() {
+        let temp = TempDb::new();
+        let conversation = temp
+            .db
+            .create_conversation("Nova conversa", "opencode-go", "deepseek-v4.1-flash")
+            .expect("conversation");
+
+        let step = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let streamer: ProviderStreamer = {
+            let step = step.clone();
+            Arc::new(move |_request, sink| {
+                let current = step.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Box::pin(async move {
+                    if current == 0 {
+                        emit(
+                            &sink,
+                            ProviderEvent::Usage(UsageInfo {
+                                input_tokens: Some(1_000),
+                                output_tokens: Some(10),
+                                ..Default::default()
+                            }),
+                        );
+                        tool_call_stream(&sink, "call-1", "list_skills");
+                    } else {
+                        emit(
+                            &sink,
+                            ProviderEvent::Usage(UsageInfo {
+                                input_tokens: Some(1_500),
+                                output_tokens: Some(20),
+                                ..Default::default()
+                            }),
+                        );
+                        text_stream(&sink, "Resposta final.");
+                    }
+                    Ok(())
+                })
+            })
+        };
+
+        let (emitter, events) = channel();
+        let result = run_turn(
+            deps(temp.db.clone(), streamer),
+            payload(&conversation, 4),
+            Settings::default(),
+            emitter,
+            CancellationToken::new(),
+        )
+        .await
+        .expect("turno com uso por passo");
+
+        let raw = events.lock().expect("events lock").clone();
+        let parsed: Vec<Value> = raw
+            .iter()
+            .map(|json| serde_json::from_str::<Value>(json).expect("evento JSON"))
+            .collect();
+        let usage_events: Vec<(usize, &Value)> = parsed
+            .iter()
+            .enumerate()
+            .filter(|(_, event)| event["type"] == "usage")
+            .map(|(index, event)| (index, &event["usage"]))
+            .collect();
+        // Dois passos + o fecho (o evento final é o total autoritativo).
+        assert!(
+            usage_events.len() >= 3,
+            "um `usage` por passo e um no fecho (eventos: {})",
+            usage_events.len()
+        );
+
+        // O primeiro `usage` acompanha o passo 1 — antes de o passo 2 começar.
+        let second_step = parsed
+            .iter()
+            .enumerate()
+            .filter(|(_, event)| event["type"] == "step_started")
+            .nth(1)
+            .map(|(index, _)| index)
+            .expect("segundo passo");
+        assert!(
+            usage_events[0].0 < second_step,
+            "o uso do passo 1 deve chegar antes do passo 2"
+        );
+        assert_eq!(usage_events[0].1["inputTokens"], 1_000);
+        assert_eq!(usage_events[0].1["outputTokens"], 10);
+
+        // O segundo já traz o acumulado do turno, não só o passo anterior.
+        assert_eq!(usage_events[1].1["inputTokens"], 2_500);
+        assert_eq!(usage_events[1].1["outputTokens"], 30);
+
+        // Fecho autoritativo: o mesmo total que vai para a mensagem persistida.
+        let persisted = result
+            .assistant_message
+            .usage
+            .as_ref()
+            .expect("usage persistido no turno");
+        assert_eq!(persisted.input_tokens, Some(2_500));
+        assert_eq!(persisted.output_tokens, Some(30));
+        assert_eq!(usage_events.last().expect("fecho").1["inputTokens"], 2_500);
     }
 
     /// B-02/D7 de ponta a ponta: um plano aprovado no **mesmo turno** mantém o

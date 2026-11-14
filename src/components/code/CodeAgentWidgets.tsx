@@ -6,7 +6,7 @@
  * envia as decisões pelo `api` — mantendo o `ChatView` livre de regras de
  * sessão (docs/goals/code-harness/WORKBENCH.md §5).
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -260,6 +260,24 @@ export function CodeSessionCards({ conversationId }: { conversationId: string })
   );
 }
 
+/** Intervalo máximo entre duas leituras do custo derivado durante um turno. */
+const COST_REFRESH_MS = 10_000;
+
+/**
+ * Re-render counter used to re-derive a value at least every `intervalMs`
+ * while `active` (a turn is running for this conversation). Idle conversations
+ * keep no timer: there is nothing to re-read until an event arrives.
+ */
+function useRefreshTick(active: boolean, intervalMs: number = COST_REFRESH_MS): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), intervalMs);
+    return () => window.clearInterval(timer);
+  }, [active, intervalMs]);
+  return tick;
+}
+
 /**
  * Medidor do header: chip compacto com anel de contexto + `%` de cache + custo
  * da sessão (USD).
@@ -274,6 +292,13 @@ export function CodeSessionCards({ conversationId }: { conversationId: string })
  * container não esconde mais o medidor abaixo de 1024px (`hidden lg:block`
  * removido): o requisito é mostrar em tempo real, então ele encolhe/reserva
  * largura em vez de sumir.
+ *
+ * **Custo em tempo real**: o harness emite `usage` com o total acumulado do
+ * turno a cada request que reportou uso (`emit_live_usage` em
+ * `harness/mod.rs`), e o `chatStore` aplica o evento na mensagem em streaming —
+ * então o `$` sobe na mesma cadência do anel de contexto e do cache. O
+ * `useRefreshTick` é a rede de segurança: enquanto o turno roda, o valor
+ * derivado é relido no máximo a cada 10 s, mesmo que um evento se perca.
  */
 export function CodeContextMeterChip({
   conversationId,
@@ -290,12 +315,17 @@ export function CodeContextMeterChip({
   );
   const providers = useAppStore((state) => state.providers);
   const messages = useChatStore((state) => state.messagesByConversation[conversationId]);
+  const turnRunning = useChatStore((state) =>
+    Boolean(state.streamsByConversation[conversationId]),
+  );
+  const tick = useRefreshTick(turnRunning);
   const cost = useMemo(
     () =>
       sessionCostFromMessages(messages, (providerId, modelId) =>
         catalogCost(providers, providerId, modelId),
       ),
-    [messages, providers],
+    // `tick` is deliberate: it re-reads the derived cost every `COST_REFRESH_MS`.
+    [messages, providers, tick],
   );
   const cacheVisible = showCache && showCacheIndicator && cache != null;
 

@@ -606,7 +606,11 @@ cache-first no composer). A verdade é o `usage` reportado pelo provedor:
   request, sessão ponderada, teto `P/(P+Δ)`, estado, última quebra, TTL, economia
   estimada e “copiar usage bruto”. O `ContextMeter` também mostra o custo da
   sessão em USD (mensagens + subagentes, preços oficiais do catálogo por modelo)
-  com entrada, saída e cache no popover. `Settings.cache` controla o indicador, o TTL
+  com entrada, saída e cache no popover. O custo acompanha **cada request** — o
+  evento `usage` leva o total acumulado do turno (passos + subagentes já
+  concluídos), na mesma cadência do `cache_stats`/`context_stats`, em vez de só no
+  fecho — e o valor derivado é relido no máximo a cada 10 s enquanto o turno roda
+  (`CodeContextMeterChip`). `Settings.cache` controla o indicador, o TTL
   Anthropic e a retenção OpenAI.
 
 Plano/evidência: `docs/goals/prompt-cache/{PLAN,GOAL,EVIDENCE}.md`; pesquisa por

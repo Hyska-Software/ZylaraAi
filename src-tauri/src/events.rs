@@ -69,7 +69,10 @@ pub enum TurnEvent {
     },
     /// A file artifact was created by the agent.
     ArtifactCreated { artifact: Artifact },
-    /// Token usage for the turn (may be emitted once at the end).
+    /// Accumulated token usage of the turn. Emitted after every request that
+    /// reported usage (the renderer prices it with the catalog, so the session
+    /// cost follows each step) and again at the end, where the payload carries
+    /// the authoritative persisted total plus `durationMs`.
     Usage { usage: UsageInfo },
     /// Cache telemetry for one provider request (wire request), emitted per step
     /// in both profiles so the context meter can show cache hit in real time.
