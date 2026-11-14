@@ -449,6 +449,14 @@ describe('ContextMeter — custo da sessão', () => {
     expect(cacheDescription(button)).toBe('Custo da sessão: $0.02');
   });
 
+  it('marca o segmento de custo com o ícone de cifrão, escondido de leitores de tela', () => {
+    render(<ContextMeter stats={makeStats()} cost={makeCost()} />);
+
+    const icon = trigger().querySelector('.lucide-dollar-sign');
+    expect(icon).toBeTruthy();
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('mantém o description do cache e concatena o custo quando os dois existem', () => {
     render(<ContextMeter stats={makeStats()} cache={makeCache()} cost={makeCost()} />);
 

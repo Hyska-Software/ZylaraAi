@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { DollarSign } from 'lucide-react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import type { SessionCostView } from '@/lib/sessionCost';
@@ -212,13 +213,18 @@ export function ContextMeter({ stats, cache, cost, compacted, className }: Conte
             <>
               <span aria-hidden className="h-3 w-px shrink-0 bg-border" />
               <span
-                className={cn(
-                  'min-w-[2.75rem] shrink-0 text-right tabular-nums',
-                  !cost.priced && 'text-foreground-subtle',
-                )}
+                className="flex shrink-0 items-center gap-0.5"
                 title={t('context.cost.title')}
               >
-                {costLabel}
+                <DollarSign aria-hidden className="size-3 shrink-0" strokeWidth={2} />
+                <span
+                  className={cn(
+                    'min-w-[2.75rem] text-right tabular-nums',
+                    !cost.priced && 'text-foreground-subtle',
+                  )}
+                >
+                  {costLabel}
+                </span>
               </span>
             </>
           ) : null}
