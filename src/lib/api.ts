@@ -632,8 +632,9 @@ export const api = {
     invoke<void>('resize_terminal', { id, cols, rows }),
   closeTerminal: (id: string) => invoke<boolean>('close_terminal', { id }),
   killTerminal: (id: string) => invoke<void>('kill_terminal', { id }),
-  listTerminals: (conversationId: string) =>
-    invoke<TerminalInfo[]>('list_terminals', { conversationId }),
+  /** `conversationId` limits the list to one session; omitted = every terminal. */
+  listTerminals: (conversationId?: string | null) =>
+    invoke<TerminalInfo[]>('list_terminals', { conversationId: conversationId ?? null }),
 
   /* -------- git (painel) -------- */
   gitStatus: (workspaceId: string) => invoke<WorkspaceGitStatus>('git_status', { workspaceId }),

@@ -3,9 +3,10 @@
  *
  * This component is intentionally a thin view: `terminalManager` owns the PTY
  * sessions, xterm instances and IPC channels so switching to Arquivos/
- * Alterações, collapsing the panel or changing the session never leaks a
- * process. The view attaches the hosts of the active conversation and renders
- * the tabs/status/actions.
+ * Alterações, collapsing the panel, changing the session or closing the session
+ * tab never leaks a process — the terminal list is global and only split by
+ * surface. The view attaches the hosts of its surface and renders the
+ * tabs/status/actions.
  */
 import {
   useEffect,
@@ -29,12 +30,18 @@ import { useAppStore } from '@/lib/store';
 import { THEME_APPLIED_EVENT } from '@/lib/theme/apply';
 import type { TerminalSurface, TerminalTabInfo } from './terminalManager';
 import { terminalManager, terminalTabLabel } from './terminalManager';
+import { openTerminal } from './terminalOpen';
 import { useHorizontalWheelScroll } from './useHorizontalWheelScroll';
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 export interface TerminalPanelProps {
-  conversationId: string;
+  /**
+   * Session whose workspace seeds a new terminal (default: the active session,
+   * then the workspace selected in the sidebar). It never scopes the list:
+   * terminals opened elsewhere stay listed here.
+   */
+  conversationId?: string | null;
   className?: string;
   /** Which independent terminal set this view hosts (default: the right panel). */
   surface?: TerminalSurface;
@@ -57,12 +64,12 @@ export function TerminalPanel({
   const tabStripRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
   const emptyCtaRef = useRef<HTMLButtonElement | null>(null);
-  const previousTabs = useRef({ conversationId, count: 0 });
+  const previousTabs = useRef(0);
   useHorizontalWheelScroll(tabStripRef);
   const snapshot = useSyncExternalStore(
     terminalManager.subscribe,
-    () => terminalManager.getSnapshot(conversationId, surface),
-    () => terminalManager.getSnapshot(conversationId, surface),
+    () => terminalManager.getSnapshot(surface),
+    () => terminalManager.getSnapshot(surface),
   );
   const terminalFontFamilySetting = useAppStore((state) => state.settings.terminalFontFamily);
   const terminalFontSizeSetting = useAppStore((state) => state.settings.terminalFontSize);
@@ -83,9 +90,9 @@ export function TerminalPanel({
     const focusTerminal =
       autoFocus ||
       (activeElement instanceof HTMLElement && activeElement.id === 'code-panel-tab-terminal');
-    terminalManager.attach(conversationId, container, { surface, focus: focusTerminal });
-    return () => terminalManager.detach(conversationId, container, surface);
-  }, [conversationId, surface, autoFocus]);
+    terminalManager.attach(container, { surface, focus: focusTerminal });
+    return () => terminalManager.detach(container, surface);
+  }, [surface, autoFocus]);
 
   useEffect(() => {
     if (typeof MutationObserver === 'undefined') return;
@@ -134,19 +141,19 @@ export function TerminalPanel({
 
   /* Closing the last tab should not drop focus on <body>. */
   useEffect(() => {
-    const previous = previousTabs.current;
-    if (previous.conversationId === conversationId && previous.count > 0 && tabs.length === 0) {
+    const previousCount = previousTabs.current;
+    if (previousCount > 0 && tabs.length === 0) {
       emptyCtaRef.current?.focus();
     }
-    previousTabs.current = { conversationId, count: tabs.length };
-  }, [conversationId, tabs.length]);
+    previousTabs.current = tabs.length;
+  }, [tabs.length]);
 
   const selectTab = (id: string, focusTerminal = true) => {
-    terminalManager.activate(conversationId, id, { focusTerminal });
+    terminalManager.activate(id, { focusTerminal });
   };
 
   const closeTab = (tab: TerminalTabInfo) => {
-    void terminalManager.close(conversationId, tab.id);
+    void terminalManager.close(tab.id);
   };
 
   const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, id: string) => {
@@ -262,7 +269,7 @@ export function TerminalPanel({
                   label={t('code:terminal.clear')}
                   size="sm"
                   className="size-7"
-                  onClick={() => terminalManager.clear(conversationId, active.id)}
+                  onClick={() => terminalManager.clear(active.id)}
                 >
                   <Eraser aria-hidden className="size-3.5" strokeWidth={1.75} />
                 </IconButton>
@@ -274,7 +281,7 @@ export function TerminalPanel({
                     size="sm"
                     className="size-7"
                     disabled={active.killing}
-                    onClick={() => void terminalManager.kill(conversationId, active.id)}
+                    onClick={() => void terminalManager.kill(active.id)}
                   >
                     {active.killing ? (
                       <Spinner size="xs" />
@@ -290,7 +297,7 @@ export function TerminalPanel({
                     size="sm"
                     className="size-7"
                     disabled={loading}
-                    onClick={() => void terminalManager.restart(conversationId, active.id)}
+                    onClick={() => void terminalManager.restart(active.id)}
                   >
                     <RotateCcw aria-hidden className="size-3.5" strokeWidth={1.75} />
                   </IconButton>
@@ -310,7 +317,7 @@ export function TerminalPanel({
                 className="size-7"
                 loading={loading}
                 disabled={blocked}
-                onClick={() => void terminalManager.open(conversationId, surface)}
+                onClick={() => void openTerminal(surface, conversationId)}
               >
                 <Plus aria-hidden className="size-4" strokeWidth={1.75} />
               </IconButton>
@@ -333,7 +340,7 @@ export function TerminalPanel({
               size="sm"
               className="h-6 shrink-0 px-2 text-[11px]"
               leftIcon={<RotateCcw aria-hidden className="size-3" strokeWidth={1.75} />}
-              onClick={() => void terminalManager.open(conversationId, surface)}
+              onClick={() => void openTerminal(surface, conversationId)}
             >
               {t('common:actions.retry')}
             </Button>
@@ -362,7 +369,7 @@ export function TerminalPanel({
               className="mt-1"
               disabled={loading || blocked}
               title={atLimit ? t('code:terminal.limitHint', { limit }) : undefined}
-              onClick={() => void terminalManager.open(conversationId, surface)}
+              onClick={() => void openTerminal(surface, conversationId)}
             >
               {t('code:terminal.open')}
             </Button>

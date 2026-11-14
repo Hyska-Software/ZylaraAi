@@ -1,18 +1,22 @@
 //! Terminal PTY do harness de código (F7 do `docs/goals/code-harness/PLAN.md`).
 //!
-//! Um terminal por sessão do Code, iniciado **pelo usuário** no painel
+//! Terminal iniciado **pelo usuário** no painel/centro do layout Code
 //! (`WORKBENCH.md` §7.3). Backend com `portable-pty` (ConPTY no Windows):
 //! entrada/saída em streaming por `tauri::ipc::Channel<TerminalEvent>`, resize,
-//! kill de processo e cwd no workspace da conversa. Contrato: `HARNESS.md` §8.3.
+//! kill de processo e cwd no workspace da conversa que o abriu. Contrato:
+//! `HARNESS.md` §8.3.
 //!
 //! Segurança: o terminal herda o ambiente do app (é um shell do usuário), mas
 //! remove variáveis com cara de segredo; o agente **não** recebe essas tools —
 //! quem digita é o usuário.
 //!
-//! Ciclo de vida: a sessão continua no registry após o processo terminar (para
+//! Ciclo de vida: o registry é process-wide e a UI mantém uma lista **global**
+//! de terminais — trocar de sessão/workspace ou fechar a aba da sessão não
+//! encerra o PTY. A sessão continua no registry após o processo terminar (para
 //! a UI mostrar o exit code e permitir fechar/reiniciar) e só deixa de contar
-//! no limite enquanto estiver rodando. Fechar a aba remove a sessão; fechar o
-//! app encerra todas as árvores de processo.
+//! no limite enquanto estiver rodando. Fechar a aba do terminal remove a
+//! sessão, apagar a conversa encerra as sessões dela e fechar o app encerra
+//! todas as árvores de processo.
 
 mod env;
 
@@ -33,9 +37,9 @@ use crate::db::Db;
 use crate::domain::Settings;
 use crate::events::TerminalEvent;
 
-/// Limite de terminais **rodando** por conversa. Abas já encerradas não contam
-/// (a UI mantém o histórico até o usuário fechar a aba).
-const MAX_TERMINALS_PER_CONVERSATION: usize = 4;
+/// Limite de terminais **rodando** (global, somando todas as sessões). Abas já
+/// encerradas não contam (a UI mantém o histórico até o usuário fechar a aba).
+const MAX_TERMINALS: usize = 4;
 
 struct TerminalSession {
     conversation_id: String,
@@ -305,7 +309,7 @@ impl TerminalRegistry {
         channel: Channel<TerminalEvent>,
     ) -> Result<TerminalInfo, String> {
         // Held until the session is inserted, so two concurrent opens cannot
-        // both observe a free slot and exceed the per-conversation limit.
+        // both observe a free slot and exceed the global limit.
         let _open_guard = self.open_lock.lock();
         let running_count = self
             .sessions
@@ -313,10 +317,10 @@ impl TerminalRegistry {
             .values()
             .filter(|session| session.is_running())
             .count();
-        if running_count >= MAX_TERMINALS_PER_CONVERSATION {
+        if running_count >= MAX_TERMINALS {
             return Err(crate::i18n::t_args(
                 "terminal.errors.limit",
-                &[("limit", &MAX_TERMINALS_PER_CONVERSATION.to_string())],
+                &[("limit", &MAX_TERMINALS.to_string())],
             ));
         }
 
@@ -523,11 +527,16 @@ impl TerminalRegistry {
         closed
     }
 
-    pub fn list(&self, conversation_id: &str) -> Vec<TerminalInfo> {
+    /// Lists live sessions; `None` returns the whole registry (the renderer keeps
+    /// one global terminal list, so its orphan reconcile needs every session).
+    pub fn list(&self, conversation_id: Option<&str>) -> Vec<TerminalInfo> {
         self.sessions
             .lock()
             .iter()
-            .filter(|(_, session)| session.conversation_id == conversation_id)
+            .filter(|(_, session)| match conversation_id {
+                Some(id) => session.conversation_id == id,
+                None => true,
+            })
             .map(|(id, session)| TerminalInfo {
                 id: id.clone(),
                 conversation_id: session.conversation_id.clone(),
@@ -627,7 +636,8 @@ mod tests {
     fn registry_lifecycle_is_honest_without_a_channel() {
         let registry = TerminalRegistry::new();
         assert!(!registry.close("term-missing"));
-        assert!(registry.list("conv-1").is_empty());
+        assert!(registry.list(Some("conv-1")).is_empty());
+        assert!(registry.list(None).is_empty());
         assert!(registry.write("term-missing", "ls\n").is_err());
         assert!(registry.resize("term-missing", 80, 24).is_err());
         assert!(registry.kill("term-missing").is_err());

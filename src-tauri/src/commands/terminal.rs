@@ -69,10 +69,12 @@ pub async fn close_terminal(state: State<'_, AppState>, id: String) -> Result<bo
     Ok(state.terminals.close(&id))
 }
 
+/// Lista os terminais abertos; `conversation_id` filtra por sessão e `None`
+/// devolve todos (a UI mantém uma lista global de terminais).
 #[tauri::command]
 pub async fn list_terminals(
     state: State<'_, AppState>,
-    conversation_id: String,
+    conversation_id: Option<String>,
 ) -> Result<Vec<TerminalInfo>, String> {
-    Ok(state.terminals.list(&conversation_id))
+    Ok(state.terminals.list(conversation_id.as_deref()))
 }

@@ -342,7 +342,7 @@
   },
   "terminal": {
     "error": {
-      "limit": "Limit of 4 terminals per session. Close a tab to open another one.",
+      "limit": "Limit of 4 open terminals. Close a tab to open another one.",
       "noWorkspace": "Open a folder to use the terminal.",
       "workspaceMissing": "The workspace folder is not available on disk.",
       "conversationNotFound": "This terminal's session no longer exists.",
@@ -729,9 +729,7 @@
     "commitsHistoryAria": "View commit history",
     "empty": {
       "noWorkspaceTitle": "No workspace open",
-      "noWorkspaceDescription": "Open a folder in the sidebar so the agent can read, edit and run commands here.",
-      "noSessionTitle": "No active session",
-      "noSessionDescription": "Open a session to use the terminal in the workspace folder."
+      "noWorkspaceDescription": "Open a folder in the sidebar so the agent can read, edit and run commands here."
     },
     "toast": {
       "openFolderError": "Could not open the folder"

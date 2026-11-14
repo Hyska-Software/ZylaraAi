@@ -2,7 +2,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-import { useAppStore } from '@/lib/store';
 import type { TerminalEvent, TerminalInfo } from '@/lib/types';
 
 /** Options of every fake xterm, in creation order (assertions read the live object). */
@@ -63,6 +62,10 @@ const apiMock = vi.hoisted(() => ({
 
 vi.mock('@/lib/api', () => ({ api: apiMock }));
 
+const toastMock = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
+vi.mock('sonner', () => ({ toast: toastMock }));
+
+import { useAppStore, useChatStore, useUiStore } from '@/lib/store';
 import { TerminalPanel } from './TerminalPanel';
 import { __resetTerminalManagerForTests } from './terminalManager';
 
@@ -102,6 +105,8 @@ beforeEach(() => {
   nextTerminal = 1;
   __resetTerminalManagerForTests();
   xtermRegistry.options.length = 0;
+  useChatStore.setState({ activeId: null });
+  useUiStore.setState({ activeWorkspaceId: null });
   (globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver =
     ResizeObserverStub;
   apiMock.openTerminal.mockImplementation(async () => terminalInfo());
@@ -235,17 +240,63 @@ describe('TerminalPanel', () => {
     expect(hosts()).toHaveLength(1);
   });
 
-  it('isola os terminais por conversa', async () => {
+  it('mantém o terminal aberto ao trocar de conversa (lista global)', async () => {
+    const view = render(<TerminalPanel conversationId="conv-1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
+    await screen.findByRole('tab', { name: 'Terminal 1' });
+
+    // Switching session/workspace must not hide nor kill the running shell.
+    view.rerender(<TerminalPanel conversationId="conv-2" />);
+
+    expect(apiMock.closeTerminal).not.toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: 'Terminal 1' })).toBeTruthy();
+    expect(screen.queryByText('Nenhum terminal aberto')).toBeNull();
+    expect(hosts()).toHaveLength(1);
+  });
+
+  it('sobrevive ao fechar a conversa que abriu o terminal', async () => {
+    const view = render(<TerminalPanel conversationId="conv-1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
+    await screen.findByRole('tab', { name: 'Terminal 1' });
+
+    // No active session anymore (tab closed or app in the welcome state).
+    view.rerender(<TerminalPanel />);
+
+    expect(apiMock.closeTerminal).not.toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: 'Terminal 1' })).toBeTruthy();
+  });
+
+  it('reinicia no workspace da conversa que abriu o terminal', async () => {
     const view = render(<TerminalPanel conversationId="conv-1" />);
     fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
     await screen.findByRole('tab', { name: 'Terminal 1' });
 
     view.rerender(<TerminalPanel conversationId="conv-2" />);
-    expect(screen.queryByRole('tab', { name: 'Terminal 1' })).toBeNull();
-    expect(screen.getByText('Nenhum terminal aberto')).toBeTruthy();
+    lastCallback()({ type: 'exit', code: 0 });
+    fireEvent.click(await screen.findByRole('button', { name: 'Reiniciar terminal' }));
 
-    view.rerender(<TerminalPanel conversationId="conv-1" />);
-    expect(await screen.findByRole('tab', { name: 'Terminal 1' })).toBeTruthy();
+    await waitFor(() => expect(apiMock.openTerminal).toHaveBeenCalledTimes(2));
+    expect(apiMock.openTerminal.mock.calls[1]?.[0]).toBe('conv-1');
+  });
+
+  it('usa a conversa ativa do app quando o chamador não informa alvo', async () => {
+    useChatStore.setState({ activeId: 'conv-9' });
+    render(<TerminalPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
+
+    await waitFor(() =>
+      expect(apiMock.openTerminal).toHaveBeenCalledWith('conv-9', 100, 24, expect.any(Function)),
+    );
+  });
+
+  it('avisa quando não há pasta para abrir um terminal novo', async () => {
+    render(<TerminalPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
+
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
+    expect(apiMock.openTerminal).not.toHaveBeenCalled();
   });
 
   it('marca o processo como encerrado e oferece reiniciar', async () => {
@@ -364,6 +415,8 @@ describe('TerminalPanel', () => {
     apiMock.listTerminals.mockResolvedValueOnce([terminalInfo('term-orphan')]);
     render(<TerminalPanel conversationId="conv-1" />);
 
+    // The renderer keeps a global list, so the reconcile asks for every session.
+    await waitFor(() => expect(apiMock.listTerminals).toHaveBeenCalledWith());
     await waitFor(() => expect(apiMock.closeTerminal).toHaveBeenCalledWith('term-orphan'));
   });
 });

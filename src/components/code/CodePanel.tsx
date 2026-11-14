@@ -557,22 +557,17 @@ export function CodePanel() {
               />
             )}
           </div>
+        ) : tab === 'terminal' ? (
+          /* The terminal list is global: it stays available (and lists the
+             terminals opened in other sessions/workspaces) even with no active
+             session; only a new tab needs a folder to run in. */
+          <TerminalPanel conversationId={activeId} className="min-h-0 flex-1" />
         ) : !workspaceId ? (
           <PanelEmptyState
             icon={FolderOpen}
             title={t('code:panel.empty.noWorkspaceTitle')}
             description={t('code:panel.empty.noWorkspaceDescription')}
           />
-        ) : tab === 'terminal' ? (
-          activeId ? (
-            <TerminalPanel conversationId={activeId} className="min-h-0 flex-1" />
-          ) : (
-            <PanelEmptyState
-              icon={SquareTerminal}
-              title={t('code:panel.empty.noSessionTitle')}
-              description={t('code:panel.empty.noSessionDescription')}
-            />
-          )
         ) : (
           <FileTree
             entries={treeEntries}

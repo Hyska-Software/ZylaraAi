@@ -513,6 +513,10 @@ pub struct ExecRequest {
   `Channel<TerminalEvent>` por sessão (`{type:'data', bytes}` base64 ou string UTF-8 com
   substituição). Renderer: `@xterm/xterm` + `addon-fit` no painel direito (aba Terminal) e/ou
   centro (`codeView: 'terminal'`).
+- Lista **global** na UI: o registry é process-wide e as abas sobrevivem à troca de sessão/
+  workspace e ao fechamento da aba da sessão que abriu o terminal (`list_terminals` sem
+  `conversationId` devolve todos, usado pelo reconcile de órfãos). Trocar de sessão não encerra
+  o PTY; fechar a aba do terminal, apagar a conversa (dona do `cwd`) ou fechar o app encerra.
 - Autorização: abrir terminal é ação do **usuário** (botão/atalho); o modelo usa `terminal_*`
   só se o usuário liberar (modo Autônomo ou regra) — v1.1 decide o default com base no uso.
 - Testes: abrir/fechar, resize, output, kill de árvore, encoding, sessão morta.

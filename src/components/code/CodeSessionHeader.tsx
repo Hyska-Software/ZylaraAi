@@ -68,6 +68,7 @@ import { WorkspaceTrustDialog } from './WorkspaceTrustDialog';
 import { CodeContextMeterChip } from './CodeAgentWidgets';
 import { FileIcon } from './FileIcon';
 import { terminalManager, terminalTabLabel, type TerminalTabInfo } from './terminalManager';
+import { openTerminal } from './terminalOpen';
 import { useHorizontalWheelScroll } from './useHorizontalWheelScroll';
 import { NO_WORKSPACE_KEY, openFolder, useWorkspaces } from './useWorkspaces';
 
@@ -514,8 +515,8 @@ export function CodeSessionHeader() {
   // the active terminal is owned by the manager, not duplicated in the store.
   const centerTerminals = useSyncExternalStore(
     terminalManager.subscribe,
-    () => terminalManager.getSnapshot(activeId, 'center'),
-    () => terminalManager.getSnapshot(activeId, 'center'),
+    () => terminalManager.getSnapshot('center'),
+    () => terminalManager.getSnapshot('center'),
   );
 
   /* Drag-and-drop order of the movable tabs (sessions + center terminals).
@@ -541,8 +542,8 @@ export function CodeSessionHeader() {
     : null;
 
   const selectTab = (id: string) => {
-    if (activeId && centerTerminals.tabs.some((tab) => tab.id === id)) {
-      terminalManager.activate(activeId, id, { focusTerminal: true });
+    if (centerTerminals.tabs.some((tab) => tab.id === id)) {
+      terminalManager.activate(id, { focusTerminal: true });
       useUiStore.getState().setCodeView('terminal');
       return;
     }
@@ -603,19 +604,19 @@ export function CodeSessionHeader() {
 
   const closeTab = (id: string) => {
     if (id === NEW_SESSION_ID) return;
-    if (activeId && centerTerminals.tabs.some((tab) => tab.id === id)) {
+    if (centerTerminals.tabs.some((tab) => tab.id === id)) {
       const wasActive = codeView === 'terminal' && centerTerminals.activeId === id;
       const last = centerTerminals.tabs.length === 1;
       // `close` removes the instance and notifies synchronously before the IPC
       // await, so the snapshot below already reflects the selected neighbor.
-      void terminalManager.close(activeId, id);
+      void terminalManager.close(id);
       if (wasActive && last) {
         useUiStore.getState().setCodeView('session');
-        focusTab(activeId);
+        focusTab(activeId ?? undefined);
         return;
       }
-      const next = terminalManager.getSnapshot(activeId, 'center').activeId;
-      focusTab(next ?? activeId);
+      const next = terminalManager.getSnapshot('center').activeId;
+      focusTab(next ?? activeId ?? undefined);
       return;
     }
     if (id.startsWith(CODE_FILE_TAB_PREFIX)) {
@@ -733,28 +734,18 @@ export function CodeSessionHeader() {
   };
 
   /**
-   * Opens a terminal in the central strip. It is a separate terminal set from
-   * the right panel's Terminal tab; with no active session the workspace
-   * selected in the sidebar seeds a new session first.
+   * Opens a terminal in the central strip. The terminal set is global, but the
+   * PTY needs a folder: the active session's workspace is used, otherwise the
+   * workspace selected in the sidebar seeds a new session first (see
+   * `openTerminal`).
    */
   const openCenterTerminal = async () => {
-    let conversationId = activeConversation?.id ?? null;
-    if (!conversationId) {
-      const workspaceId = useUiStore.getState().activeWorkspaceId;
-      if (!workspaceId) {
-        toast.error(t('code:terminal.error.noWorkspace'));
-        return;
-      }
-      useUiStore.getState().setActiveWorkspace(workspaceId);
-      conversationId = await startSession(workspaceId);
-      if (!conversationId) return;
-    }
-    const terminalId = await terminalManager.open(conversationId, 'center');
+    const terminalId = await openTerminal('center', activeConversation?.id ?? null);
     if (terminalId) {
       useUiStore.getState().setCodeView('terminal');
       return;
     }
-    const error = terminalManager.getSnapshot(conversationId, 'center').error;
+    const error = terminalManager.getSnapshot('center').error;
     if (error) toast.error(error.message, { description: error.detail });
   };
 

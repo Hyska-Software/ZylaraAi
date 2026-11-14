@@ -28,6 +28,7 @@ vi.mock('@/lib/api', () => ({
     suggestCommitMessage: vi.fn(),
     revertFile: vi.fn(),
     getWorkspaceChanges: vi.fn(),
+    listTerminals: vi.fn(),
   },
 }));
 
@@ -140,6 +141,7 @@ beforeEach(() => {
   apiMock.gitLog.mockResolvedValue([]);
   apiMock.gitBranches.mockResolvedValue({ current: 'main', branches: ['main'], all: [] });
   apiMock.getWorkspace.mockResolvedValue(null);
+  apiMock.listTerminals.mockResolvedValue([]);
   setViewport(1440);
   resetPanelState();
   __resetWorkspacesForTests();
@@ -213,6 +215,16 @@ describe('CodePanel — abas Arquivos / Alterações', () => {
 
     expect(useUiStore.getState().codePanelTab).toBe('files');
     expect(screen.getByText('Nenhum workspace aberto')).toBeTruthy();
+  });
+
+  it('mantém a aba Terminal disponível sem workspace nem sessão', () => {
+    useUiStore.setState({ codePanelTab: 'terminal' });
+
+    render(<CodePanel />);
+
+    // The terminal list is global: it is not gated by the active session.
+    expect(screen.getByText('Nenhum terminal aberto')).toBeTruthy();
+    expect(screen.queryByText('Nenhum workspace aberto')).toBeNull();
   });
 
   it('abre o arquivo em aba central sem carregar prévia inline', async () => {

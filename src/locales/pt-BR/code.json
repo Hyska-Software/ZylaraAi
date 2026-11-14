@@ -342,7 +342,7 @@
   },
   "terminal": {
     "error": {
-      "limit": "Limite de 4 terminais por sessão. Feche uma aba para abrir outro.",
+      "limit": "Limite de 4 terminais abertos. Feche uma aba para abrir outro.",
       "noWorkspace": "Abra uma pasta para usar o terminal.",
       "workspaceMissing": "A pasta do workspace não está disponível no disco.",
       "conversationNotFound": "A sessão deste terminal não existe mais.",
@@ -729,9 +729,7 @@
     "commitsHistoryAria": "Ver histórico de commits",
     "empty": {
       "noWorkspaceTitle": "Nenhum workspace aberto",
-      "noWorkspaceDescription": "Abra uma pasta na barra lateral para o agente ler, editar e rodar comandos aqui.",
-      "noSessionTitle": "Nenhuma sessão ativa",
-      "noSessionDescription": "Abra uma sessão para usar o terminal no diretório do workspace."
+      "noWorkspaceDescription": "Abra uma pasta na barra lateral para o agente ler, editar e rodar comandos aqui."
     },
     "toast": {
       "openFolderError": "Não foi possível abrir a pasta"

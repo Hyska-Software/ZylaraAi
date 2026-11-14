@@ -1471,9 +1471,7 @@ describe('CodeSessionHeader — terminais nas abas', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Fechar Terminal 1' }));
 
-    await waitFor(() =>
-      expect(terminalMock.manager.close).toHaveBeenCalledWith('c-1', 'term-1'),
-    );
+    await waitFor(() => expect(terminalMock.manager.close).toHaveBeenCalledWith('term-1'));
     expect(useUiStore.getState().codeView).toBe('session');
   });
 
@@ -1486,9 +1484,33 @@ describe('CodeSessionHeader — terminais nas abas', () => {
     render(<CodeSessionHeader />);
     fireEvent.click(await screen.findByRole('tab', { name: 'Terminal 1' }));
 
-    expect(terminalMock.manager.activate).toHaveBeenCalledWith('c-1', 'term-1', {
+    expect(terminalMock.manager.activate).toHaveBeenCalledWith('term-1', {
       focusTerminal: true,
     });
+    expect(useUiStore.getState().codeView).toBe('terminal');
+  });
+
+  it('mantém a aba do terminal ao trocar de sessão', async () => {
+    activeSession();
+    const terminalTab = terminalMock.tab();
+    terminalMock.emit({ tabs: [terminalTab], activeId: terminalTab.id, used: 1 });
+    useUiStore.setState({ codeView: 'terminal' });
+
+    render(<CodeSessionHeader />);
+    expect(await screen.findByRole('tab', { name: 'Terminal 1' })).toBeTruthy();
+
+    act(() =>
+      useChatStore.setState({
+        conversations: [
+          conversation({ id: 'c-1', title: 'Sessão', workspaceId: 'ws-1' }),
+          conversation({ id: 'c-2', title: 'Outra sessão', workspaceId: 'ws-2' }),
+        ],
+        activeId: 'c-2',
+      }),
+    );
+
+    // The terminal list is global: the tab stays and the view keeps showing it.
+    expect(screen.getByRole('tab', { name: 'Terminal 1' })).toBeTruthy();
     expect(useUiStore.getState().codeView).toBe('terminal');
   });
 

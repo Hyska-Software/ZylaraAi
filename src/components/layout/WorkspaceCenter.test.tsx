@@ -58,7 +58,7 @@ vi.mock('@/components/code', () => ({
     showTabStrip,
     className,
   }: {
-    conversationId: string;
+    conversationId?: string | null;
     surface?: string;
     showTabStrip?: boolean;
     className?: string;
@@ -69,7 +69,7 @@ vi.mock('@/components/code', () => ({
       data-tabstrip={String(showTabStrip)}
       className={className}
     >
-      {conversationId}
+      {conversationId ?? 'sem-sessao'}
     </div>
   ),
   GitHubPullRequestsView: ({ tab }: { tab: { workspaceId: string } }) => (
@@ -245,6 +245,19 @@ describe('WorkspaceCenter — modo Code', () => {
     expect(screen.getByTestId('code-session-header').parentElement?.className).not.toContain(
       'hidden',
     );
+    expect(screen.getByTestId('chat-view').parentElement?.className).toContain('hidden');
+  });
+
+  it('mostra o terminal central mesmo sem sessão ativa', () => {
+    useUiStore.setState({ layoutMode: 'code', codeView: 'terminal' });
+    useChatStore.setState({ activeId: null });
+
+    render(<WorkspaceCenter />);
+
+    const terminal = screen.getByTestId('terminal-panel');
+    expect(terminal.getAttribute('data-surface')).toBe('center');
+    // Global terminal list: no session is needed to look at open terminals.
+    expect(terminal.textContent).toBe('sem-sessao');
     expect(screen.getByTestId('chat-view').parentElement?.className).toContain('hidden');
   });
 

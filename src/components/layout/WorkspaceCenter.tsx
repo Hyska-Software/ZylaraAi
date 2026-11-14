@@ -75,7 +75,7 @@ export function WorkspaceCenter() {
   const showGoal = isCode && codeView === 'goal' && activeId !== null;
   const showCommits = isCode && codeView === 'commits' && codeCommitsTab !== null;
   const showSubagent = isCode && codeView === 'subagent' && codeSubagentTab !== null;
-  const showTerminal = isCode && codeView === 'terminal' && activeId !== null;
+  const showTerminal = isCode && codeView === 'terminal';
   const showPullRequests = isCode && codeView === 'prs' && codePullRequestsTab !== null;
   const showPullRequest = isCode && codeView === 'pr' && codePullRequestTab !== null;
   const showIssues = isCode && codeView === 'issues' && codeIssuesTab !== null;
@@ -133,7 +133,7 @@ export function WorkspaceCenter() {
         <ChatView welcome={isCode ? <CodeWelcomeScreen /> : undefined} />
       </div>
 
-      {showTerminal && activeId ? (
+      {showTerminal ? (
         <div
           id="code-terminal-panel"
           role="region"
