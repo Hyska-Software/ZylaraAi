@@ -155,7 +155,9 @@ pub fn sdk_js() -> &'static str {
   const pluginId = params.get('zylaraPlugin') || '';
   const listeners = new Map();
   const pending = new Map();
+  const hostPending = new Map();
   const toolHandlers = [];
+  const genuiHandlers = [];
   let init = null;
   let seq = 0;
 
@@ -189,6 +191,19 @@ pub fn sdk_js() -> &'static str {
           reject(new Error('PLUGIN_RPC_TIMEOUT'));
         }
       }, 120000);
+    });
+  }
+  function hostAction(action, params = {}) {
+    const id = `action-${Date.now()}-${++seq}`;
+    return new Promise((resolve, reject) => {
+      hostPending.set(id, { resolve, reject });
+      post({ type: 'host-action', id, action, params });
+      setTimeout(() => {
+        if (hostPending.has(id)) {
+          hostPending.delete(id);
+          reject(new Error('PLUGIN_HOST_ACTION_TIMEOUT'));
+        }
+      }, 30000);
     });
   }
   function applyTheme(theme) {
@@ -231,6 +246,19 @@ pub fn sdk_js() -> &'static str {
     } else if (data.type === 'theme') {
       applyTheme(data.theme);
       emit('theme', data.theme);
+    } else if (data.type === 'context') {
+      if (init) init.context = data.context || {};
+      emit('context', data.context || {});
+    } else if (data.type === 'host-action-result') {
+      const entry = hostPending.get(data.id);
+      if (!entry) return;
+      hostPending.delete(data.id);
+      if (data.error) entry.reject(new Error(data.error));
+      else entry.resolve(data.result);
+    } else if (data.type === 'genui-props') {
+      for (const handler of genuiHandlers.slice()) {
+        try { handler(data.props || {}); } catch (error) { console.error(error); }
+      }
     } else if (data.type === 'rpc-result') {
       const entry = pending.get(data.id);
       if (!entry) return;
@@ -251,7 +279,22 @@ pub fn sdk_js() -> &'static str {
     get theme() { return (init && init.theme) || {}; },
     rpc,
     on,
+    onEvent(name, handler) { return on(name, handler); },
     onTool(handler) { toolHandlers.push(handler); },
+    onGenui(handler) { genuiHandlers.push(handler); },
+    ui: {
+      openPage(pageId, options = {}) {
+        return hostAction('openPage', { page: String(pageId), layout: options.layout || null });
+      },
+      openPanelTab(tabId, options = {}) {
+        return hostAction('openPanelTab', { tab: String(tabId), layout: options.layout || null });
+      },
+      closePanelTab() { return hostAction('closePanelTab', {}); },
+      setLayout(layout) { return hostAction('setLayout', { layout: String(layout) }); },
+      openSettings(tab) { return hostAction('openSettings', { tab: tab ? String(tab) : null }); },
+      toast(title, body) { return hostAction('toast', { title: String(title), body: String(body || '') }); },
+      setBadge(navId, badge) { return hostAction('setBadge', { id: String(navId), badge }); },
+    },
     t(key, fallback) {
       const bundle = (init && init.localeBundle) || {};
       const value = key.split('.').reduce((current, part) => (current && typeof current === 'object' ? current[part] : undefined), bundle);
@@ -261,9 +304,9 @@ pub fn sdk_js() -> &'static str {
     resize() {
       post({ type: 'resize', height: Math.min(1200, Math.max(1, document.documentElement.scrollHeight)) });
     },
-    openView(viewId) { post({ type: 'openView', viewId: String(viewId) }); },
-    openPanel(panelId) { post({ type: 'openPanel', panelId: String(panelId) }); },
-    closeOverlays() { post({ type: 'closeOverlays' }); },
+    openView(viewId) { return hostAction('openPage', { page: String(viewId), layout: null }); },
+    openPanel(panelId) { return hostAction('openPanelTab', { tab: String(panelId), layout: null }); },
+    closeOverlays() { return hostAction('closePanelTab', {}); },
     openExternal(url) { return rpc('opener.open', { url }); },
     ready() { post({ type: 'ready' }); },
   };
@@ -297,6 +340,10 @@ mod tests {
         assert!(sdk.contains("'ZylaraPlugin'"));
         assert!(sdk.contains("event.source !== parent"));
         assert!(sdk.contains("PLUGIN_RPC_TIMEOUT"));
+        assert!(sdk.contains("onEvent"));
+        assert!(sdk.contains("onGenui"));
+        assert!(sdk.contains("host-action"));
+        assert!(sdk.contains("openPage"));
         assert!(!sdk.contains("__TAURI__"));
     }
 }

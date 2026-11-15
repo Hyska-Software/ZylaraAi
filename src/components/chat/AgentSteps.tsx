@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type ComponentType,
 } from 'react';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useReduceMotion } from '@/components/layout/hooks';
+import { ComponentSlot, Slot } from '@/components/plugins/ui/Slot';
 import { Spinner } from '@/components/ui';
 import {
   buildAgentResponseBlocks,
@@ -200,7 +202,9 @@ function ReasoningRow({ text, streaming, label, durationMs = null }: ReasoningRo
         </div>
         <Collapsible.Content>
           <div className="ml-[26px] mt-1">
-            <Markdown content={text} variant="thinking" streaming={streaming} />
+            <Slot name="chat.reasoning.body.frame" owner={{ text, streaming }}>
+              <Markdown content={text} variant="thinking" streaming={streaming} />
+            </Slot>
           </div>
         </Collapsible.Content>
       </Collapsible.Root>
@@ -242,12 +246,16 @@ function TraceEntryRows({
           // only to the last block while the model is thinking; the row
           // itself starts collapsed like a tool row.
           return (
-            <ReasoningRow
+            <ComponentSlot
               key={`reasoning-${index}`}
-              text={entry.text}
-              label={showReasoningDuration ? t('trace.reasoning') : undefined}
-              durationMs={showReasoningDuration ? (entry.durationMs ?? null) : null}
-              streaming={streaming && phase === 'reasoning' && index === lastReasoningIndex}
+              name="chat.message.reasoning"
+              fallback={ReasoningRow as unknown as ComponentType<Record<string, unknown>>}
+              props={{
+                text: entry.text,
+                label: showReasoningDuration ? t('trace.reasoning') : undefined,
+                durationMs: showReasoningDuration ? (entry.durationMs ?? null) : null,
+                streaming: streaming && phase === 'reasoning' && index === lastReasoningIndex,
+              }}
             />
           );
         }
@@ -258,10 +266,14 @@ function TraceEntryRows({
           return (
             <Fragment key={`tools-${index}`}>
               {entry.group.tools.map((tool) => (
-                <ToolCallRow
+                <Slot
                   key={tool.id}
-                  tool={tool}
-                  icon={TOOL_ICONS[tool.name] ?? Wrench}
+                  name="chat.message.tool"
+                  entryKey={tool.name}
+                  owner={{ tool }}
+                  fallback={
+                    <ToolCallRow tool={tool} icon={TOOL_ICONS[tool.name] ?? Wrench} />
+                  }
                 />
               ))}
             </Fragment>

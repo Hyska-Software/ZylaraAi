@@ -29,6 +29,7 @@ import { ProvidersTab } from './ProvidersTab';
 import { SETTINGS_TAB_ICONS } from './tabIcons';
 import { TerminalTab } from './TerminalTab';
 import { ThemesTab } from './ThemesTab';
+import { DesignTab } from './DesignTab';
 import { ToolsTab } from './ToolsTab';
 
 /**
@@ -129,6 +130,9 @@ export function SettingsDialog() {
                   </TabsContent>
                   <TabsContent value="themes">
                     <ThemesTab />
+                  </TabsContent>
+                  <TabsContent value="design">
+                    <DesignTab />
                   </TabsContent>
                   <TabsContent value="terminal">
                     <TerminalTab />

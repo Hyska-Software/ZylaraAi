@@ -117,11 +117,7 @@ pub fn fs_scope(grants: &[String], base: &str) -> Vec<String> {
 }
 
 pub fn is_trusted_only(permission: &str) -> bool {
-    matches!(
-        contract::permission_base(permission),
-        "ui.override" | "ui.css.global" | "ui.shell" | "unsafe.renderer" | "secrets.read"
-            | "process.spawn"
-    )
+    contract::permission_trusted_only(contract::permission_base(permission))
 }
 
 #[cfg(test)]
@@ -156,7 +152,6 @@ mod tests {
     fn trusted_only_permissions_are_flagged() {
         for permission in [
             "ui.override:chat.welcome",
-            "ui.css.global",
             "ui.shell",
             "unsafe.renderer",
             "secrets.read",
@@ -164,6 +159,8 @@ mod tests {
         ] {
             assert!(is_trusted_only(permission), "{permission}");
         }
+        assert!(!is_trusted_only("ui.css.global"));
+        assert!(!is_trusted_only("ui.nav"));
         assert!(!is_trusted_only("storage"));
     }
 

@@ -17,6 +17,11 @@ import { AgentPanelRoutines } from './AgentPanelRoutines';
 import { AgentPanelScreen } from './AgentPanelScreen';
 import { AgentActivityDialog } from './AgentActivityDialog';
 import { PanelResizer } from '@/components/layout/PanelResizer';
+import { Slot } from '@/components/plugins/ui/Slot';
+import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
+import { pluginIcon } from '@/lib/plugins/icons';
+import { pluginLabel } from '@/lib/plugins/registry';
+import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { IconButton, Tooltip } from '@/components/ui';
 import { api } from '@/lib/api';
 import {
@@ -61,6 +66,13 @@ export function AgentPanel() {
   const open = useUiStore((state) => state.agentPanelOpen);
   const tab = useUiStore((state) => state.agentPanelTab);
   const setTab = useUiStore((state) => state.setAgentPanelTab);
+  const pluginDock = useUiStore((state) => state.pluginDockTab.agent);
+  const openPluginDockTab = useUiStore((state) => state.openPluginDockTab);
+  const ui = usePluginUi();
+  const pluginTabs = useMemo(
+    () => ui.panelTabs.filter((entry) => entry.layouts.includes('agent') && !entry.takeover),
+    [ui.panelTabs],
+  );
   const setOpen = useUiStore((state) => state.setAgentPanelOpen);
   const openEditor = useUiStore((state) => state.openAgentEditor);
   const activeAgentId = useUiStore((state) => state.activeAgentId);
@@ -279,6 +291,35 @@ export function AgentPanel() {
             );
           })}
         </div>
+        {pluginTabs.map((entry) => {
+          const Icon = pluginIcon(entry.icon);
+          const selected = pluginDock === entry.key;
+          const label = pluginLabel(entry.plugin, entry.titleKey, entry.title);
+          return (
+            <button
+              key={entry.key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-label={label}
+              title={label}
+              onClick={() => openPluginDockTab(entry.key, 'agent')}
+              className={cn(
+                'flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium',
+                'transition-colors duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                selected
+                  ? 'bg-surface-active text-foreground'
+                  : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
+                compactTabs && 'px-2',
+              )}
+            >
+              <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
+              {compactTabs ? null : label}
+            </button>
+          );
+        })}
+        <Slot name="agent.panel.tabs" owner={{ layout: 'agent' }} />
         {agent ? (
           <Tooltip content={t('panel.editAgent')} side="bottom">
             <IconButton label={t('panel.editAgent')} size="sm" onClick={context?.onEdit}>
@@ -318,7 +359,9 @@ export function AgentPanel() {
         aria-labelledby={`agent-panel-tab-${activeTab}`}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        {channel ? (
+        {pluginDock ? (
+          <PluginDockTabHost layout="agent" tabKey={pluginDock} />
+        ) : channel ? (
           <div className="flex flex-col gap-2 p-3 text-[12px] text-foreground-muted">
             <p className="font-medium text-foreground">{t('panel.sharedChannel')}</p>
             <p>

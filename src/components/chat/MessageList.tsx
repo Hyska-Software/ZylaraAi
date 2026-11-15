@@ -2,6 +2,8 @@ import { Fragment } from 'react';
 
 import type { StreamingState } from '@/lib/store';
 import type { ChatMessage } from '@/lib/types';
+import { ComponentSlot, Slot } from '@/components/plugins/ui/Slot';
+import type { PluginComponent } from '@/lib/plugins/ui/types';
 import { MessageItem } from './MessageItem';
 import { ModelSwitchDivider, modelSwitchAt } from './ModelSwitchDivider';
 
@@ -12,15 +14,7 @@ export interface MessageListProps {
   readOnly?: boolean;
 }
 
-/**
- * Ordered list of chat messages. The container is a polite live region while a
- * turn streams so screen readers announce the new content (DESIGN §12).
- *
- * Sessions may switch model/provider between turns (Code layout); when a
- * response inaugurates a new route, a discreet divider is rendered as a sibling
- * right before it. `MessageItem` keeps owning its own grouping/spacing.
- */
-export function MessageList({ messages, streaming, readOnly = false }: MessageListProps) {
+function MessageListHost({ messages, streaming, readOnly = false }: MessageListProps) {
   return (
     <div
       role="log"
@@ -50,5 +44,30 @@ export function MessageList({ messages, streaming, readOnly = false }: MessageLi
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Ordered list of chat messages. The container is a polite live region while a
+ * turn streams so screen readers announce the new content (DESIGN §12).
+ *
+ * Sessions may switch model/provider between turns (Code layout); when a
+ * response inaugurates a new route, a discreet divider is rendered as a sibling
+ * right before it. `MessageItem` keeps owning its own grouping/spacing.
+ */
+export function MessageList(props: MessageListProps) {
+  const owner = {
+    conversationId: props.messages[0]?.conversationId ?? null,
+    messages: props.messages,
+    streaming: props.streaming,
+  };
+  return (
+    <Slot name="chat.message.list.frame" owner={owner}>
+      <ComponentSlot
+        name="chat.message.list"
+        fallback={MessageListHost as unknown as PluginComponent}
+        props={props as unknown as Record<string, unknown>}
+      />
+    </Slot>
   );
 }

@@ -6,14 +6,15 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import { useUiStore } from '@/lib/store/uiStore';
-import { usePluginStore } from './store';
+import { pluginUiState } from './ui/registry';
+import { usePluginUiPrefs } from './ui/prefs';
+import { runPluginHostAction } from './ui/hostActions';
 import {
   panelByKey,
   pluginHasPermission,
   pluginLabel,
   viewByKey,
   type ResolvedCommand,
-  type ResolvedSlot,
 } from './registry';
 import type { PluginAction, PluginRecord, ViewContribution } from './types';
 
@@ -22,15 +23,19 @@ export interface PluginActionContext {
   draft?: string;
 }
 
-function switchLayoutForSurface(surface: ViewContribution['surface']): void {
+function switchLayoutForSurface(surface: ViewContribution['surface'] | undefined): void {
   const ui = useUiStore.getState();
-  if (surface === 'global') return;
+  if (!surface || surface === 'global') return;
   if (surface === 'chat' && ui.layoutMode !== 'chat') ui.setLayoutMode('chat');
   if (surface === 'code' && ui.layoutMode !== 'code') ui.setLayoutMode('code');
   if (surface === 'agent' && ui.layoutMode !== 'agent') ui.setLayoutMode('agent');
 }
 
-export function openPluginView(plugin: PluginRecord, viewId: string): void {
+export function openPluginView(
+  plugin: PluginRecord,
+  viewId: string,
+  layout?: 'chat' | 'code' | 'agent' | null,
+): void {
   const key = `${plugin.id}:${viewId}`;
   const view = viewByKey(key);
   if (!view) {
@@ -41,11 +46,20 @@ export function openPluginView(plugin: PluginRecord, viewId: string): void {
     toast.error(t('plugins:errors.permissionDenied', { permission: 'ui.view' }));
     return;
   }
-  switchLayoutForSurface(view.view.surface);
-  usePluginStore.getState().openView(plugin.id, viewId);
+  const page = pluginUiState().pages.find(
+    (entry) => entry.pluginId === plugin.id && entry.pageId === viewId,
+  );
+  const targetLayout = layout ?? page?.layouts[0] ?? undefined;
+  if (targetLayout) useUiStore.getState().setLayoutMode(targetLayout);
+  else switchLayoutForSurface(view.view.surface);
+  useUiStore.getState().openPluginPage({ pluginId: plugin.id, pageId: viewId }, targetLayout);
 }
 
-export function openPluginPanel(plugin: PluginRecord, panelId: string): void {
+export function openPluginPanel(
+  plugin: PluginRecord,
+  panelId: string,
+  layout?: 'chat' | 'code' | 'agent' | null,
+): void {
   const key = `${plugin.id}:${panelId}`;
   if (!panelByKey(key)) {
     toast.error(t('plugins:errors.panelMissing', { id: panelId }));
@@ -55,7 +69,10 @@ export function openPluginPanel(plugin: PluginRecord, panelId: string): void {
     toast.error(t('plugins:errors.permissionDenied', { permission: 'ui.panel' }));
     return;
   }
-  usePluginStore.getState().openPanel(plugin.id, panelId);
+  const tab = pluginUiState().panelTabs.find(
+    (entry) => entry.pluginId === plugin.id && entry.tabId === panelId,
+  );
+  if (tab) useUiStore.getState().openPluginDockTab(tab.key, layout ?? undefined);
 }
 
 export async function runPluginAction(
@@ -70,6 +87,59 @@ export async function runPluginAction(
     case 'openPanel':
       openPluginPanel(plugin, action.target);
       return;
+    case 'openPage':
+      runPluginHostAction(plugin, 'openPage', {
+        page: action.target,
+        layout: action.layout ?? null,
+      });
+      return;
+    case 'openPanelTab':
+      runPluginHostAction(plugin, 'openPanelTab', {
+        tab: action.target,
+        layout: action.layout ?? null,
+      });
+      return;
+    case 'setLayout':
+      useUiStore.getState().setLayoutMode(action.target);
+      return;
+    case 'openSettings':
+      useUiStore.getState().openSettings((action.target ?? undefined) as never);
+      return;
+    case 'setVariant': {
+      if (!pluginHasPermission(plugin, 'ui.variant')) {
+        toast.error(t('plugins:errors.permissionDenied', { permission: 'ui.variant' }));
+        return;
+      }
+      const layout = useUiStore.getState().layoutMode;
+      const variant = pluginUiState().variants.find(
+        (entry) =>
+          entry.component === action.component &&
+          entry.variantId === action.target &&
+          entry.pluginId === plugin.id,
+      );
+      usePluginUiPrefs
+        .getState()
+        .setVariant(
+          action.component,
+          layout,
+          variant ? `${variant.pluginId}:${variant.variantId}` : null,
+        );
+      return;
+    }
+    case 'setPreset': {
+      if (!pluginHasPermission(plugin, 'ui.preset')) {
+        toast.error(t('plugins:errors.permissionDenied', { permission: 'ui.preset' }));
+        return;
+      }
+      const layout = action.layout ?? useUiStore.getState().layoutMode;
+      const preset = pluginUiState().presets.find(
+        (entry) =>
+          entry.pluginId === plugin.id &&
+          (entry.presetId === action.target || entry.key === action.target),
+      );
+      if (preset) usePluginUiPrefs.getState().setPreset(layout, preset.key);
+      return;
+    }
     case 'insertDraft': {
       if (!pluginHasPermission(plugin, 'chat.write')) {
         toast.error(t('plugins:errors.permissionDenied', { permission: 'chat.write' }));
@@ -123,16 +193,23 @@ export async function runPluginCommand(
   await runPluginAction(resolved.plugin, resolved.command.action, context);
 }
 
-export function runSlotAction(entry: ResolvedSlot): void {
-  if (!entry.slot.action) return;
-  void runPluginAction(entry.plugin, entry.slot.action);
+export interface SlotActionSource {
+  plugin: PluginRecord;
+  action?: PluginAction | null;
+  title?: string | null;
+  titleKey?: string | null;
 }
 
-export function slotLabel(entry: ResolvedSlot): string {
+export function runSlotAction(entry: SlotActionSource): void {
+  if (!entry.action) return;
+  void runPluginAction(entry.plugin, entry.action);
+}
+
+export function slotLabel(entry: SlotActionSource): string {
   return pluginLabel(
     entry.plugin,
-    entry.slot.titleKey,
-    entry.slot.title ?? entry.plugin.name,
+    entry.titleKey,
+    entry.title ?? entry.plugin.name,
   );
 }
 

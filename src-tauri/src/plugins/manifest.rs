@@ -10,7 +10,7 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::contract;
+use super::{contract, permissions};
 
 pub const MAX_MANIFEST_BYTES: usize = 512 * 1024;
 pub const MAX_NAME_CHARS: usize = 80;
@@ -113,10 +113,15 @@ pub enum ToolSource {
 pub struct PluginUiContributions {
     pub slots: Vec<SlotContribution>,
     pub views: Vec<ViewContribution>,
+    pub nav: Vec<NavContribution>,
     pub panels: Vec<PanelContribution>,
     pub commands: Vec<CommandContribution>,
     pub settings_tabs: Vec<SettingsTabContribution>,
     pub themes: Vec<ThemeContribution>,
+    pub variants: Vec<VariantContribution>,
+    pub presets: Vec<PresetContribution>,
+    pub css: Vec<CssContribution>,
+    pub genui: GenuiContribution,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,7 +129,11 @@ pub struct PluginUiContributions {
 pub struct SlotContribution {
     pub slot: String,
     #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
     pub entry: Option<String>,
+    #[serde(default)]
+    pub component: Option<String>,
     #[serde(default)]
     pub title: Option<String>,
     #[serde(default)]
@@ -137,6 +146,16 @@ pub struct SlotContribution {
     /// no entry.
     #[serde(default)]
     pub declarative: Option<bool>,
+    #[serde(default)]
+    pub layouts: Vec<String>,
+    #[serde(default)]
+    pub order: Option<u32>,
+    #[serde(default)]
+    pub priority: Option<u32>,
+    #[serde(default)]
+    pub key: Option<String>,
+    #[serde(default)]
+    pub when: Option<BTreeMap<String, Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,17 +171,40 @@ pub struct ViewContribution {
     pub description_key: Option<String>,
     #[serde(default)]
     pub icon: Option<String>,
-    /// `chat` | `code` | `agent` | `global`
+    /// v1: `chat` | `code` | `agent` | `global`
     #[serde(default = "default_surface")]
     pub surface: String,
-    /// `main` | `sidebar`
+    /// v1: `main` | `sidebar`
     #[serde(default = "default_location")]
     pub location: String,
+    /// v2: layouts this page is available in (empty derives from `surface`).
+    #[serde(default)]
+    pub layouts: Vec<String>,
+    #[serde(default)]
+    pub order: Option<u32>,
     #[serde(default)]
     pub entry: Option<String>,
     /// Trusted component export registered by `main.js`.
     #[serde(default)]
     pub component: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NavContribution {
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub title_key: Option<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
+    pub page: String,
+    #[serde(default)]
+    pub layouts: Vec<String>,
+    #[serde(default)]
+    pub order: Option<u32>,
+    #[serde(default)]
+    pub badge: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,9 +220,16 @@ pub struct PanelContribution {
     pub entry: Option<String>,
     #[serde(default)]
     pub component: Option<String>,
-    /// `right` is the only supported dock in v1.
+    /// `right` is the only supported dock.
     #[serde(default = "default_right")]
     pub dock: String,
+    /// v2: open as a tab in the right dock instead of taking it over.
+    #[serde(default)]
+    pub tab: Option<bool>,
+    #[serde(default)]
+    pub layouts: Vec<String>,
+    #[serde(default)]
+    pub order: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -212,8 +261,34 @@ pub enum PluginAction {
     OpenView {
         target: String,
     },
+    OpenPage {
+        target: String,
+        #[serde(default)]
+        layout: Option<String>,
+    },
     OpenPanel {
         target: String,
+    },
+    OpenPanelTab {
+        target: String,
+        #[serde(default)]
+        layout: Option<String>,
+    },
+    SetLayout {
+        target: String,
+    },
+    OpenSettings {
+        #[serde(default)]
+        target: Option<String>,
+    },
+    SetVariant {
+        component: String,
+        target: String,
+    },
+    SetPreset {
+        target: String,
+        #[serde(default)]
+        layout: Option<String>,
     },
     InsertDraft {
         text: String,
@@ -238,6 +313,8 @@ pub struct SettingsTabContribution {
     #[serde(default)]
     pub icon: Option<String>,
     #[serde(default)]
+    pub order: Option<u32>,
+    #[serde(default)]
     pub entry: Option<String>,
     #[serde(default)]
     pub component: Option<String>,
@@ -252,6 +329,82 @@ pub struct ThemeContribution {
     pub light: BTreeMap<String, String>,
     #[serde(default)]
     pub dark: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VariantContribution {
+    pub component: String,
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub layouts: Vec<String>,
+    pub recipe: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PresetTokens {
+    pub light: BTreeMap<String, String>,
+    pub dark: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresetContribution {
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub layouts: Vec<String>,
+    #[serde(default)]
+    pub tokens: PresetTokens,
+    #[serde(default)]
+    pub density: Option<String>,
+    #[serde(default)]
+    pub variants: BTreeMap<String, String>,
+    #[serde(default)]
+    pub css: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CssContribution {
+    pub id: String,
+    pub file: String,
+    #[serde(default)]
+    pub layouts: Vec<String>,
+    #[serde(default)]
+    pub order: Option<u32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct GenuiContribution {
+    pub components: Vec<GenuiComponentContribution>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenuiComponentContribution {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    #[serde(default)]
+    pub props: BTreeMap<String, Value>,
+    pub render: GenuiRender,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenuiRender {
+    /// `trusted` | `sandbox`
+    pub kind: String,
+    #[serde(default)]
+    pub component: Option<String>,
+    #[serde(default)]
+    pub entry: Option<String>,
+    #[serde(default)]
+    pub height: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -375,19 +528,20 @@ impl PluginManifest {
     }
 
     pub fn validate(&self) -> Result<()> {
-        if self.schema_version != contract::contract().manifest_schema_version {
+        if !matches!(self.schema_version, 1 | 2) {
             bail!(
-                "schemaVersion {} is not supported (expected {})",
-                self.schema_version,
-                contract::contract().manifest_schema_version
+                "schemaVersion {} is not supported (expected 1 or 2)",
+                self.schema_version
             );
         }
-        if self.api_version != contract::contract().api_version {
+        if !matches!(self.api_version, 1 | 2) {
             bail!(
-                "apiVersion {} is not supported (expected {})",
-                self.api_version,
-                contract::contract().api_version
+                "apiVersion {} is not supported (expected 1 or 2)",
+                self.api_version
             );
+        }
+        if self.api_version == 2 && self.schema_version != 2 {
+            bail!("apiVersion 2 requires schemaVersion 2");
         }
         validate_plugin_id(&self.id)?;
         validate_publisher_id(&self.publisher.id)?;
@@ -452,6 +606,12 @@ impl PluginManifest {
             {
                 bail!("scoped permission `{permission}` requires a scope (`{permission}:...`)");
             }
+            if !trusted_ui && permissions::is_trusted_only(permission) {
+                bail!("permission `{permission}` requires the trusted runtime");
+            }
+        }
+        if self.permissions.len() > 64 {
+            bail!("too many permissions");
         }
 
         for slot in &self.contributes.ui.slots {
@@ -474,20 +634,57 @@ impl PluginManifest {
                     slot.slot
                 );
             }
-            if slot.entry.is_none() && slot.action.is_none() {
-                bail!("slot `{}` needs `entry` or `action`", slot.slot);
+            if slot.entry.is_none() && slot.action.is_none() && slot.component.is_none() {
+                bail!("slot `{}` needs `entry`, `component` or `action`", slot.slot);
+            }
+            if slot.component.is_some() && !trusted_ui {
+                bail!("slot `{}` declares `component` outside the trusted runtime", slot.slot);
+            }
+            if let Some(id) = &slot.id {
+                validate_entry_id(id, "slot entry")?;
             }
             if let Some(entry) = &slot.entry {
                 validate_relative_path(entry)?;
             }
+            validate_layouts(&slot.layouts, &spec.layouts, &format!("slot {}", slot.slot))?;
+            validate_order(slot.order, "slot order")?;
+            validate_order(slot.priority, "slot priority")?;
+            if spec.kind == "keyed" {
+                let key = slot
+                    .key
+                    .as_deref()
+                    .ok_or_else(|| anyhow::anyhow!("keyed slot `{}` requires `key`", slot.slot))?;
+                if key.chars().count() > 64 {
+                    bail!("slot `{}` key is too long", slot.slot);
+                }
+                if let Some(when) = &slot.when {
+                    for name in when.keys() {
+                        if !spec.props.iter().any(|prop| prop == name) {
+                            bail!("slot `{}` condition uses unknown prop `{name}`", slot.slot);
+                        }
+                    }
+                }
+            } else if slot.key.is_some() {
+                bail!("slot `{}` declares `key` but is not keyed", slot.slot);
+            }
+            if let Some(action) = &slot.action {
+                if slot.component.is_some() || slot.entry.is_some() {
+                    bail!("slot `{}` mixes action with entry/component", slot.slot);
+                }
+                validate_action(action)?;
+            }
         }
         if self.contributes.ui.slots.len() > MAX_SLOTS {
+            bail!("too many slot contributions");
+        } else if self.contributes.ui.slots.len() > contract::ui_limits().slot_entries_per_plugin {
             bail!("too many slot contributions");
         }
         if !self.contributes.ui.views.is_empty() && !self.has_permission("ui.view") {
             bail!("ui.views requires the `ui.view` permission");
         }
-        if self.contributes.ui.views.len() > MAX_VIEWS {
+        if self.contributes.ui.views.len() > MAX_VIEWS
+            || self.contributes.ui.views.len() > contract::ui_limits().pages_per_plugin
+        {
             bail!("too many view contributions");
         }
         let mut view_ids = HashSet::new();
@@ -496,12 +693,19 @@ impl PluginManifest {
             if !view_ids.insert(view.id.as_str()) {
                 bail!("duplicate view id `{}`", view.id);
             }
+            if self.api_version == 2 && view.layouts.is_empty() {
+                bail!("view `{}` requires `layouts` in apiVersion 2", view.id);
+            }
             if !matches!(view.surface.as_str(), "chat" | "code" | "agent" | "global") {
                 bail!("view `{}` has an invalid surface", view.id);
             }
             if !matches!(view.location.as_str(), "main" | "sidebar") {
                 bail!("view `{}` has an invalid location", view.id);
             }
+            if !view.layouts.is_empty() {
+                validate_layouts(&view.layouts, contract::layout_ids(), &format!("view {}", view.id))?;
+            }
+            validate_order(view.order, "view order")?;
             if let Some(entry) = &view.entry {
                 validate_relative_path(entry)?;
             }
@@ -509,14 +713,55 @@ impl PluginManifest {
                 bail!("view `{}` needs `entry` or `component`", view.id);
             }
         }
+        if !self.contributes.ui.nav.is_empty() && !self.has_permission("ui.nav") {
+            bail!("ui.nav requires the `ui.nav` permission");
+        }
+        if self.contributes.ui.nav.len() > contract::ui_limits().nav_entries_per_plugin {
+            bail!("too many nav contributions");
+        }
+        let mut nav_ids = HashSet::new();
+        for nav in &self.contributes.ui.nav {
+            validate_entry_id(&nav.id, "nav")?;
+            if !nav_ids.insert(nav.id.as_str()) {
+                bail!("duplicate nav id `{}`", nav.id);
+            }
+            if nav.icon.as_deref().unwrap_or("").trim().is_empty() {
+                bail!("nav `{}` needs an icon", nav.id);
+            }
+            validate_layouts(&nav.layouts, contract::layout_ids(), &format!("nav {}", nav.id))?;
+            validate_order(nav.order, "nav order")?;
+            let mut pages = HashSet::new();
+            for view in &self.contributes.ui.views {
+                pages.insert(view.id.as_str());
+            }
+            if !pages.contains(nav.page.as_str())
+                && !contract::host_pages().iter().any(|page| page == &nav.page)
+            {
+                bail!("nav `{}` targets unknown page `{}`", nav.id, nav.page);
+            }
+            if let Some(badge) = &nav.badge {
+                if badge.chars().count() > 24 {
+                    bail!("nav `{}` badge is too long", nav.id);
+                }
+            }
+        }
         if !self.contributes.ui.panels.is_empty() && !self.has_permission("ui.panel") {
             bail!("ui.panels requires the `ui.panel` permission");
         }
+        if self.contributes.ui.panels.len() > contract::ui_limits().panel_tabs_per_plugin {
+            bail!("too many panel contributions");
+        }
+        let mut panel_ids = HashSet::new();
         for panel in &self.contributes.ui.panels {
             validate_contribution_id(&panel.id, "panel")?;
+            if !panel_ids.insert(panel.id.as_str()) {
+                bail!("duplicate panel id `{}`", panel.id);
+            }
             if panel.dock != "right" {
                 bail!("panel `{}` has unsupported dock `{}`", panel.id, panel.dock);
             }
+            validate_layouts(&panel.layouts, contract::layout_ids(), &format!("panel {}", panel.id))?;
+            validate_order(panel.order, "panel order")?;
             if let Some(entry) = &panel.entry {
                 validate_relative_path(entry)?;
             }
@@ -551,6 +796,7 @@ impl PluginManifest {
         }
         for tab in &self.contributes.ui.settings_tabs {
             validate_contribution_id(&tab.id, "settings tab")?;
+            validate_order(tab.order, "settings tab order")?;
             if let Some(entry) = &tab.entry {
                 validate_relative_path(entry)?;
             }
@@ -561,18 +807,201 @@ impl PluginManifest {
         if !self.contributes.ui.themes.is_empty() && !self.has_permission("ui.theme") {
             bail!("ui.themes requires the `ui.theme` permission");
         }
+        let mut theme_ids = HashSet::new();
         for theme in &self.contributes.ui.themes {
             validate_contribution_id(&theme.id, "theme")?;
+            if !theme_ids.insert(theme.id.as_str()) {
+                bail!("duplicate theme id `{}`", theme.id);
+            }
             if theme.name.trim().is_empty() {
                 bail!("theme `{}` needs a name", theme.id);
             }
             for (key, value) in theme.light.iter().chain(theme.dark.iter()) {
-                if !key.starts_with("--") || key.chars().count() > 80 {
+                if key.chars().count() > 80 {
                     bail!("theme `{}` has invalid token `{key}`", theme.id);
                 }
                 if value.chars().count() > 300 || value.contains([';', '{', '}']) {
                     bail!("theme `{}` has invalid value for `{key}`", theme.id);
                 }
+                // Tokens outside the allowlist stay in the manifest but the
+                // renderer only applies the known ones.
+            }
+        }
+        if !self.contributes.ui.variants.is_empty() && !self.has_permission("ui.variant") {
+            bail!("ui.variants requires the `ui.variant` permission");
+        }
+        if self.contributes.ui.variants.len() > contract::ui_limits().variants_per_plugin {
+            bail!("too many variant contributions");
+        }
+        let mut variant_keys = HashSet::new();
+        for variant in &self.contributes.ui.variants {
+            validate_entry_id(&variant.id, "variant")?;
+            if !variant_keys.insert((variant.component.as_str(), variant.id.as_str())) {
+                bail!(
+                    "duplicate variant `{}` for `{}`",
+                    variant.id,
+                    variant.component
+                );
+            }
+            let component = contract::component_spec(&variant.component)
+                .ok_or_else(|| anyhow::anyhow!("unknown component `{}`", variant.component))?;
+            if component.variants.is_empty() {
+                bail!("component `{}` does not accept variants", variant.component);
+            }
+            validate_layouts(
+                &variant.layouts,
+                contract::layout_ids(),
+                &format!("variant {}", variant.id),
+            )?;
+            if !contract::style_recipe_valid_for_contract(&variant.recipe) {
+                bail!(
+                    "variant `{}` for `{}` has an invalid recipe",
+                    variant.id,
+                    variant.component
+                );
+            }
+        }
+        if !self.contributes.ui.presets.is_empty() && !self.has_permission("ui.preset") {
+            bail!("ui.presets requires the `ui.preset` permission");
+        }
+        if self.contributes.ui.presets.len() > contract::ui_limits().presets_per_plugin {
+            bail!("too many preset contributions");
+        }
+        if self
+            .contributes
+            .ui
+            .presets
+            .iter()
+            .any(|preset| preset.css.as_deref().is_some_and(|css| !css.trim().is_empty()))
+            && !self.has_permission("ui.css.global")
+        {
+            bail!("preset css requires the `ui.css.global` permission");
+        }
+        let mut preset_ids = HashSet::new();
+        for preset in &self.contributes.ui.presets {
+            validate_entry_id(&preset.id, "preset")?;
+            if !preset_ids.insert(preset.id.as_str()) {
+                bail!("duplicate preset id `{}`", preset.id);
+            }
+            validate_layouts(
+                &preset.layouts,
+                contract::layout_ids(),
+                &format!("preset {}", preset.id),
+            )?;
+            if let Some(density) = &preset.density {
+                if !matches!(density.as_str(), "compact" | "comfortable" | "spacious") {
+                    bail!("preset `{}` has an invalid density", preset.id);
+                }
+            }
+            for (key, value) in preset.tokens.light.iter().chain(preset.tokens.dark.iter()) {
+                let token = key.strip_prefix("--").unwrap_or(key);
+                if !crate::themes::is_known_theme_token(token) {
+                    bail!("preset `{}` has unknown token `{key}`", preset.id);
+                }
+                if value.chars().count() > 300 || value.contains([';', '{', '}']) {
+                    bail!("preset `{}` has invalid value for `{key}`", preset.id);
+                }
+            }
+            for (component, variant) in &preset.variants {
+                let spec = contract::component_spec(component)
+                    .ok_or_else(|| anyhow::anyhow!("preset `{}` references unknown component `{component}`", preset.id))?;
+                if spec.variants.is_empty() {
+                    bail!("preset `{}` references component `{component}` without variants", preset.id);
+                }
+                let builtin = spec.variants.iter().any(|candidate| candidate == variant);
+                let declared = self.contributes.ui.variants.iter().any(|entry| {
+                    entry.component == *component && entry.id == *variant
+                });
+                if !builtin && !declared {
+                    bail!(
+                        "preset `{}` references unknown variant `{}` for `{component}`",
+                        preset.id,
+                        variant
+                    );
+                }
+            }
+            if let Some(css) = &preset.css {
+                if css.chars().count() > contract::ui_limits().css_chars_per_plugin {
+                    bail!("preset `{}` css is too large", preset.id);
+                }
+            }
+        }
+        if !self.contributes.ui.css.is_empty() && !self.has_permission("ui.css.global") {
+            bail!("ui.css requires the `ui.css.global` permission");
+        }
+        let mut css_ids = HashSet::new();
+        for css in &self.contributes.ui.css {
+            validate_entry_id(&css.id, "css")?;
+            if !css_ids.insert(css.id.as_str()) {
+                bail!("duplicate css id `{}`", css.id);
+            }
+            validate_relative_path(&css.file)?;
+            validate_layouts(&css.layouts, contract::layout_ids(), &format!("css {}", css.id))?;
+            validate_order(css.order, "css order")?;
+        }
+        if !self.contributes.ui.genui.components.is_empty() && !self.has_permission("ui.genui") {
+            bail!("ui.genui requires the `ui.genui` permission");
+        }
+        if self.contributes.ui.genui.components.len()
+            > contract::ui_limits().genui_components_per_plugin
+        {
+            bail!("too many genui components");
+        }
+        let mut genui_ids = HashSet::new();
+        for component in &self.contributes.ui.genui.components {
+            validate_entry_id(&component.id, "genui component")?;
+            if !genui_ids.insert(component.id.as_str()) {
+                bail!("duplicate genui component id `{}`", component.id);
+            }
+            if component.title.chars().count() > 80 {
+                bail!("genui component `{}` title is too long", component.id);
+            }
+            if component.summary.chars().count() > 160 {
+                bail!("genui component `{}` summary is too long", component.id);
+            }
+            if component.props.len() > 16 {
+                bail!("genui component `{}` has too many props", component.id);
+            }
+            if serde_json::to_vec(&component.props).map(|bytes| bytes.len()).unwrap_or(0)
+                > contract::ui_limits().genui_schema_chars
+            {
+                bail!("genui component `{}` schema is too large", component.id);
+            }
+            for (name, schema) in &component.props {
+                validate_genui_prop(name, schema)?;
+            }
+            match component.render.kind.as_str() {
+                "trusted" => {
+                    if !trusted_ui {
+                        bail!("genui component `{}` trusted render requires the trusted runtime", component.id);
+                    }
+                    if !self.has_permission("unsafe.renderer") {
+                        bail!("genui component `{}` trusted render requires `unsafe.renderer`", component.id);
+                    }
+                    if component.render.component.as_deref().unwrap_or("").trim().is_empty() {
+                        bail!("genui component `{}` needs render.component", component.id);
+                    }
+                }
+                "sandbox" => {
+                    if self.runtime.ui != "sandbox" {
+                        bail!(
+                            "genui component `{}` sandbox render requires the sandbox runtime",
+                            component.id
+                        );
+                    }
+                    let entry = component
+                        .render
+                        .entry
+                        .as_deref()
+                        .ok_or_else(|| anyhow::anyhow!("genui component `{}` needs render.entry", component.id))?;
+                    validate_relative_path(entry)?;
+                    if let Some(height) = component.render.height {
+                        if !(80..=480).contains(&height) {
+                            bail!("genui component `{}` height must be 80..=480", component.id);
+                        }
+                    }
+                }
+                _ => bail!("genui component `{}` has an invalid render.kind", component.id),
             }
         }
         if self.contributes.tools.is_some() && !self.has_permission("agent.tools") {
@@ -710,6 +1139,48 @@ fn validate_action(action: &PluginAction) -> Result<()> {
         PluginAction::OpenView { target } | PluginAction::OpenPanel { target } => {
             validate_contribution_id(target, "action target")?;
         }
+        PluginAction::OpenPage { target, layout } => {
+            validate_contribution_id(target, "action target")?;
+            if let Some(layout) = layout {
+                if !contract::layout_ids().iter().any(|candidate| candidate == layout) {
+                    bail!("action layout `{layout}` is invalid");
+                }
+            }
+        }
+        PluginAction::OpenPanelTab { target, layout } => {
+            validate_contribution_id(target, "action target")?;
+            if let Some(layout) = layout {
+                if !contract::layout_ids().iter().any(|candidate| candidate == layout) {
+                    bail!("action layout `{layout}` is invalid");
+                }
+            }
+        }
+        PluginAction::SetLayout { target } => {
+            if !contract::layout_ids().iter().any(|candidate| candidate == target) {
+                bail!("action layout `{target}` is invalid");
+            }
+        }
+        PluginAction::OpenSettings { target } => {
+            if let Some(target) = target {
+                if target.trim().is_empty() || target.chars().count() > 80 {
+                    bail!("action settings target is invalid");
+                }
+            }
+        }
+        PluginAction::SetVariant { component, target } => {
+            if contract::component_spec(component).is_none() {
+                bail!("action references unknown component `{component}`");
+            }
+            validate_entry_id(target, "action variant target")?;
+        }
+        PluginAction::SetPreset { target, layout } => {
+            validate_entry_id(target, "action preset target")?;
+            if let Some(layout) = layout {
+                if !contract::layout_ids().iter().any(|candidate| candidate == layout) {
+                    bail!("action layout `{layout}` is invalid");
+                }
+            }
+        }
         PluginAction::InsertDraft { text } => {
             if text.chars().count() > 20_000 {
                 bail!("action text exceeds 20000 characters");
@@ -731,6 +1202,72 @@ fn validate_action(action: &PluginAction) -> Result<()> {
                     bail!("action params exceed 64 KiB");
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+fn validate_entry_id(id: &str, what: &str) -> Result<()> {
+    if id.is_empty()
+        || id.chars().count() > 64
+        || !id
+            .chars()
+            .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-')
+        || !id.starts_with(|character: char| character.is_ascii_lowercase())
+    {
+        bail!("{what} id `{id}` is invalid");
+    }
+    Ok(())
+}
+
+fn validate_layouts(layouts: &[String], allowed: &[String], what: &str) -> Result<()> {
+    if layouts.is_empty() {
+        return Ok(());
+    }
+    for layout in layouts {
+        if !allowed.iter().any(|candidate| candidate == layout) {
+            bail!("{what} has invalid layout `{layout}`");
+        }
+    }
+    Ok(())
+}
+
+fn validate_order(order: Option<u32>, what: &str) -> Result<()> {
+    if order.is_some_and(|value| value > 1000) {
+        bail!("{what} must be <= 1000");
+    }
+    Ok(())
+}
+
+fn validate_genui_prop(name: &str, schema: &Value) -> Result<()> {
+    let object = schema
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("genui prop `{name}` must be an object"))?;
+    let kind = object
+        .get("type")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow::anyhow!("genui prop `{name}` needs `type`"))?;
+    if !matches!(
+        kind,
+        "text" | "number" | "boolean" | "enum" | "icon" | "array" | "image"
+    ) {
+        bail!("genui prop `{name}` has invalid type `{kind}`");
+    }
+    if kind == "enum" {
+        let values = object
+            .get("values")
+            .and_then(Value::as_array)
+            .ok_or_else(|| anyhow::anyhow!("genui enum prop `{name}` needs `values`"))?;
+        if values.is_empty() || values.len() > 16 {
+            bail!("genui enum prop `{name}` needs 1..=16 values");
+        }
+        if values.iter().any(|value| !value.is_string()) {
+            bail!("genui enum prop `{name}` values must be strings");
+        }
+    }
+    if let Some(max) = object.get("maxChars").and_then(Value::as_u64) {
+        if max == 0 || max > 4000 {
+            bail!("genui prop `{name}` maxChars must be 1..=4000");
         }
     }
     Ok(())
@@ -1081,5 +1618,138 @@ mod tests {
         assert!(parse_semver("1.4.0").is_ok());
         assert!(parse_semver("1.4").is_err());
         assert!(parse_semver("1.4.0-beta.1").is_ok());
+    }
+
+    fn manifest_v2_json() -> Value {
+        serde_json::json!({
+            "schemaVersion": 2,
+            "id": "com.acme.studio",
+            "name": "Studio",
+            "version": "2.0.0",
+            "apiVersion": 2,
+            "publisher": { "id": "acme", "name": "Acme" },
+            "permissions": [
+                "ui.slot:chat.message.actions",
+                "ui.view",
+                "ui.nav",
+                "ui.panel",
+                "ui.settings",
+                "ui.variant",
+                "ui.preset",
+                "ui.css.global",
+                "ui.genui"
+            ],
+            "contributes": {
+                "ui": {
+                    "slots": [{
+                        "slot": "chat.message.actions",
+                        "id": "pin",
+                        "title": "Pin",
+                        "icon": "pin",
+                        "action": { "kind": "openPage", "target": "notes" },
+                        "layouts": ["chat"],
+                        "order": 50
+                    }],
+                    "views": [{ "id": "notes", "title": "Notes", "icon": "notebook", "layouts": ["chat", "code"], "entry": "ui/page.html" }],
+                    "nav": [{ "id": "notes", "title": "Notes", "icon": "notebook", "page": "notes", "layouts": ["chat"], "order": 60 }],
+                    "panels": [{ "id": "outline", "title": "Outline", "icon": "list-tree", "tab": true, "layouts": ["chat"], "entry": "ui/panel.html" }],
+                    "settingsTabs": [{ "id": "config", "title": "Notes", "order": 120, "entry": "ui/settings.html" }],
+                    "variants": [{
+                        "component": "chat.message.user",
+                        "id": "glass",
+                        "title": "Glass",
+                        "layouts": ["chat"],
+                        "recipe": { "surface": "accent-soft", "radius": "xl", "padding": "3" }
+                    }],
+                    "presets": [{
+                        "id": "paper",
+                        "title": "Paper",
+                        "layouts": ["chat"],
+                        "tokens": { "light": { "background": "#faf8f4" }, "dark": { "background": "#14120f" } },
+                        "density": "compact",
+                        "variants": { "chat.message.user": "glass" }
+                    }],
+                    "css": [{ "id": "chrome", "file": "ui/chrome.css", "layouts": ["chat"] }],
+                    "genui": {
+                        "components": [{
+                            "id": "metric",
+                            "title": "Metric",
+                            "summary": "One KPI",
+                            "props": { "label": { "type": "text", "required": true, "maxChars": 80 } },
+                            "render": { "kind": "sandbox", "entry": "ui/metric.html", "height": 160 }
+                        }]
+                    }
+                }
+            },
+            "runtime": { "ui": "sandbox" }
+        })
+    }
+
+    #[test]
+    fn accepts_a_v2_manifest_with_the_full_ui_catalog() {
+        let manifest = parse(manifest_v2_json()).expect("v2 manifest");
+        assert_eq!(manifest.api_version, 2);
+        assert_eq!(manifest.contributes.ui.nav.len(), 1);
+        assert_eq!(manifest.contributes.ui.variants[0].id, "glass");
+        assert_eq!(manifest.contributes.ui.css[0].file, "ui/chrome.css");
+        assert_eq!(
+            manifest.contributes.ui.genui.components[0].render.kind,
+            "sandbox"
+        );
+    }
+
+    #[test]
+    fn rejects_trusted_only_permissions_outside_trusted() {
+        let mut value = manifest_v2_json();
+        value["permissions"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!("ui.override:chat.message.user"));
+        assert!(parse(value.clone()).is_err());
+        value["runtime"]["ui"] = serde_json::json!("trusted");
+        value["trusted"] = serde_json::json!(true);
+        value["runtime"]["entry"] = serde_json::json!("main.js");
+        value["permissions"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!("unsafe.renderer"));
+        parse(value).expect("trusted manifest");
+    }
+
+    #[test]
+    fn rejects_invalid_variant_recipes_and_keyed_slots() {
+        let mut value = manifest_v2_json();
+        value["contributes"]["ui"]["variants"][0]["recipe"] =
+            serde_json::json!({ "background": "#ffffff" });
+        assert!(parse(value).is_err());
+
+        let mut value = manifest_v2_json();
+        value["contributes"]["ui"]["slots"] = serde_json::json!([{
+            "slot": "chat.message.node",
+            "entry": "ui/node.html",
+            "layouts": ["chat"]
+        }]);
+        assert!(parse(value).is_err(), "keyed slot requires key");
+
+        let mut value = manifest_v2_json();
+        value["permissions"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!("ui.slot:chat.message.node"));
+        value["contributes"]["ui"]["slots"] = serde_json::json!([{
+            "slot": "chat.message.node",
+            "entry": "ui/node.html",
+            "key": "assistant",
+            "layouts": ["chat"]
+        }]);
+        assert!(parse(value).is_ok());
+    }
+
+    #[test]
+    fn rejects_genui_trusted_render_without_trusted_lane() {
+        let mut value = manifest_v2_json();
+        value["contributes"]["ui"]["genui"]["components"][0]["render"] =
+            serde_json::json!({ "kind": "trusted", "component": "metricView" });
+        assert!(parse(value).is_err());
     }
 }

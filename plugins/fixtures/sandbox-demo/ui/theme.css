@@ -1,0 +1,13 @@
+/* Acme Notes sample stylesheet: host parts + package font/image assets. */
+[data-zylara-part='chat-message-user'] {
+  border-bottom-left-radius: 0.35rem;
+  border-bottom-right-radius: 0.35rem;
+}
+
+[data-zylara-part='chat-composer'] {
+  box-shadow: 0 10px 30px -24px var(--accent);
+}
+
+[data-zylara-part='sidebar-nav-list'] [aria-current='page'] {
+  font-weight: 600;
+}

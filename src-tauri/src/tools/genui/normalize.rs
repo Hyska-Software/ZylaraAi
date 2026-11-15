@@ -18,6 +18,8 @@
 //! Texto é contado por code points (não bytes/UTF-16) para que o corte em
 //! `maxChars` seja idêntico nas duas linguagens.
 
+use std::collections::BTreeMap;
+
 use serde_json::{Map, Value};
 
 use super::codes;
@@ -29,10 +31,12 @@ use super::DiagnosticSink;
 pub(crate) fn normalize_components(
     contract: &Contract,
     components: &[Value],
+    extra: &BTreeMap<String, ComponentSpec>,
     sink: &mut DiagnosticSink,
 ) -> (Vec<Value>, usize) {
     let mut normalizer = Normalizer {
         contract,
+        extra,
         sink,
         nodes: 0,
     };
@@ -47,6 +51,7 @@ pub(crate) fn normalize_components(
 
 struct Normalizer<'a> {
     contract: &'a Contract,
+    extra: &'a BTreeMap<String, ComponentSpec>,
     sink: &'a mut DiagnosticSink,
     nodes: usize,
 }
@@ -109,8 +114,13 @@ impl Normalizer<'_> {
                 return None;
             }
         };
-        let spec: ComponentSpec = match self.contract.component(&type_value) {
-            Some(spec) => spec.clone(),
+        let spec: ComponentSpec = match self
+            .contract
+            .component(&type_value)
+            .cloned()
+            .or_else(|| self.extra.get(&type_value).cloned())
+        {
+            Some(spec) => spec,
             None => {
                 self.error(
                     codes::UNKNOWN_TYPE,

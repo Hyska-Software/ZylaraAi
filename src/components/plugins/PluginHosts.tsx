@@ -13,15 +13,13 @@ import { t } from '@/lib/i18n';
 import { usePluginStore } from '@/lib/plugins/store';
 import {
   pluginLabel,
-  slotEntries,
   usePluginRegistry,
   viewByKey,
   panelByKey,
   type ResolvedArtifactViewer,
 } from '@/lib/plugins/registry';
-import { pluginIcon } from '@/lib/plugins/icons';
-import { runSlotAction, slotLabel } from '@/lib/plugins/host';
 import { PluginFrame, reportPluginFailure } from '@/lib/plugins/frame';
+import { Slot } from './ui/Slot';
 import type { ArtifactContent } from '@/lib/types';
 import type { PluginRecord } from '@/lib/plugins/types';
 
@@ -78,68 +76,19 @@ export function PluginSlot({
   compact?: boolean;
   onlyPluginId?: string;
 }) {
-  usePluginRegistry();
-  const entries = slotEntries(slot).filter(
-    (entry) => !onlyPluginId || entry.plugin.id === onlyPluginId,
-  );
-  if (entries.length === 0) return null;
   return (
-    <div
-      className={cn('flex min-w-0 flex-wrap items-center gap-1.5', className)}
-      data-plugin-slot={slot}
-    >
-      {entries.map((entry) => {
-        const title = slotLabel(entry);
-        if (entry.component) {
-          const Component = entry.component;
-          return (
-            <div key={entry.key} className="min-w-0">
-              <PluginContributionBoundary plugin={entry.plugin}>
-                <Component plugin={entry.plugin} slot={entry.slot} context={context} />
-              </PluginContributionBoundary>
-            </div>
-          );
-        }
-        if (entry.slot.entry) {
-          return (
-            <PluginFrame
-              key={entry.key}
-              plugin={entry.plugin}
-              entry={entry.slot.entry}
-              kind="slot"
-              title={title}
-              context={context}
-              className={compact ? 'max-w-full' : undefined}
-              maxHeight={compact ? 64 : 240}
-            />
-          );
-        }
-        if (!entry.slot.action) return null;
-        const Icon = pluginIcon(entry.slot.icon);
-        return (
-          <button
-            key={entry.key}
-            type="button"
-            onClick={() => runSlotAction(entry)}
-            title={title}
-            aria-label={title}
-            className={cn(
-              'inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg bg-surface-raised/70 px-2',
-              'text-[12px] font-medium text-foreground-muted transition-colors',
-              'hover:bg-surface-hover hover:text-foreground',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-            )}
-          >
-            <Icon aria-hidden className="size-3.5 shrink-0" strokeWidth={2} />
-            <span className="truncate">{title}</span>
-          </button>
-        );
-      })}
-    </div>
+    <Slot
+      name={slot}
+      owner={context}
+      className={className}
+      compact={compact}
+      variant="row"
+      onlyPluginId={onlyPluginId}
+    />
   );
 }
 
-function PluginPageHeader({
+export function PluginPageHeader({
   title,
   subtitle,
   pluginId,

@@ -1,20 +1,25 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "com.acme.notes",
   "name": "Acme Notes",
-  "version": "1.2.0",
-  "description": "Reference sandboxed plugin: notes panel, toolbar action, a tool, a skill and a prompt section.",
+  "version": "1.3.0",
+  "description": "Reference sandboxed plugin: nav tab, dock tab, variants, preset, scoped CSS, GenUI, tools and skills.",
   "author": "Acme",
   "homepage": "https://example.com/acme-notes",
   "icon": "assets/icon.svg",
-  "apiVersion": 1,
+  "apiVersion": 2,
   "engines": { "zylara": ">=0.10.0 <1.0.0" },
   "publisher": { "id": "acme", "name": "Acme", "keyId": "acme-fixture-2026" },
   "permissions": [
     "ui.slot:chat.composer.toolbar",
     "ui.view",
+    "ui.nav",
     "ui.panel",
     "ui.command",
+    "ui.variant",
+    "ui.preset",
+    "ui.css.global",
+    "ui.genui",
     "ui.artifact",
     "ui.theme",
     "agent.tools",
@@ -43,9 +48,20 @@
           "description": "Notes stored in the plugin namespace.",
           "descriptionKey": "views.notesDescription",
           "icon": "ListChecks",
-          "surface": "chat",
-          "location": "sidebar",
+          "layouts": ["chat", "code"],
+          "order": 60,
           "entry": "ui/page.html"
+        }
+      ],
+      "nav": [
+        {
+          "id": "notes",
+          "title": "Acme Notes",
+          "titleKey": "views.notes",
+          "icon": "ListChecks",
+          "page": "notes",
+          "layouts": ["chat", "code"],
+          "order": 60
         }
       ],
       "panels": [
@@ -55,9 +71,60 @@
           "titleKey": "panels.notes",
           "icon": "PanelRight",
           "entry": "ui/panel.html",
-          "dock": "right"
+          "dock": "right",
+          "tab": true,
+          "layouts": ["chat", "code"],
+          "order": 60
         }
       ],
+      "variants": [
+        {
+          "component": "chat.composer",
+          "id": "notebook",
+          "title": "Notebook",
+          "layouts": ["chat"],
+          "recipe": {
+            "surface": "surface",
+            "radius": "lg",
+            "padding": "3"
+          }
+        }
+      ],
+      "presets": [
+        {
+          "id": "notebook",
+          "title": "Notebook",
+          "layouts": ["chat"],
+          "tokens": {
+            "light": { "accent": "#8b5cf6", "surface": "#faf9ff" },
+            "dark": { "accent": "#a78bfa", "surface": "#17131f" }
+          },
+          "density": "comfortable",
+          "variants": { "chat.composer": "notebook" }
+        }
+      ],
+      "css": [
+        {
+          "id": "notes-theme",
+          "file": "ui/theme.css",
+          "layouts": ["chat"],
+          "order": 100
+        }
+      ],
+      "genui": {
+        "components": [
+          {
+            "id": "note",
+            "title": "Note card",
+            "summary": "A short note from the Acme vault",
+            "props": {
+              "title": { "type": "text", "required": true, "maxChars": 60 },
+              "body": { "type": "text", "required": true, "maxChars": 400 }
+            },
+            "render": { "kind": "sandbox", "entry": "ui/metric.html", "height": 160 }
+          }
+        ]
+      },
       "commands": [
         {
           "id": "open-notes",

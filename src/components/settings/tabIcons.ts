@@ -14,6 +14,7 @@ import {
   Settings2,
   Sparkles,
   SquareTerminal,
+  Wand2,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ export type SettingsTabIconMap = Record<BuiltinSettingsTabId, LucideIcon>;
 export const SETTINGS_TAB_ICONS: SettingsTabIconMap = {
   general: Settings2,
   themes: Palette,
+  design: Wand2,
   terminal: SquareTerminal,
   providers: KeyRound,
   model: Sparkles,

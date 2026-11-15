@@ -49,7 +49,7 @@ pub struct VerifiedKey {
     pub fingerprint: String,
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     let mut digest = Sha256::new();
     digest.update(bytes);
     let hash = digest.finalize();

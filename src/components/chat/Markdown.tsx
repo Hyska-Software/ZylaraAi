@@ -13,6 +13,7 @@ import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { ChartBlock, GenUIBlock, HtmlPreview, MermaidBlock } from '@/components/genui';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { CodeBlock, normalizeLanguage } from './CodeBlock';
@@ -23,10 +24,35 @@ import { protectEscapedDollars, remarkRestoreMathDollars } from './markdown/math
 import { childrenToText, isIgnorableNode } from './markdown/reactText';
 import { rehypeSafeHtml } from './markdown/rehypeSafeHtml';
 
-/** Fence languages rendered by dedicated components instead of Prism. */
-const DELEGATED_LANGUAGES = new Set(['ui', 'mermaid', 'chart', 'html', 'svg']);
-
 type MarkdownCodeProps = ComponentPropsWithoutRef<'code'> & ExtraProps;
+
+function renderDefaultFence(
+  language: string,
+  code: string,
+  className: string | undefined,
+): ReactNode {
+  switch (language) {
+    case 'ui':
+      return <GenUIBlock source={code} />;
+    case 'mermaid':
+      return <MermaidBlock code={code} />;
+    case 'chart':
+      return <ChartBlock spec={code} />;
+    case 'html':
+      return <HtmlPreview html={code} title="HTML" />;
+    case 'svg':
+      return <HtmlPreview html={code} title="SVG" />;
+    default:
+      return (
+        <CodeBlock
+          code={code}
+          language={normalizeLanguage(language)}
+          label={language}
+          className={className}
+        />
+      );
+  }
+}
 
 function MarkdownCode({ node, className, children, ...rest }: MarkdownCodeProps) {
   const match = /language-([\w+#.-]+)/.exec(className ?? '');
@@ -51,24 +77,14 @@ function MarkdownCode({ node, className, children, ...rest }: MarkdownCodeProps)
   const code = childrenToText(children).replace(/\n$/, '');
   if (!code.trim()) return null;
 
-  if (DELEGATED_LANGUAGES.has(fenceLanguage)) {
-    switch (fenceLanguage) {
-      case 'ui':
-        return <GenUIBlock source={code} />;
-      case 'mermaid':
-        return <MermaidBlock code={code} />;
-      case 'chart':
-        return <ChartBlock spec={code} />;
-      case 'html':
-        return <HtmlPreview html={code} title="HTML" />;
-      case 'svg':
-        return <HtmlPreview html={code} title="SVG" />;
-      default:
-        break;
-    }
-  }
-
-  return <CodeBlock code={code} language={normalizeLanguage(fenceLanguage)} label={fenceLanguage} />;
+  return (
+    <Slot
+      name="chat.markdown.fence"
+      entryKey={fenceLanguage}
+      owner={{ language: fenceLanguage, code }}
+      fallback={renderDefaultFence(fenceLanguage, code, className)}
+    />
+  );
 }
 
 /** True when the `<pre>` child will become a block card (code card / KaTeX display). */

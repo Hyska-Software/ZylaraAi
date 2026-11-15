@@ -1,19 +1,24 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "com.acme.trusted-demo",
   "name": "Acme Trusted Lab",
-  "version": "1.0.0",
-  "description": "Trusted reference plugin: React view/panel, component override, shell wrapper, global CSS and an agent tool.",
+  "version": "1.1.0",
+  "description": "Trusted reference plugin: React page/panel, per-layout nav, variants, presets, GenUI and an agent tool.",
   "author": "Acme",
-  "apiVersion": 1,
+  "apiVersion": 2,
   "engines": { "zylara": ">=0.10.0 <1.0.0" },
   "publisher": { "id": "acme", "name": "Acme", "keyId": "acme-fixture-2026" },
   "permissions": [
     "unsafe.renderer",
     "ui.slot:chat.sidebar.footer",
+    "ui.slot:chat.message.actions",
     "ui.view",
+    "ui.nav",
     "ui.panel",
     "ui.command",
+    "ui.variant",
+    "ui.preset",
+    "ui.genui",
     "ui.override:chat.welcome",
     "ui.override:layout.shell",
     "ui.css.global",
@@ -44,9 +49,20 @@
           "description": "A React component running in the main webview.",
           "descriptionKey": "views.labDescription",
           "icon": "Sparkles",
-          "surface": "chat",
-          "location": "sidebar",
+          "layouts": ["chat", "code"],
+          "order": 50,
           "component": "Lab"
+        }
+      ],
+      "nav": [
+        {
+          "id": "lab",
+          "title": "Trusted Lab",
+          "titleKey": "views.lab",
+          "icon": "Sparkles",
+          "page": "lab",
+          "layouts": ["chat", "code"],
+          "order": 45
         }
       ],
       "panels": [
@@ -56,9 +72,54 @@
           "titleKey": "panels.lab",
           "icon": "PanelRight",
           "component": "LabPanel",
-          "dock": "right"
+          "dock": "right",
+          "tab": true,
+          "layouts": ["chat", "code"],
+          "order": 50
         }
       ],
+      "variants": [
+        {
+          "component": "chat.message.user",
+          "id": "glass",
+          "title": "Glass",
+          "layouts": ["chat"],
+          "recipe": {
+            "surface": "accent-soft",
+            "radius": "xl",
+            "padding": "3",
+            "align": "end"
+          }
+        }
+      ],
+      "presets": [
+        {
+          "id": "paper",
+          "title": "Paper",
+          "layouts": ["chat", "code"],
+          "tokens": {
+            "light": { "background": "#faf8f4", "surface": "#f4efe7" },
+            "dark": { "background": "#14120f", "surface": "#1d1a16" }
+          },
+          "density": "compact",
+          "variants": { "chat.message.user": "glass" }
+        }
+      ],
+      "genui": {
+        "components": [
+          {
+            "id": "metric",
+            "title": "Metric",
+            "summary": "One KPI with a trend",
+            "props": {
+              "label": { "type": "text", "required": true, "maxChars": 40 },
+              "value": { "type": "text", "required": true, "maxChars": 40 },
+              "trend": { "type": "enum", "values": ["up", "down", "flat"] }
+            },
+            "render": { "kind": "trusted", "component": "MetricView" }
+          }
+        ]
+      },
       "commands": [
         {
           "id": "open-lab",

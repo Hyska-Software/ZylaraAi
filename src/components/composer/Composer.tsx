@@ -7,6 +7,7 @@ import {
   type ChangeEvent,
   type ClipboardEvent as ReactClipboardEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUp, FilePlus, Globe, Plus, Square, Target, TriangleAlert, Zap } from 'lucide-react';
@@ -15,6 +16,8 @@ import { toast } from 'sonner';
 import { credentialGateMessage } from '@/components/chat/turnError';
 import { useReduceMotion } from '@/components/layout/hooks';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { ComponentSlot, Slot } from '@/components/plugins/ui/Slot';
+import { useStyleRecipe } from '@/lib/plugins/ui/recipe';
 import { usePluginRegistry } from '@/lib/plugins/registry';
 import { ModelPill } from '@/components/models/ModelPill';
 import {
@@ -57,7 +60,19 @@ import { PlanModeChip } from './PlanModeChip';
 import { SLASH_LISTBOX_ID, SlashMenu, slashOptionId } from './SlashMenu';
 import { ToolsToggle } from './ToolsToggle';
 
-/** The textarea grows up to ten lines before scrolling (DESIGN §7). */
+/** The composer card itself; variants dress this wrapper, replacements replace it. */
+function ComposerCardHost({ children }: Record<string, unknown>) {
+  const recipe = useStyleRecipe(
+    'chat.composer',
+    'relative rounded-3xl bg-surface-raised shadow-sm transition-colors duration-150',
+  );
+  return (
+    <div className={recipe.className} data-variant={recipe.variantId ?? undefined}>
+      {children as ReactNode}
+    </div>
+  );
+}
+
 const MAX_LINES = 10;
 
 /** Debounce da busca de arquivos do `@` (WORKBENCH §6). */
@@ -676,9 +691,25 @@ export function Composer() {
         </div>
       ) : null}
 
-      <div
-        className="relative rounded-3xl bg-surface-raised shadow-sm transition-colors duration-150"
-      >
+      <ComponentSlot
+        name="chat.composer"
+        fallback={ComposerCardHost}
+        props={{
+          conversationId: activeConversationId,
+          draft: value,
+          streaming: isStreaming,
+          canSend,
+          children: (
+            <>
+              <Slot
+                name="chat.composer.frame"
+                owner={{
+                  conversationId: activeConversationId,
+                  draft: value,
+                  streaming: isStreaming,
+                  canSend,
+                }}
+              >
         <ComposerActivity active={isStreaming} reduceMotion={reduceMotion} />
 
         <Popover
@@ -744,6 +775,16 @@ export function Composer() {
                 />
               ) : null}
 
+              <Slot
+                name="chat.composer.attachments"
+                owner={{
+                  conversationId: activeConversationId,
+                  draft: value,
+                  streaming: isStreaming,
+                  canSend,
+                }}
+              />
+
               <textarea
                 ref={textareaRef}
                 value={value}
@@ -801,12 +842,18 @@ export function Composer() {
                 onHoverIndex={(index) => setMenu({ ...menu, active: index })}
               />
             ) : menu?.kind === 'slash' ? (
-              <SlashMenu
-                commands={slashCommands}
-                activeIndex={activeIndex}
-                onSelect={selectSlash}
-                onHoverIndex={(index) => setMenu({ ...menu, active: index })}
-              />
+              <>
+                <SlashMenu
+                  commands={slashCommands}
+                  activeIndex={activeIndex}
+                  onSelect={selectSlash}
+                  onHoverIndex={(index) => setMenu({ ...menu, active: index })}
+                />
+                <Slot
+                  name="chat.composer.slash"
+                  owner={{ query: menu.query, conversationId: activeConversationId }}
+                />
+              </>
             ) : null}
           </PopoverContent>
         </Popover>
@@ -856,6 +903,15 @@ export function Composer() {
           />
 
           <div className="ml-auto flex items-center gap-1.5">
+            <Slot
+              name="chat.composer.actions"
+              owner={{
+                conversationId: activeConversationId,
+                draft: value,
+                streaming: isStreaming,
+                canSend,
+              }}
+            />
             {layoutMode === 'chat' && activeConversationId ? (
               <CacheMeterChip conversationId={activeConversationId} />
             ) : null}
@@ -938,7 +994,11 @@ export function Composer() {
             )}
           </div>
         </div>
-      </div>
+              </Slot>
+            </>
+          ),
+        }}
+      />
 
       <p className="mt-1.5 text-center text-[11px] leading-relaxed text-foreground-subtle">
         {t('disclaimer')}

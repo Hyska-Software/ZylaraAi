@@ -10,6 +10,7 @@
 export type BuiltinSettingsTabId =
   | 'general'
   | 'themes'
+  | 'design'
   | 'terminal'
   | 'providers'
   | 'model'
@@ -31,6 +32,7 @@ export interface SettingsTabDefinition {
 export const SETTINGS_TABS = [
   { id: 'general', labelKey: 'tabs.general' },
   { id: 'themes', labelKey: 'tabs.themes' },
+  { id: 'design', labelKey: 'tabs.design' },
   { id: 'terminal', labelKey: 'tabs.terminal' },
   { id: 'providers', labelKey: 'tabs.providers' },
   { id: 'model', labelKey: 'tabs.model' },

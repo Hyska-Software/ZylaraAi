@@ -1,6 +1,6 @@
 import { HtmlPreview } from '@/components/genui';
 import { cn } from '@/lib/utils';
-import { artifactViewerForMime, usePluginRegistry } from '@/lib/plugins/registry';
+import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { PluginArtifactViewer } from '@/components/plugins/PluginHosts';
 import { ArchivePreview } from './ArchivePreview';
 import { AudioPreview } from './AudioPreview';
@@ -27,12 +27,33 @@ export type ArtifactPreviewProps = ArtifactViewProps;
  */
 export function ArtifactPreview({ content, className, showArtifactActions }: ArtifactPreviewProps) {
   const { artifact } = content;
-  usePluginRegistry();
-  const pluginViewer = artifactViewerForMime(artifact.mimeType);
-  if (pluginViewer) {
+  const ui = usePluginUi();
+  const mime = artifact.mimeType.trim().toLowerCase();
+  const viewer = [...ui.artifactViewers]
+    .sort((left, right) => left.priority - right.priority)
+    .find((entry) =>
+      entry.mimeTypes.some((pattern) => {
+        const normalized = pattern.trim().toLowerCase();
+        return normalized === mime || (normalized.endsWith('/*') && mime.startsWith(normalized.slice(0, -1)));
+      }),
+    );
+  if (viewer) {
     return (
       <PluginArtifactViewer
-        viewer={pluginViewer}
+        viewer={{
+          plugin: viewer.plugin,
+          viewer: {
+            id: viewer.id,
+            title: viewer.title,
+            titleKey: viewer.titleKey,
+            mimeTypes: viewer.mimeTypes,
+            entry: viewer.entry,
+            component: null,
+            priority: viewer.priority,
+          },
+          key: viewer.key,
+          component: viewer.component,
+        }}
         content={content}
         className={className}
         showArtifactActions={showArtifactActions}

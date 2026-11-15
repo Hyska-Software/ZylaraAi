@@ -28,6 +28,7 @@ use crate::providers::ToolDefinition;
 use super::ToolOutcome;
 
 pub mod contract;
+pub mod extension;
 
 #[cfg(test)]
 mod fixtures;
@@ -193,6 +194,13 @@ impl DiagnosticSink {
 /// Analisa um bloco `ui` completo (texto entre as cercas). Nunca falha/entra em
 /// pânico: qualquer problema vira diagnóstico.
 pub fn analyze(source: &str) -> Analysis {
+    analyze_with(source, &BTreeMap::new())
+}
+
+pub fn analyze_with(
+    source: &str,
+    extra: &BTreeMap<String, super::genui::contract::ComponentSpec>,
+) -> Analysis {
     let contract = contract();
     let mut sink = DiagnosticSink::new(contract.limits.diagnostics_per_code);
 
@@ -309,7 +317,7 @@ pub fn analyze(source: &str) -> Analysis {
     }
 
     let (normalized_components, component_count) =
-        normalize::normalize_components(contract, &components, &mut sink);
+        normalize::normalize_components(contract, &components, extra, &mut sink);
 
     if sink.has_errors() {
         return Analysis {
@@ -437,7 +445,9 @@ pub fn run(args: &Value) -> ToolOutcome {
         Some(other) => compact_json(other),
     };
 
-    let analysis = analyze(&source);
+    let extra_components = extension::active_components();
+    let extra = extension::component_map(&extra_components);
+    let analysis = analyze_with(&source, &extra);
     let summary = summary(&analysis);
     let response = ToolResponse {
         ok: analysis.is_ok(),

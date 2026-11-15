@@ -900,6 +900,11 @@
     "reason": "Internal storage diagnostic: surfaced only through the generic command error chain, never as dedicated UI copy."
   },
   {
+    "file": "src-tauri/src/db.rs",
+    "text": "falha ao salvar ponto de retomada do turno",
+    "reason": "Internal storage diagnostic: surfaced only through the generic command error chain, never as dedicated UI copy."
+  },
+  {
     "file": "src-tauri/src/documents/image.rs",
     "text": "imagem grande demais para ser enviada ao modelo; apenas metadados disponíveis",
     "reason": "Document parser/preview diagnostic detail; the surrounding preview error copy is localized."
@@ -1647,6 +1652,16 @@
   {
     "file": "src-tauri/src/providers/mod.rs",
     "text": "falha ao conectar no provedor: {error}",
+    "reason": "Provider protocol/parser diagnostic or test fixture; raw provider bodies are intentionally not localized."
+  },
+  {
+    "file": "src-tauri/src/providers/mod.rs",
+    "text": "saldo/créditos insuficientes: {excerpt}",
+    "reason": "Provider protocol/parser diagnostic or test fixture; raw provider bodies are intentionally not localized."
+  },
+  {
+    "file": "src-tauri/src/providers/mod.rs",
+    "text": "falha na conexão com o provedor: {error}",
     "reason": "Provider protocol/parser diagnostic or test fixture; raw provider bodies are intentionally not localized."
   },
   {

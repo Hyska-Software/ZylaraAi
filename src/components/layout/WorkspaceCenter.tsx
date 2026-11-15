@@ -21,15 +21,16 @@ import {
 import { LibraryView } from '@/components/library';
 import { PluginsView } from '@/components/plugins/PluginsView';
 import { PluginViewHost } from '@/components/plugins/PluginHosts';
+import { PluginPageHost } from '@/components/plugins/ui/PluginPageHost';
 import { SkillsView } from '@/components/skills';
 import { useChatStore, useUiStore } from '@/lib/store';
 import { usePluginStore } from '@/lib/plugins/store';
 import {
-  resolvePluginComponent,
   usePluginRegistry,
   viewByKey,
-  type PluginComponent,
 } from '@/lib/plugins/registry';
+import { ComponentSlot } from '@/components/plugins/ui/Slot';
+import type { PluginComponent } from '@/lib/plugins/ui/types';
 import { cn } from '@/lib/utils';
 
 /**
@@ -69,17 +70,19 @@ export function WorkspaceCenter() {
   /** Sessão ativa no Code (dona do objetivo exibido no painel central). */
   const activeId = useChatStore((state) => state.activeId);
   const pluginTarget = usePluginStore((state) => state.activeView);
+  const pluginPage = useUiStore((state) => state.pluginPages[state.layoutMode]);
   usePluginRegistry();
-  const PluginsPage = resolvePluginComponent(
-    'plugins.view',
-    PluginsView as unknown as PluginComponent,
-  );
   const pluginView = viewByKey(
     pluginTarget ? `${pluginTarget.pluginId}:${pluginTarget.id}` : null,
   );
 
   if (pluginView && (pluginView.view.surface === 'global' || pluginView.view.surface === layoutMode)) {
     return <PluginViewHost />;
+  }
+
+  const codePluginPage = layoutMode === 'code' ? pluginPage : null;
+  if (pluginPage && layoutMode !== 'code') {
+    return <PluginPageHost layout={layoutMode} target={pluginPage} />;
   }
 
   if (layoutMode === 'agent') {
@@ -89,7 +92,12 @@ export function WorkspaceCenter() {
       activeChannelId === null &&
       activeId === null
     ) {
-      return <PluginsPage />;
+      return (
+        <ComponentSlot
+          name="plugins.view"
+          fallback={PluginsView as unknown as PluginComponent}
+        />
+      );
     }
     return (
       <>
@@ -115,6 +123,7 @@ export function WorkspaceCenter() {
   const showIssues = isCode && codeView === 'issues' && codeIssuesTab !== null;
   const showIssue = isCode && codeView === 'issue' && codeIssueTab !== null;
   const showChat =
+    !codePluginPage &&
     !showPlugins &&
     !showSkills &&
     !showLibrary &&
@@ -165,8 +174,18 @@ export function WorkspaceCenter() {
         aria-label={t('shell.workspace.conversationRegion')}
         className={cn('min-h-0 flex-1 flex-col', showChat ? 'flex' : 'hidden')}
       >
-        <ChatView welcome={isCode ? <CodeWelcomeScreen /> : undefined} />
+        <ComponentSlot
+          name="chat.view"
+          fallback={ChatView as unknown as PluginComponent}
+          props={{ welcome: isCode ? <CodeWelcomeScreen /> : undefined }}
+        />
       </div>
+
+      {codePluginPage ? (
+        <div className="min-h-0 flex-1">
+          <PluginPageHost layout="code" target={codePluginPage} />
+        </div>
+      ) : null}
 
       {showTerminal ? (
         <div
@@ -295,7 +314,12 @@ export function WorkspaceCenter() {
         </div>
       ) : null}
 
-      {showPlugins ? <PluginsPage /> : null}
+      {showPlugins ? (
+        <ComponentSlot
+          name="plugins.view"
+          fallback={PluginsView as unknown as PluginComponent}
+        />
+      ) : null}
 
       {showSkills ? (
         <SkillsView

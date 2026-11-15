@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
@@ -49,65 +50,46 @@ const MAX_AUTHOR_CHARS: usize = 80;
 const MAX_DESCRIPTION_CHARS: usize = 300;
 const MAX_VERSION_CHARS: usize = 32;
 
-const REQUIRED_TOKENS: &[&str] = &[
-    "background",
-    "surface",
-    "surface-raised",
-    "surface-hover",
-    "surface-active",
-    "foreground",
-    "foreground-muted",
-    "foreground-subtle",
-    "border",
-    "border-strong",
-    "accent",
-    "accent-hover",
-    "accent-foreground",
-    "accent-soft",
-    "success",
-    "success-soft",
-    "warning",
-    "warning-soft",
-    "danger",
-    "danger-soft",
-    "user-bubble",
-    "code-bg",
-    "terminal-selection",
-];
+const THEME_TOKENS_JSON: &str = include_str!("../../data/theme-tokens.json");
 
-const OPTIONAL_COLOR_TOKENS: &[&str] = &[
-    "accent-ring",
-    "context-system",
-    "context-tools",
-    "context-messages",
-    "assistant-bubble",
-    "terminal-ansi-black",
-    "terminal-ansi-red",
-    "terminal-ansi-green",
-    "terminal-ansi-yellow",
-    "terminal-ansi-blue",
-    "terminal-ansi-magenta",
-    "terminal-ansi-cyan",
-    "terminal-ansi-white",
-    "terminal-ansi-bright-black",
-    "terminal-ansi-bright-red",
-    "terminal-ansi-bright-green",
-    "terminal-ansi-bright-yellow",
-    "terminal-ansi-bright-blue",
-    "terminal-ansi-bright-magenta",
-    "terminal-ansi-bright-cyan",
-    "terminal-ansi-bright-white",
-];
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ThemeTokenCatalog {
+    required: Vec<String>,
+    optional_color: Vec<String>,
+    optional_length: Vec<String>,
+}
 
-const OPTIONAL_LENGTH_TOKENS: &[&str] = &[
-    "radius-xs",
-    "radius-sm",
-    "radius-md",
-    "radius-lg",
-    "radius-xl",
-    "radius-2xl",
-    "radius-3xl",
-];
+static THEME_TOKENS: LazyLock<ThemeTokenCatalog> = LazyLock::new(|| {
+    serde_json::from_str(THEME_TOKENS_JSON).expect("data/theme-tokens.json must be valid JSON")
+});
+
+fn required_tokens() -> &'static [String] {
+    &THEME_TOKENS.required
+}
+
+fn optional_color_tokens() -> &'static [String] {
+    &THEME_TOKENS.optional_color
+}
+
+fn optional_length_tokens() -> &'static [String] {
+    &THEME_TOKENS.optional_length
+}
+
+fn is_color_token(token: &str) -> bool {
+    required_tokens().iter().any(|value| value == token)
+        || optional_color_tokens().iter().any(|value| value == token)
+}
+
+/// Whether a bare token name (`accent`, `radius-md`) is accepted by the theme
+/// and plugin-preset allowlists.
+pub fn is_known_theme_token(token: &str) -> bool {
+    is_color_token(token) || optional_length_tokens().iter().any(|value| value == token)
+}
+
+pub fn is_theme_length_token(token: &str) -> bool {
+    optional_length_tokens().iter().any(|value| value == token)
+}
 
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "gif"];
 const FONT_EXTENSIONS: &[&str] = &["woff2", "woff", "ttf", "otf"];
@@ -206,9 +188,9 @@ fn error_args(key: &str, args: &[(&str, &str)]) -> String {
 }
 
 fn token_kind(token: &str) -> Option<TokenKind> {
-    if REQUIRED_TOKENS.contains(&token) || OPTIONAL_COLOR_TOKENS.contains(&token) {
+    if is_color_token(token) {
         Some(TokenKind::Color)
-    } else if OPTIONAL_LENGTH_TOKENS.contains(&token) {
+    } else if optional_length_tokens().iter().any(|value| value == token) {
         Some(TokenKind::Length)
     } else {
         None
@@ -310,11 +292,11 @@ fn validate_tokens(variant: &str, tokens: &BTreeMap<String, String>) -> Result<(
     if tokens.len() > MAX_TOKENS {
         return Err(error_key("themes.errors.tooManyTokens"));
     }
-    for token in REQUIRED_TOKENS {
-        if !tokens.contains_key(*token) {
+    for token in required_tokens() {
+        if !tokens.contains_key(token) {
             return Err(error_args(
                 "themes.errors.missingToken",
-                &[("variant", variant), ("token", token)],
+                &[("variant", variant), ("token", token.as_str())],
             ));
         }
     }
@@ -1013,7 +995,7 @@ mod tests {
 
     fn required_palette(accent: &str) -> String {
         let mut tokens = String::new();
-        for token in REQUIRED_TOKENS {
+        for token in required_tokens() {
             tokens.push_str(&format!("\"{token}\":\"{accent}\","));
         }
         format!("{{{}}}", tokens.trim_end_matches(','))
@@ -1128,9 +1110,9 @@ mod tests {
         for theme in &listed[1..] {
             assert!(theme.built_in);
             for variant in [&theme.light, &theme.dark] {
-                for token in REQUIRED_TOKENS {
+                for token in required_tokens() {
                     assert!(
-                        variant.tokens.contains_key(*token),
+                        variant.tokens.contains_key(token),
                         "{} missing {token}",
                         theme.id
                     );

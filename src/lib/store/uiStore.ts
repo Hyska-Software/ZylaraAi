@@ -26,6 +26,12 @@ export type MainView = 'chat' | 'skills' | 'library' | 'plugins';
  */
 export type LayoutMode = 'chat' | 'code' | 'agent';
 
+/** Plugin-owned center page active in one layout. */
+export interface PluginPageTarget {
+  pluginId: string;
+  pageId: string;
+}
+
 /**
  * Center surface inside the Agentes layout when no agent/channel is selected.
  * Volatile: `stats` and `routines` never survive an app restart.
@@ -374,6 +380,10 @@ interface UiState {
   /** Persisted layout preference of the right side panel (see SidePanelMode). */
   sidePanelMode: SidePanelMode;
   activeView: MainView;
+  /** Plugin page open in each layout (null = the layout's host page). */
+  pluginPages: Record<LayoutMode, PluginPageTarget | null>;
+  /** Plugin dock tab active in each layout (null = the host dock tab). */
+  pluginDockTab: Record<LayoutMode, string | null>;
   activeArtifactId: string | null;
   artifacts: Artifact[];
 
@@ -488,6 +498,14 @@ interface UiState {
   setCommandPaletteOpen: (open: boolean) => void;
   /** Switches the main content between the chat and the skills manager. */
   setActiveView: (view: MainView) => void;
+  /** Opens a plugin page in one layout (default: the active layout). */
+  openPluginPage: (target: PluginPageTarget, layout?: LayoutMode) => void;
+  /** Closes the plugin page of one layout (default: the active layout). */
+  closePluginPage: (layout?: LayoutMode) => void;
+  /** Opens a plugin dock tab in one layout (default: the active layout). */
+  openPluginDockTab: (key: string, layout?: LayoutMode) => void;
+  /** Closes the plugin dock tab of one layout (default: the active layout). */
+  closePluginDockTab: (layout?: LayoutMode) => void;
   /** Opens the panel on the artifact preview (or the list when there is none). */
   openArtifactPanel: (artifactId?: string | null) => void;
   /** Opens the panel on the generated-artifact list. */
@@ -602,6 +620,8 @@ export const useUiStore = create<UiState>()(
       sidePanelWidth: SIDE_PANEL_WIDTH_DEFAULT,
       sidePanelMode: 'overlay',
       activeView: 'chat',
+      pluginPages: { chat: null, code: null, agent: null },
+      pluginDockTab: { chat: null, code: null, agent: null },
       activeArtifactId: null,
       artifacts: [],
 
@@ -643,7 +663,11 @@ export const useUiStore = create<UiState>()(
           activeAgentId: activeChannelId ? null : state.activeAgentId,
           agentView: activeChannelId ? 'team' : state.agentView,
         })),
-      setAgentView: (agentView) => set({ agentView }),
+      setAgentView: (agentView) =>
+        set((state) => ({
+          agentView,
+          pluginPages: { ...state.pluginPages, agent: null },
+        })),
       openAgentRoutines: (agentRoutinesAgentId) =>
         set({ agentView: 'routines', agentRoutinesAgentId }),
       setAgentRoutinesAgentId: (agentRoutinesAgentId) => set({ agentRoutinesAgentId }),
@@ -652,7 +676,10 @@ export const useUiStore = create<UiState>()(
       openAgentAvatarEditor: (agentAvatarEditor) => set({ agentAvatarEditor }),
       closeAgentAvatarEditor: () => set({ agentAvatarEditor: null }),
       setCodeView: (codeView) =>
-        set({ codeView: CODE_VIEWS.includes(codeView) ? codeView : 'session' }),
+        set((state) => ({
+          codeView: CODE_VIEWS.includes(codeView) ? codeView : 'session',
+          pluginPages: { ...state.pluginPages, code: null },
+        })),
       openCodeDiff: (codeDiffTab) => set({ codeDiffTab, codeView: 'diff' }),
       closeCodeDiff: () =>
         set((state) => ({ codeDiffTab: null, ...keepCenterViewUnlessActive(state, 'diff') })),
@@ -875,29 +902,34 @@ export const useUiStore = create<UiState>()(
       setCodePanelOpen: (codePanelOpen) => set({ codePanelOpen }),
       toggleCodePanel: () => set((state) => ({ codePanelOpen: !state.codePanelOpen })),
       setCodePanelTab: (codePanelTab) =>
-        set({
+        set((state) => ({
           codePanelTab:
             codePanelTab === 'files'
               ? 'files'
               : codePanelTab === 'terminal'
                 ? 'terminal'
                 : 'changes',
-        }),
+          pluginDockTab: { ...state.pluginDockTab, code: null },
+          pluginPages: { ...state.pluginPages, code: null },
+        })),
       setCodePanelTabOrder: (order) =>
         set({ codePanelTabOrder: normalizeCodePanelTabOrder(order) }),
       setCodeTabOrder: (order) => set({ codeTabOrder: normalizeTabOrder(order) }),
       setAgentPanelOpen: (agentPanelOpen) => set({ agentPanelOpen }),
       toggleAgentPanel: () => set((state) => ({ agentPanelOpen: !state.agentPanelOpen })),
       setAgentPanelTab: (agentPanelTab) =>
-        set({
+        set((state) => ({
           agentPanelTab: ['screen', 'routines', 'browser', 'data'].includes(agentPanelTab)
             ? agentPanelTab
             : 'screen',
-        }),
+          pluginDockTab: { ...state.pluginDockTab, agent: null },
+          pluginPages: { ...state.pluginPages, agent: null },
+        })),
       setAgentRightPanel: (agentRightPanel) =>
-        set({
+        set((state) => ({
           agentRightPanel: agentRightPanel === 'workspace' ? 'workspace' : 'agent',
-        }),
+          pluginPages: { ...state.pluginPages, agent: null },
+        })),
       setActiveWorkspace: (activeWorkspaceId) => set({ activeWorkspaceId }),
       openWorkspaceSession: (workspaceId, conversationId) =>
         set((state) => {
@@ -941,19 +973,63 @@ export const useUiStore = create<UiState>()(
         set({ settingsTab: isSettingsTabId(settingsTab) ? settingsTab : DEFAULT_SETTINGS_TAB }),
       setModelPickerOpen: (modelPickerOpen) => set({ modelPickerOpen }),
       setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
-      setActiveView: (activeView) => set({ activeView }),
+      setActiveView: (activeView) =>
+        set((state) => ({
+          activeView,
+          pluginPages: { ...state.pluginPages, chat: null },
+        })),
+      openPluginPage: (target, layout) =>
+        set((state) => {
+          const targetLayout = layout ?? state.layoutMode;
+          return {
+            pluginPages: { ...state.pluginPages, [targetLayout]: target },
+          };
+        }),
+      closePluginPage: (layout) =>
+        set((state) => {
+          const targetLayout = layout ?? state.layoutMode;
+          return {
+            pluginPages: { ...state.pluginPages, [targetLayout]: null },
+          };
+        }),
+      openPluginDockTab: (key, layout) =>
+        set((state) => {
+          const targetLayout = layout ?? state.layoutMode;
+          const pluginDockTab = { ...state.pluginDockTab, [targetLayout]: key };
+          if (targetLayout === 'chat') {
+            return { pluginDockTab, artifactPanelOpen: true, sourcesPanelOpen: false };
+          }
+          if (targetLayout === 'code') return { pluginDockTab, codePanelOpen: true };
+          return { pluginDockTab, agentPanelOpen: true, agentRightPanel: 'agent' };
+        }),
+      closePluginDockTab: (layout) =>
+        set((state) => {
+          const targetLayout = layout ?? state.layoutMode;
+          return { pluginDockTab: { ...state.pluginDockTab, [targetLayout]: null } };
+        }),
       openArtifactPanel: (artifactId) =>
         set((state) => {
           const active = (typeof artifactId === 'string' ? artifactId : null) ?? state.activeArtifactId;
+          const pluginDockTab = { ...state.pluginDockTab, chat: null };
           if (active) {
-            return { artifactPanelOpen: true, artifactPanelView: 'preview', activeArtifactId: active, sourcesPanelOpen: false };
+            return { artifactPanelOpen: true, artifactPanelView: 'preview', activeArtifactId: active, sourcesPanelOpen: false, pluginDockTab };
           }
-          return { artifactPanelOpen: true, artifactPanelView: 'list', sourcesPanelOpen: false };
+          return { artifactPanelOpen: true, artifactPanelView: 'list', sourcesPanelOpen: false, pluginDockTab };
         }),
       openArtifactList: () =>
-        set({ artifactPanelOpen: true, artifactPanelView: 'list', sourcesPanelOpen: false }),
+        set((state) => ({
+          artifactPanelOpen: true,
+          artifactPanelView: 'list',
+          sourcesPanelOpen: false,
+          pluginDockTab: { ...state.pluginDockTab, chat: null },
+        })),
       closeArtifactPanel: () => set({ artifactPanelOpen: false }),
-      openSourcesPanel: () => set({ sourcesPanelOpen: true, artifactPanelOpen: false }),
+      openSourcesPanel: () =>
+        set((state) => ({
+          sourcesPanelOpen: true,
+          artifactPanelOpen: false,
+          pluginDockTab: { ...state.pluginDockTab, chat: null },
+        })),
       closeSourcesPanel: () => set({ sourcesPanelOpen: false }),
       setArtifactPanelView: (view) =>
         set((state) => {
@@ -1023,6 +1099,8 @@ export const useUiStore = create<UiState>()(
         activeWorkspaceId: state.activeWorkspaceId,
         openSessionsByWorkspace: state.openSessionsByWorkspace,
         codeFileWrap: state.codeFileWrap,
+        pluginPages: state.pluginPages,
+        pluginDockTab: state.pluginDockTab,
       }),
       /**
        * Rehydrated layouts may carry an out-of-range width (manually edited

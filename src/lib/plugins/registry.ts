@@ -6,11 +6,11 @@
  * lists. Trusted registrations are added by the main-webview loader and removed
  * on disable/safe mode.
  */
-import { createElement, type ComponentType, type ReactNode } from 'react';
+import { type ComponentType } from 'react';
 import { useSyncExternalStore } from 'react';
 import { t } from '@/lib/i18n';
 import {
-  pluginComponentExists,
+  PLUGIN_SLOTS,
   pluginPermissionBase,
   pluginPermissionSpec,
 } from './contract';
@@ -19,16 +19,31 @@ import type {
   CommandContribution,
   PanelContribution,
   PluginAction,
+  PluginLayoutId,
   PluginManifest,
   PluginPermissionView,
   PluginRecord,
   PluginSnapshot,
   SettingsTabContribution,
-  SlotContribution,
+  SlotContribution as ManifestSlotContribution,
   ThemeContribution,
   ViewContribution,
 } from './types';
-
+import { setPluginUiState } from './ui/registry';
+import type {
+  ArtifactViewerSpec,
+  ComponentReplacement,
+  ComponentWrap,
+  CssEntry,
+  GenuiComponentSpec,
+  NavEntry,
+  PageSpec,
+  PanelTabSpec,
+  PresetSpec,
+  SettingsTabSpec,
+  SlotContribution as UiSlotContribution,
+  VariantSpec,
+} from './ui/types';
 export type PluginComponent = ComponentType<Record<string, unknown>>;
 
 export interface TrustedRegistration {
@@ -42,7 +57,19 @@ export interface TrustedRegistration {
   overrides: Map<string, PluginComponent>;
   wrappers: Map<string, PluginComponent[]>;
   shell: PluginComponent | null;
-  css: string[];
+  uiSlots: UiSlotContribution[];
+  uiPages: PageSpec[];
+  uiPanelTabs: PanelTabSpec[];
+  uiNav: NavEntry[];
+  uiSettingsTabs: SettingsTabSpec[];
+  uiArtifactViewers: ArtifactViewerSpec[];
+  uiVariants: VariantSpec[];
+  uiPresets: PresetSpec[];
+  uiCss: CssEntry[];
+  uiGenui: GenuiComponentSpec[];
+  uiReplacements: ComponentReplacement[];
+  uiWraps: ComponentWrap[];
+  uiCommands: CommandContribution[];
   toolHandlers: Map<string, (input: { tool: string; arguments: unknown }) => unknown>;
   commands: Map<string, (params: unknown) => unknown>;
   cleanup: Array<() => void>;
@@ -58,14 +85,6 @@ export interface ResolvedView {
 export interface ResolvedPanel {
   plugin: PluginRecord;
   panel: PanelContribution;
-  key: string;
-  component: PluginComponent | null;
-}
-
-export interface ResolvedSlot {
-  plugin: PluginRecord;
-  slot: SlotContribution;
-  index: number;
   key: string;
   component: PluginComponent | null;
 }
@@ -108,7 +127,6 @@ export interface PluginRegistryState {
   plugins: PluginRecord[];
   views: ResolvedView[];
   panels: ResolvedPanel[];
-  slots: ResolvedSlot[];
   commands: ResolvedCommand[];
   settingsTabs: ResolvedSettingsTab[];
   artifactViewers: ResolvedArtifactViewer[];
@@ -157,7 +175,6 @@ let state: PluginRegistryState = {
   plugins: [],
   views: [],
   panels: [],
-  slots: [],
   commands: [],
   settingsTabs: [],
   artifactViewers: [],
@@ -171,11 +188,21 @@ function activePlugins(snapshot: PluginSnapshot): PluginRecord[] {
   return snapshot.plugins.filter((plugin) => plugin.active && plugin.enabled);
 }
 
+const ALL_LAYOUTS: PluginLayoutId[] = ['chat', 'code', 'agent'];
+
+function viewLayouts(view: ViewContribution): PluginLayoutId[] {
+  if (view.layouts?.length) return view.layouts;
+  if (view.surface === 'global' || !view.surface) return ALL_LAYOUTS;
+  if (view.surface === 'chat' || view.surface === 'code' || view.surface === 'agent') {
+    return [view.surface];
+  }
+  return ALL_LAYOUTS;
+}
+
 function build(snapshot: PluginSnapshot): PluginRegistryState {
   const plugins = activePlugins(snapshot);
   const views: ResolvedView[] = [];
   const panels: ResolvedPanel[] = [];
-  const slots: ResolvedSlot[] = [];
   const commands: ResolvedCommand[] = [];
   const commandsBySlash = new Map<string, string>();
   const commandsByHotkey = new Map<string, string>();
@@ -185,6 +212,19 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
   const conflicts: PluginConflict[] = [];
   const overrideOwners = new Map<string, string[]>();
   const shellOwners: string[] = [];
+  const uiSlots: UiSlotContribution[] = [];
+  const uiReplacements: ComponentReplacement[] = [];
+  const uiWraps: ComponentWrap[] = [];
+  const uiPages: PageSpec[] = [];
+  const uiPanelTabs: PanelTabSpec[] = [];
+  const uiNav: NavEntry[] = [];
+  const uiSettingsTabs: SettingsTabSpec[] = [];
+  const uiArtifactViewers: ArtifactViewerSpec[] = [];
+  const uiVariants: VariantSpec[] = [];
+  const uiPresets: PresetSpec[] = [];
+  const uiCss: CssEntry[] = [];
+  const uiGenui: GenuiComponentSpec[] = [];
+  const allLayouts: PluginLayoutId[] = ['chat', 'code', 'agent'];
   for (const plugin of plugins) {
     const registration = trustedFor(plugin.id);
     if (registration) {
@@ -197,40 +237,213 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
     }
     if (hasPermission(plugin, 'ui.view')) {
       plugin.manifest.contributes.ui.views.forEach((view) => {
+        const component =
+          registration?.views.get(view.id) ?? registration?.components.get(view.id) ?? null;
         views.push({
           plugin,
           view,
           key: `${plugin.id}:${view.id}`,
-          component: registration?.views.get(view.id) ?? registration?.components.get(view.id) ?? null,
+          component,
+        });
+        const layouts = viewLayouts(view);
+        uiPages.push({
+          key: `${plugin.id}:page:${view.id}`,
+          plugin,
+          pluginId: plugin.id,
+          source: registration ? 'trusted' : 'manifest',
+          order: view.order ?? 100,
+          priority: 100,
+          layouts,
+          pageId: view.id,
+          title: view.title,
+          titleKey: view.titleKey ?? null,
+          icon: view.icon ?? null,
+          entry: view.entry ?? null,
+          component,
+        });
+        if (
+          view.location === 'sidebar' &&
+          plugin.manifest.contributes.ui.nav.length === 0 &&
+          plugin.manifest.apiVersion < 2
+        ) {
+          uiNav.push({
+            key: `${plugin.id}:nav:${view.id}`,
+            source: 'plugin',
+            pluginId: plugin.id,
+            plugin,
+            id: view.id,
+            title: view.title,
+            titleKey: view.titleKey ?? null,
+            icon: view.icon ?? 'Puzzle',
+            page: view.id,
+            layouts,
+            order: 500,
+            badge: null,
+          });
+        }
+      });
+    }
+    if (hasPermission(plugin, 'ui.nav')) {
+      plugin.manifest.contributes.ui.nav.forEach((nav) => {
+        uiNav.push({
+          key: `${plugin.id}:nav:${nav.id}`,
+          source: 'plugin',
+          pluginId: plugin.id,
+          plugin,
+          id: nav.id,
+          title: nav.title,
+          titleKey: nav.titleKey ?? null,
+          icon: nav.icon ?? 'Puzzle',
+          page: nav.page,
+          layouts: nav.layouts?.length ? nav.layouts : ALL_LAYOUTS,
+          order: nav.order ?? 200,
+          badge: nav.badge ?? null,
         });
       });
     }
     if (hasPermission(plugin, 'ui.panel')) {
       plugin.manifest.contributes.ui.panels.forEach((panel) => {
+        const component =
+          registration?.panels.get(panel.id) ?? registration?.components.get(panel.id) ?? null;
+        const tab = panel.tab ?? plugin.manifest.apiVersion >= 2;
         panels.push({
           plugin,
           panel,
           key: `${plugin.id}:${panel.id}`,
-          component:
-            registration?.panels.get(panel.id) ??
-            registration?.components.get(panel.id) ??
-            null,
+          component,
+        });
+        uiPanelTabs.push({
+          key: `${plugin.id}:panel:${panel.id}`,
+          plugin,
+          pluginId: plugin.id,
+          source: registration ? 'trusted' : 'manifest',
+          order: panel.order ?? 100,
+          priority: 100,
+          layouts: panel.layouts?.length ? panel.layouts : ALL_LAYOUTS,
+          tabId: panel.id,
+          title: panel.title,
+          titleKey: panel.titleKey ?? null,
+          icon: panel.icon ?? null,
+          entry: panel.entry ?? null,
+          component,
+          takeover: !tab,
         });
       });
     }
     plugin.manifest.contributes.ui.slots.forEach((slot, index) => {
       if (!hasPermission(plugin, `ui.slot:${slot.slot}`)) return;
-      slots.push({
+      const component =
+        registration?.slots.get(slot.slot) ??
+        registration?.components.get(`${slot.slot}:${index}`) ??
+        (slot.component ? registration?.components.get(slot.component) ?? null : null);
+      const spec = PLUGIN_SLOTS.find((entry) => entry.id === slot.slot);
+      uiSlots.push({
+        key: `${plugin.id}:slot:${slot.id ?? index}`,
         plugin,
-        slot,
-        index,
-        key: `${plugin.id}:${slot.slot}:${index}`,
-        component:
-          registration?.slots.get(slot.slot) ??
-          registration?.components.get(`${slot.slot}:${index}`) ??
-          null,
+        pluginId: plugin.id,
+        source: 'manifest',
+        order: slot.order ?? 100,
+        priority: slot.priority ?? 100,
+        layouts: slot.layouts?.length ? slot.layouts : allLayouts,
+        slot: slot.slot,
+        entryId: slot.id ?? `slot-${index}`,
+        kind: spec?.kind ?? 'list',
+        keyMatch: slot.key ?? null,
+        component,
+        entry: slot.entry ?? null,
+        action: slot.action ?? null,
+        title: slot.title ?? null,
+        titleKey: slot.titleKey ?? null,
+        icon: slot.icon ?? null,
+        when: slot.when ?? null,
       });
     });
+    if (registration) {
+      for (const slotId of registration.slots.keys()) {
+        if (plugin.manifest.contributes.ui.slots.some((slot) => slot.slot === slotId)) {
+          continue;
+        }
+        uiSlots.push({
+          key: `${plugin.id}:slot:${slotId}`,
+          plugin,
+          pluginId: plugin.id,
+          source: 'trusted',
+          order: 100,
+          priority: 100,
+          layouts: allLayouts,
+          slot: slotId,
+          entryId: slotId,
+          kind: PLUGIN_SLOTS.find((entry) => entry.id === slotId)?.kind ?? 'list',
+          keyMatch: null,
+          component: registration.slots.get(slotId) ?? null,
+          entry: null,
+          action: null,
+          title: null,
+          titleKey: null,
+          icon: null,
+          when: null,
+        });
+      }
+      for (const [componentId, componentFn] of registration.overrides) {
+        uiReplacements.push({
+          key: `${plugin.id}:replace:${componentId}`,
+          plugin,
+          pluginId: plugin.id,
+          source: 'trusted',
+          order: 100,
+          priority: 100,
+          layouts: allLayouts,
+          component: componentId,
+          entryId: componentId,
+          componentFn,
+        });
+      }
+      for (const [componentId, wrappers] of registration.wrappers) {
+        wrappers.forEach((wrapper, index) => {
+          uiWraps.push({
+            key: `${plugin.id}:wrap:${componentId}:${index}`,
+            plugin,
+            pluginId: plugin.id,
+            source: 'trusted',
+            order: index * 10,
+            priority: 100,
+            layouts: allLayouts,
+            component: componentId,
+            entryId: `${componentId}:${index}`,
+            wrapper,
+          });
+        });
+      }
+      if (registration.shell) {
+        uiReplacements.push({
+          key: `${plugin.id}:replace:layout.shell`,
+          plugin,
+          pluginId: plugin.id,
+          source: 'trusted',
+          order: 100,
+          priority: 100,
+          layouts: allLayouts,
+          component: 'layout.shell',
+          entryId: 'layout.shell',
+          componentFn: registration.shell,
+        });
+      }
+      uiSlots.push(...registration.uiSlots);
+      uiPages.push(...registration.uiPages);
+      uiPanelTabs.push(...registration.uiPanelTabs);
+      uiNav.push(...registration.uiNav);
+      uiSettingsTabs.push(...registration.uiSettingsTabs);
+      uiArtifactViewers.push(...registration.uiArtifactViewers);
+      uiVariants.push(...registration.uiVariants);
+      uiPresets.push(...registration.uiPresets);
+      uiCss.push(...registration.uiCss);
+      uiGenui.push(...registration.uiGenui);
+      uiReplacements.push(...registration.uiReplacements);
+      uiWraps.push(...registration.uiWraps);
+      for (const command of registration.uiCommands) {
+        commands.push({ plugin, command, key: `${plugin.id}:runtime:${command.id}` });
+      }
+    }
     if (hasPermission(plugin, 'ui.command')) {
       plugin.manifest.contributes.ui.commands.forEach((command) => {
         const slash = `/${(command.command?.trim().replace(/^\//, '') || command.id).toLowerCase()}`;
@@ -264,27 +477,141 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
     }
     if (hasPermission(plugin, 'ui.settings')) {
       plugin.manifest.contributes.ui.settingsTabs.forEach((tab) => {
+        const component = registration?.settingsTabs.get(tab.id) ?? null;
         settingsTabs.push({
           plugin,
           tab,
           key: `${plugin.id}:${tab.id}`,
-          component: registration?.settingsTabs.get(tab.id) ?? null,
+          component,
+        });
+        uiSettingsTabs.push({
+          key: `${plugin.id}:settings:${tab.id}`,
+          plugin,
+          pluginId: plugin.id,
+          source: registration ? 'trusted' : 'manifest',
+          order: tab.order ?? 200,
+          priority: 100,
+          layouts: ALL_LAYOUTS,
+          tabId: tab.id,
+          title: tab.title,
+          titleKey: tab.titleKey ?? null,
+          icon: tab.icon ?? null,
+          entry: tab.entry ?? null,
+          component,
         });
       });
     }
     if (hasPermission(plugin, 'ui.artifact')) {
       plugin.manifest.contributes.artifactViewers.forEach((viewer) => {
+        const component = registration?.artifactViewers.get(viewer.id) ?? null;
         artifactViewers.push({
           plugin,
           viewer,
           key: `${plugin.id}:${viewer.id}`,
-          component: registration?.artifactViewers.get(viewer.id) ?? null,
+          component,
+        });
+        uiArtifactViewers.push({
+          key: `${plugin.id}:artifact:${viewer.id}`,
+          plugin,
+          pluginId: plugin.id,
+          id: viewer.id,
+          title: viewer.title,
+          titleKey: viewer.titleKey ?? null,
+          mimeTypes: viewer.mimeTypes,
+          entry: viewer.entry ?? null,
+          component,
+          priority: viewer.priority,
+        });
+      });
+    }
+    if (hasPermission(plugin, 'ui.variant')) {
+      plugin.manifest.contributes.ui.variants.forEach((variant) => {
+        uiVariants.push({
+          key: `${plugin.id}:variant:${variant.component}:${variant.id}`,
+          plugin,
+          pluginId: plugin.id,
+          source: registration ? 'trusted' : 'manifest',
+          order: 100,
+          priority: 100,
+          layouts: variant.layouts?.length ? variant.layouts : ALL_LAYOUTS,
+          component: variant.component,
+          variantId: variant.id,
+          title: variant.title,
+          recipe: variant.recipe,
+        });
+      });
+    }
+    if (hasPermission(plugin, 'ui.preset')) {
+      plugin.manifest.contributes.ui.presets.forEach((preset) => {
+        uiPresets.push({
+          key: `${plugin.id}:preset:${preset.id}`,
+          plugin,
+          pluginId: plugin.id,
+          source: 'plugin',
+          order: 100,
+          layouts: preset.layouts?.length ? preset.layouts : ALL_LAYOUTS,
+          presetId: preset.id,
+          title: preset.title,
+          tokens: {
+            light: preset.tokens?.light ?? {},
+            dark: preset.tokens?.dark ?? {},
+          },
+          density: preset.density ?? null,
+          variants: preset.variants ?? {},
+          css: preset.css ?? null,
+        });
+      });
+    }
+    if (hasPermission(plugin, 'ui.css.global')) {
+      plugin.manifest.contributes.ui.css.forEach((css) => {
+        uiCss.push({
+          key: `${plugin.id}:css:${css.id}`,
+          pluginId: plugin.id,
+          plugin,
+          id: css.id,
+          file: css.file,
+          css: null,
+          layouts: css.layouts?.length ? css.layouts : ALL_LAYOUTS,
+          order: css.order ?? 100,
+        });
+      });
+    }
+    if (hasPermission(plugin, 'ui.genui')) {
+      plugin.manifest.contributes.ui.genui.components.forEach((component) => {
+        uiGenui.push({
+          key: `${plugin.id}:genui:${component.id}`,
+          pluginId: plugin.id,
+          plugin,
+          type: `plugin:${plugin.id}:${component.id}`,
+          id: component.id,
+          title: component.title,
+          summary: component.summary,
+          props: component.props,
+          render: component.render,
+          component:
+            component.render.component
+              ? registration?.components.get(component.render.component) ?? null
+              : null,
         });
       });
     }
     if (hasPermission(plugin, 'ui.theme')) {
       plugin.manifest.contributes.ui.themes.forEach((theme) => {
         themes.push({ plugin, theme, key: `${plugin.id}:${theme.id}` });
+        uiPresets.push({
+          key: `${plugin.id}:theme:${theme.id}`,
+          plugin,
+          pluginId: plugin.id,
+          source: 'plugin',
+          order: 90,
+          layouts: ALL_LAYOUTS,
+          presetId: `theme:${theme.id}`,
+          title: theme.name,
+          tokens: { light: theme.light, dark: theme.dark },
+          density: null,
+          variants: {},
+          css: null,
+        });
       });
     }
   }
@@ -312,16 +639,25 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
       left.plugin.id.localeCompare(right.plugin.id) ||
       left.viewer.id.localeCompare(right.viewer.id),
   );
-  slots.sort(
-    (left, right) =>
-      left.plugin.id.localeCompare(right.plugin.id) || left.index - right.index,
-  );
+  setPluginUiState({
+    slots: uiSlots,
+    replacements: uiReplacements,
+    wraps: uiWraps,
+    pages: uiPages,
+    panelTabs: uiPanelTabs,
+    nav: uiNav,
+    settingsTabs: uiSettingsTabs,
+    artifactViewers: uiArtifactViewers,
+    variants: uiVariants,
+    presets: uiPresets,
+    css: uiCss,
+    genui: uiGenui,
+  });
   return {
     snapshot,
     plugins,
     views,
     panels,
-    slots,
     commands,
     settingsTabs,
     artifactViewers,
@@ -398,10 +734,6 @@ export function commandByKey(key: string): ResolvedCommand | undefined {
   return state.commands.find((command) => command.key === key);
 }
 
-export function slotEntries(slotId: string): ResolvedSlot[] {
-  return state.slots.filter((entry) => entry.slot.slot === slotId);
-}
-
 export function pluginViewsForSurface(
   surface: 'chat' | 'code' | 'agent' | 'global',
   location: 'main' | 'sidebar',
@@ -427,58 +759,6 @@ export function artifactViewerForMime(
       return false;
     }),
   );
-}
-
-export function getComponentOverride(id: string): PluginComponent | null {
-  if (!pluginComponentExists(id)) return null;
-  const matches = [...trusted.values()]
-    .map((registration) => registration.overrides.get(id))
-    .filter((component): component is PluginComponent => Boolean(component));
-  // Two trusted plugins claiming the same component is a conflict: apply
-  // neither until the user disables one. This avoids silent precedence.
-  return matches.length === 1 ? matches[0] : null;
-}
-
-export function getComponentWrappers(id: string): PluginComponent[] {
-  const wrappers: PluginComponent[] = [];
-  for (const registration of trusted.values()) {
-    wrappers.push(...(registration.wrappers.get(id) ?? []));
-  }
-  return wrappers;
-}
-
-export function getShellOverride(): PluginComponent | null {
-  const matches = [...trusted.values()]
-    .map((registration) => registration.shell)
-    .filter((component): component is PluginComponent => Boolean(component));
-  return matches.length === 1 ? matches[0] : null;
-}
-
-export function globalPluginCss(): string {
-  return [...trusted.values()]
-    .flatMap((registration) => registration.css)
-    .join('\n');
-}
-
-/**
- * Applies trusted overrides/wrappers to a host component. Call from the host
- * component boundary (`layout.shell`, `layout.center`, …).
- */
-export function resolvePluginComponent(
-  id: string,
-  HostComponent: PluginComponent,
-): PluginComponent {
-  const override = getComponentOverride(id);
-  const base = override ?? HostComponent;
-  const wrappers = getComponentWrappers(id);
-  if (wrappers.length === 0) return base;
-  return function WrappedHostComponent(props: Record<string, unknown>) {
-    let node: ReactNode = createElement(base, props);
-    for (const Wrapper of [...wrappers].reverse()) {
-      node = createElement(Wrapper, { ...props, children: node, Host: base });
-    }
-    return node;
-  };
 }
 
 export function pluginLabel(

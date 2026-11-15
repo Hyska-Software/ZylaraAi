@@ -1,19 +1,28 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { createElement } from 'react';
 
-import { PLUGIN_COMPONENTS, PLUGIN_PERMISSIONS, PLUGIN_SLOTS } from '@/lib/plugins/contract';
+import {
+  PLUGIN_COMPONENTS,
+  PLUGIN_EVENTS,
+  PLUGIN_LAYOUTS,
+  PLUGIN_PERMISSIONS,
+  PLUGIN_SLOTS,
+  PLUGIN_UI_LIMITS,
+  pluginComponentSpec,
+  pluginPermissionTrustedOnly,
+  pluginSlotSpec,
+} from '@/lib/plugins/contract';
 import {
   artifactViewerForMime,
   getPluginRegistryState,
   pluginHasPermission,
   pluginViewsForSurface,
   registerTrustedPlugin,
-  resolvePluginComponent,
   setPluginSnapshot,
-  slotEntries,
   unregisterTrustedPlugin,
   type PluginComponent,
 } from '@/lib/plugins/registry';
+import { pluginUiState } from '@/lib/plugins/ui/registry';
 import type { PluginManifest, PluginRecord, PluginSnapshot } from '@/lib/plugins/types';
 
 function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
@@ -31,7 +40,8 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
     contributes: {
       ui: {
         slots: [],
-        views: [{ id: 'demo', title: 'Demo', surface: 'chat', location: 'sidebar', entry: 'ui/page.html' }],
+        views: [{ id: 'demo', title: 'Demo', surface: 'chat', location: 'sidebar', layouts: ['chat'], entry: 'ui/page.html' }],
+        nav: [],
         panels: [{ id: 'side', title: 'Side', entry: 'ui/panel.html', dock: 'right' }],
         commands: [
           {
@@ -42,6 +52,10 @@ function manifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
         ],
         settingsTabs: [{ id: 'config', title: 'Config', entry: 'ui/settings.html' }],
         themes: [],
+        variants: [],
+        presets: [],
+        css: [],
+        genui: { components: [] },
       },
       tools: undefined,
       promptSections: [],
@@ -172,7 +186,7 @@ beforeEach(() => {
 });
 
 describe('plugin contract', () => {
-  it('has unique slot, component and permission ids', () => {
+  it('has unique slot, component, permission and event ids', () => {
     expect(new Set(PLUGIN_SLOTS.map((slot) => slot.id)).size).toBe(PLUGIN_SLOTS.length);
     expect(new Set(PLUGIN_COMPONENTS.map((component) => component.id)).size).toBe(
       PLUGIN_COMPONENTS.length,
@@ -180,7 +194,30 @@ describe('plugin contract', () => {
     expect(new Set(PLUGIN_PERMISSIONS.map((permission) => permission.id)).size).toBe(
       PLUGIN_PERMISSIONS.length,
     );
+    expect(new Set(PLUGIN_EVENTS.map((event) => event.name)).size).toBe(PLUGIN_EVENTS.length);
     expect(PLUGIN_SLOTS.some((slot) => slot.id === 'chat.composer.toolbar')).toBe(true);
+  });
+
+  it('describes slot kinds, scopes and layout limits', () => {
+    const slot = pluginSlotSpec('chat.message.actions');
+    expect(slot?.kind).toBe('list');
+    expect(slot?.scope).toBe('message');
+    expect(slot?.layouts).toEqual(['chat', 'code']);
+    expect(pluginSlotSpec('chat.markdown.fence')?.entryKey).toBe('language');
+    expect(pluginSlotSpec('chat.message.node')?.entryKey).toBe('role');
+    expect(PLUGIN_LAYOUTS).toEqual(['chat', 'code', 'agent']);
+    expect(PLUGIN_UI_LIMITS.cssCharsPerPlugin).toBeGreaterThan(0);
+  });
+
+  it('keeps component replacement trusted and CSS available to every lane', () => {
+    const user = pluginComponentSpec('chat.message.user');
+    expect(user?.lanes).toEqual(['trusted']);
+    expect(user?.variants).toContain('bubble');
+    expect(user?.builtinRecipes?.bubble.surface).toBe('user-bubble');
+    expect(pluginPermissionTrustedOnly('ui.override')).toBe(true);
+    expect(pluginPermissionTrustedOnly('ui.shell')).toBe(true);
+    expect(pluginPermissionTrustedOnly('ui.css.global')).toBe(false);
+    expect(pluginPermissionTrustedOnly('ui.nav')).toBe(false);
   });
 });
 
@@ -191,7 +228,7 @@ describe('plugin registry', () => {
     expect(pluginViewsForSurface('chat', 'sidebar')).toHaveLength(1);
     expect(artifactViewerForMime('text/csv')?.viewer.id).toBe('csv-viewer');
     expect(artifactViewerForMime('application/json')).toBeUndefined();
-    expect(slotEntries('chat.composer.toolbar')).toHaveLength(0);
+    expect(pluginUiState().slots).toHaveLength(0);
   });
 
   it('hides contributions from inactive, disabled and ungranted plugins', () => {
@@ -232,12 +269,12 @@ describe('plugin registry', () => {
     expect(pluginHasPermission(wildcard, 'net:api.github.com')).toBe(true);
   });
 
-  it('resolves trusted component overrides and wrappers', () => {
+  it('projects trusted component overrides and wrappers into the UI state', () => {
     const plugin = record({ trusted: true });
     setPluginSnapshot(snapshot([plugin]));
     const Host: PluginComponent = () => createElement('div', null, 'host');
     const Override: PluginComponent = () => createElement('div', null, 'plugin');
-    expect(resolvePluginComponent('chat.welcome', Host)).toBe(Host);
+    expect(pluginUiState().replacements).toHaveLength(0);
     registerTrustedPlugin({
       pluginId: plugin.id,
       views: new Map(),
@@ -249,12 +286,27 @@ describe('plugin registry', () => {
       overrides: new Map([['chat.welcome', Override]]),
       wrappers: new Map(),
       shell: null,
-      css: [],
+      uiSlots: [],
+      uiPages: [],
+      uiPanelTabs: [],
+      uiNav: [],
+      uiSettingsTabs: [],
+      uiArtifactViewers: [],
+      uiVariants: [],
+      uiPresets: [],
+      uiCss: [],
+      uiGenui: [],
+      uiReplacements: [],
+      uiWraps: [],
+      uiCommands: [],
       toolHandlers: new Map(),
       commands: new Map(),
       cleanup: [],
     });
-    expect(resolvePluginComponent('chat.welcome', Host)).toBe(Override);
+    setPluginSnapshot(snapshot([plugin]));
+    expect(pluginUiState().replacements[0]?.componentFn).toBe(Override);
+    expect(pluginUiState().replacements[0]?.component).toBe('chat.welcome');
+    expect(Host).not.toBe(Override);
   });
 
   it('rejects duplicate plugin commands deterministically', () => {
@@ -274,5 +326,83 @@ describe('plugin registry', () => {
         otherPluginId: 'com.acme.demo',
       },
     ]);
+  });
+});
+
+describe('trusted runtime UI registrations', () => {
+  it('merges runtime pages, nav, variants and presets into the UI state', () => {
+    const plugin = record({ trusted: true });
+    setPluginSnapshot(snapshot([plugin]));
+    registerTrustedPlugin({
+      pluginId: plugin.id,
+      views: new Map(),
+      panels: new Map(),
+      slots: new Map(),
+      settingsTabs: new Map(),
+      artifactViewers: new Map(),
+      components: new Map(),
+      overrides: new Map(),
+      wrappers: new Map(),
+      shell: null,
+      uiSlots: [],
+      uiPages: [{
+        key: 'demo:ui:page:metrics:1',
+        plugin,
+        pluginId: plugin.id,
+        source: 'trusted',
+        order: 100,
+        priority: 100,
+        layouts: ['chat'],
+        pageId: 'metrics',
+        title: 'Metrics',
+        titleKey: null,
+        icon: 'Puzzle',
+        entry: null,
+        component: null,
+      }],
+      uiPanelTabs: [],
+      uiNav: [{
+        key: 'demo:ui:nav:metrics:2',
+        source: 'plugin',
+        pluginId: plugin.id,
+        plugin,
+        id: 'metrics',
+        title: 'Metrics',
+        titleKey: null,
+        icon: 'Puzzle',
+        page: 'metrics',
+        layouts: ['chat'],
+        order: 10,
+        badge: null,
+      }],
+      uiSettingsTabs: [],
+      uiArtifactViewers: [],
+      uiVariants: [{
+        key: 'demo:ui:variant:glass:3',
+        plugin,
+        pluginId: plugin.id,
+        source: 'trusted',
+        order: 100,
+        priority: 100,
+        layouts: ['chat'],
+        component: 'chat.message.user',
+        variantId: 'glass',
+        title: 'Glass',
+        recipe: { surface: 'accent-soft' },
+      }],
+      uiPresets: [],
+      uiCss: [],
+      uiGenui: [],
+      uiReplacements: [],
+      uiWraps: [],
+      uiCommands: [],
+      toolHandlers: new Map(),
+      commands: new Map(),
+      cleanup: [],
+    });
+    setPluginSnapshot(snapshot([plugin]));
+    expect(pluginUiState().pages.some((entry) => entry.pageId === 'metrics')).toBe(true);
+    expect(pluginUiState().nav.some((entry) => entry.page === 'metrics')).toBe(true);
+    expect(pluginUiState().variants.some((entry) => entry.variantId === 'glass')).toBe(true);
   });
 });

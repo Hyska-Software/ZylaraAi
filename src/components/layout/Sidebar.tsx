@@ -5,14 +5,11 @@ import {
   Code,
   Download,
   Ellipsis,
-  Library,
   Pencil,
   Pin,
   PinOff,
-  Plug,
   Search,
   Settings,
-  Sparkles,
   SquarePen,
   Trash,
   Unlink,
@@ -21,11 +18,12 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { filterConversationsForLayout } from '@/lib/conversations';
-import { pluginIcon } from '@/lib/plugins/icons';
-import { pluginLabel, pluginViewsForSurface, usePluginRegistry } from '@/lib/plugins/registry';
-import { openPluginView } from '@/lib/plugins/host';
-import { usePluginStore } from '@/lib/plugins/store';
+import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
+import { navEntries, openNavTarget } from '@/lib/plugins/ui/nav';
+import { SidebarNavItem } from './SidebarNavItem';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { useAppStore, useChatStore, useUiStore } from '@/lib/store';
 import type { Conversation } from '@/lib/types';
 import { cn, groupConversations, modKey } from '@/lib/utils';
@@ -72,37 +70,6 @@ function MenuEntry({ icon, children, danger, onSelect }: MenuEntryProps) {
       <span className={cn('shrink-0', danger ? 'text-danger' : 'text-foreground-subtle')}>{icon}</span>
       {children}
     </DropdownMenu.Item>
-  );
-}
-
-interface NavViewItemProps {
-  icon: ReactNode;
-  label: string;
-  ariaLabel: string;
-  active: boolean;
-  onSelect: () => void;
-}
-
-/** Sidebar entry that replaces the chat column (Skills, Biblioteca) — DESIGN §5. */
-function NavViewItem({ icon, label, ariaLabel, active, onSelect }: NavViewItemProps) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-label={ariaLabel}
-      aria-current={active ? 'page' : undefined}
-      className={cn(
-        'mx-3 mt-1 flex h-8 items-center gap-2 rounded-lg px-2 text-[13px]',
-        'transition-colors duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-        active
-          ? 'bg-surface-active text-foreground'
-          : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
-      )}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
   );
 }
 
@@ -260,12 +227,19 @@ export function Sidebar({ className, onClose }: SidebarProps) {
   const setCommandPaletteOpen = useUiStore((state) => state.setCommandPaletteOpen);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const activeView = useUiStore((state) => state.activeView);
+  const pluginPages = useUiStore((state) => state.pluginPages.chat);
   const appInfo = useAppStore((state) => state.appInfo);
-  const skillsPanelEnabled = useAppStore((state) => state.settings.skillsPanelEnabled);
-  const pluginView = usePluginStore((state) => state.activeView);
-  usePluginRegistry();
-  const sidebarPluginViews = pluginViewsForSurface('chat', 'sidebar');
+  const ui = usePluginUi();
+  const prefs = usePluginUiPrefs();
   const isCompact = useIsCompact();
+  const nav = useMemo(
+    () =>
+      navEntries('chat', ui.nav, {
+        hidden: prefs.navHidden,
+        order: prefs.navOrder,
+      }),
+    [ui.nav, prefs.navHidden, prefs.navOrder, i18n.language],
+  );
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -282,22 +256,6 @@ export function Sidebar({ className, onClose }: SidebarProps) {
 
   const handleNewChat = () => {
     void useChatStore.getState().startNewConversation();
-    if (isCompact) onClose?.();
-  };
-
-  const handleOpenSkills = () => {
-    useUiStore.getState().setActiveView('skills');
-    if (isCompact) onClose?.();
-  };
-
-  const handleOpenLibrary = () => {
-    useUiStore.getState().setActiveView('library');
-    if (isCompact) onClose?.();
-  };
-
-  const handleOpenPlugins = () => {
-    usePluginStore.getState().closeOverlays();
-    useUiStore.getState().setActiveView('plugins');
     if (isCompact) onClose?.();
   };
 
@@ -393,52 +351,27 @@ export function Sidebar({ className, onClose }: SidebarProps) {
         ) : null}
       </div>
 
-      {/* Ordem (PLAN §4.1): Novo chat → Biblioteca → Plugins → Skills → Buscar conversas.
-          A Biblioteca é sempre visível; Skills depende do painel habilitado. */}
+      {/* Order comes from the plugin navigation registry (host entries first). */}
       <PluginSlot slot="chat.sidebar.header" className="px-3" compact />
-      <NavViewItem
-        icon={<Library className="size-4" />}
-        label={t('shell.sidebar.library')}
-        ariaLabel={t('shell.sidebar.openLibrary')}
-        active={activeView === 'library'}
-        onSelect={handleOpenLibrary}
-      />
-
-      <NavViewItem
-        icon={<Plug className="size-4" />}
-        label={t('shell.sidebar.plugins')}
-        ariaLabel={t('shell.sidebar.openPlugins')}
-        active={activeView === 'plugins' && !pluginView}
-        onSelect={handleOpenPlugins}
-      />
-
-      {skillsPanelEnabled ? (
-        <NavViewItem
-          icon={<Sparkles className="size-4" />}
-          label={t('shell.sidebar.skills')}
-          ariaLabel={t('shell.sidebar.manageSkills')}
-          active={activeView === 'skills'}
-          onSelect={handleOpenSkills}
-        />
-      ) : null}
-
-      {sidebarPluginViews.map((view) => {
-        const Icon = pluginIcon(view.view.icon);
-        const label = pluginLabel(view.plugin, view.view.titleKey, view.view.title);
+      <Slot name="sidebar.nav.before" owner={{ layout: 'chat' }} />
+      {nav.map((entry) => {
+        const active =
+          entry.source === 'plugin'
+            ? pluginPages?.pluginId === entry.pluginId && pluginPages.pageId === entry.page
+            : !pluginPages && activeView === entry.page;
         return (
-          <NavViewItem
-            key={view.key}
-            icon={<Icon className="size-4" />}
-            label={label}
-            ariaLabel={label}
-            active={pluginView?.pluginId === view.plugin.id && pluginView.id === view.view.id}
+          <SidebarNavItem
+            key={entry.key}
+            entry={entry}
+            active={active}
             onSelect={() => {
-              openPluginView(view.plugin, view.view.id);
+              openNavTarget(entry);
               if (isCompact) onClose?.();
             }}
           />
         );
       })}
+      <Slot name="sidebar.nav.after" owner={{ layout: 'chat' }} />
 
       <button
         type="button"

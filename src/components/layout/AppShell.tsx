@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { clampSidebarWidth, SIDEBAR_WIDTH_DEFAULT, useUiStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { TitleBar } from './TitleBar';
+import { ComponentSlot } from '@/components/plugins/ui/Slot';
 import { Sidebar } from './Sidebar';
 import { SidebarResizer } from './SidebarResizer';
 import { useIsCompact, useReduceMotion } from './hooks';
@@ -124,7 +125,7 @@ export function AppShell({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface text-foreground">
-        <TitleBar />
+        <ComponentSlot name="layout.titlebar" fallback={TitleBar} />
 
         <div className="relative flex min-h-0 flex-1">
           {!isCompact ? (

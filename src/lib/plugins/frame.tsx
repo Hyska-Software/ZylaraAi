@@ -19,16 +19,43 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { api } from '@/lib/api';
+import { useUiStore } from '@/lib/store/uiStore';
+import { pluginUiState } from './ui/registry';
 import { useThemeRevision } from '@/lib/theme/useThemeRevision';
 import { cn } from '@/lib/utils';
 import { usePluginStore } from './store';
 import type { PluginRecord, PluginToolCallEvent, PluginToolResult } from './types';
 import { pluginAssetUrl } from './urls';
 
-export type PluginFrameKind = 'view' | 'panel' | 'slot' | 'backend' | 'artifact' | 'settings';
+export type PluginFrameKind =
+  | 'view'
+  | 'panel'
+  | 'dock'
+  | 'slot'
+  | 'backend'
+  | 'artifact'
+  | 'settings'
+  | 'genui';
 
 const FRAME_LOAD_TIMEOUT_MS = 12_000;
 const failures = new Map<string, number>();
+const liveFrames = new Set<{
+  pluginId: string;
+  isReady: () => boolean;
+  send: (message: Record<string, unknown>) => void;
+}>();
+
+/** Delivers a normalized host event to every sandboxed frame of a plugin. */
+export function emitPluginFrameEvent(
+  pluginId: string,
+  name: string,
+  detail: unknown,
+): void {
+  for (const frame of liveFrames) {
+    if (frame.pluginId !== pluginId || !frame.isReady()) continue;
+    frame.send({ type: 'event', name, detail });
+  }
+}
 
 /**
  * Records a sandboxed contribution failure and disables the plugin after three
@@ -58,6 +85,7 @@ interface PluginFrameProps {
   entry: string;
   kind: PluginFrameKind;
   context?: Record<string, unknown>;
+  slot?: string;
   className?: string;
   style?: CSSProperties;
   title?: string;
@@ -65,6 +93,7 @@ interface PluginFrameProps {
   maxHeight?: number;
   onReady?: () => void;
   onError?: (message: string) => void;
+  onHostAction?: (action: string, params: Record<string, unknown>) => unknown | Promise<unknown>;
 }
 
 const THEME_TOKENS = [
@@ -143,6 +172,7 @@ export const PluginFrame = forwardRef<PluginFrameHandle, PluginFrameProps>(
       entry,
       kind,
       context,
+      slot,
       className,
       style,
       title,
@@ -150,6 +180,7 @@ export const PluginFrame = forwardRef<PluginFrameHandle, PluginFrameProps>(
       maxHeight = 900,
       onReady,
       onError,
+      onHostAction,
     },
     ref,
   ) {
@@ -165,6 +196,8 @@ export const PluginFrame = forwardRef<PluginFrameHandle, PluginFrameProps>(
     const pendingTools = useRef(new Map<string, (result: PluginToolResult) => void>());
     const contextRef = useRef(context);
     contextRef.current = context;
+    const readyRef = useRef(false);
+    readyRef.current = ready;
     const contextKey = JSON.stringify(context ?? {});
     const callbackRef = useRef({ onReady, onError });
     callbackRef.current = { onReady, onError };
@@ -186,6 +219,8 @@ export const PluginFrame = forwardRef<PluginFrameHandle, PluginFrameProps>(
         localeBundle: bundle,
         context: contextRef.current ?? {},
         kind,
+        slot: slot ?? null,
+        layout: useUiStore.getState().layoutMode,
       };
     }
 
@@ -215,15 +250,41 @@ export const PluginFrame = forwardRef<PluginFrameHandle, PluginFrameProps>(
           return;
         }
         if (!backend && data.type === 'openView' && typeof data.viewId === 'string') {
-          usePluginStore.getState().openView(plugin.id, data.viewId);
+          useUiStore.getState().openPluginPage({ pluginId: plugin.id, pageId: data.viewId });
           return;
         }
         if (!backend && data.type === 'openPanel' && typeof data.panelId === 'string') {
-          usePluginStore.getState().openPanel(plugin.id, data.panelId);
+          const tab = pluginUiState().panelTabs.find(
+            (entry) => entry.pluginId === plugin.id && entry.tabId === data.panelId,
+          );
+          if (tab) useUiStore.getState().openPluginDockTab(tab.key);
           return;
         }
         if (!backend && data.type === 'closeOverlays') {
-          usePluginStore.getState().closeOverlays();
+          useUiStore.getState().closePluginPage();
+          useUiStore.getState().closePluginDockTab();
+          return;
+        }
+        if (!backend && data.type === 'host-action') {
+          const id = typeof data.id === 'string' ? data.id : '';
+          const action = typeof data.action === 'string' ? data.action : '';
+          const params =
+            typeof data.params === 'object' && data.params
+              ? (data.params as Record<string, unknown>)
+              : {};
+          if (!onHostAction) {
+            send({ type: 'host-action-result', id, error: 'PLUGIN_HOST_ACTION_UNSUPPORTED' });
+            return;
+          }
+          void Promise.resolve(onHostAction(action, params))
+            .then((result) => send({ type: 'host-action-result', id, result }))
+            .catch((error) =>
+              send({
+                type: 'host-action-result',
+                id,
+                error: error instanceof Error ? error.message : String(error),
+              }),
+            );
           return;
         }
         if (data.type === 'tool-result') {
@@ -269,16 +330,22 @@ export const PluginFrame = forwardRef<PluginFrameHandle, PluginFrameProps>(
 
     useEffect(() => {
       if (!ready) return;
-      send(initMessage());
-      // `contextKey` is the serialized context; `initMessage` reads the latest
-      // ref. Resending init keeps a mounted view in sync when the conversation
-      // changes without remounting the iframe.
+      send({ type: 'context', context: contextRef.current ?? {} });
+      // `contextKey` is the serialized context; the frame receives the latest
+      // props without re-sending locale/theme or remounting.
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [contextKey, ready]);
 
     useEffect(() => {
       setArmed(true);
+      const record = {
+        pluginId: plugin.id,
+        isReady: () => readyRef.current,
+        send,
+      };
+      liveFrames.add(record);
       return () => {
+        liveFrames.delete(record);
         setArmed(false);
         for (const resolve of pendingTools.current.values()) {
           resolve({

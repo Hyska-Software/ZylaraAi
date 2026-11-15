@@ -782,7 +782,7 @@ fn plugin_genui_presentations_are_validated_before_reaching_the_renderer() {
 }
 
 #[test]
-fn manifest_schema_artifact_is_valid_and_documents_the_v1_runtime() {
+fn manifest_schema_artifact_is_valid_and_documents_the_runtime() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("data")
@@ -790,7 +790,7 @@ fn manifest_schema_artifact_is_valid_and_documents_the_v1_runtime() {
     let raw = std::fs::read_to_string(&path).expect("manifest schema");
     let schema: Value = serde_json::from_str(&raw).expect("schema JSON");
     assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
-    assert_eq!(schema["properties"]["schemaVersion"]["const"], 1);
+    assert_eq!(schema["properties"]["schemaVersion"]["enum"], serde_json::json!([1, 2]));
     assert_eq!(
         schema["properties"]["runtime"]["properties"]["backend"]["properties"]["kind"]["const"],
         "js"

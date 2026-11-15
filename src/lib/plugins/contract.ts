@@ -1,28 +1,53 @@
 /**
  * Typed loader for `data/plugin-contract.json`, the single source of truth for
- * plugin slots, permissions, component ids and limits.
+ * plugin slots, components, permissions, events and limits.
  */
 import rawContract from '@data/plugin-contract.json';
-import type { PluginRisk } from './types';
+import type { PluginLayoutId, PluginRisk } from './types';
+
+export type PluginUiMode = 'declarative' | 'sandbox' | 'trusted';
+export type PluginSlotKind = 'single' | 'list' | 'keyed' | 'chain' | 'hoc';
+export type PluginSlotScope = 'root' | 'layout' | 'conversation' | 'message' | 'composer';
 
 export interface PluginSlotSpec {
   id: string;
   title: string;
+  kind: PluginSlotKind;
+  scope: PluginSlotScope;
   props: string[];
-  modes: Array<'declarative' | 'sandbox' | 'trusted'>;
+  entryKey?: string | null;
+  layouts: PluginLayoutId[];
+  modes: PluginUiMode[];
+  replacement: boolean;
+  description?: string;
 }
 
 export interface PluginComponentSpec {
   id: string;
   title: string;
+  kind: 'single' | 'hoc';
+  lanes: Array<'trusted'>;
+  layouts: PluginLayoutId[];
   props: string[];
+  variants: string[];
+  builtinRecipes?: Record<string, Record<string, string>>;
+  risk: PluginRisk;
+  description?: string;
 }
 
 export interface PluginPermissionSpec {
   id: string;
   scoped: boolean;
   risk: PluginRisk;
+  trustedOnly: boolean;
   description: string;
+}
+
+export interface PluginEventSpec {
+  name: string;
+  scope: string;
+  props: string[];
+  description?: string;
 }
 
 export interface PluginLimits {
@@ -41,6 +66,19 @@ export interface PluginLimits {
   toolTimeoutSecs: number;
 }
 
+export interface PluginUiLimits {
+  slotEntriesPerPlugin: number;
+  navEntriesPerPlugin: number;
+  pagesPerPlugin: number;
+  panelTabsPerPlugin: number;
+  variantsPerPlugin: number;
+  presetsPerPlugin: number;
+  cssCharsPerPlugin: number;
+  genuiComponentsPerPlugin: number;
+  genuiSchemaChars: number;
+  genuiPromptCharsPerPlugin: number;
+}
+
 export interface PluginContract {
   apiVersion: number;
   manifestSchemaVersion: number;
@@ -48,33 +86,47 @@ export interface PluginContract {
   description: string;
   toolNamePrefix: string;
   toolNameMaxChars: number;
+  layouts: PluginLayoutId[];
+  hostPages: string[];
   limits: PluginLimits;
+  uiLimits: PluginUiLimits;
+  styleRecipes: Record<string, string[]>;
   slots: PluginSlotSpec[];
   components: PluginComponentSpec[];
+  events: PluginEventSpec[];
   permissions: PluginPermissionSpec[];
 }
 
 export const PLUGIN_CONTRACT = rawContract as unknown as PluginContract;
 export const PLUGIN_LIMITS = PLUGIN_CONTRACT.limits;
+export const PLUGIN_UI_LIMITS = PLUGIN_CONTRACT.uiLimits;
+export const PLUGIN_LAYOUTS = PLUGIN_CONTRACT.layouts;
+export const PLUGIN_HOST_PAGES = PLUGIN_CONTRACT.hostPages;
+export const PLUGIN_STYLE_RECIPES = PLUGIN_CONTRACT.styleRecipes;
 export const PLUGIN_SLOTS = PLUGIN_CONTRACT.slots;
 export const PLUGIN_COMPONENTS = PLUGIN_CONTRACT.components;
+export const PLUGIN_EVENTS = PLUGIN_CONTRACT.events;
 export const PLUGIN_PERMISSIONS = PLUGIN_CONTRACT.permissions;
 
 export const PLUGIN_SLOT_IDS = PLUGIN_SLOTS.map((slot) => slot.id);
 export const PLUGIN_COMPONENT_IDS = PLUGIN_COMPONENTS.map((component) => component.id);
 
-const SLOT_SET = new Set(PLUGIN_SLOT_IDS);
-const COMPONENT_SET = new Set(PLUGIN_COMPONENT_IDS);
+const SLOT_MAP = new Map(PLUGIN_SLOTS.map((slot) => [slot.id, slot]));
+const COMPONENT_MAP = new Map(PLUGIN_COMPONENTS.map((component) => [component.id, component]));
 const PERMISSION_MAP = new Map(
   PLUGIN_PERMISSIONS.map((permission) => [permission.id, permission]),
 );
 
-export function pluginSlot(id: string): PluginSlotSpec | undefined {
-  return SLOT_SET.has(id) ? PLUGIN_SLOTS.find((slot) => slot.id === id) : undefined;
+export function pluginSlotSpec(id: string): PluginSlotSpec | undefined {
+  return SLOT_MAP.get(id);
+}
+
+export function pluginComponentSpec(id: string): PluginComponentSpec | undefined {
+  return COMPONENT_MAP.get(id);
 }
 
 export function pluginComponentExists(id: string): boolean {
-  return COMPONENT_SET.has(id);
+  return COMPONENT_MAP.has(id);
 }
 
 export function pluginPermissionBase(permission: string): string {
@@ -87,6 +139,10 @@ export function pluginPermissionSpec(permission: string): PluginPermissionSpec |
 
 export function pluginPermissionKnown(permission: string): boolean {
   return PERMISSION_MAP.has(pluginPermissionBase(permission));
+}
+
+export function pluginPermissionTrustedOnly(permission: string): boolean {
+  return pluginPermissionSpec(permission)?.trustedOnly === true;
 }
 
 const RISK_ORDER: Record<PluginRisk, number> = {
@@ -115,6 +171,7 @@ export const PLUGIN_ICON_NAMES = [
   'Bot',
   'Zap',
   'ListChecks',
+  'Library',
 ] as const;
 
 export type PluginIconName = (typeof PLUGIN_ICON_NAMES)[number];

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Copy, Pencil, RefreshCw, ThumbsDown, ThumbsUp, TriangleAlert } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 import { CodeTurnSummary } from '@/components/code/CodeTurnSummary';
 import { AttachmentChips } from '@/components/composer/AttachmentChips';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { Slot, ComponentSlot } from '@/components/plugins/ui/Slot';
+import { useStyleRecipe } from '@/lib/plugins/ui/recipe';
+import type { PluginComponent } from '@/lib/plugins/ui/types';
 import { useReduceMotion } from '@/components/layout/hooks';
 import { Badge, Button, IconButton, Spinner } from '@/components/ui';
 import { findModel, getModel } from '@/lib/catalog';
@@ -75,7 +78,7 @@ function modelLabel(message: ChatMessage): string | null {
   return model?.name ?? message.modelId;
 }
 
-interface MessageItemProps {
+export interface MessageItemProps {
   message: ChatMessage;
   isStreaming: boolean;
   isGroupStart: boolean;
@@ -100,6 +103,16 @@ const UserMessageItem = memo(function UserMessageItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const attachments = message.attachments ?? [];
+  const owner = {
+    message,
+    messageId: message.id,
+    role: 'user',
+    conversationId: message.conversationId,
+  };
+  const bubble = useStyleRecipe(
+    'chat.message.user',
+    'whitespace-pre-wrap break-words rounded-3xl bg-user-bubble px-4 py-2.5 text-[15px] leading-relaxed text-foreground',
+  );
 
   const startEditing = () => {
     setDraft(message.content);
@@ -121,41 +134,47 @@ const UserMessageItem = memo(function UserMessageItem({
       className={cn('group/message flex flex-col items-end', isGroupStart ? 'mt-7' : 'mt-3')}
     >
       <div className="flex max-w-[80%] flex-col items-end gap-1.5">
-        {attachments.length > 0 ? <AttachmentChips attachments={attachments} align="end" /> : null}
-
-        {editing ? (
-          <div className="w-72 max-w-[70vw] rounded-2xl bg-surface-raised p-2 shadow-sm">
-            <textarea
-              autoFocus
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  event.preventDefault();
-                  setEditing(false);
-                } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault();
-                  saveEdit();
-                }
-              }}
-              rows={2}
-              aria-label={t('message.editAria')}
-              className="max-h-60 w-full resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed text-foreground outline-none"
-            />
-            <div className="flex justify-end gap-1.5 pt-1">
-              <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
-                {tCommon('actions.cancel')}
-              </Button>
-              <Button variant="primary" size="sm" onClick={saveEdit} disabled={!draft.trim()}>
-                {t('message.saveAndResend')}
-              </Button>
-            </div>
-          </div>
-        ) : message.content ? (
-          <div className="whitespace-pre-wrap break-words rounded-3xl bg-user-bubble px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
-            {message.content}
-          </div>
+        {attachments.length > 0 ? (
+          <Slot name="chat.message.attachments.frame" owner={owner}>
+            <AttachmentChips attachments={attachments} align="end" />
+          </Slot>
         ) : null}
+
+        <Slot name="chat.message.body.frame" owner={owner}>
+          {editing ? (
+            <div className="w-72 max-w-[70vw] rounded-2xl bg-surface-raised p-2 shadow-sm">
+              <textarea
+                autoFocus
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setEditing(false);
+                  } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault();
+                    saveEdit();
+                  }
+                }}
+                rows={2}
+                aria-label={t('message.editAria')}
+                className="max-h-60 w-full resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed text-foreground outline-none"
+              />
+              <div className="flex justify-end gap-1.5 pt-1">
+                <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+                  {tCommon('actions.cancel')}
+                </Button>
+                <Button variant="primary" size="sm" onClick={saveEdit} disabled={!draft.trim()}>
+                  {t('message.saveAndResend')}
+                </Button>
+              </div>
+            </div>
+          ) : message.content ? (
+            <div className={bubble.className} data-variant={bubble.variantId ?? undefined}>
+              {message.content}
+            </div>
+          ) : null}
+        </Slot>
       </div>
 
       {!editing ? (
@@ -250,6 +269,13 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
   const attachments = message.attachments ?? [];
   const citations = message.citations ?? [];
   const toolCalls = message.toolCalls ?? [];
+  const owner = {
+    message,
+    messageId: message.id,
+    role: 'assistant',
+    conversationId: message.conversationId,
+  };
+  const assistant = useStyleRecipe('chat.message.assistant', 'min-w-0 flex-1');
   const reasoning = message.reasoning?.trim() ?? '';
   const reasoningActive = isStreaming && phase === 'reasoning';
   const awaitingText =
@@ -302,9 +328,16 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
       transition={reduceMotion ? { duration: 0 } : MESSAGE_MOTION.transition}
       className={cn('group/message flex items-start gap-3', isGroupStart ? 'mt-7' : 'mt-3')}
     >
-      {showAssistantAvatar ? assistantAvatar : null}
+      {showAssistantAvatar && assistant.recipe?.avatar !== 'hide' ? (
+        <ComponentSlot
+          name="chat.message.avatar"
+          fallback={AvatarSlotHost as unknown as PluginComponent}
+          props={{ role: 'assistant', message, node: assistantAvatar }}
+        />
+      ) : null}
 
-      <div className="min-w-0 flex-1">
+      <div className={assistant.className} data-variant={assistant.variantId ?? undefined}>
+        <Slot name="chat.message.body.frame" owner={owner}>
         {reasoning || reasoningActive || toolCalls.length > 0 || hasTraceText(message.trace) ? (
           <AgentSteps
             message={message}
@@ -315,7 +348,11 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
         ) : null}
 
         {message.status !== 'error' && message.content ? (
-          <Markdown content={message.content} streaming={showCaret} />
+          <ComponentSlot
+            name="chat.message.markdown"
+            fallback={MarkdownHost as unknown as PluginComponent}
+            props={{ content: message.content, streaming: showCaret }}
+          />
         ) : null}
 
         {awaitingText ? (
@@ -387,13 +424,23 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
           </div>
         ) : null}
 
-        {attachments.length > 0 ? <AttachmentChips attachments={attachments} className="mt-3" /> : null}
+        {attachments.length > 0 ? (
+          <Slot name="chat.message.attachments.frame" owner={owner}>
+            <AttachmentChips attachments={attachments} className="mt-3" />
+          </Slot>
+        ) : null}
         {/* Source chips are a Chat surface; the Code layout has no sources panel. */}
         {citations.length > 0 && layoutMode !== 'code' ? (
-          <CitationChips citations={citations} className="mt-3" />
+          <Slot name="chat.message.citations.frame" owner={owner}>
+            <CitationChips citations={citations} className="mt-3" />
+          </Slot>
         ) : null}
 
-        {messageArtifacts.length > 0 ? <MessageArtifacts artifacts={messageArtifacts} /> : null}
+        {messageArtifacts.length > 0 ? (
+          <Slot name="chat.message.artifacts.frame" owner={owner}>
+            <MessageArtifacts artifacts={messageArtifacts} />
+          </Slot>
+        ) : null}
 
         {message.status === 'cancelled' ? (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -474,22 +521,34 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
               </>
             ) : null}
 
-            {model || (showTokenUsage && totalTokens) ? (
-              <span aria-hidden className="mx-1 h-3 w-px bg-border" />
-            ) : null}
-            {model ? <span className="px-1 text-[11px] text-foreground-subtle">{model}</span> : null}
-            {showTokenUsage && totalTokens ? (
-              <span className="text-[11px] tabular-nums text-foreground-subtle">
-                {usage?.durationMs
-                  ? t('message.tokensAndDuration', {
-                      tokens: formatTokens(totalTokens),
-                      duration: formatDuration(usage.durationMs),
-                    })
-                  : t('message.tokens', { tokens: formatTokens(totalTokens) })}
-              </span>
-            ) : null}
+            <Slot
+              name="chat.message.usage"
+              owner={owner}
+              fallback={
+                <>
+                  {model || (showTokenUsage && totalTokens) ? (
+                    <span aria-hidden className="mx-1 h-3 w-px bg-border" />
+                  ) : null}
+                  {model ? (
+                    <span className="px-1 text-[11px] text-foreground-subtle">{model}</span>
+                  ) : null}
+                  {showTokenUsage && totalTokens ? (
+                    <span className="text-[11px] tabular-nums text-foreground-subtle">
+                      {usage?.durationMs
+                        ? t('message.tokensAndDuration', {
+                            tokens: formatTokens(totalTokens),
+                            duration: formatDuration(usage.durationMs),
+                          })
+                        : t('message.tokens', { tokens: formatTokens(totalTokens) })}
+                    </span>
+                  ) : null}
+                </>
+              }
+            />
+            <Slot name="chat.message.usage.actions" owner={owner} />
           </div>
         ) : null}
+        </Slot>
       </div>
     </motion.div>
   );
@@ -521,16 +580,114 @@ const GoalRoundMessageItem = memo(function GoalRoundMessageItem({
   );
 });
 
-/** Renders a single chat message: user bubble or assistant markdown turn. */
-export const MessageItem = memo(function MessageItem(props: MessageItemProps) {
+function AvatarSlotHost({ node }: { node?: ReactNode }) {
+  return <>{node}</>;
+}
+
+function MarkdownHost({ content, streaming }: { content?: string; streaming?: boolean }) {
+  return <Markdown content={content ?? ''} streaming={streaming} />;
+}
+
+function MessageRole(props: MessageItemProps) {
+  const owner = {
+    message: props.message,
+    messageId: props.message.id,
+    role: props.message.role,
+    conversationId: props.message.conversationId,
+  };
   if (props.message.role === 'user' && props.message.origin === 'goal_round') {
-    return <GoalRoundMessageItem {...props} />;
-  }
-  if (props.message.role === 'user') return <UserMessageItem {...props} />;
-  if (props.message.role === 'system') {
     return (
-      <div className="mt-4 text-center text-[12px] italic text-foreground-subtle">{props.message.content}</div>
+      <Slot
+        name="chat.message.node"
+        entryKey="goal-round"
+        owner={owner}
+        fallback={
+          <ComponentSlot
+            name="chat.message.goal-round"
+            fallback={GoalRoundMessageItem as unknown as PluginComponent}
+            props={props as unknown as Record<string, unknown>}
+          />
+        }
+      />
     );
   }
-  return <AssistantMessageItem {...props} />;
+  if (props.message.role === 'user') {
+    return (
+      <Slot
+        name="chat.message.node"
+        entryKey="user"
+        owner={owner}
+        fallback={
+          <ComponentSlot
+            name="chat.message.user"
+            fallback={UserMessageItem as unknown as PluginComponent}
+            props={props as unknown as Record<string, unknown>}
+          />
+        }
+      />
+    );
+  }
+  if (props.message.role === 'system') {
+    return (
+      <Slot
+        name="chat.message.node"
+        entryKey="system"
+        owner={owner}
+        fallback={
+          <ComponentSlot
+            name="chat.message.system"
+            fallback={SystemMessageHost as unknown as PluginComponent}
+            props={{ message: props.message }}
+          />
+        }
+      />
+    );
+  }
+  return (
+    <Slot
+      name="chat.message.node"
+      entryKey="assistant"
+      owner={owner}
+      fallback={
+        <ComponentSlot
+          name="chat.message.assistant"
+          fallback={AssistantMessageItem as unknown as PluginComponent}
+          props={props as unknown as Record<string, unknown>}
+        />
+      }
+    />
+  );
+}
+
+function SystemMessageHost({ message }: { message?: ChatMessage }) {
+  return (
+    <div className="mt-4 text-center text-[12px] italic text-foreground-subtle">
+      {message?.content}
+    </div>
+  );
+}
+
+function MessageItemHost(props: MessageItemProps) {
+  return <MessageRole {...props} />;
+}
+
+/** Renders a single chat message: user bubble or assistant markdown turn. */
+export const MessageItem = memo(function MessageItem(props: MessageItemProps) {
+  const owner = {
+    message: props.message,
+    messageId: props.message.id,
+    role: props.message.role,
+    conversationId: props.message.conversationId,
+  };
+  return (
+    <>
+      <Slot name="chat.message.before" owner={owner} />
+      <ComponentSlot
+        name="chat.message.item"
+        fallback={MessageItemHost as unknown as PluginComponent}
+        props={props as unknown as Record<string, unknown>}
+      />
+      <Slot name="chat.message.after" owner={owner} />
+    </>
+  );
 });

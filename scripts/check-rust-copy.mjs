@@ -26,6 +26,7 @@ const SKIP = [
   /src-tauri\/src\/harness\/code\/prompt\.rs$/,
   /src-tauri\/src\/harness\/code\/context\.rs$/,
   /src-tauri\/src\/harness\/cache\/bench\.rs$/,
+  /src-tauri\/src\/harness\/completion\.rs$/, // multilingual unfinished-work markers, never UI copy
   /src-tauri\/src\/tools\/genui\/(normalize|lint|fixtures)\.rs$/,
 ];
 

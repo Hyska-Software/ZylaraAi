@@ -141,6 +141,7 @@
   "tabs": {
     "general": "General",
     "themes": "Temas",
+    "design": "Diseño",
     "terminal": "Terminal",
     "providers": "Proveedores",
     "model": "Modelo predeterminado",
@@ -150,6 +151,22 @@
     "agents": "Agentes",
     "data": "Datos",
     "about": "Acerca de"
+  },
+  "design": {
+    "title": "Interfaz por plugins",
+    "description": "Elige cómo se ve cada layout. Los cambios solo se aplican al layout seleccionado.",
+    "layout": { "chat": "Chat", "code": "Code", "agents": "Agentes" },
+    "hostDefault": "Predeterminado de la app",
+    "disable": "Desactivar UI de plugins",
+    "enable": "Activar UI de plugins",
+    "presets": "Presets",
+    "variants": "Variantes de componentes",
+    "conflicts": "Conflictos",
+    "modifications": "Modificaciones activas",
+    "empty": "Nada contribuido todavía.",
+    "default": "Predeterminado",
+    "resetLayout": "Restablecer este layout",
+    "resetAll": "Restablecer toda la UI de plugins"
   },
   "dialog": {
     "title": "Configuración",

@@ -19,19 +19,34 @@ export interface PluginPublisher {
 
 export type PluginAction =
   | { kind: 'openView'; target: string }
+  | { kind: 'openPage'; target: string; layout?: PluginLayoutId | null }
   | { kind: 'openPanel'; target: string }
+  | { kind: 'openPanelTab'; target: string; layout?: PluginLayoutId | null }
+  | { kind: 'setLayout'; target: PluginLayoutId }
+  | { kind: 'openSettings'; target?: string | null }
+  | { kind: 'setVariant'; component: string; target: string }
+  | { kind: 'setPreset'; target: string; layout?: PluginLayoutId | null }
   | { kind: 'insertDraft'; text: string }
   | { kind: 'openExternal'; url: string }
   | { kind: 'execute'; method: string; params?: unknown };
 
+export type PluginLayoutId = 'chat' | 'code' | 'agent';
+
 export interface SlotContribution {
   slot: string;
+  id?: string | null;
   entry?: string | null;
+  component?: string | null;
   title?: string | null;
   titleKey?: string | null;
   icon?: string | null;
   action?: PluginAction | null;
   declarative?: boolean | null;
+  layouts?: PluginLayoutId[];
+  order?: number | null;
+  priority?: number | null;
+  key?: string | null;
+  when?: Record<string, string | number | boolean> | null;
 }
 
 export interface ViewContribution {
@@ -41,10 +56,23 @@ export interface ViewContribution {
   description?: string | null;
   descriptionKey?: string | null;
   icon?: string | null;
-  surface: PluginSurface;
-  location: PluginLocation;
+  surface?: PluginSurface;
+  location?: PluginLocation;
+  layouts?: PluginLayoutId[];
+  order?: number | null;
   entry?: string | null;
   component?: string | null;
+}
+
+export interface NavContribution {
+  id: string;
+  title: string;
+  titleKey?: string | null;
+  icon?: string | null;
+  page: string;
+  layouts?: PluginLayoutId[];
+  order?: number | null;
+  badge?: string | null;
 }
 
 export interface PanelContribution {
@@ -55,6 +83,9 @@ export interface PanelContribution {
   entry?: string | null;
   component?: string | null;
   dock: PluginDock;
+  tab?: boolean | null;
+  layouts?: PluginLayoutId[];
+  order?: number | null;
 }
 
 export interface CommandContribution {
@@ -75,6 +106,7 @@ export interface SettingsTabContribution {
   title: string;
   titleKey?: string | null;
   icon?: string | null;
+  order?: number | null;
   entry?: string | null;
   component?: string | null;
 }
@@ -84,6 +116,50 @@ export interface ThemeContribution {
   name: string;
   light: Record<string, string>;
   dark: Record<string, string>;
+}
+
+export interface VariantContribution {
+  component: string;
+  id: string;
+  title: string;
+  layouts?: PluginLayoutId[];
+  recipe: Record<string, string>;
+}
+
+export interface PresetContribution {
+  id: string;
+  title: string;
+  layouts?: PluginLayoutId[];
+  tokens?: { light?: Record<string, string>; dark?: Record<string, string> };
+  density?: 'compact' | 'comfortable' | 'spacious' | null;
+  variants?: Record<string, string>;
+  css?: string | null;
+}
+
+export interface CssContribution {
+  id: string;
+  file: string;
+  layouts?: PluginLayoutId[];
+  order?: number | null;
+}
+
+export interface GenuiRender {
+  kind: 'trusted' | 'sandbox';
+  component?: string | null;
+  entry?: string | null;
+  height?: number | null;
+}
+
+export interface GenuiComponentContribution {
+  id: string;
+  title: string;
+  summary: string;
+  props: Record<string, Record<string, unknown>>;
+  render: GenuiRender;
+}
+
+export interface GenuiContribution {
+  components: GenuiComponentContribution[];
 }
 
 export interface PromptSection {
@@ -135,10 +211,15 @@ export interface ArtifactViewerContribution {
 export interface UiContributions {
   slots: SlotContribution[];
   views: ViewContribution[];
+  nav: NavContribution[];
   panels: PanelContribution[];
   commands: CommandContribution[];
   settingsTabs: SettingsTabContribution[];
   themes: ThemeContribution[];
+  variants: VariantContribution[];
+  presets: PresetContribution[];
+  css: CssContribution[];
+  genui: GenuiContribution;
 }
 
 export interface PluginContributions {

@@ -6,17 +6,16 @@ import { listen } from '@tauri-apps/api/event';
 import { AppShell } from '@/components/layout/AppShell';
 import { WorkspaceCenter } from '@/components/layout/WorkspaceCenter';
 import { PluginPanelHost } from '@/components/plugins/PluginHosts';
+import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
+import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { ComponentSlot } from '@/components/plugins/ui/Slot';
+import { LayoutSidebar } from '@/components/layout/LayoutSidebar';
+import { PluginUiRuntime } from '@/components/plugins/PluginUiRuntime';
 import { PluginRuntime } from '@/lib/plugins/runtime';
 import { usePluginStore } from '@/lib/plugins/store';
-import {
-  getShellOverride,
-  resolvePluginComponent,
-  usePluginRegistry,
-  type PluginComponent,
-} from '@/lib/plugins/registry';
-import { AgentSidebar } from '@/components/agents/AgentSidebar';
+import type { PluginComponent } from '@/lib/plugins/ui/types';
 import { AgentPanel } from '@/components/agents/AgentPanel';
-import { CodePanel, CodeSidebar } from '@/components/code';
+import { CodePanel } from '@/components/code';
 import { SettingsDialog } from '@/components/settings/SettingsDialog';
 import { TrayPromptDialog } from '@/components/settings/TrayPromptDialog';
 import { ModelPickerDialog } from '@/components/models/ModelPickerDialog';
@@ -154,7 +153,11 @@ export default function App() {
   const artifactPanelOpen = useUiStore((state) => state.artifactPanelOpen);
   const sourcesPanelOpen = useUiStore((state) => state.sourcesPanelOpen);
   const pluginPanel = usePluginStore((state) => state.activePanel);
-  const pluginRegistry = usePluginRegistry();
+  const chatPluginDock = useUiStore((state) => state.pluginDockTab.chat);
+  const pluginUi = usePluginUi();
+  const takeoverDock = pluginUi.panelTabs.find(
+    (entry) => entry.takeover && entry.layouts.includes(layoutMode),
+  );
   const activeConversation = useChatStore((state) => {
     const id = state.activeId;
     return id ? state.conversations.find((conversation) => conversation.id === id) : undefined;
@@ -183,20 +186,6 @@ export default function App() {
   const fontScale = useAppStore((state) => state.settings.fontScale);
   const reduceMotion = useAppStore((state) => state.settings.reduceMotion);
   const bootstrapped = useRef(false);
-  const ShellComponent = useMemo(
-    () =>
-      getShellOverride() ??
-      resolvePluginComponent('layout.shell', AppShell as unknown as PluginComponent),
-    [pluginRegistry.revision],
-  );
-  const CenterComponent = useMemo(
-    () => resolvePluginComponent('layout.center', WorkspaceCenter as unknown as PluginComponent),
-    [pluginRegistry.revision],
-  );
-  const SettingsComponent = useMemo(
-    () => resolvePluginComponent('settings.dialog', SettingsDialog as unknown as PluginComponent),
-    [pluginRegistry.revision],
-  );
 
   useEffect(() => {
     if (bootstrapped.current) return;
@@ -573,24 +562,29 @@ export default function App() {
   return (
     <TooltipProvider delayDuration={280}>
       <ErrorBoundary>
-        <ShellComponent
-          sidebar={
-            layoutMode === 'code' ? (
-              (context: { onClose?: () => void }) => <CodeSidebar {...context} />
-            ) : layoutMode === 'agent' ? (
-              (context: { onClose?: () => void }) => <AgentSidebar {...context} />
-            ) : undefined
-          }
-          sidebarLabel={
-            layoutMode === 'code'
-              ? translate('shell.labels.sessions')
-              : layoutMode === 'agent'
-                ? translate('shell.labels.agents')
-                : translate('shell.labels.conversations')
-          }
-          rightPanel={
-            pluginPanel ? (
+        <ComponentSlot
+          name="layout.shell"
+          fallback={AppShell as unknown as PluginComponent}
+          props={{
+            sidebar: (context: { onClose?: () => void }) => (
+              <ComponentSlot
+                name="layout.sidebar"
+                fallback={LayoutSidebar as unknown as PluginComponent}
+                props={{ layout: layoutMode, onClose: context.onClose }}
+              />
+            ),
+            sidebarLabel:
+              layoutMode === 'code'
+                ? translate('shell.labels.sessions')
+                : layoutMode === 'agent'
+                  ? translate('shell.labels.agents')
+                  : translate('shell.labels.conversations'),
+            rightPanel: takeoverDock ? (
+              <PluginDockTabHost layout={layoutMode} tabKey={takeoverDock.key} />
+            ) : pluginPanel ? (
               <PluginPanelHost />
+            ) : chatPluginDock ? (
+              <PluginDockTabHost layout="chat" tabKey={chatPluginDock} />
             ) : layoutMode === 'code' ? (
               <CodePanel />
             ) : agentPanelVisible ? (
@@ -604,23 +598,30 @@ export default function App() {
                 <ArtifactPanel />
                 <SourcesPanel />
               </>
-            )
-          }
-          // The Code panel only docks from this width up (see CodePanel); the
-          // chat mirrors that with its top-right corner.
-          rightPanelOpen={
-            (Boolean(pluginPanel) ||
-              layoutMode === 'code' ||
-              (agentPanelVisible &&
-                (agentWorkspacePanel ? codePanelOpen : agentPanelOpen))) &&
-            viewportWidth >= SIDE_PANEL_DOCK_MIN_VIEWPORT
-          }
-        >
-          <CenterComponent />
-        </ShellComponent>
+            ),
+            rightPanelOpen:
+              (Boolean(takeoverDock) ||
+                Boolean(pluginPanel) ||
+                Boolean(chatPluginDock) ||
+                layoutMode === 'code' ||
+                (agentPanelVisible &&
+                  (agentWorkspacePanel ? codePanelOpen : agentPanelOpen))) &&
+              viewportWidth >= SIDE_PANEL_DOCK_MIN_VIEWPORT,
+            children: (
+              <ComponentSlot
+                name="layout.center"
+                fallback={WorkspaceCenter as unknown as PluginComponent}
+              />
+            ),
+          }}
+        />
         <PluginRuntime />
+        <PluginUiRuntime />
         <TrayPromptDialog />
-        <SettingsComponent />
+        <ComponentSlot
+          name="settings.dialog"
+          fallback={SettingsDialog as unknown as PluginComponent}
+        />
         <ModelPickerDialog />
         <CommandPalette />
         <ComputerControlBanner

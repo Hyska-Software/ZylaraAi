@@ -19,6 +19,9 @@ import {
   PluginBackendFrame,
 } from './frame';
 import { emitTrustedEvent, loadTrustedPlugin, loadedTrustedPluginIds, unloadTrustedPlugin } from './trusted';
+import { startPluginEventBridge } from './ui/events';
+import { pluginUiState, subscribePluginUi } from './ui/registry';
+import { setPluginGenuiComponents } from '@/lib/genui/extension';
 import type {
   PluginNotificationEvent,
   PluginToolCallEvent,
@@ -215,6 +218,7 @@ export function PluginRuntime() {
     const disposers: Array<() => void> = [];
     let disposed = false;
     disposers.push(registerPluginHotkeys());
+    disposers.push(startPluginEventBridge());
     void listen<PluginToolCallEvent>('zylara:plugin-tool-call', (event) => {
       if (disposed) return;
       void dispatchToolCall(event.payload);
@@ -303,6 +307,12 @@ export function PluginRuntime() {
       window.removeEventListener('zylara:plugin-command', onCommand);
       for (const dispose of disposers) dispose();
     };
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setPluginGenuiComponents(pluginUiState().genui);
+    sync();
+    return subscribePluginUi(sync);
   }, []);
 
   useEffect(() => {

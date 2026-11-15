@@ -110,12 +110,78 @@ host.registerPlugin({
       );
     }
 
+    function MetricView({ props }) {
+      return e(
+        'div',
+        {
+          style: {
+            display: 'flex',
+            gap: 12,
+            alignItems: 'baseline',
+            padding: 12,
+            borderRadius: 12,
+            background: 'var(--surface-raised)',
+            color: 'var(--foreground)',
+            fontFamily: 'var(--font-sans)',
+          },
+        },
+        e('span', { style: { fontSize: 12, color: 'var(--foreground-muted)' } }, props.label),
+        e('strong', { style: { fontSize: 22 } }, props.value),
+        e('span', { style: { fontSize: 11, color: 'var(--accent)' } }, props.trend || 'flat'),
+      );
+    }
+
+    const LabAction = () =>
+      e(
+        'button',
+        {
+          type: 'button',
+          onClick: () => host.ui.openPage('lab'),
+          style: { border: 0, background: 'transparent', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 },
+        },
+        'Open lab',
+      );
+
     host.registerView('lab', Lab);
     host.registerPanel('lab-panel', LabPanel);
     host.registerComponent('Lab', Lab);
     host.registerComponent('LabPanel', LabPanel);
+    host.registerComponent('MetricView', MetricView);
+    host.ui.registerSlot(
+      { slot: 'chat.message.actions', id: 'open-lab', layouts: ['chat'], order: 10 },
+      LabAction,
+    );
+    host.ui.registerGenuiComponent(
+      {
+        id: 'metric-runtime',
+        title: 'Runtime metric',
+        summary: 'Metric registered by the trusted runtime',
+        props: {
+          label: { type: 'text', required: true, maxChars: 40 },
+          value: { type: 'text', required: true, maxChars: 40 },
+        },
+      },
+      MetricView,
+    );
+    host.ui.registerPreset({
+      id: 'ink',
+      title: 'Ink (runtime)',
+      layouts: ['chat'],
+      tokens: { light: { accent: '#1f6feb' }, dark: { accent: '#79b8ff' } },
+    });
+    host.commands.register(
+      { id: 'lab-runtime', title: 'Runtime lab command', command: 'lab-runtime' },
+      () => host.ui.toast('Runtime command', 'Registered by the trusted plugin'),
+    );
+    host.events.on('layout/changed', (detail) => {
+      host.log('debug', `layout ${detail.layout}`);
+    });
     host.replaceComponent('chat.welcome', WelcomeOverride);
     host.wrapComponent('layout.shell', ShellWrapper);
+    host.ui.addCss(
+      ':root { --plugin-lab-glow: 1; } [data-zylara-part="chat-message-user"] { outline: 1px solid var(--accent); }',
+      { layouts: ['chat'], id: 'lab-chat' },
+    );
     host.addGlobalCss(
       ':root { --plugin-lab-glow: 1; } .zylara-trusted-lab { outline: 1px solid var(--accent); }',
     );

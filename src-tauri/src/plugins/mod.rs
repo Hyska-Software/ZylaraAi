@@ -12,7 +12,7 @@
 mod assets;
 pub mod contract;
 pub mod contract_generated;
-mod manifest;
+pub mod manifest;
 mod package;
 mod permissions;
 mod providers_support;
@@ -638,7 +638,20 @@ impl PluginManager {
             wrapped.push_str(&prompt_text);
             prompt_text = wrapped;
         }
+        let mut genui_components = Vec::new();
         skills.sort_by(|left, right| left.plugin_id.cmp(&right.plugin_id));
+        for plugin in &active {
+            if permissions::granted_any(&plugin.grants, "ui.genui") {
+                genui_components.extend(crate::tools::genui::extension::from_manifest(
+                    &plugin.stored.id,
+                    &plugin.manifest,
+                ));
+            }
+        }
+        prompt_text.push_str(&crate::tools::genui::extension::prompt_section(
+            &genui_components,
+            4_000,
+        ));
         let fingerprint = compute_fingerprint(&active, &tools, &prompt_text, &skills);
         let state = RuntimeState {
             active,
@@ -741,6 +754,22 @@ impl PluginManager {
                 .map(|plugin| plugin.stored.id.clone())
                 .collect(),
         }
+    }
+
+    /// Active plugin components exposed to generative UI blocks.
+    pub fn genui_components(&self) -> Vec<crate::tools::genui::extension::PluginGenuiComponent> {
+        let state = self.state.read();
+        let mut out = Vec::new();
+        for plugin in &state.active {
+            if !permissions::granted_any(&plugin.grants, "ui.genui") {
+                continue;
+            }
+            out.extend(crate::tools::genui::extension::from_manifest(
+                &plugin.stored.id,
+                &plugin.manifest,
+            ));
+        }
+        out
     }
 
     pub fn skill_roots(&self) -> Vec<ExternalSkillRoot> {
@@ -1380,6 +1409,28 @@ impl PluginManager {
             &stored.id,
             "install",
             Some(&package.package_hash),
+            "installed",
+        );
+        let ui_surface = serde_json::json!({
+            "slots": manifest.contributes.ui.slots.len(),
+            "nav": manifest.contributes.ui.nav.len(),
+            "pages": manifest.contributes.ui.views.len(),
+            "panels": manifest.contributes.ui.panels.len(),
+            "settingsTabs": manifest.contributes.ui.settings_tabs.len(),
+            "variants": manifest.contributes.ui.variants.len(),
+            "presets": manifest.contributes.ui.presets.len(),
+            "css": manifest.contributes.ui.css.len(),
+            "genui": manifest.contributes.ui.genui.components.len(),
+        });
+        let digest = signature::sha256_hex(
+            serde_json::to_string(&ui_surface)
+                .unwrap_or_default()
+                .as_bytes(),
+        );
+        let _ = self.db.plugin_audit(
+            &stored.id,
+            "plugins.ui.surface",
+            Some(&digest),
             "installed",
         );
         if let Some(verified) = &package.verified {

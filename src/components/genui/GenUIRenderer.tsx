@@ -24,6 +24,8 @@ import {
 import { GenUIActions } from './GenUIActions';
 import { GenUIChoices } from './GenUIChoices';
 import { GenUIReveal } from './GenUIReveal';
+import { pluginGenuiComponent } from '@/lib/genui/extension';
+import { PluginGenuiView } from '@/components/plugins/ui/PluginGenuiView';
 
 interface RenderNodeProps {
   node: GenUIComponent;
@@ -51,6 +53,14 @@ function GenUINode({ node, depth }: RenderNodeProps) {
 
   const children = renderChildren(node, depth);
   const props = node.props;
+
+  if (typeof node.type === 'string' && node.type.startsWith('plugin:')) {
+    const entry = pluginGenuiComponent(node.type);
+    if (!entry) {
+      return <GenUIFallback message={t('renderer.unsupportedComponent', { type: String(node.type) })} />;
+    }
+    return <PluginGenuiView entry={entry} props={{ ...(props ?? {}) }} />;
+  }
 
   switch (node.type) {
     case 'card':

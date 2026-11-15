@@ -39,20 +39,33 @@ export interface ToolResult {
   }>;
 }
 
+export interface PluginUiApi {
+  openPage(pageId: string, options?: { layout?: 'chat' | 'code' | 'agent' }): Promise<unknown>;
+  openPanelTab(tabId: string, options?: { layout?: 'chat' | 'code' | 'agent' }): Promise<unknown>;
+  closePanelTab(): Promise<unknown>;
+  setLayout(layout: 'chat' | 'code' | 'agent'): Promise<unknown>;
+  openSettings(tab?: string): Promise<unknown>;
+  toast(title: string, body?: string): Promise<unknown>;
+  setBadge(navId: string, badge: string | null): Promise<unknown>;
+}
+
 export interface PluginApi {
   readonly pluginId: string;
   readonly locale: string;
   readonly context: Record<string, unknown>;
   readonly theme: PluginInit['theme'];
+  readonly ui: PluginUiApi;
   rpc<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;
   on(event: string, handler: (detail: unknown) => void): () => void;
+  onEvent(event: string, handler: (detail: unknown) => void): () => void;
+  onGenui(handler: (props: Record<string, unknown>) => void): void;
   onTool(handler: (invocation: ToolInvocation) => ToolResult | string | Promise<ToolResult | string>): void;
   t(key: string, fallback?: string): string;
   notify(message: string): Promise<unknown>;
   resize(): void;
-  openView(viewId: string): void;
-  openPanel(panelId: string): void;
-  closeOverlays(): void;
+  openView(viewId: string): Promise<unknown>;
+  openPanel(panelId: string): Promise<unknown>;
+  closeOverlays(): Promise<unknown>;
   openExternal(url: string): Promise<unknown>;
   ready(): void;
 }
@@ -65,11 +78,15 @@ declare global {
 
 export type PluginPermission =
   | 'ui.view'
+  | 'ui.nav'
   | 'ui.panel'
   | 'ui.command'
   | 'ui.artifact'
   | 'ui.settings'
   | 'ui.theme'
+  | 'ui.variant'
+  | 'ui.preset'
+  | 'ui.genui'
   | 'ui.shell'
   | 'ui.css.global'
   | 'commands'
@@ -98,11 +115,11 @@ export type PluginPermission =
   | `fs.write:${string}`;
 
 export interface Manifest {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   id: string;
   name: string;
   version: string;
-  apiVersion: 1;
+  apiVersion: 1 | 2;
   description?: string;
   author?: string;
   publisher: { id: string; name: string; keyId?: string };

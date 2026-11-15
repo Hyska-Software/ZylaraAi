@@ -6,7 +6,7 @@
   "type": "object",
   "required": ["schemaVersion", "id", "name", "version", "apiVersion", "publisher"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "enum": [1, 2] },
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$",
@@ -17,7 +17,7 @@
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
     },
-    "apiVersion": { "type": "integer", "minimum": 1 },
+    "apiVersion": { "enum": [1, 2] },
     "description": { "type": "string", "maxLength": 4000 },
     "author": { "type": "string", "maxLength": 200 },
     "homepage": { "type": "string", "format": "uri" },
@@ -45,7 +45,7 @@
       "maxItems": 64,
       "items": {
         "type": "string",
-        "pattern": "^(unsafe\\.renderer|ui\\.slot:[a-z0-9.]+|ui\\.override:[a-z0-9.]+|ui\\.view|ui\\.panel|ui\\.command|ui\\.settings|ui\\.theme|ui\\.artifact|ui\\.shell|ui\\.css\\.global|commands|hotkeys|chat\\.read|chat\\.write|opener|agents\\.read|agents\\.write|agent\\.tools|agent\\.prompt|agent\\.skills|providers|storage|settings|secrets\\.use|secrets\\.read|clipboard\\.read|notify|events|fs\\.read:.+|fs\\.write:.+|net:.+|process\\.spawn)$"
+        "pattern": "^(unsafe\\.renderer|ui\\.slot:[a-z0-9.]+|ui\\.override:[a-z0-9.-]+|ui\\.view|ui\\.nav|ui\\.panel|ui\\.command|ui\\.settings|ui\\.theme|ui\\.variant|ui\\.preset|ui\\.genui|ui\\.artifact|ui\\.shell|ui\\.css\\.global|commands|hotkeys|chat\\.read|chat\\.write|opener|agents\\.read|agents\\.write|agent\\.tools|agent\\.prompt|agent\\.skills|providers|storage|settings|secrets\\.use|secrets\\.read|clipboard\\.read|notify|notifications|dialog|events|fs\\.read:.+|fs\\.write:.+|net:.+|process\\.spawn)$"
       }
     },
     "runtime": {
@@ -73,10 +73,15 @@
           "properties": {
             "slots": { "type": "array", "items": { "$ref": "#/$defs/slot" } },
             "views": { "type": "array", "items": { "$ref": "#/$defs/view" } },
+            "nav": { "type": "array", "items": { "$ref": "#/$defs/nav" } },
             "panels": { "type": "array", "items": { "$ref": "#/$defs/panel" } },
             "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } },
             "settingsTabs": { "type": "array", "items": { "$ref": "#/$defs/settingsTab" } },
-            "themes": { "type": "array", "items": { "$ref": "#/$defs/theme" } }
+            "themes": { "type": "array", "items": { "$ref": "#/$defs/theme" } },
+            "variants": { "type": "array", "items": { "$ref": "#/$defs/variant" } },
+            "presets": { "type": "array", "items": { "$ref": "#/$defs/preset" } },
+            "css": { "type": "array", "items": { "$ref": "#/$defs/css" } },
+            "genui": { "$ref": "#/$defs/genui" }
           },
           "additionalProperties": false
         },
@@ -101,8 +106,10 @@
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["openView", "openPanel", "insertDraft", "openExternal", "execute"] },
-        "target": { "type": "string" },
+        "kind": { "enum": ["openView", "openPage", "openPanel", "openPanelTab", "setLayout", "openSettings", "setVariant", "setPreset", "insertDraft", "openExternal", "execute"] },
+        "target": { "type": "string", "maxLength": 128 },
+        "layout": { "enum": ["chat", "code", "agent"] },
+        "component": { "type": "string", "maxLength": 64 },
         "text": { "type": "string", "maxLength": 16000 },
         "url": { "type": "string", "format": "uri", "pattern": "^https://" },
         "method": { "type": "string" },
@@ -115,18 +122,25 @@
       "required": ["slot"],
       "properties": {
         "slot": { "type": "string" },
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
         "entry": { "type": "string" },
+        "component": { "type": "string" },
         "title": { "type": "string" },
         "titleKey": { "type": "string" },
         "icon": { "type": "string" },
         "action": { "$ref": "#/$defs/action" },
-        "declarative": { "type": "boolean" }
+        "declarative": { "type": "boolean" },
+        "layouts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["chat", "code", "agent"] } },
+        "order": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "priority": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "key": { "type": "string", "maxLength": 64 },
+        "when": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] } }
       },
       "additionalProperties": false
     },
     "view": {
       "type": "object",
-      "required": ["id", "title", "surface", "location"],
+      "required": ["id", "title"],
       "properties": {
         "id": { "type": "string", "maxLength": 64 },
         "title": { "type": "string", "maxLength": 120 },
@@ -136,8 +150,98 @@
         "icon": { "type": "string" },
         "surface": { "enum": ["chat", "code", "agent", "global"] },
         "location": { "enum": ["main", "sidebar"] },
+        "layouts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["chat", "code", "agent"] } },
+        "order": { "type": "integer", "minimum": 0, "maximum": 1000 },
         "entry": { "type": "string" },
         "component": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "nav": {
+      "type": "object",
+      "required": ["id", "title", "icon", "page"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "title": { "type": "string", "maxLength": 120 },
+        "titleKey": { "type": "string" },
+        "icon": { "type": "string" },
+        "page": { "type": "string", "maxLength": 64 },
+        "layouts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["chat", "code", "agent"] } },
+        "order": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "badge": { "type": ["string", "null"], "maxLength": 24 }
+      },
+      "additionalProperties": false
+    },
+    "variant": {
+      "type": "object",
+      "required": ["component", "id", "title", "recipe"],
+      "properties": {
+        "component": { "type": "string", "maxLength": 64 },
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "title": { "type": "string", "maxLength": 120 },
+        "layouts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["chat", "code", "agent"] } },
+        "recipe": { "type": "object", "additionalProperties": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "preset": {
+      "type": "object",
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "title": { "type": "string", "maxLength": 120 },
+        "layouts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["chat", "code", "agent"] } },
+        "tokens": {
+          "type": "object",
+          "properties": {
+            "light": { "type": "object", "additionalProperties": { "type": "string", "maxLength": 300 } },
+            "dark": { "type": "object", "additionalProperties": { "type": "string", "maxLength": 300 } }
+          },
+          "additionalProperties": false
+        },
+        "density": { "enum": ["compact", "comfortable", "spacious"] },
+        "variants": { "type": "object", "additionalProperties": { "type": "string" } },
+        "css": { "type": ["string", "null"], "maxLength": 200000 }
+      },
+      "additionalProperties": false
+    },
+    "css": {
+      "type": "object",
+      "required": ["id", "file"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "file": { "type": "string" },
+        "layouts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["chat", "code", "agent"] } },
+        "order": { "type": "integer", "minimum": 0, "maximum": 1000 }
+      },
+      "additionalProperties": false
+    },
+    "genui": {
+      "type": "object",
+      "properties": {
+        "components": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/genuiComponent" } }
+      },
+      "additionalProperties": false
+    },
+    "genuiComponent": {
+      "type": "object",
+      "required": ["id", "title", "summary", "props", "render"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "title": { "type": "string", "maxLength": 80 },
+        "summary": { "type": "string", "maxLength": 160 },
+        "props": { "type": "object", "maxProperties": 16, "additionalProperties": { "type": "object" } },
+        "render": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["trusted", "sandbox"] },
+            "component": { "type": "string", "maxLength": 64 },
+            "entry": { "type": "string" },
+            "height": { "type": "integer", "minimum": 80, "maximum": 480 }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
@@ -151,7 +255,10 @@
         "icon": { "type": "string" },
         "entry": { "type": "string" },
         "component": { "type": "string" },
-        "dock": { "enum": ["right"] }
+        "dock": { "enum": ["right"] },
+        "tab": { "type": "boolean" },
+        "layouts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["chat", "code", "agent"] } },
+        "order": { "type": "integer", "minimum": 0, "maximum": 1000 }
       },
       "additionalProperties": false
     },
@@ -180,6 +287,7 @@
         "title": { "type": "string", "maxLength": 120 },
         "titleKey": { "type": "string" },
         "icon": { "type": "string" },
+        "order": { "type": "integer", "minimum": 0, "maximum": 1000 },
         "entry": { "type": "string" },
         "component": { "type": "string" }
       },

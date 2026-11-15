@@ -15,8 +15,10 @@ import { MessageList } from './MessageList';
 import { TurnErrorBanner } from './TurnErrorBanner';
 import { planUsageUrl } from './turnError';
 import { WelcomeScreen } from './WelcomeScreen';
-import { PluginSlot } from '@/components/plugins/PluginHosts';
-import { resolvePluginComponent, usePluginRegistry, type PluginComponent } from '@/lib/plugins/registry';
+import { ComponentSlot, Slot } from '@/components/plugins/ui/Slot';
+import { useStyleRecipe } from '@/lib/plugins/ui/recipe';
+import { usePluginRegistry } from '@/lib/plugins/registry';
+import type { PluginComponent } from '@/lib/plugins/ui/types';
 
 /** Distance from the bottom (px) still considered "reading the latest message". */
 const BOTTOM_THRESHOLD = 96;
@@ -34,6 +36,22 @@ function lastAssistantFailed(messages: ChatMessage[]): boolean {
     return message.status === 'error' || message.error != null;
   }
   return false;
+}
+
+function ChatHeaderHost({ conversationId }: Record<string, unknown>) {
+  const owner = { conversationId: (conversationId as string | null | undefined) ?? null };
+  const header = useStyleRecipe(
+    'chat.header',
+    'pointer-events-none absolute inset-x-0 top-1 z-10 flex items-center gap-2 px-3',
+  );
+  return (
+    <div className={header.className} data-variant={header.variantId ?? undefined}>
+      <Slot name="chat.header.leading" owner={owner} />
+      <div className="flex-1" />
+      <Slot name="chat.header.actions" owner={owner} compact className="pointer-events-auto" />
+      <Slot name="chat.header.trailing" owner={owner} />
+    </div>
+  );
 }
 
 /**
@@ -162,20 +180,15 @@ export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
     return () => window.removeEventListener('zylara:scroll-bottom', onScrollBottom);
   }, [reduceMotion, scrollToBottom]);
 
-  const Welcome = resolvePluginComponent(
-    'chat.welcome',
-    WelcomeScreen as unknown as PluginComponent,
-  );
+  const owner = { conversationId: activeId ?? null };
   return (
+    <Slot name="chat.view.frame" owner={owner}>
     <div className="relative flex h-full min-h-0 flex-col">
-      <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center px-3">
-        <PluginSlot
-          slot="chat.header.actions"
-          context={{ conversationId: activeId ?? undefined }}
-          compact
-          className="pointer-events-auto"
-        />
-      </div>
+      <ComponentSlot
+        name="chat.header"
+        fallback={ChatHeaderHost}
+        props={{ conversationId: activeId ?? null }}
+      />
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -185,11 +198,19 @@ export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
           <LoadingSkeleton />
         ) : messages.length === 0 && pendingGateCount === 0 ? (
           <div className="flex min-h-full items-center justify-center">
-            {welcome ?? <Welcome pluginRegistryRevision={pluginRegistry.revision} />}
+            {welcome ?? (
+              <ComponentSlot
+                name="chat.welcome"
+                fallback={WelcomeScreen as unknown as PluginComponent}
+                props={{ pluginRegistryRevision: pluginRegistry.revision }}
+              />
+            )}
           </div>
         ) : (
           <div className="mx-auto w-full max-w-3xl px-6 pb-10 pt-6">
+            <Slot name="chat.messages.before" owner={owner} />
             {messages.length > 0 ? <MessageList messages={messages} streaming={streaming} /> : null}
+            <Slot name="chat.messages.after" owner={owner} />
             {activeId && (layoutMode === 'code' || pendingGateCount > 0) ? (
               // Aprovação/pergunta pendente deve continuar visível e operável
               // mesmo se o usuário trocar para o layout Chat no meio do turno
@@ -208,15 +229,21 @@ export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
         <div className="relative mx-auto w-full max-w-3xl">
           {/* Jobs em background vivem no popover do composer (CodeSessionControls),
               junto de plano/tarefas; não há mais faixa acima do composer. */}
-          {activeId ? <MessageQueueBar conversationId={activeId} /> : null}
+          {activeId ? (
+            <Slot name="chat.queue.frame" owner={owner}>
+              <MessageQueueBar conversationId={activeId} />
+            </Slot>
+          ) : null}
           {showTurnError ? (
-            <TurnErrorBanner
-              code={errorCode}
-              hint={errorHint}
-              planProvider={planProvider}
-              usageUrl={planUsageUrl(selectedProvider)}
-              onOpenProviders={() => openSettings('providers')}
-            />
+            <Slot name="chat.turn.error.frame" owner={owner}>
+              <TurnErrorBanner
+                code={errorCode}
+                hint={errorHint}
+                planProvider={planProvider}
+                usageUrl={planUsageUrl(selectedProvider)}
+                onOpenProviders={() => openSettings('providers')}
+              />
+            </Slot>
           ) : null}
           <Composer />
         </div>
@@ -240,5 +267,6 @@ export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
         </div>
       ) : null}
     </div>
+    </Slot>
   );
 }

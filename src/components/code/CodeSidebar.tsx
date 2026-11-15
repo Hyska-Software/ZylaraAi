@@ -17,12 +17,10 @@ import {
   Pencil,
   Pin,
   PinOff,
-  Plug,
   RefreshCw,
   Search,
   Settings,
   SlidersHorizontal,
-  Sparkles,
   SquarePen,
   SquareTerminal,
   Trash2,
@@ -56,10 +54,11 @@ import {
 import type { SortableListApi } from '@/components/ui';
 import { api } from '@/lib/api';
 import { localeLowerCase } from '@/lib/i18n/format';
+import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
+import { navEntries, openNavTarget } from '@/lib/plugins/ui/nav';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { pluginIcon } from '@/lib/plugins/icons';
-import { pluginLabel, pluginViewsForSurface, usePluginRegistry } from '@/lib/plugins/registry';
-import { openPluginView } from '@/lib/plugins/host';
-import { usePluginStore } from '@/lib/plugins/store';
 import {
   selectConversationStream,
   useAppStore,
@@ -758,11 +757,18 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
   const activeWorkspaceId = useUiStore((state) => state.activeWorkspaceId);
   const setActiveWorkspace = useUiStore((state) => state.setActiveWorkspace);
   const appInfo = useAppStore((state) => state.appInfo);
-  const skillsPanelEnabled = useAppStore((state) => state.settings.skillsPanelEnabled);
-  const pluginView = usePluginStore((state) => state.activeView);
-  usePluginRegistry();
-  const codePluginViews = pluginViewsForSurface('code', 'sidebar');
+  const pluginPages = useUiStore((state) => state.pluginPages.code);
+  const ui = usePluginUi();
+  const prefs = usePluginUiPrefs();
   const isCompact = useIsCompact();
+  const codeNav = useMemo(
+    () =>
+      navEntries('code', ui.nav, {
+        hidden: prefs.navHidden,
+        order: prefs.navOrder,
+      }),
+    [ui.nav, prefs.navHidden, prefs.navOrder],
+  );
 
   const {
     workspaces,
@@ -1071,17 +1077,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     setCommandPaletteOpen(true);
   };
 
-  const handleSkills = () => {
-    setCodeView('skills');
-    if (isCompact) onClose?.();
-  };
-
-  const handlePlugins = () => {
-    usePluginStore.getState().closeOverlays();
-    setCodeView('plugins');
-    if (isCompact) onClose?.();
-  };
-
   const handleOpenSettings = () => {
     setSettingsOpen(true);
     if (isCompact) onClose?.();
@@ -1133,42 +1128,28 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
         }
         onSelect={handleSearch}
       />
-      <SidebarAction
-        icon={<Plug className="size-4" />}
-        label={t('code:sidebar.plugins')}
-        ariaLabel={t('code:sidebar.plugins')}
-        current={codeView === 'plugins'}
-        onSelect={handlePlugins}
-      />
-      {skillsPanelEnabled ? (
-        <SidebarAction
-          icon={<Sparkles className="size-4" />}
-          label={t('code:sidebar.skills')}
-          ariaLabel={t('code:sidebar.skills')}
-          current={codeView === 'skills'}
-          onSelect={handleSkills}
-        />
-      ) : null}
-
-      {codePluginViews.map((view) => {
-        const Icon = pluginIcon(view.view.icon);
-        const label = pluginLabel(view.plugin, view.view.titleKey, view.view.title);
+      <Slot name="sidebar.nav.before" owner={{ layout: 'code' }} />
+      {codeNav.map((entry) => {
+        const Icon = pluginIcon(entry.icon);
+        const current =
+          entry.source === 'plugin'
+            ? pluginPages?.pluginId === entry.pluginId && pluginPages.pageId === entry.page
+            : !pluginPages && codeView === entry.page;
         return (
           <SidebarAction
-            key={view.key}
+            key={entry.key}
             icon={<Icon className="size-4" />}
-            label={label}
-            ariaLabel={label}
-            current={
-              pluginView?.pluginId === view.plugin.id && pluginView.id === view.view.id
-            }
+            label={entry.title}
+            ariaLabel={entry.ariaLabel ?? entry.title}
+            current={current}
             onSelect={() => {
-              openPluginView(view.plugin, view.view.id);
+              openNavTarget(entry);
               if (isCompact) onClose?.();
             }}
           />
         );
       })}
+      <Slot name="sidebar.nav.after" owner={{ layout: 'code' }} />
 
       <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
         <section

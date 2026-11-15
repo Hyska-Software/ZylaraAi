@@ -25,7 +25,6 @@ import {
   Pin,
   PinOff,
   PanelRight,
-  Plug,
   Plus,
   Power,
   Search,
@@ -33,7 +32,6 @@ import {
   ShieldAlert,
   Square,
   Trash2,
-  Users,
   WandSparkles,
   X,
 } from 'lucide-react';
@@ -70,7 +68,11 @@ import {
   sortableDropClass,
 } from '@/components/ui';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
-import { usePluginStore } from '@/lib/plugins/store';
+import { Slot } from '@/components/plugins/ui/Slot';
+import { pluginIcon } from '@/lib/plugins/icons';
+import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
+import { navEntries, openNavTarget } from '@/lib/plugins/ui/nav';
 import type { SortableListApi } from '@/components/ui';
 import {
   selectActiveAgents,
@@ -659,21 +661,23 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
   const startNewConversation = useChatStore((state) => state.startNewConversation);
   const clearActiveConversation = useChatStore((state) => state.clearActiveConversation);
   const openConversation = useChatStore((state) => state.openConversation);
+  const pluginPages = useUiStore((state) => state.pluginPages.agent);
+  const ui = usePluginUi();
+  const prefs = usePluginUiPrefs();
+  const agentNav = useMemo(
+    () =>
+      navEntries('agent', ui.nav, {
+        hidden: prefs.navHidden,
+        order: prefs.navOrder,
+      }),
+    [ui.nav, prefs.navHidden, prefs.navOrder],
+  );
 
   const openRoutines = (agentId: string | null) => {
     setActiveAgentId(null);
     setActiveChannelId(null);
     clearActiveConversation();
     openAgentRoutines(agentId);
-    onClose?.();
-  };
-
-  const openPlugins = () => {
-    usePluginStore.getState().closeOverlays();
-    setActiveAgentId(null);
-    setActiveChannelId(null);
-    clearActiveConversation();
-    setAgentView('plugins');
     onClose?.();
   };
 
@@ -1282,75 +1286,45 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
 
       <div className="shrink-0 border-t border-border px-3 py-2">
         <PluginSlot slot="agent.sidebar.footer" className="mb-1 px-1" compact />
-        <button
-          type="button"
-          onClick={openPlugins}
-          aria-current={
-            activeAgentId === null && activeChannelId === null && agentView === 'plugins'
-              ? 'page'
-              : undefined
-          }
-          className={cn(
-            'flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[12px]',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-            activeAgentId === null && activeChannelId === null && agentView === 'plugins'
-              ? 'bg-surface-active text-foreground'
-              : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
-          )}
-        >
-          <Plug className="size-3.5" />
-          {t('sidebar.plugins')}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setAgentView('team');
-            setActiveAgentId(null);
-            setActiveChannelId(null);
-            clearActiveConversation();
-            onClose?.();
-          }}
-          aria-current={
-            activeAgentId === null &&
-            activeChannelId === null &&
-            agentView !== 'routines' &&
-            agentView !== 'plugins'
-              ? 'page'
-              : undefined
-          }
-          className={cn(
-            'flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[12px]',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-            activeAgentId === null &&
-              activeChannelId === null &&
-              agentView !== 'routines' &&
-              agentView !== 'plugins'
-              ? 'bg-surface-active text-foreground'
-              : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
-          )}
-        >
-          <Users className="size-3.5" />
-          {t('sidebar.team')}
-        </button>
-        <button
-          type="button"
-          onClick={() => openRoutines(null)}
-          aria-current={
-            activeAgentId === null && activeChannelId === null && agentView === 'routines'
-              ? 'page'
-              : undefined
-          }
-          className={cn(
-            'flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[12px]',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-            activeAgentId === null && activeChannelId === null && agentView === 'routines'
-              ? 'bg-surface-active text-foreground'
-              : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
-          )}
-        >
-          <CalendarClock className="size-3.5" />
-          {t('panel.tabs.routines')}
-        </button>
+        <Slot name="sidebar.nav.before" owner={{ layout: 'agent' }} />
+        {agentNav.map((entry) => {
+          const Icon = pluginIcon(entry.icon);
+          const current =
+            entry.source === 'plugin'
+              ? pluginPages?.pluginId === entry.pluginId && pluginPages.pageId === entry.page
+              : activeAgentId === null &&
+                activeChannelId === null &&
+                !pluginPages &&
+                agentView === entry.page;
+          return (
+            <button
+              key={entry.key}
+              type="button"
+              onClick={() => {
+                openNavTarget(entry);
+                if (entry.source === 'host') {
+                  setActiveAgentId(null);
+                  setActiveChannelId(null);
+                  clearActiveConversation();
+                }
+                onClose?.();
+              }}
+              aria-label={entry.ariaLabel ?? entry.title}
+              aria-current={current ? 'page' : undefined}
+              className={cn(
+                'flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[12px]',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                current
+                  ? 'bg-surface-active text-foreground'
+                  : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
+              )}
+            >
+              <Icon className="size-3.5" />
+              {entry.title}
+            </button>
+          );
+        })}
+        <Slot name="sidebar.nav.after" owner={{ layout: 'agent' }} />
         <button
           type="button"
           onClick={() => openSettings()}

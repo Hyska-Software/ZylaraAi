@@ -21,6 +21,11 @@ import {
 } from '@/components/ui';
 import { PanelResizer } from '@/components/layout/PanelResizer';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { Slot } from '@/components/plugins/ui/Slot';
+import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
+import { pluginIcon } from '@/lib/plugins/icons';
+import { pluginLabel } from '@/lib/plugins/registry';
+import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { api } from '@/lib/api';
 import {
   SIDE_PANEL_WIDTH_DEFAULT,
@@ -132,6 +137,13 @@ export function CodePanel() {
   const setTab = useUiStore((state) => state.setCodePanelTab);
   const tabOrder = useUiStore((state) => state.codePanelTabOrder);
   const setTabOrder = useUiStore((state) => state.setCodePanelTabOrder);
+  const pluginDock = useUiStore((state) => state.pluginDockTab.code);
+  const openPluginDockTab = useUiStore((state) => state.openPluginDockTab);
+  const ui = usePluginUi();
+  const pluginTabs = useMemo(
+    () => ui.panelTabs.filter((entry) => entry.layouts.includes('code') && !entry.takeover),
+    [ui.panelTabs],
+  );
   const setOpen = useUiStore((state) => state.setCodePanelOpen);
   const openCodeDiff = useUiStore((state) => state.openCodeDiff);
   const openCodeCommits = useUiStore((state) => state.openCodeCommits);
@@ -455,6 +467,36 @@ export function CodePanel() {
           )}
         </SortableList>
 
+        {pluginTabs.map((entry) => {
+          const Icon = pluginIcon(entry.icon);
+          const selected = pluginDock === entry.key;
+          const label = pluginLabel(entry.plugin, entry.titleKey, entry.title);
+          return (
+            <button
+              key={entry.key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-label={label}
+              title={label}
+              onClick={() => openPluginDockTab(entry.key, 'code')}
+              className={cn(
+                'flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium',
+                'transition-colors duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                selected
+                  ? 'bg-surface-active text-foreground'
+                  : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
+              )}
+            >
+              <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
+              {compactTabs ? null : label}
+            </button>
+          );
+        })}
+
+        <Slot name="code.panel.tabs" owner={{ layout: 'code' }} />
+
         <PluginSlot slot="code.panel.header" compact />
 
         <Tooltip content={t('code:panel.refreshTooltip')} side="bottom">
@@ -479,7 +521,9 @@ export function CodePanel() {
         aria-labelledby={`code-panel-tab-${tab}`}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        {tab === 'changes' ? (
+        {pluginDock ? (
+          <PluginDockTabHost layout="code" tabKey={pluginDock} />
+        ) : tab === 'changes' ? (
           <div className="flex min-h-0 flex-1 flex-col">
             {/* Workspace + branch só na aba Alterações (as abas Arquivos/Terminal
                 já têm o próprio contexto no cabeçalho/título). */}

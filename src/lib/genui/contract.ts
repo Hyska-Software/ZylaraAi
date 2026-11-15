@@ -42,7 +42,7 @@ export interface GenUIPropSpec {
 }
 
 export type GenUIComponentKind = 'leaf' | 'container';
-export type GenUIComponentCategory = 'layout' | 'data' | 'content' | 'interaction';
+export type GenUIComponentCategory = 'layout' | 'data' | 'content' | 'interaction' | 'plugin';
 
 export interface GenUIComponentSpec {
   type: string;
@@ -114,9 +114,19 @@ export const GENUI_COMPONENT_MAP: Readonly<Record<string, GenUIComponentSpec>> =
   Object.fromEntries(GENUI_CONTRACT.components.map((component) => [component.type, component])),
 );
 
+const pluginComponentMap = new Map<string, GenUIComponentSpec>();
+
+/** Registers plugin-provided component specs (replaced on every snapshot). */
+export function setPluginGenuiComponentSpecs(specs: readonly GenUIComponentSpec[]): void {
+  pluginComponentMap.clear();
+  for (const spec of specs) pluginComponentMap.set(spec.type, spec);
+}
+
 /** Resolve a spec de um tipo sem cair no protótipo de `Object`. */
 export function componentSpec(type: unknown): GenUIComponentSpec | undefined {
-  if (typeof type !== 'string' || !Object.hasOwn(GENUI_COMPONENT_MAP, type)) return undefined;
+  if (typeof type !== 'string') return undefined;
+  if (pluginComponentMap.has(type)) return pluginComponentMap.get(type);
+  if (!Object.hasOwn(GENUI_COMPONENT_MAP, type)) return undefined;
   return GENUI_COMPONENT_MAP[type];
 }
 

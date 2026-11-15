@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acme note</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        color: var(--foreground, #111);
+        font-family: var(--font-sans, system-ui, sans-serif);
+      }
+      .note {
+        box-sizing: border-box;
+        padding: 14px;
+        border-radius: 12px;
+        background: var(--surface-raised, #fff);
+      }
+      .title {
+        margin: 0 0 6px;
+        font-size: 14px;
+      }
+      .body {
+        margin: 0;
+        color: var(--foreground-muted, #555);
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <article class="note" id="note">
+      <h3 class="title" id="title">Note</h3>
+      <p class="body" id="body"></p>
+    </article>
+    <script src="/@zylara/sdk.js"></script>
+    <script>
+      const title = document.getElementById('title');
+      const body = document.getElementById('body');
+      ZylaraPlugin.onGenui((props) => {
+        title.textContent = String(props.title ?? 'Note');
+        body.textContent = String(props.body ?? '');
+        ZylaraPlugin.resize();
+      });
+      ZylaraPlugin.ready();
+    </script>
+  </body>
+</html>

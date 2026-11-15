@@ -193,7 +193,7 @@ function reviewOne(path, options) {
   } catch (error) {
     throw new Error(`invalid manifest.json: ${error.message}`);
   }
-  if (manifest.schemaVersion !== 1) throw new Error('unsupported schemaVersion');
+  if (![1, 2].includes(manifest.schemaVersion)) throw new Error('unsupported schemaVersion');
   if (!/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/.test(manifest.id ?? '')) throw new Error('invalid plugin id');
   if (!/^\d+\.\d+\.\d+(?:[-+].*)?$/.test(manifest.version ?? '')) throw new Error('invalid version');
   const permissions = Array.isArray(manifest.permissions) ? manifest.permissions : [];

@@ -28,6 +28,16 @@
     "stringChars": 4000,
     "diagnosticsPerCode": 3
   },
+  "plugin": {
+    "typePrefix": "plugin:",
+    "maxComponentsPerPlugin": 8,
+    "maxPropsPerComponent": 16,
+    "maxSchemaChars": 8192,
+    "maxTitleChars": 80,
+    "maxSummaryChars": 160,
+    "propTypes": ["text", "number", "boolean", "enum", "icon", "array", "image"],
+    "sandboxMaxHeight": 480
+  },
   "icons": [
     "arrow-right",
     "calendar",

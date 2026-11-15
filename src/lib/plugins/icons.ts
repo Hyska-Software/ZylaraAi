@@ -8,6 +8,7 @@ import {
   GitBranch,
   Globe,
   LayoutGrid,
+  Library,
   ListChecks,
   PanelRight,
   Plug,
@@ -34,6 +35,7 @@ export const PLUGIN_ICONS: Record<PluginIconName, LucideIcon> = {
   Bot,
   Zap,
   ListChecks,
+  Library,
 };
 
 export function pluginIcon(value: string | null | undefined): LucideIcon {

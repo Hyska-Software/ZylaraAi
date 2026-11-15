@@ -141,6 +141,7 @@
   "tabs": {
     "general": "General",
     "themes": "Themes",
+    "design": "Design",
     "terminal": "Terminal",
     "providers": "Providers",
     "model": "Default model",
@@ -150,6 +151,22 @@
     "agents": "Agents",
     "data": "Data",
     "about": "About"
+  },
+  "design": {
+    "title": "Interface by plugins",
+    "description": "Choose what each layout looks like. Changes apply only to the selected layout.",
+    "layout": { "chat": "Chat", "code": "Code", "agents": "Agents" },
+    "hostDefault": "Host default",
+    "disable": "Disable plugin UI",
+    "enable": "Enable plugin UI",
+    "presets": "Presets",
+    "variants": "Component variants",
+    "conflicts": "Conflicts",
+    "modifications": "Active modifications",
+    "empty": "Nothing contributed yet.",
+    "default": "Default",
+    "resetLayout": "Reset this layout",
+    "resetAll": "Reset all plugin UI"
   },
   "dialog": {
     "title": "Settings",

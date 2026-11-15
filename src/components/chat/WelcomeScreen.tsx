@@ -4,6 +4,8 @@ import { CodeXml, FilePlus, FileText, Globe, type LucideIcon } from 'lucide-reac
 import { motion } from 'motion/react';
 import { useReduceMotion } from '@/components/layout/hooks';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { Slot } from '@/components/plugins/ui/Slot';
+import { useStyleRecipe } from '@/lib/plugins/ui/recipe';
 import { Kbd } from '@/components/ui';
 import { modKey } from '@/lib/utils';
 import { BrandMark } from './BrandMark';
@@ -59,6 +61,10 @@ function fillComposer(text: string) {
 export function WelcomeScreen() {
   const { t } = useTranslation('chat');
   const reduceMotion = useReduceMotion();
+  const welcome = useStyleRecipe(
+    'chat.welcome',
+    'mx-auto flex w-full max-w-2xl flex-col items-center px-6 pb-8 pt-10 text-center sm:pt-16',
+  );
 
   useEffect(() => {
     /* Keep the composer focused when the welcome screen mounts (after the
@@ -70,7 +76,7 @@ export function WelcomeScreen() {
   }, []);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-6 pb-8 pt-10 text-center sm:pt-16">
+    <div className={welcome.className} data-variant={welcome.variantId ?? undefined}>
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -91,6 +97,8 @@ export function WelcomeScreen() {
       <p className="mt-2 max-w-md text-[15px] leading-relaxed text-foreground-muted">
         {t('welcome.description')}
       </p>
+
+      <Slot name="chat.welcome.suggestions" owner={{}} className="mt-4 justify-center" />
 
       <div className="mt-8 grid w-full grid-cols-1 gap-2.5 text-left sm:grid-cols-2">
         {SUGGESTIONS.map((suggestion, index) => {
