@@ -8,7 +8,8 @@ Zylara é um aplicativo desktop de conversação com LLMs, construído em **Taur
 2. **Um único ponto de verdade para modelos**: o catálogo embutido (`data/catalog.json`) descreve protocolo de wire, capacidades de raciocínio, visão, limites e preço de cada modelo. É gerado/atualizado no build a partir da documentação oficial + models.dev, com sondagens reais contra o gateway quando disponíveis.
 3. **Protocolo neutro**: o harness não conhece OpenAI/Anthropic/Google; ele fala com uma camada de provedores que traduz um modelo neutro de conversa para 4 protocolos de wire.
 4. **Segurança por construção**: a UI generativa é declarativa (JSON com whitelist de componentes), nunca `eval`. HTML/SVG do agente roda em `<iframe sandbox>`.
-5. **Degradação graciosa**: se um protocolo não é suportado pelo modelo, tenta o próximo; se um parâmetro de raciocínio falha, reenvia sem ele; se a rede cai, a mensagem parcial é preservada.
+5. **Plugins com fronteira explícita**: código de terceiro só roda em iframe `zplugin` isolado; a lane **trusted** é opt-in, assinada/conhecida, e recebe um bridge estreito — nunca `invoke` genérico. Detalhes em `docs/PLUGINS.md`.
+6. **Degradação graciosa**: se um protocolo não é suportado pelo modelo, tenta o próximo; se um parâmetro de raciocínio falha, reenvia sem ele; se a rede cai, a mensagem parcial é preservada.
 
 ## 2. Stack
 

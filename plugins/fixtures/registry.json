@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "name": "Zylara fixtures",
+  "generatedAt": "2026-11-15T05:10:08.855Z",
+  "plugins": [
+    {
+      "id": "com.acme.gateway",
+      "name": "Acme Gateway",
+      "version": "1.0.0",
+      "apiVersion": 1,
+      "publisher": {
+        "id": "acme",
+        "name": "Acme",
+        "keyId": "acme-fixture-2026",
+        "publicKey": "y4c2Uk3O3hvijSk/3cVA8eJUTiuIyCKK9J6mX0wlxmw="
+      },
+      "summary": "Declarative OpenAI-compatible provider fixture.",
+      "description": "Declarative OpenAI-compatible provider fixture.",
+      "packageUrl": "provider-demo-1.0.0.zplugin",
+      "packageSha256": "a0cea77166b869e3d0cfe383ff6f63100aa9c2bd22ee56e1cfdb6e7a138b6af7",
+      "packageSize": 2183,
+      "minAppVersion": "0.11.0",
+      "channel": "stable",
+      "permissions": [
+        "providers"
+      ],
+      "yanked": false,
+      "publishedAt": "2026-11-15T05:10:08.826Z"
+    },
+    {
+      "id": "com.acme.notes",
+      "name": "Acme Notes",
+      "version": "1.2.0",
+      "apiVersion": 1,
+      "publisher": {
+        "id": "acme",
+        "name": "Acme",
+        "keyId": "acme-fixture-2026",
+        "publicKey": "y4c2Uk3O3hvijSk/3cVA8eJUTiuIyCKK9J6mX0wlxmw="
+      },
+      "summary": "Reference sandboxed plugin: notes panel, toolbar action, a tool, a skill and a prompt section.",
+      "description": "Reference sandboxed plugin: notes panel, toolbar action, a tool, a skill and a prompt section.",
+      "packageUrl": "sandbox-demo-1.2.0.zplugin",
+      "packageSha256": "a8ac64521058838c0e1eaf95b9a8a2a4dfdc598f7a822156230f3006ac913648",
+      "packageSize": 17189,
+      "minAppVersion": "0.11.0",
+      "channel": "stable",
+      "permissions": [
+        "ui.slot:chat.composer.toolbar",
+        "ui.view",
+        "ui.panel",
+        "ui.command",
+        "ui.artifact",
+        "ui.theme",
+        "agent.tools",
+        "agent.prompt",
+        "agent.skills",
+        "storage",
+        "notifications",
+        "opener",
+        "hotkeys"
+      ],
+      "yanked": false,
+      "publishedAt": "2026-11-15T05:10:08.834Z"
+    },
+    {
+      "id": "com.acme.trusted-demo",
+      "name": "Acme Trusted Lab",
+      "version": "1.0.0",
+      "apiVersion": 1,
+      "publisher": {
+        "id": "acme",
+        "name": "Acme",
+        "keyId": "acme-fixture-2026",
+        "publicKey": "y4c2Uk3O3hvijSk/3cVA8eJUTiuIyCKK9J6mX0wlxmw="
+      },
+      "summary": "Trusted reference plugin: React view/panel, component override, shell wrapper, global CSS and an agent tool.",
+      "description": "Trusted reference plugin: React view/panel, component override, shell wrapper, global CSS and an agent tool.",
+      "packageUrl": "trusted-demo-1.0.0.zplugin",
+      "packageSha256": "50cfae3a91696d6236bab135f40d3e2f9307c1e747866bf374547bf85f207c0e",
+      "packageSize": 11988,
+      "minAppVersion": "0.11.0",
+      "channel": "stable",
+      "permissions": [
+        "unsafe.renderer",
+        "ui.slot:chat.sidebar.footer",
+        "ui.view",
+        "ui.panel",
+        "ui.command",
+        "ui.override:chat.welcome",
+        "ui.override:layout.shell",
+        "ui.css.global",
+        "agent.tools",
+        "agent.prompt",
+        "agent.skills",
+        "storage",
+        "notifications",
+        "providers"
+      ],
+      "yanked": false,
+      "publishedAt": "2026-11-15T05:10:08.841Z"
+    }
+  ],
+  "revoked": [],
+  "signature": {
+    "schemaVersion": 1,
+    "algorithm": "ed25519",
+    "keyId": "registry-fixture-2026",
+    "publicKey": "WO4w8KkOFvUAd+1BbK94946rGnviHQvKID39iRaEgXc=",
+    "signature": "96sKvL8/q/8yzoXHxL7mwyWrzpVSzbdvNYLyfs6QLUHHHuO0HBpQleRUZGy47OgE8VNDI5nKn7vceV1inKxhCw=="
+  }
+}

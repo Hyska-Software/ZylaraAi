@@ -1,10 +1,19 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toaster, toast } from 'sonner';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { listen } from '@tauri-apps/api/event';
 import { AppShell } from '@/components/layout/AppShell';
 import { WorkspaceCenter } from '@/components/layout/WorkspaceCenter';
+import { PluginPanelHost } from '@/components/plugins/PluginHosts';
+import { PluginRuntime } from '@/lib/plugins/runtime';
+import { usePluginStore } from '@/lib/plugins/store';
+import {
+  getShellOverride,
+  resolvePluginComponent,
+  usePluginRegistry,
+  type PluginComponent,
+} from '@/lib/plugins/registry';
 import { AgentSidebar } from '@/components/agents/AgentSidebar';
 import { AgentPanel } from '@/components/agents/AgentPanel';
 import { CodePanel, CodeSidebar } from '@/components/code';
@@ -21,6 +30,7 @@ import { api } from '@/lib/api';
 import { SIDE_PANEL_DOCK_MIN_VIEWPORT, useViewportWidth } from '@/lib/sidePanel';
 import { resolveHotkey, type HotkeyCommand } from '@/lib/hotkeys';
 import { ComputerControlBanner } from '@/components/computer/ComputerControlBanner';
+import { PluginSafeModeBanner } from '@/components/plugins/PluginSafeModeBanner';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SplashScreen } from '@/components/SplashScreen';
 import type {
@@ -45,6 +55,7 @@ function bootstrap(): Promise<void> {
     }
     applyFontScale(settings.fontScale);
     await useThemeStore.getState().init();
+    await usePluginStore.getState().init();
     await useChatStore.getState().init();
     await useAgentStore.getState().initialize();
     // A webview reload must reattach turns that kept running in Rust before a
@@ -99,12 +110,14 @@ function runHotkey(command: HotkeyCommand, event: KeyboardEvent): void {
     case 'return-to-chat':
       // In the Code layout, Escape/“return” only leaves the Skills page; the
       // Chat layout is a separate surface the user switches explicitly.
-      if (ui.layoutMode === 'code' && ui.codeView === 'skills') {
+      if (ui.layoutMode === 'code' && (ui.codeView === 'skills' || ui.codeView === 'plugins')) {
         ui.setCodeView('session');
         break;
       }
       if (ui.layoutMode === 'agent') {
-        if (chat.activeId) {
+        if (ui.agentView === 'plugins') {
+          ui.setAgentView('team');
+        } else if (chat.activeId) {
           chat.clearActiveConversation();
         } else {
           ui.setActiveAgentId(null);
@@ -140,6 +153,8 @@ export default function App() {
   const activeChannelId = useUiStore((state) => state.activeChannelId);
   const artifactPanelOpen = useUiStore((state) => state.artifactPanelOpen);
   const sourcesPanelOpen = useUiStore((state) => state.sourcesPanelOpen);
+  const pluginPanel = usePluginStore((state) => state.activePanel);
+  const pluginRegistry = usePluginRegistry();
   const activeConversation = useChatStore((state) => {
     const id = state.activeId;
     return id ? state.conversations.find((conversation) => conversation.id === id) : undefined;
@@ -168,6 +183,20 @@ export default function App() {
   const fontScale = useAppStore((state) => state.settings.fontScale);
   const reduceMotion = useAppStore((state) => state.settings.reduceMotion);
   const bootstrapped = useRef(false);
+  const ShellComponent = useMemo(
+    () =>
+      getShellOverride() ??
+      resolvePluginComponent('layout.shell', AppShell as unknown as PluginComponent),
+    [pluginRegistry.revision],
+  );
+  const CenterComponent = useMemo(
+    () => resolvePluginComponent('layout.center', WorkspaceCenter as unknown as PluginComponent),
+    [pluginRegistry.revision],
+  );
+  const SettingsComponent = useMemo(
+    () => resolvePluginComponent('settings.dialog', SettingsDialog as unknown as PluginComponent),
+    [pluginRegistry.revision],
+  );
 
   useEffect(() => {
     if (bootstrapped.current) return;
@@ -472,6 +501,24 @@ export default function App() {
           // composer (library-page PLAN §2.6). The view owns the import. It only
           // exists in the Chat layout (docs/goals/chat-code-layout/PLAN §3.5).
           const uiState = useUiStore.getState();
+          if (event.payload.type === 'drop') {
+            const dropped = event.payload.paths ?? [];
+            const packages = dropped.filter((path) =>
+              path.toLowerCase().endsWith('.zplugin'),
+            );
+            if (packages.length > 0) {
+              uiState.setLayoutMode('chat');
+              uiState.setActiveView('plugins');
+              window.setTimeout(
+                () =>
+                  window.dispatchEvent(
+                    new CustomEvent('zylara:plugin-drop', { detail: { paths: packages } }),
+                  ),
+                0,
+              );
+              return;
+            }
+          }
           if (uiState.layoutMode === 'chat' && uiState.activeView === 'library') {
             if (event.payload.type === 'drop') {
               dispatchLibraryDrag(false);
@@ -526,12 +573,12 @@ export default function App() {
   return (
     <TooltipProvider delayDuration={280}>
       <ErrorBoundary>
-        <AppShell
+        <ShellComponent
           sidebar={
             layoutMode === 'code' ? (
-              (context) => <CodeSidebar {...context} />
+              (context: { onClose?: () => void }) => <CodeSidebar {...context} />
             ) : layoutMode === 'agent' ? (
-              (context) => <AgentSidebar {...context} />
+              (context: { onClose?: () => void }) => <AgentSidebar {...context} />
             ) : undefined
           }
           sidebarLabel={
@@ -542,7 +589,9 @@ export default function App() {
                 : translate('shell.labels.conversations')
           }
           rightPanel={
-            layoutMode === 'code' ? (
+            pluginPanel ? (
+              <PluginPanelHost />
+            ) : layoutMode === 'code' ? (
               <CodePanel />
             ) : agentPanelVisible ? (
               agentWorkspacePanel ? (
@@ -560,21 +609,24 @@ export default function App() {
           // The Code panel only docks from this width up (see CodePanel); the
           // chat mirrors that with its top-right corner.
           rightPanelOpen={
-            (layoutMode === 'code' ||
+            (Boolean(pluginPanel) ||
+              layoutMode === 'code' ||
               (agentPanelVisible &&
                 (agentWorkspacePanel ? codePanelOpen : agentPanelOpen))) &&
             viewportWidth >= SIDE_PANEL_DOCK_MIN_VIEWPORT
           }
         >
-          <WorkspaceCenter />
-        </AppShell>
+          <CenterComponent />
+        </ShellComponent>
+        <PluginRuntime />
         <TrayPromptDialog />
-        <SettingsDialog />
+        <SettingsComponent />
         <ModelPickerDialog />
         <CommandPalette />
         <ComputerControlBanner
           hideConversationId={agentThreadHeaderVisible ? activeConversation?.id ?? null : null}
         />
+        <PluginSafeModeBanner />
       </ErrorBoundary>
       <Toaster
         position="bottom-right"

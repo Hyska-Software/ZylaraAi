@@ -302,6 +302,30 @@ describe('AgentSidebar — routines entry', () => {
   });
 });
 
+describe('AgentSidebar — plugins entry', () => {
+  it('opens the plugins page from the footer', async () => {
+    render(<AgentSidebar />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Plugins' }));
+
+    const state = useUiStore.getState();
+    expect(state.agentView).toBe('plugins');
+    expect(state.activeAgentId).toBeNull();
+    expect(state.activeChannelId).toBeNull();
+    expect(useChatStore.getState().activeId).toBeNull();
+  });
+
+  it('leaves the plugins page when an agent is selected', async () => {
+    useUiStore.setState({ agentView: 'plugins', activeAgentId: null, activeChannelId: null });
+    render(<AgentSidebar />);
+
+    fireEvent.click(await screen.findByText('Irineu'));
+
+    expect(useUiStore.getState().agentView).toBe('team');
+    expect(useUiStore.getState().activeAgentId).toBe('agent-1');
+  });
+});
+
 describe('AgentSidebar — reordenação por teclado', () => {
   it('move o agente dentro do departamento e persiste a ordem', async () => {
     const first = agent({ id: 'agent-1', name: 'Ana', sortOrder: 1 });

@@ -545,7 +545,7 @@ async fn execute_routine_inner(
         db: db.clone(),
         http: state.http.clone(),
         search_http: state.search_http.clone(),
-        catalog: state.catalog.clone(),
+        catalog: state.catalog_with_plugins(),
         data_dir: None,
         skills_roots: None,
         // Unattended runs cannot answer approval/questions cards. Fail closed

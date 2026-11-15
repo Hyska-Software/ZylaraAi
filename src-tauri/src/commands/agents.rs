@@ -50,7 +50,7 @@ fn validate_fallback(state: &AppState, input: &AgentInput) -> Result<(), String>
             if provider_id == input.provider_id && model_id == input.model_id {
                 return Ok(());
             }
-            let known_provider = state.catalog.provider(provider_id).is_some()
+            let known_provider = state.provider(provider_id).is_some()
                 || state.dynamic_models_for(provider_id).is_some();
             if !known_provider {
                 return Err(crate::i18n::t_args(
@@ -73,7 +73,7 @@ fn validate_fallback(state: &AppState, input: &AgentInput) -> Result<(), String>
 }
 
 fn validate_model(state: &AppState, input: &AgentInput) -> Result<(), String> {
-    let known_provider = state.catalog.provider(&input.provider_id).is_some()
+    let known_provider = state.provider(&input.provider_id).is_some()
         || state.dynamic_models_for(&input.provider_id).is_some();
     if !known_provider {
         return Err(crate::i18n::t_args(
@@ -464,7 +464,7 @@ pub async fn suggest_agent(
     if prompt.chars().count() > 4_000 {
         return Err(crate::i18n::t("agents.errors.briefTooLong"));
     }
-    let known_provider = state.catalog.provider(&provider_id).is_some()
+    let known_provider = state.provider(&provider_id).is_some()
         || state.dynamic_models_for(&provider_id).is_some();
     if !known_provider {
         return Err(crate::i18n::t_args(
@@ -485,7 +485,7 @@ pub async fn suggest_agent(
         db: state.db.clone(),
         http: state.http.clone(),
         search_http: state.search_http.clone(),
-        catalog: state.catalog.clone(),
+        catalog: state.catalog_with_plugins(),
         data_dir: None,
         skills_roots: Some(Vec::new()),
         approvals: None,
@@ -635,7 +635,7 @@ pub async fn revise_agent(
         .ok_or_else(|| {
             crate::i18n::t_args("agents.commands.notFound", &[("agent_id", &agent_id)])
         })?;
-    let known_provider = state.catalog.provider(&provider_id).is_some()
+    let known_provider = state.provider(&provider_id).is_some()
         || state.dynamic_models_for(&provider_id).is_some();
     if !known_provider || state.model(&provider_id, &model_id).is_none() {
         return Err(crate::i18n::t_args(
@@ -656,7 +656,7 @@ pub async fn revise_agent(
         db: state.db.clone(),
         http: state.http.clone(),
         search_http: state.search_http.clone(),
-        catalog: state.catalog.clone(),
+        catalog: state.catalog_with_plugins(),
         data_dir: None,
         skills_roots: Some(Vec::new()),
         approvals: None,

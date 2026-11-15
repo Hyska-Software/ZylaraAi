@@ -230,13 +230,14 @@ describe('CodeSidebar — chrome e ações', () => {
     expect(aside.className).not.toContain('border-r');
   });
 
-  it('oferece Novo agente, Abrir pasta, Adicionar sessão do Chat, Buscar e Skills, na ordem', async () => {
+  it('oferece Novo agente, Abrir pasta, Adicionar sessão do Chat, Buscar, Plugins e Skills, na ordem', async () => {
     renderSidebar();
 
     const newAgent = screen.getByRole('button', { name: /Nova sess/i });
     const openFolder = screen.getByRole('button', { name: 'Abrir pasta' });
     const addSession = screen.getByRole('button', { name: 'Adicionar sessão do Chat' });
     const search = screen.getByRole('button', { name: /Buscar/ });
+    const plugins = screen.getByRole('button', { name: 'Plugins' });
     const skills = screen.getByRole('button', { name: 'Skills' });
 
     expect(
@@ -249,7 +250,10 @@ describe('CodeSidebar — chrome e ações', () => {
       addSession.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      search.compareDocumentPosition(skills) & Node.DOCUMENT_POSITION_FOLLOWING,
+      search.compareDocumentPosition(plugins) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      plugins.compareDocumentPosition(skills) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     await waitFor(() => expect(mocks.listWorkspaces).toHaveBeenCalled());
   });
@@ -303,6 +307,18 @@ describe('CodeSidebar — chrome e ações', () => {
 
     expect(useUiStore.getState().codeView).toBe('skills');
     expect(screen.getByRole('button', { name: 'Skills' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('Plugins abre a página de Plugins no Code e marca o item como atual', () => {
+    renderSidebar();
+
+    const plugins = screen.getByRole('button', { name: 'Plugins' });
+    expect(plugins.getAttribute('aria-current')).toBeNull();
+
+    fireEvent.click(plugins);
+
+    expect(useUiStore.getState().codeView).toBe('plugins');
+    expect(screen.getByRole('button', { name: 'Plugins' }).getAttribute('aria-current')).toBe('page');
   });
 
   it('esconde Skills quando o painel de skills está desativado nas configurações', () => {

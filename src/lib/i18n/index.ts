@@ -30,6 +30,7 @@ export const NAMESPACES = [
   'palette',
   'genui',
   'installer',
+  'plugins',
 ] as const;
 
 export const LOCALE_CACHE_KEY = 'zylara.locale';

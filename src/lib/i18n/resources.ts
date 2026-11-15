@@ -14,6 +14,7 @@ import enInstaller from '@/locales/en/installer.json';
 import enLibrary from '@/locales/en/library.json';
 import enModels from '@/locales/en/models.json';
 import enPalette from '@/locales/en/palette.json';
+import enPlugins from '@/locales/en/plugins.json';
 import enSettings from '@/locales/en/settings.json';
 
 import esAgents from '@/locales/es/agents.json';
@@ -27,6 +28,7 @@ import esInstaller from '@/locales/es/installer.json';
 import esLibrary from '@/locales/es/library.json';
 import esModels from '@/locales/es/models.json';
 import esPalette from '@/locales/es/palette.json';
+import esPlugins from '@/locales/es/plugins.json';
 import esSettings from '@/locales/es/settings.json';
 
 import ptAgents from '@/locales/pt-BR/agents.json';
@@ -40,6 +42,7 @@ import ptInstaller from '@/locales/pt-BR/installer.json';
 import ptLibrary from '@/locales/pt-BR/library.json';
 import ptModels from '@/locales/pt-BR/models.json';
 import ptPalette from '@/locales/pt-BR/palette.json';
+import ptPlugins from '@/locales/pt-BR/plugins.json';
 import ptSettings from '@/locales/pt-BR/settings.json';
 
 export const resources = {
@@ -54,6 +57,7 @@ export const resources = {
     artifacts: enArtifacts,
     library: enLibrary,
     palette: enPalette,
+    plugins: enPlugins,
     genui: enGenui,
     installer: enInstaller,
   },
@@ -68,6 +72,7 @@ export const resources = {
     artifacts: ptArtifacts,
     library: ptLibrary,
     palette: ptPalette,
+    plugins: ptPlugins,
     genui: ptGenui,
     installer: ptInstaller,
   },
@@ -82,6 +87,7 @@ export const resources = {
     artifacts: esArtifacts,
     library: esLibrary,
     palette: esPalette,
+    plugins: esPlugins,
     genui: esGenui,
     installer: esInstaller,
   },

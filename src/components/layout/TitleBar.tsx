@@ -6,6 +6,7 @@ import { IconButton, Kbd, Tooltip } from '@/components/ui';
 import { useUiStore } from '@/lib/store';
 import { cn, modKey } from '@/lib/utils';
 import { BrandMark } from '@/components/chat/BrandMark';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { LayoutModeSwitch } from './LayoutModeSwitch';
 import { PlanUsageChip } from './PlanUsageChip';
 import { UpdateChip } from './UpdateChip';
@@ -144,6 +145,7 @@ export function TitleBar() {
       </div>
 
       <div className="no-drag flex min-w-0 items-center justify-end gap-2" data-tauri-drag-region>
+        <PluginSlot slot="titlebar.actions" className="max-w-[40vw] justify-end" compact />
         <div className="hidden xl:block">
           <PlanUsageChip />
         </div>

@@ -9,6 +9,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Plug,
   Search,
   Settings,
   Sparkles,
@@ -20,6 +21,11 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { filterConversationsForLayout } from '@/lib/conversations';
+import { pluginIcon } from '@/lib/plugins/icons';
+import { pluginLabel, pluginViewsForSurface, usePluginRegistry } from '@/lib/plugins/registry';
+import { openPluginView } from '@/lib/plugins/host';
+import { usePluginStore } from '@/lib/plugins/store';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { useAppStore, useChatStore, useUiStore } from '@/lib/store';
 import type { Conversation } from '@/lib/types';
 import { cn, groupConversations, modKey } from '@/lib/utils';
@@ -256,6 +262,9 @@ export function Sidebar({ className, onClose }: SidebarProps) {
   const activeView = useUiStore((state) => state.activeView);
   const appInfo = useAppStore((state) => state.appInfo);
   const skillsPanelEnabled = useAppStore((state) => state.settings.skillsPanelEnabled);
+  const pluginView = usePluginStore((state) => state.activeView);
+  usePluginRegistry();
+  const sidebarPluginViews = pluginViewsForSurface('chat', 'sidebar');
   const isCompact = useIsCompact();
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -283,6 +292,12 @@ export function Sidebar({ className, onClose }: SidebarProps) {
 
   const handleOpenLibrary = () => {
     useUiStore.getState().setActiveView('library');
+    if (isCompact) onClose?.();
+  };
+
+  const handleOpenPlugins = () => {
+    usePluginStore.getState().closeOverlays();
+    useUiStore.getState().setActiveView('plugins');
     if (isCompact) onClose?.();
   };
 
@@ -378,14 +393,23 @@ export function Sidebar({ className, onClose }: SidebarProps) {
         ) : null}
       </div>
 
-      {/* Ordem (PLAN §4.1): Novo chat → Biblioteca → Skills → Buscar conversas.
+      {/* Ordem (PLAN §4.1): Novo chat → Biblioteca → Plugins → Skills → Buscar conversas.
           A Biblioteca é sempre visível; Skills depende do painel habilitado. */}
+      <PluginSlot slot="chat.sidebar.header" className="px-3" compact />
       <NavViewItem
         icon={<Library className="size-4" />}
         label={t('shell.sidebar.library')}
         ariaLabel={t('shell.sidebar.openLibrary')}
         active={activeView === 'library'}
         onSelect={handleOpenLibrary}
+      />
+
+      <NavViewItem
+        icon={<Plug className="size-4" />}
+        label={t('shell.sidebar.plugins')}
+        ariaLabel={t('shell.sidebar.openPlugins')}
+        active={activeView === 'plugins' && !pluginView}
+        onSelect={handleOpenPlugins}
       />
 
       {skillsPanelEnabled ? (
@@ -397,6 +421,24 @@ export function Sidebar({ className, onClose }: SidebarProps) {
           onSelect={handleOpenSkills}
         />
       ) : null}
+
+      {sidebarPluginViews.map((view) => {
+        const Icon = pluginIcon(view.view.icon);
+        const label = pluginLabel(view.plugin, view.view.titleKey, view.view.title);
+        return (
+          <NavViewItem
+            key={view.key}
+            icon={<Icon className="size-4" />}
+            label={label}
+            ariaLabel={label}
+            active={pluginView?.pluginId === view.plugin.id && pluginView.id === view.view.id}
+            onSelect={() => {
+              openPluginView(view.plugin, view.view.id);
+              if (isCompact) onClose?.();
+            }}
+          />
+        );
+      })}
 
       <button
         type="button"
@@ -468,6 +510,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
       </div>
 
       <div className="border-t border-border px-2 py-2">
+        <PluginSlot slot="chat.sidebar.footer" className="mb-1 px-1" compact />
         <button
           type="button"
           onClick={() => {

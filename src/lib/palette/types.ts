@@ -16,6 +16,7 @@ export type PaletteGroupId =
   | 'conversas'
   | 'navegacao'
   | 'ferramentas'
+  | 'plugins'
   | 'aparencia'
   | 'configuracoes'
   | 'sistema';
@@ -30,6 +31,7 @@ export const PALETTE_GROUPS: readonly PaletteGroupDefinition[] = [
   { id: 'conversas', labelKey: 'palette:groups.conversas' },
   { id: 'navegacao', labelKey: 'palette:groups.navegacao' },
   { id: 'ferramentas', labelKey: 'palette:groups.ferramentas' },
+  { id: 'plugins', labelKey: 'palette:groups.plugins' },
   { id: 'aparencia', labelKey: 'palette:groups.aparencia' },
   { id: 'configuracoes', labelKey: 'palette:groups.configuracoes' },
   { id: 'sistema', labelKey: 'palette:groups.sistema' },
@@ -48,6 +50,8 @@ export function paletteGroupLabel(id: PaletteGroupId): string {
       return t('palette:groups.navegacao');
     case 'ferramentas':
       return t('palette:groups.ferramentas');
+    case 'plugins':
+      return t('palette:groups.plugins');
     case 'aparencia':
       return t('palette:groups.aparencia');
     case 'configuracoes':

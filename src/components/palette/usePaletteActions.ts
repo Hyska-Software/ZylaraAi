@@ -24,6 +24,8 @@ import {
   PanelLeft,
   Pin,
   PinOff,
+  Plug,
+  Puzzle,
   RefreshCw,
   RotateCcw,
   Settings,
@@ -43,6 +45,20 @@ import { conversationCitations } from '@/lib/citations';
 import { t } from '@/lib/i18n';
 import { SETTINGS_TABS } from '@/lib/settingsTabs';
 import { SETTINGS_TAB_ICONS } from '@/components/settings/tabIcons';
+import { pluginIcon } from '@/lib/plugins/icons';
+import {
+  commandDescription,
+  commandLabel,
+  openPluginView,
+  runPluginCommand,
+} from '@/lib/plugins/host';
+import {
+  pluginLabel,
+  pluginViewsForSurface,
+  usePluginRegistry,
+  type ResolvedView,
+} from '@/lib/plugins/registry';
+import { usePluginStore } from '@/lib/plugins/store';
 import {
   modelLockCopy,
   modelLockReason,
@@ -74,12 +90,16 @@ function settingsTabDescription(id: SettingsTabId): string {
       return t('palette:settingsTabDescriptions.instructions');
     case 'tools':
       return t('palette:settingsTabDescriptions.tools');
+    case 'plugins':
+      return t('palette:settingsTabDescriptions.plugins');
     case 'agents':
       return t('palette:settingsTabDescriptions.agents');
     case 'data':
       return t('palette:settingsTabDescriptions.data');
     case 'about':
       return t('palette:settingsTabDescriptions.about');
+    default:
+      return t('palette:settingsTabDescriptions.plugins');
   }
 }
 
@@ -275,6 +295,8 @@ export function usePaletteActions(): PaletteAction[] {
   const openAgentEditor = useUiStore((state) => state.openAgentEditor);
   const codeView = useUiStore((state) => state.codeView);
   const artifacts = useUiStore((state) => state.artifacts);
+  const pluginRegistry = usePluginRegistry();
+  const pluginSafeMode = usePluginStore((state) => state.snapshot.safeMode);
   // Chat locks the model of a started conversation; a Code session can switch it
   // between turns (a running turn locks it in every layout).
   const lockReason = useChatStore((state) => modelLockReason(state, layoutMode));
@@ -710,6 +732,22 @@ export function usePaletteActions(): PaletteAction[] {
     });
   }
 
+  for (const tab of pluginRegistry.settingsTabs) {
+    const label = pluginLabel(tab.plugin, tab.tab.titleKey, tab.tab.title);
+    actions.push({
+      id: `config-plugin-${tab.key}`,
+      group: 'configuracoes',
+      label: tSettings('dialog.openTab', { tab: label }),
+      description: tab.plugin.name,
+      icon: pluginIcon(tab.tab.icon),
+      keywords: `${tPalette('actions.openSettings.keywords')} ${label} plugin`,
+      run: () =>
+        useUiStore
+          .getState()
+          .openSettings(`plugin:${tab.key}` as SettingsTabId),
+    });
+  }
+
   /* -------- Sistema -------- */
   actions.push({
     id: 'abrir-pasta-dados',
@@ -729,6 +767,61 @@ export function usePaletteActions(): PaletteAction[] {
     keywords: tPalette('actions.refreshCatalog.keywords'),
     run: refreshCatalog,
   });
+
+  actions.push({
+    id: 'abrir-plugins',
+    group: 'plugins',
+    label: tPalette('actions.openPlugins.label'),
+    description: pluginSafeMode
+      ? tPalette('actions.openPlugins.safeModeDescription')
+      : tPalette('actions.openPlugins.description'),
+    icon: Plug,
+    keywords: tPalette('actions.openPlugins.keywords'),
+    run: () => {
+      usePluginStore.getState().closeOverlays();
+      useUiStore.getState().setLayoutMode('chat');
+      useUiStore.getState().setActiveView('plugins');
+    },
+  });
+  actions.push({
+    id: 'instalar-plugin-arquivo',
+    group: 'plugins',
+    label: tPalette('actions.installPluginFile.label'),
+    description: tPalette('actions.installPluginFile.description'),
+    icon: Upload,
+    keywords: tPalette('actions.installPluginFile.keywords'),
+    run: () => {
+      useUiStore.getState().setLayoutMode('chat');
+      useUiStore.getState().setActiveView('plugins');
+      window.setTimeout(
+        () => window.dispatchEvent(new CustomEvent('zylara:plugin-install-file')),
+        0,
+      );
+    },
+  });
+  for (const view of pluginViewsForSurface(layoutMode, 'sidebar')) {
+    const label = pluginLabel(view.plugin, view.view.titleKey, view.view.title);
+    actions.push({
+      id: `plugin-view-${view.key}`,
+      group: 'plugins',
+      label,
+      description: view.plugin.name,
+      icon: pluginIcon(view.view.icon),
+      keywords: `${view.plugin.name} plugin`,
+      run: () => openPluginView(view.plugin, view.view.id),
+    });
+  }
+  for (const command of pluginRegistry.commands) {
+    actions.push({
+      id: `plugin-command-${command.key}`,
+      group: 'plugins',
+      label: commandLabel(command),
+      description: commandDescription(command),
+      icon: pluginIcon(command.command.icon),
+      keywords: `${command.plugin.name} ${command.command.keywords ?? ''} plugin`,
+      run: () => void runPluginCommand(command, { conversationId: activeId }),
+    });
+  }
 
   return actions;
 }

@@ -133,11 +133,9 @@ pub async fn get_cache_stats(
         .ok()
         .flatten()
         .ok_or_else(|| crate::i18n::t("cache.errors.conversationNotFound"))?;
-    let provider = state.catalog.provider(&conversation.provider_id);
-    let model = state
-        .catalog
-        .model(&conversation.provider_id, &conversation.model_id);
-    let caps = provider.zip(model).and_then(|(provider, model)| {
+    let provider = state.provider(&conversation.provider_id);
+    let model = state.model(&conversation.provider_id, &conversation.model_id);
+    let caps = provider.as_ref().zip(model.as_ref()).and_then(|(provider, model)| {
         let protocol = model
             .protocols
             .iter()
@@ -146,7 +144,7 @@ pub async fn get_cache_stats(
             protocol, provider, model,
         ))
     });
-    let cost = model.and_then(|model| model.cost.as_ref());
+    let cost = model.as_ref().and_then(|model| model.cost.as_ref());
 
     let mut current = recent.last().map(sample_stats);
     if let Some(current) = current.as_mut() {

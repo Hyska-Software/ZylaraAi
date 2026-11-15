@@ -1,0 +1,4 @@
+{
+  "views": { "home": "__PLUGIN_NAME__" },
+  "slots": { "toolbar": "__PLUGIN_NAME__" }
+}

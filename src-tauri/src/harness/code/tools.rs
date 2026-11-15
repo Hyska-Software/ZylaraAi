@@ -79,6 +79,64 @@ pub async fn execute(ctx: &ToolCtx, call: &ToolCallRecord) -> ToolOutcome {
     // apresentação (`presentation`) do card correto.
     let mut call_ctx = ctx.clone();
     call_ctx.tool_call_id = call.id.clone();
+    if let Some(manager) = crate::plugins::global_manager() {
+        if let Some((plugin_id, tool)) = manager.tool_owner(&call.name) {
+            use crate::domain::RiskClass;
+            let risk = match tool.risk.as_str() {
+                "write" => RiskClass::Write,
+                "shell" => RiskClass::Shell,
+                "network" => RiskClass::Network,
+                _ => RiskClass::Read,
+            };
+            if matches!(risk, RiskClass::Write | RiskClass::Shell)
+                && call_ctx.workspace.is_some()
+            {
+                let detail = crate::domain::ApprovalDetail::Other {
+                    text: format!(
+                        "Plugin `{plugin_id}` tool `{}` requested this action.",
+                        tool.name
+                    ),
+                };
+                if let Err(outcome) = crate::tools::code::exec::policy_check(
+                    &call_ctx,
+                    &call.name,
+                    risk,
+                    true,
+                    None,
+                    false,
+                    None,
+                    detail,
+                    "Plugin tool",
+                )
+                .await
+                {
+                    let _ = manager.db().plugin_audit(
+                        &plugin_id,
+                        &format!("approval:{}", tool.name),
+                        None,
+                        "denied",
+                    );
+                    return outcome;
+                }
+                let _ = manager.db().plugin_audit(
+                    &plugin_id,
+                    &format!("approval:{}", tool.name),
+                    None,
+                    "allowed",
+                );
+            }
+            return manager
+                .execute_tool(
+                    &plugin_id,
+                    &tool,
+                    args,
+                    &call_ctx.conversation_id,
+                    &call_ctx.turn_id,
+                    &call_ctx.cancel,
+                )
+                .await;
+        }
+    }
     if call.name.starts_with("mcp__") {
         return crate::tools::code::exec::run_mcp(&call_ctx, &call.name, args).await;
     }
@@ -239,10 +297,17 @@ pub async fn execute_batch(ctx: &ToolCtx, calls: &[ToolCallRecord]) -> Vec<ToolO
             outcomes[*call_index] = Some(outcome);
         }
     }
-    // Tools MCP são dinâmicas (não estão no registry estático) e rodam depois do
-    // lote, em ordem: a aprovação de uma pode depender do usuário.
+    // Tools MCP/plugin são dinâmicas (não estão no registry estático) e rodam
+    // depois do lote, em ordem: aprovação e RPC podem depender do usuário.
+    let plugin_manager = crate::plugins::global_manager();
     for (index, call) in calls.iter().enumerate() {
-        if outcomes[index].is_none() && call.name.starts_with("mcp__") {
+        if outcomes[index].is_some() {
+            continue;
+        }
+        let is_plugin = plugin_manager
+            .as_ref()
+            .is_some_and(|manager| manager.tool_owner(&call.name).is_some());
+        if call.name.starts_with("mcp__") || is_plugin {
             outcomes[index] = Some(execute(ctx, call).await);
         }
     }

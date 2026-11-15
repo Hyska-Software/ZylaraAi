@@ -487,6 +487,41 @@ mod tests {
     }
 
     #[test]
+    fn plugin_config_change_is_reported_as_its_own_break() {
+        let mut tracker = CacheTracker::new();
+        let first = digest(&[system(1, 800), tools(2, 400)]);
+        tracker.observe(
+            "opencode-go",
+            "deepseek-v4.1-flash",
+            "",
+            Some(&first),
+            Some(&openai_usage(1_000, 0)),
+            1,
+            "turn-1",
+        );
+        tracker.trigger_epoch_break(CacheBreakReason::PluginConfigChanged);
+        let second = digest(&[system(2, 900), tools(3, 500)]);
+        let sample = tracker.observe(
+            "opencode-go",
+            "deepseek-v4.1-flash",
+            "",
+            Some(&second),
+            Some(&openai_usage(1_400, 0)),
+            1,
+            "turn-2",
+        );
+        assert_eq!(
+            sample.break_reason,
+            Some(CacheBreakReason::PluginConfigChanged)
+        );
+        assert!(sample
+            .break_detail
+            .as_deref()
+            .is_some_and(|detail| detail.contains("PluginConfigChanged")));
+        assert_eq!(sample.state, CacheState::Cold);
+    }
+
+    #[test]
     fn second_request_extends_the_prefix_without_breaking() {
         let mut tracker = CacheTracker::new();
         let first = digest(&[system(1, 800), tools(2, 400), message(3, 400)]);

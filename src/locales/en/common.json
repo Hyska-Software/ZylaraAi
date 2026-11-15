@@ -89,6 +89,8 @@
       "openLibrary": "Open library",
       "skills": "Skills",
       "manageSkills": "Manage skills",
+      "plugins": "Plugins",
+      "openPlugins": "Open plugins",
       "settings": "Settings",
       "search": "Search conversations",
       "loading": "Loading conversations",

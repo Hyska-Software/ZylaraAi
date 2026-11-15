@@ -86,6 +86,10 @@ function libraryButton(): HTMLElement | null {
   return screen.queryByRole('button', { name: 'Abrir biblioteca' });
 }
 
+function pluginsButton(): HTMLElement | null {
+  return screen.queryByRole('button', { name: 'Abrir plugins' });
+}
+
 beforeEach(() => {
   window.matchMedia = matchMediaReturning(false);
   mocks.createConversation.mockResolvedValue(conversation());
@@ -297,6 +301,35 @@ describe('Sidebar — item Biblioteca', () => {
     expect(mocks.createConversation).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(useUiStore.getState().activeView).toBe('chat'));
     expect(libraryButton()?.getAttribute('aria-current')).toBeNull();
+  });
+});
+
+describe('Sidebar — item Plugins', () => {
+  it('renders Plugins above Skills and opens the plugins page', () => {
+    const onClose = vi.fn();
+    render(<Sidebar onClose={onClose} />);
+
+    const library = libraryButton();
+    const plugins = pluginsButton();
+    const skills = skillsButton();
+
+    expect(plugins).not.toBeNull();
+    expect(plugins?.textContent).toContain('Plugins');
+    expect(
+      (library as Node).compareDocumentPosition(plugins as Node) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      (plugins as Node).compareDocumentPosition(skills as Node) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(plugins?.getAttribute('aria-current')).toBeNull();
+
+    fireEvent.click(plugins as HTMLElement);
+
+    expect(useUiStore.getState().activeView).toBe('plugins');
+    expect(pluginsButton()?.getAttribute('aria-current')).toBe('page');
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 

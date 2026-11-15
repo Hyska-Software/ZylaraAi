@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "id": "com.acme.notes",
+  "name": "Acme Notes",
+  "version": "1.2.0",
+  "description": "Reference sandboxed plugin: notes panel, toolbar action, a tool, a skill and a prompt section.",
+  "author": "Acme",
+  "homepage": "https://example.com/acme-notes",
+  "icon": "assets/icon.svg",
+  "apiVersion": 1,
+  "engines": { "zylara": ">=0.10.0 <1.0.0" },
+  "publisher": { "id": "acme", "name": "Acme", "keyId": "acme-fixture-2026" },
+  "permissions": [
+    "ui.slot:chat.composer.toolbar",
+    "ui.view",
+    "ui.panel",
+    "ui.command",
+    "ui.artifact",
+    "ui.theme",
+    "agent.tools",
+    "agent.prompt",
+    "agent.skills",
+    "storage",
+    "notifications",
+    "opener",
+    "hotkeys"
+  ],
+  "contributes": {
+    "ui": {
+      "slots": [
+        {
+          "slot": "chat.composer.toolbar",
+          "entry": "ui/toolbar.html",
+          "titleKey": "toolbar.title",
+          "icon": "ListChecks"
+        }
+      ],
+      "views": [
+        {
+          "id": "notes",
+          "title": "Acme Notes",
+          "titleKey": "views.notes",
+          "description": "Notes stored in the plugin namespace.",
+          "descriptionKey": "views.notesDescription",
+          "icon": "ListChecks",
+          "surface": "chat",
+          "location": "sidebar",
+          "entry": "ui/page.html"
+        }
+      ],
+      "panels": [
+        {
+          "id": "notes-panel",
+          "title": "Notes",
+          "titleKey": "panels.notes",
+          "icon": "PanelRight",
+          "entry": "ui/panel.html",
+          "dock": "right"
+        }
+      ],
+      "commands": [
+        {
+          "id": "open-notes",
+          "title": "Open Acme Notes",
+          "titleKey": "commands.openNotes",
+          "command": "notes",
+          "keywords": "notes acme",
+          "icon": "ListChecks",
+          "hotkey": "mod+shift+n",
+          "action": { "kind": "openView", "target": "notes" }
+        },
+        {
+          "id": "new-note",
+          "title": "New note with the agent",
+          "titleKey": "commands.newNote",
+          "command": "note",
+          "action": {
+            "kind": "insertDraft",
+            "text": "Create a note titled "
+          }
+        }
+      ],
+      "themes": [
+        {
+          "id": "acme-paper",
+          "name": "Acme paper",
+          "light": {
+            "--accent": "#8b5cf6",
+            "--accent-soft": "#ede9fe",
+            "--surface": "#faf9ff"
+          },
+          "dark": {
+            "--accent": "#a78bfa",
+            "--accent-soft": "#2e1f4d",
+            "--surface": "#17131f"
+          }
+        }
+      ]
+    },
+    "tools": [
+      {
+        "name": "list_notes",
+        "description": "List the notes saved by this plugin.",
+        "risk": "read",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "save_note",
+        "description": "Save a short note in the plugin's own storage.",
+        "risk": "write",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "body": { "type": "string" }
+          },
+          "required": ["title", "body"]
+        }
+      }
+    ],
+    "promptSections": [
+      { "id": "notes-rules", "title": "Acme Notes", "file": "prompt.md" }
+    ],
+    "skills": ["skills"],
+    "locales": ["locales"],
+    "artifactViewers": [
+      {
+        "id": "notes-csv",
+        "title": "Notes CSV viewer",
+        "mimeTypes": ["text/csv"],
+        "entry": "ui/csv.html",
+        "priority": 50
+      }
+    ]
+  },
+  "runtime": {
+    "ui": "sandbox",
+    "backend": { "kind": "js", "entry": "backend/index.html" }
+  }
+}

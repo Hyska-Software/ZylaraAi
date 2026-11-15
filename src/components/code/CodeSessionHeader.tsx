@@ -44,6 +44,7 @@ import {
   Tooltip,
   sortableDropClassHorizontal,
 } from '@/components/ui';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
 import type { SortableListApi } from '@/components/ui';
 import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
@@ -1081,6 +1082,14 @@ export function CodeSessionHeader() {
         />
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <PluginSlot
+            slot="code.header.actions"
+            context={{
+              conversationId: activeConversation?.id ?? null,
+              workspaceId: workspace?.id ?? null,
+            }}
+            compact
+          />
           {activeConversation ? (
             <CodeContextMeterChip conversationId={activeConversation.id} />
           ) : null}

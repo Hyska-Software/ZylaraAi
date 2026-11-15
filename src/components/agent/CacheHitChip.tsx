@@ -65,6 +65,8 @@ function breakSentence(reason: CacheBreakReason | null): string {
       return globalT('agents:cache.breakSentence.attachments');
     case 'config_change':
       return globalT('agents:cache.breakSentence.configChange');
+    case 'plugin_config_changed':
+      return globalT('agents:cache.breakSentence.pluginConfigChanged');
     case 'ttl_expired':
       return globalT('agents:cache.breakSentence.ttlExpired');
     case 'provider_policy':

@@ -704,6 +704,112 @@ CREATE TABLE IF NOT EXISTS cache_samples (
 );
 CREATE INDEX IF NOT EXISTS idx_cache_samples_conv
   ON cache_samples(conversation_id, created_at);
+
+-- Plugins (docs/PLUGINS.md). Additive: older databases keep every row and the
+-- manager only scans enabled rows at boot.
+CREATE TABLE IF NOT EXISTS plugins (
+  id                 TEXT PRIMARY KEY,
+  version            TEXT NOT NULL,
+  api_version        INTEGER NOT NULL,
+  root               TEXT NOT NULL,
+  enabled            INTEGER NOT NULL DEFAULT 0,
+  trusted            INTEGER NOT NULL DEFAULT 0,
+  source             TEXT NOT NULL,
+  signature_status   TEXT NOT NULL,
+  publisher_id       TEXT,
+  publisher_name     TEXT,
+  key_id             TEXT,
+  key_fingerprint    TEXT,
+  manifest_json      TEXT NOT NULL,
+  package_hash       TEXT NOT NULL DEFAULT '',
+  installed_at       INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  last_used_at       INTEGER,
+  auto_update        INTEGER NOT NULL DEFAULT 0,
+  previous_version   TEXT,
+  previous_root      TEXT,
+  disabled_reason    TEXT,
+  size_bytes         INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS plugin_permissions (
+  plugin_id          TEXT NOT NULL,
+  permission         TEXT NOT NULL,
+  granted            INTEGER NOT NULL DEFAULT 0,
+  granted_at         INTEGER NOT NULL,
+  PRIMARY KEY(plugin_id, permission)
+);
+CREATE TABLE IF NOT EXISTS plugin_settings (
+  plugin_id          TEXT NOT NULL,
+  key                TEXT NOT NULL,
+  value_json         TEXT NOT NULL,
+  PRIMARY KEY(plugin_id, key)
+);
+CREATE TABLE IF NOT EXISTS plugin_state (
+  plugin_id          TEXT NOT NULL,
+  key                TEXT NOT NULL,
+  value_json         TEXT NOT NULL,
+  PRIMARY KEY(plugin_id, key)
+);
+CREATE TABLE IF NOT EXISTS plugin_logs (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  plugin_id          TEXT NOT NULL,
+  level              TEXT NOT NULL,
+  message            TEXT NOT NULL,
+  created_at         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_plugin_logs_plugin
+  ON plugin_logs(plugin_id, id DESC);
+CREATE TABLE IF NOT EXISTS plugin_audit (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  plugin_id          TEXT NOT NULL,
+  capability         TEXT NOT NULL,
+  params_digest      TEXT,
+  decision           TEXT NOT NULL,
+  created_at         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_plugin_audit_plugin
+  ON plugin_audit(plugin_id, id DESC);
+CREATE TABLE IF NOT EXISTS plugin_tool_calls (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  plugin_id          TEXT NOT NULL,
+  tool               TEXT NOT NULL,
+  conversation_id    TEXT,
+  turn_id            TEXT,
+  status             TEXT NOT NULL,
+  duration_ms        INTEGER,
+  created_at         INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS plugin_store_cache (
+  key                TEXT PRIMARY KEY,
+  etag               TEXT,
+  body               TEXT NOT NULL,
+  fetched_at         INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS plugin_publishers (
+  publisher_id       TEXT NOT NULL,
+  key_id             TEXT NOT NULL,
+  public_key         TEXT NOT NULL,
+  fingerprint        TEXT NOT NULL,
+  trusted_at         INTEGER NOT NULL,
+  PRIMARY KEY(publisher_id, key_id)
+);
+CREATE TABLE IF NOT EXISTS plugin_publisher_keys (
+  publisher_id       TEXT NOT NULL,
+  key_id             TEXT NOT NULL,
+  public_key         TEXT NOT NULL,
+  fingerprint        TEXT NOT NULL,
+  revoked            INTEGER NOT NULL DEFAULT 0,
+  rotated_at         INTEGER,
+  trusted_at         INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(publisher_id, key_id)
+);
+-- Fingerprint of the enabled-plugin configuration per conversation, used to
+-- attribute a prompt-cache break to the specific `plugin_config_changed`.
+CREATE TABLE IF NOT EXISTS plugin_cache_state (
+  conversation_id    TEXT PRIMARY KEY,
+  fingerprint        TEXT NOT NULL,
+  updated_at         INTEGER NOT NULL
+);
 ";
 
 /* ------------------------------------------------------------------ */
@@ -1731,6 +1837,7 @@ fn cache_break_reason_to_str(reason: CacheBreakReason) -> &'static str {
         CacheBreakReason::ProtocolFallback => "protocol_fallback",
         CacheBreakReason::Attachments => "attachments",
         CacheBreakReason::ConfigChange => "config_change",
+        CacheBreakReason::PluginConfigChanged => "plugin_config_changed",
         CacheBreakReason::TtlExpired => "ttl_expired",
         CacheBreakReason::ProviderPolicy => "provider_policy",
     }
@@ -1748,6 +1855,7 @@ fn cache_break_reason_from_str(raw: &str) -> Option<CacheBreakReason> {
         "protocol_fallback" => Some(CacheBreakReason::ProtocolFallback),
         "attachments" => Some(CacheBreakReason::Attachments),
         "config_change" => Some(CacheBreakReason::ConfigChange),
+        "plugin_config_changed" => Some(CacheBreakReason::PluginConfigChanged),
         "ttl_expired" => Some(CacheBreakReason::TtlExpired),
         "provider_policy" => Some(CacheBreakReason::ProviderPolicy),
         _ => None,
@@ -2683,6 +2791,13 @@ pub struct Db {
 }
 
 impl Db {
+    /// Shared connection guard for subsystem modules that own their tables.
+    /// Plugin persistence lives in `plugins/store_db.rs` so schema changes stay
+    /// next to their consumers.
+    pub(crate) fn connection(&self) -> parking_lot::MutexGuard<'_, rusqlite::Connection> {
+        self.conn.lock()
+    }
+
     pub fn open(path: &Path) -> anyhow::Result<Self> {
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {

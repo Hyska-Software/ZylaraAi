@@ -913,7 +913,7 @@ pub async fn suggest_commit_message(
         db: state.db.clone(),
         http: state.http.clone(),
         search_http: state.search_http.clone(),
-        catalog: state.catalog.clone(),
+        catalog: state.catalog_with_plugins(),
         streamer: None,
         credential_override: None,
         refresh_override: None,

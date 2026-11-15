@@ -590,7 +590,7 @@ async fn execute_task(app: &AppHandle, task: AgentTask) -> Result<(), String> {
         db: state.db.clone(),
         http: state.http.clone(),
         search_http: state.search_http.clone(),
-        catalog: state.catalog.clone(),
+        catalog: state.catalog_with_plugins(),
         data_dir: None,
         skills_roots: None,
         // Unattended task work cannot answer approval/question cards.

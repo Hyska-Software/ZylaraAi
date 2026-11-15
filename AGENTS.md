@@ -1,6 +1,6 @@
 # AGENTS.md — como trabalhar neste repositório
 
-> Leia `docs/ARCHITECTURE.md` (visão técnica), `docs/AGENTS.md` (layout Agentes: memória, workspace, fila, rotinas e canais), `docs/FILES.md` (arquivos, execução de código e skills), `docs/DESIGN.md` (UI/UX), `docs/GENUI.md` (UI generativa/interativa do agente) e `docs/MODELS.md` (provedores/raciocínio) antes de implementar.
+> Leia `docs/ARCHITECTURE.md` (visão técnica), `docs/AGENTS.md` (layout Agentes: memória, workspace, fila, rotinas e canais), `docs/FILES.md` (arquivos, execução de código e skills), `docs/DESIGN.md` (UI/UX), `docs/GENUI.md` (UI generativa/interativa do agente), `docs/MODELS.md` (provedores/raciocínio) e `docs/PLUGINS.md` (plataforma de plugins, permissões, SDK, loja e lanes trusted/sandboxed) antes de implementar.
 
 # COMENTARIOS E ANOTAÇÕES DEVEM SER SEMPRE EM INGLES, O CÓDIGO TAMBEM DEVE SER SEMPRE EM INGLES PARA CONSISTENCIA COM O PADRÃO DA INDUSTRIA
 
@@ -33,6 +33,7 @@ Observação: `cargo` usa um target dir compartilhado. Se aparecer `Blocking wai
 | Harness/tools/docs | `src-tauri/src/harness/**`, `src-tauri/src/tools/**`, `src-tauri/src/policy/**`, `src-tauri/src/documents/**`, `src-tauri/src/jobs/**` | harness-dev |
 | Runtime do workspace (código) | `src-tauri/src/workspace/**`, `src-tauri/src/terminal/**`, `src-tauri/src/commands/{workspace,code,git,terminal}.rs` | code-runtime-dev |
 | Skills embutidas | `src-tauri/skills/**` | formats-dev |
+| Plataforma de plugins | `src-tauri/src/plugins/**`, `src-tauri/src/commands/plugins.rs`, `src/lib/plugins/**`, `src/components/plugins/**`, `packages/plugin-sdk/**`, `packages/create-zylara-plugin/**`, `plugins/fixtures/**`, `data/plugin-contract.json`, `data/plugin-manifest.schema.json`, `scripts/plugin/**` | Lead |
 | Persistência/config/commands | `src-tauri/src/db.rs`, `src-tauri/src/config.rs`, `src-tauri/src/commands/{conversations,settings,attachments,artifacts}.rs` | storage-dev |
 | UI núcleo | `src/components/layout/**`, `src/components/chat/**`, `src/components/composer/**` | ui-core |
 | Code workbench | `src/components/code/**` | ui-code |

@@ -17,6 +17,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Plug,
   RefreshCw,
   Search,
   Settings,
@@ -55,6 +56,10 @@ import {
 import type { SortableListApi } from '@/components/ui';
 import { api } from '@/lib/api';
 import { localeLowerCase } from '@/lib/i18n/format';
+import { pluginIcon } from '@/lib/plugins/icons';
+import { pluginLabel, pluginViewsForSurface, usePluginRegistry } from '@/lib/plugins/registry';
+import { openPluginView } from '@/lib/plugins/host';
+import { usePluginStore } from '@/lib/plugins/store';
 import {
   selectConversationStream,
   useAppStore,
@@ -754,6 +759,9 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
   const setActiveWorkspace = useUiStore((state) => state.setActiveWorkspace);
   const appInfo = useAppStore((state) => state.appInfo);
   const skillsPanelEnabled = useAppStore((state) => state.settings.skillsPanelEnabled);
+  const pluginView = usePluginStore((state) => state.activeView);
+  usePluginRegistry();
+  const codePluginViews = pluginViewsForSurface('code', 'sidebar');
   const isCompact = useIsCompact();
 
   const {
@@ -1068,6 +1076,12 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     if (isCompact) onClose?.();
   };
 
+  const handlePlugins = () => {
+    usePluginStore.getState().closeOverlays();
+    setCodeView('plugins');
+    if (isCompact) onClose?.();
+  };
+
   const handleOpenSettings = () => {
     setSettingsOpen(true);
     if (isCompact) onClose?.();
@@ -1119,6 +1133,13 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
         }
         onSelect={handleSearch}
       />
+      <SidebarAction
+        icon={<Plug className="size-4" />}
+        label={t('code:sidebar.plugins')}
+        ariaLabel={t('code:sidebar.plugins')}
+        current={codeView === 'plugins'}
+        onSelect={handlePlugins}
+      />
       {skillsPanelEnabled ? (
         <SidebarAction
           icon={<Sparkles className="size-4" />}
@@ -1128,6 +1149,26 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
           onSelect={handleSkills}
         />
       ) : null}
+
+      {codePluginViews.map((view) => {
+        const Icon = pluginIcon(view.view.icon);
+        const label = pluginLabel(view.plugin, view.view.titleKey, view.view.title);
+        return (
+          <SidebarAction
+            key={view.key}
+            icon={<Icon className="size-4" />}
+            label={label}
+            ariaLabel={label}
+            current={
+              pluginView?.pluginId === view.plugin.id && pluginView.id === view.view.id
+            }
+            onSelect={() => {
+              openPluginView(view.plugin, view.view.id);
+              if (isCompact) onClose?.();
+            }}
+          />
+        );
+      })}
 
       <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
         <section

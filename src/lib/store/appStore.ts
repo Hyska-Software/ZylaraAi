@@ -51,6 +51,12 @@ const DEFAULT_SETTINGS: Settings = {
   codeDefaultPermissionMode: 'autonomous',
   closeToTray: true,
   closeToTrayPrompted: false,
+  pluginsEnabled: true,
+  pluginRegistryUrl: '',
+  pluginAutoUpdate: false,
+  pluginAllowTrusted: false,
+  pluginSafeMode: false,
+  pluginDevMode: false,
 };
 
 interface AppState {
@@ -91,6 +97,8 @@ interface AppState {
   toggleFavorite: (providerId: string, modelId?: string) => void;
   isFavorite: (providerId: string, modelId?: string) => boolean;
   refreshCatalog: () => Promise<void>;
+  /** Reloads only the local catalog view (plugin providers) without probing. */
+  reloadCatalog: () => Promise<void>;
   refreshProviderModels: (providerId: string) => Promise<ProviderInfo[]>;
   validateProvider: (providerId: string) => Promise<ProviderValidation>;
   setError: (error: string | null) => void;
@@ -276,6 +284,38 @@ export const useAppStore = create<AppState>()(
         const pairProvider = modelId === undefined ? get().selection.providerId : providerId;
         const pairModel = modelId ?? providerId;
         return matchesFavorite(get().favorites, pairProvider, pairModel);
+      },
+
+      reloadCatalog: async () => {
+        try {
+          const catalogView = await api.getCatalog();
+          const providers = catalogView.catalog.providers;
+          const current = get().selection;
+          const fallback = defaultSelectionFrom(get().settings, providers);
+          const provider =
+            findProviderIn(providers, current.providerId) ??
+            findProviderIn(providers, fallback.providerId);
+          const modelId =
+            current.modelId && provider?.models.some((model) => model.id === current.modelId)
+              ? current.modelId
+              : findModelIn(providers, provider?.id ?? fallback.providerId, fallback.modelId)?.id ??
+                fallback.modelId;
+          set({
+            providers,
+            keys: catalogView.keys,
+            auth: catalogView.auth ?? get().auth,
+            selection: {
+              providerId: provider?.id ?? fallback.providerId,
+              modelId,
+              reasoning:
+                current.providerId === provider?.id && current.modelId === modelId
+                  ? current.reasoning
+                  : null,
+            },
+          });
+        } catch (error) {
+          set({ error: error instanceof Error ? error.message : String(error) });
+        }
       },
 
       refreshCatalog: async () => {

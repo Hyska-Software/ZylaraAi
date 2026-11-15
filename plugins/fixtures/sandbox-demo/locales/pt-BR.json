@@ -1,0 +1,12 @@
+{
+  "toolbar": { "title": "Abrir notas" },
+  "views": {
+    "notes": "Notas Acme",
+    "notesDescription": "Notas guardadas no namespace do plugin."
+  },
+  "panels": { "notes": "Notas" },
+  "commands": {
+    "openNotes": "Abrir Notas Acme",
+    "newNote": "Nova nota com o agente"
+  }
+}

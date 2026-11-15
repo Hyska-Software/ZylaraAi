@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>__PLUGIN_NAME__ toolbar</title>
+<style>
+  body { margin: 0; background: transparent; color: var(--foreground); }
+  button { font: 12px system-ui, sans-serif; border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; }
+</style>
+<button id="open">__PLUGIN_NAME__</button>
+<script src="/@zylara/sdk.js"></script>
+<script>
+  document.getElementById('open').addEventListener('click', () => {
+    ZylaraPlugin.openView('home');
+  });
+  ZylaraPlugin.on('init', () => ZylaraPlugin.resize());
+</script>

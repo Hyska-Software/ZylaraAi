@@ -25,6 +25,7 @@ import {
   Pin,
   PinOff,
   PanelRight,
+  Plug,
   Plus,
   Power,
   Search,
@@ -68,6 +69,8 @@ import {
   SortableList,
   sortableDropClass,
 } from '@/components/ui';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { usePluginStore } from '@/lib/plugins/store';
 import type { SortableListApi } from '@/components/ui';
 import {
   selectActiveAgents,
@@ -665,6 +668,15 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
     onClose?.();
   };
 
+  const openPlugins = () => {
+    usePluginStore.getState().closeOverlays();
+    setActiveAgentId(null);
+    setActiveChannelId(null);
+    clearActiveConversation();
+    setAgentView('plugins');
+    onClose?.();
+  };
+
   useEffect(() => {
     if (activeAgentId) {
       setExpanded((current) => {
@@ -765,6 +777,7 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
   );
 
   const selectAgent = (agent: Agent) => {
+    setAgentView('team');
     setActiveAgentId(agent.id);
     clearActiveConversation();
     setExpanded((current) => new Set(current).add(agent.id));
@@ -772,6 +785,7 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
   };
 
   const selectChannel = (channel: AgentChannel) => {
+    setAgentView('team');
     setActiveChannelId(channel.id);
     clearActiveConversation();
     onClose?.();
@@ -786,12 +800,14 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
       : channel.name;
 
   const newThread = (agent: Agent) => {
+    setAgentView('team');
     setActiveAgentId(agent.id);
     void startNewConversation('agent', { agentId: agent.id });
     onClose?.();
   };
 
   const openThread = (agent: Agent, threadId: string) => {
+    setAgentView('team');
     setActiveAgentId(agent.id);
     void openConversation(threadId);
     onClose?.();
@@ -1265,6 +1281,26 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
       </div>
 
       <div className="shrink-0 border-t border-border px-3 py-2">
+        <PluginSlot slot="agent.sidebar.footer" className="mb-1 px-1" compact />
+        <button
+          type="button"
+          onClick={openPlugins}
+          aria-current={
+            activeAgentId === null && activeChannelId === null && agentView === 'plugins'
+              ? 'page'
+              : undefined
+          }
+          className={cn(
+            'flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[12px]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+            activeAgentId === null && activeChannelId === null && agentView === 'plugins'
+              ? 'bg-surface-active text-foreground'
+              : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
+          )}
+        >
+          <Plug className="size-3.5" />
+          {t('sidebar.plugins')}
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -1275,14 +1311,20 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
             onClose?.();
           }}
           aria-current={
-            activeAgentId === null && activeChannelId === null && agentView !== 'routines'
+            activeAgentId === null &&
+            activeChannelId === null &&
+            agentView !== 'routines' &&
+            agentView !== 'plugins'
               ? 'page'
               : undefined
           }
           className={cn(
             'flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[12px]',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-            activeAgentId === null && activeChannelId === null && agentView !== 'routines'
+            activeAgentId === null &&
+              activeChannelId === null &&
+              agentView !== 'routines' &&
+              agentView !== 'plugins'
               ? 'bg-surface-active text-foreground'
               : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
           )}

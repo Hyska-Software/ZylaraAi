@@ -263,6 +263,13 @@ fn normalize_settings(mut settings: Settings) -> Settings {
         settings.provider_retry_max_elapsed_ms.min(600_000);
     settings.provider_retry_after_cap_ms =
         settings.provider_retry_after_cap_ms.clamp(1_000, 600_000);
+    settings.plugin_registry_url = settings
+        .plugin_registry_url
+        .trim()
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(2_000)
+        .collect();
     settings
 }
 
@@ -515,6 +522,10 @@ pub struct SecretsFile {
     /// GitHub account used by the PR/Issue tabs. Additive block: builds that do
     /// not know it simply ignore the key (`#[serde(default)]`).
     pub github: GitHubSecrets,
+    /// Plugin secrets under `plugin:<id>:<key>`. Values never cross the IPC
+    /// boundary; RPC calls can only test existence or inject the secret into a
+    /// mediated HTTP request.
+    pub plugins: BTreeMap<String, String>,
 }
 
 impl Default for SecretsFile {
@@ -524,6 +535,7 @@ impl Default for SecretsFile {
             providers: BTreeMap::new(),
             oauth: OAuthStore::default(),
             github: GitHubSecrets::default(),
+            plugins: BTreeMap::new(),
         }
     }
 }
@@ -535,6 +547,10 @@ impl std::fmt::Debug for SecretsFile {
             .field("providers", &self.providers.keys().collect::<Vec<_>>())
             .field("oauth", &self.oauth)
             .field("github", &self.github)
+            .field(
+                "plugins",
+                &self.plugins.keys().collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -1162,6 +1178,92 @@ fn set_api_key_at(path: &Path, provider_id: &str, key: Option<&str>) -> anyhow::
 /// Stores/removes the API key of a provider. The OAuth block is preserved.
 pub fn set_api_key(app: &AppHandle, provider_id: &str, key: Option<&str>) -> anyhow::Result<()> {
     set_api_key_at(&secrets_path(app), provider_id, key)
+}
+
+/* ------------------------------------------------------------------ */
+/* Plugin secrets                                                      */
+/* ------------------------------------------------------------------ */
+
+/// Namespaced key used in `secrets.json`: `plugin:<id>:<key>`.
+pub fn plugin_secret_key(plugin_id: &str, key: &str) -> String {
+    format!("plugin:{plugin_id}:{key}")
+}
+
+fn valid_secret_part(value: &str) -> bool {
+    !value.is_empty()
+        && value.chars().count() <= 120
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
+}
+
+fn set_plugin_secret_at(
+    path: &Path,
+    plugin_id: &str,
+    key: &str,
+    value: Option<&str>,
+) -> anyhow::Result<()> {
+    if !valid_secret_part(plugin_id) || !valid_secret_part(key) {
+        bail!("invalid plugin secret namespace");
+    }
+    let _guard = credentials_lock().lock();
+    let mut secrets = read_secrets_for_write_at(path)?;
+    let name = plugin_secret_key(plugin_id, key);
+    match value.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) => {
+            if value.chars().count() > 8_192 {
+                bail!("plugin secret is too large");
+            }
+            secrets.plugins.insert(name, value.to_string());
+        }
+        None => {
+            secrets.plugins.remove(&name);
+        }
+    }
+    secrets.version = SECRETS_VERSION;
+    save_secrets_at(path, &secrets)
+}
+
+pub fn set_plugin_secret(
+    app: &AppHandle,
+    plugin_id: &str,
+    key: &str,
+    value: Option<&str>,
+) -> anyhow::Result<()> {
+    set_plugin_secret_at(&secrets_path(app), plugin_id, key, value)
+}
+
+fn plugin_secret_from_file(secrets: &SecretsFile, plugin_id: &str, key: &str) -> Option<String> {
+    secrets
+        .plugins
+        .get(&plugin_secret_key(plugin_id, key))
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+pub fn plugin_secret(app: &AppHandle, plugin_id: &str, key: &str) -> Option<String> {
+    plugin_secret_from_file(&load_secrets(app), plugin_id, key)
+}
+
+pub fn plugin_secret_names(app: &AppHandle, plugin_id: &str) -> Vec<String> {
+    let prefix = format!("plugin:{plugin_id}:");
+    let secrets = load_secrets(app);
+    let mut names: Vec<String> = secrets
+        .plugins
+        .keys()
+        .filter_map(|key| key.strip_prefix(&prefix).map(str::to_string))
+        .collect();
+    names.sort();
+    names
+}
+
+pub fn delete_plugin_secrets(app: &AppHandle, plugin_id: &str) -> anyhow::Result<()> {
+    let path = secrets_path(app);
+    let _guard = credentials_lock().lock();
+    let mut secrets = read_secrets_for_write_at(&path)?;
+    let prefix = format!("plugin:{plugin_id}:");
+    secrets.plugins.retain(|key, _| !key.starts_with(&prefix));
+    save_secrets_at(&path, &secrets)
 }
 
 /* ------------------------------------------------------------------ */

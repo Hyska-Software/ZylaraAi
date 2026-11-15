@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner';
 
 import { DiffView } from '@/components/code/DiffView';
+import { GenUIBlock } from '@/components/genui';
 import { Spinner } from '@/components/ui';
 import { describeCodeTool, type CodeToolLabel } from '@/lib/agentTrace';
 import { useChatStore, useUiStore, type CodeSubagentTab } from '@/lib/store';
@@ -201,6 +202,10 @@ export function ToolCallRow({ tool, icon: Icon, className }: ToolCallRowProps) {
   );
   const subagentPresentation =
     tool.presentation?.kind === 'subagent' ? tool.presentation : null;
+  const genuiSource =
+    tool.presentation?.kind === 'genui' && typeof tool.presentation.source === 'string'
+      ? tool.presentation.source
+      : null;
   const subagentConversationId =
     liveSubagent?.conversationId ?? subagentPresentation?.conversationId ?? null;
 
@@ -354,6 +359,12 @@ export function ToolCallRow({ tool, icon: Icon, className }: ToolCallRowProps) {
               {t('tool.openChat')}
             </button>
           ) : null}
+        </div>
+      ) : null}
+
+      {genuiSource ? (
+        <div className="ml-[26px] mt-1 min-w-0">
+          <GenUIBlock source={genuiSource} />
         </div>
       ) : null}
 

@@ -9,6 +9,7 @@ import {
   Info,
   KeyRound,
   Palette,
+  Plug,
   ScrollText,
   Settings2,
   Sparkles,
@@ -16,9 +17,11 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
-import type { SettingsTabId } from '@/lib/settingsTabs';
+import type { BuiltinSettingsTabId } from '@/lib/settingsTabs';
 
-export const SETTINGS_TAB_ICONS: Record<SettingsTabId, LucideIcon> = {
+export type SettingsTabIconMap = Record<BuiltinSettingsTabId, LucideIcon>;
+
+export const SETTINGS_TAB_ICONS: SettingsTabIconMap = {
   general: Settings2,
   themes: Palette,
   terminal: SquareTerminal,
@@ -26,6 +29,7 @@ export const SETTINGS_TAB_ICONS: Record<SettingsTabId, LucideIcon> = {
   model: Sparkles,
   instructions: ScrollText,
   tools: Wrench,
+  plugins: Plug,
   agents: Bot,
   data: Database,
   about: Info,

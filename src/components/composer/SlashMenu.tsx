@@ -24,6 +24,7 @@ const GROUP_ORDER: SlashCommandGroup[] = [
   'git',
   'context',
   'project',
+  'plugins',
 ];
 
 /**

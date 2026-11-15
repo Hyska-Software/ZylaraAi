@@ -357,6 +357,7 @@ pub enum CacheBreakReason {
     ProtocolFallback,
     Attachments,
     ConfigChange,
+    PluginConfigChanged,
     TtlExpired,
     ProviderPolicy,
 }
@@ -850,6 +851,12 @@ pub struct TurnOptions {
     pub allowed_skills: Option<Vec<String>>,
     #[serde(skip)]
     pub allowed_mcp_servers: Option<Vec<String>>,
+    /// Plugin prompt sections resolved for this turn (internal). The text and
+    /// fingerprint are part of the prompt snapshot/config hash.
+    #[serde(skip)]
+    pub plugin_prompt: String,
+    #[serde(skip)]
+    pub plugin_fingerprint: String,
     /// Agent turn with durable memory enabled (`memory` tool available).
     #[serde(skip)]
     pub agent_memory: bool,
@@ -887,6 +894,8 @@ impl Default for TurnOptions {
             allowed_tools: None,
             allowed_skills: None,
             allowed_mcp_servers: None,
+            plugin_prompt: String::new(),
+            plugin_fingerprint: String::new(),
             agent_memory: false,
             agent_id: None,
             agent_delegation: false,
@@ -1581,6 +1590,21 @@ pub struct Settings {
     pub provider_retry_max_elapsed_ms: u32,
     /// Longest server-requested wait (`Retry-After`) accepted before surfacing.
     pub provider_retry_after_cap_ms: u32,
+    /* ---- plugin platform (docs/PLUGINS.md) ---- */
+    /// Third-party plugins are enabled. Disabling keeps installed data but
+    /// unloads every contribution and tool.
+    pub plugins_enabled: bool,
+    /// Signed store registry URL; empty uses the bundled/local development
+    /// registry only.
+    pub plugin_registry_url: String,
+    /// Check and stage plugin updates automatically in the background.
+    pub plugin_auto_update: bool,
+    /// Allow trusted plugins (main-webview JavaScript). Off by default.
+    pub plugin_allow_trusted: bool,
+    /// Skip loading third-party plugins until the user explicitly recovers.
+    pub plugin_safe_mode: bool,
+    /// Developer mode: load unpacked folders and unsigned packages.
+    pub plugin_dev_mode: bool,
 }
 
 impl Default for Settings {
@@ -1659,6 +1683,12 @@ impl Default for Settings {
             provider_retry_max_delay_ms: 20_000,
             provider_retry_max_elapsed_ms: 90_000,
             provider_retry_after_cap_ms: 60_000,
+            plugins_enabled: true,
+            plugin_registry_url: String::new(),
+            plugin_auto_update: false,
+            plugin_allow_trusted: false,
+            plugin_safe_mode: false,
+            plugin_dev_mode: false,
         }
     }
 }

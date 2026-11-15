@@ -1,0 +1,15 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>__PLUGIN_NAME__ backend</title>
+<script src="/@zylara/sdk.js"></script>
+<script>
+  ZylaraPlugin.on('init', () => ZylaraPlugin.ready());
+  ZylaraPlugin.onTool(async ({ tool, arguments: args }) => {
+    if (tool !== 'lookup') throw new Error(`unknown tool: ${tool}`);
+    const query = typeof args.query === 'string' ? args.query : '';
+    return {
+      content: JSON.stringify({ query, value: `hello from __PLUGIN_NAME__` }),
+      summary: `lookup ${query}`,
+    };
+  });
+</script>

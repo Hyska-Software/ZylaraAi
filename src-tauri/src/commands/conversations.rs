@@ -51,12 +51,12 @@ fn resolve_defaults(
 
     let provider = provider_id
         .as_deref()
-        .and_then(|id| state.catalog.provider(id));
-    let provider_id = match provider {
+        .and_then(|id| state.provider(id));
+    let resolved_provider_id = match provider.as_ref() {
         Some(provider) => provider.id.clone(),
         None => provider_id.unwrap_or_else(|| "opencode-go".to_string()),
     };
-    let model_id = match (model_id, provider) {
+    let model_id = match (model_id, provider.as_ref()) {
         (Some(model), Some(provider)) => {
             if provider
                 .models
@@ -72,7 +72,7 @@ fn resolve_defaults(
         (None, Some(provider)) => provider.default_model_id.clone(),
         (None, None) => "glm-5.3-flash".to_string(),
     };
-    (provider_id, model_id)
+    (resolved_provider_id, model_id)
 }
 
 /* ------------------------------------------------------------------ */
@@ -368,7 +368,7 @@ pub fn set_conversation_model(
         &conversation,
         &provider_id,
         &model_id,
-        |provider_id| state.catalog.provider(provider_id).is_some(),
+        |provider_id| state.provider(provider_id).is_some(),
         |provider_id, model_id| state.model(provider_id, model_id).is_some(),
     )?;
     if state.has_active_turn_for(conversation_id) {

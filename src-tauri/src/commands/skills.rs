@@ -191,7 +191,7 @@ fn content_of(skill: &Skill) -> SkillContent {
     SkillContent {
         name: skill.name.clone(),
         description: skill.description.clone(),
-        source: skill.source_str().to_string(),
+        source: skill.source_label(),
         dir: skill.dir.display().to_string(),
         content: skill.body.clone(),
     }
@@ -333,7 +333,11 @@ mod tests {
         for name in names {
             write_skill(&dir, name, &format!("Skill externa {name}."));
         }
-        ExternalSkillRoot { source, dir }
+        ExternalSkillRoot {
+            source,
+            dir,
+            plugin_id: None,
+        }
     }
 
     #[test]
@@ -555,6 +559,7 @@ mod tests {
             body: String::new(),
             dir: outside.clone(),
             source: SkillSource::User,
+            plugin_id: None,
         };
 
         let error = remove_user_skill(&temp.path, &skill).expect_err("caminho fora é recusado");
@@ -575,6 +580,7 @@ mod tests {
             body: String::new(),
             dir: temp.path.join("skills").join("fantasma"),
             source: SkillSource::User,
+            plugin_id: None,
         };
         assert!(remove_user_skill(&temp.path, &skill).is_err());
     }
@@ -724,6 +730,7 @@ mod tests {
             body: String::new(),
             dir: link,
             source: SkillSource::User,
+            plugin_id: None,
         };
         let error = remove_user_skill(&temp.path, &skill).expect_err("symlink é recusado");
         assert!(

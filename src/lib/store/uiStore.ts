@@ -16,7 +16,7 @@ import type { AgentInput, Artifact, ThemeMode } from '../types';
  * sidebar stays visible), so their management never opens as a modal —
  * docs/FILES.md §7.4 and docs/goals/library-page/PLAN.md.
  */
-export type MainView = 'chat' | 'skills' | 'library';
+export type MainView = 'chat' | 'skills' | 'library' | 'plugins';
 
 /**
  * Application layout mode. `chat` is the classic conversation app; `code` is
@@ -30,7 +30,7 @@ export type LayoutMode = 'chat' | 'code' | 'agent';
  * Center surface inside the Agentes layout when no agent/channel is selected.
  * Volatile: `stats` and `routines` never survive an app restart.
  */
-export type AgentView = 'team' | 'stats' | 'routines';
+export type AgentView = 'team' | 'stats' | 'routines' | 'plugins';
 
 /** Dialog de criação/edição de agente (volátil). */
 export type AgentEditorState =
@@ -53,6 +53,7 @@ export type AgentEditorState =
 export type CodeView =
   | 'session'
   | 'skills'
+  | 'plugins'
   | 'diff'
   | 'commits'
   | 'file'
@@ -69,6 +70,7 @@ export type CodeView =
 const CODE_VIEWS: readonly CodeView[] = [
   'session',
   'skills',
+  'plugins',
   'diff',
   'commits',
   'file',

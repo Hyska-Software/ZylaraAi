@@ -372,6 +372,8 @@ mod tests {
             agent_hooks: None,
             data_dir: PathBuf::new(),
             skills_roots: Vec::<ExternalSkillRoot>::new(),
+            approval: None,
+            emit: None,
         }
     }
 

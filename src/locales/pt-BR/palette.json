@@ -3,6 +3,7 @@
     "conversas": "Conversas",
     "navegacao": "Navegação",
     "ferramentas": "Ferramentas",
+    "plugins": "Plugins",
     "aparencia": "Aparência",
     "configuracoes": "Configurações",
     "sistema": "Sistema"
@@ -92,11 +93,23 @@
     "model": "Modelo e modo de pensamento padrão",
     "instructions": "Instruções do sistema",
     "tools": "Busca web, criação de arquivos, execução e passos",
+    "plugins": "Instale, descubra e configure plugins de terceiros",
     "agents": "Concorrência, orçamento, notificações e computer use",
     "data": "Pasta de dados, exportação e limpeza",
     "about": "Versão e informações do aplicativo"
   },
   "actions": {
+    "openPlugins": {
+      "label": "Abrir plugins",
+      "description": "Navegue pelos plugins instalados, registry e atualizações",
+      "safeModeDescription": "Plugins ficam desativados enquanto o modo seguro estiver ativo",
+      "keywords": "plugins extensões loja registry"
+    },
+    "installPluginFile": {
+      "label": "Instalar plugin por arquivo",
+      "description": "Escolha e inspecione um pacote .zplugin assinado",
+      "keywords": "plugin instalar zplugin pacote arquivo"
+    },
     "newConversation": {
       "codeLabel": "Nova sessão",
       "agentLabel": "Nova conversa com agente",

@@ -71,6 +71,78 @@ pub struct ToolRuntime {
     /// External skills repositories (Codex/Claude/OpenCode/Agent Skills) read
     /// by the `list_skills`/`read_skill` tools; empty in most unit tests.
     pub skills_roots: Vec<skills::ExternalSkillRoot>,
+    /// Interactive approvals available to the turn. Chat also uses this for
+    /// plugin tools (the Code profile has its own policy gate).
+    pub approval: Option<std::sync::Arc<crate::policy::approval::ApprovalRegistry>>,
+    /// Turn event sink used by approval cards.
+    pub emit: Option<std::sync::Arc<dyn crate::harness::EventEmitter>>,
+}
+
+impl ToolRuntime {
+    /// Requests consent for a plugin tool. Plugin tools always pass through an
+    /// explicit approval in Chat; a missing approval channel fails closed.
+    async fn approve_plugin_tool(
+        &self,
+        plugin_id: &str,
+        tool: &crate::plugins::ToolContribution,
+        call_id: &str,
+    ) -> Result<(), ToolOutcome> {
+        let Some(registry) = &self.approval else {
+            return Err(ToolOutcome::error(
+                "PLUGIN_APPROVAL_UNAVAILABLE: plugin tools require an interactive approval channel",
+            ));
+        };
+        let risk = match tool.risk.as_str() {
+            "write" => crate::domain::RiskClass::Write,
+            "shell" => crate::domain::RiskClass::Shell,
+            "network" => crate::domain::RiskClass::Network,
+            _ => crate::domain::RiskClass::Read,
+        };
+        let request = crate::domain::ApprovalRequest {
+            id: format!("apr-{}", uuid::Uuid::new_v4().simple()),
+            conversation_id: self.conversation_id.clone(),
+            tool_call_id: call_id.to_string(),
+            tool: format!("plugin:{plugin_id}:{}", tool.name),
+            title: format!("Plugin `{plugin_id}` · {}", tool.name),
+            detail: crate::domain::ApprovalDetail::Other {
+                text: format!(
+                    "Plugin `{plugin_id}` wants to run `{}` (risk: {}).",
+                    tool.name, tool.risk
+                ),
+            },
+            risk,
+            preview: None,
+            options: vec![
+                crate::domain::ApprovalOption {
+                    id: "allow".into(),
+                    label: i18n::t("approvals.allowOnce"),
+                    scope: None,
+                },
+                crate::domain::ApprovalOption {
+                    id: "deny".into(),
+                    label: i18n::t("approvals.deny"),
+                    scope: None,
+                },
+            ],
+            created_at: crate::domain::now_ms(),
+        };
+        let outcome = crate::policy::approval::request_interactive(
+            registry,
+            self.emit.clone(),
+            request,
+            std::time::Duration::from_secs(self.settings.approval_timeout_secs.max(30) as u64),
+            &self.cancel,
+        )
+        .await;
+        if outcome.is_approved() {
+            Ok(())
+        } else {
+            Err(ToolOutcome::error(format!(
+                "PLUGIN_APPROVAL_{}: the plugin tool was not approved",
+                outcome.decision.as_str().to_ascii_uppercase()
+            )))
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -155,6 +227,20 @@ pub fn definitions(options: &TurnOptions) -> Vec<ToolDefinition> {
     // Agent capabilities restrict the catalog **after** the global gates: a
     // persona can remove tools, never add ones the app disabled globally.
     tools.retain(|tool| tool_allowed(options, &tool.name));
+    // Plugin tools are an overlay: they appear only for top-level turns and
+    // when the agent allowlist (if any) permits them. The execution boundary in
+    // the harness re-checks the same catalog.
+    if options.delegation_depth == 0 {
+        if let Some(manager) = crate::plugins::global_manager() {
+            for definition in manager.tool_definitions(crate::domain::TurnProfile::Chat) {
+                if !tools.iter().any(|tool| tool.name == definition.name)
+                    && tool_allowed(options, &definition.name)
+                {
+                    tools.push(definition);
+                }
+            }
+        }
+    }
     tools
 }
 
@@ -170,6 +256,39 @@ pub async fn execute(rt: &ToolRuntime, call: &ToolCallRecord) -> ToolOutcome {
         Ok(arguments) => arguments,
         Err(error) => return ToolOutcome::error(error),
     };
+
+    if let Some(manager) = crate::plugins::global_manager() {
+        if let Some((plugin_id, tool)) = manager.tool_owner(&call.name) {
+            if let Err(denied) = rt
+                .approve_plugin_tool(&plugin_id, &tool, &call.id)
+                .await
+            {
+                let _ = manager.db().plugin_audit(
+                    &plugin_id,
+                    &format!("approval:{}", tool.name),
+                    None,
+                    "denied",
+                );
+                return denied;
+            }
+            let _ = manager.db().plugin_audit(
+                &plugin_id,
+                &format!("approval:{}", tool.name),
+                None,
+                "allowed",
+            );
+            return manager
+                .execute_tool(
+                    &plugin_id,
+                    &tool,
+                    arguments,
+                    &rt.conversation_id,
+                    &rt.message_id,
+                    &rt.cancel,
+                )
+                .await;
+        }
+    }
 
     let outcome = match call.name.as_str() {
         "web_search" if !rt.options.web_search => {
@@ -420,6 +539,8 @@ mod tests {
                 uuid::Uuid::new_v4()
             )),
             skills_roots: Vec::new(),
+            approval: None,
+            emit: None,
         };
         let mut list_call = ToolCallRecord::running("call-1", "list_artifacts");
         list_call.arguments = "{}".to_string();
@@ -447,5 +568,83 @@ mod tests {
         assert_eq!(clean_inline("  olá   mundo \n"), "olá mundo");
         assert_eq!(truncate_chars("abcdef", 3), "abc");
         assert_eq!(host_of("https://www.example.com/a/b"), Some("example.com".to_string()));
+    }
+
+    struct AutoApprovalEmitter {
+        registry: std::sync::Arc<crate::policy::approval::ApprovalRegistry>,
+        approve: bool,
+    }
+
+    impl crate::harness::EventEmitter for AutoApprovalEmitter {
+        fn emit(&self, event: crate::events::TurnEvent) {
+            if let crate::events::TurnEvent::ApprovalRequested { approval } = event {
+                let outcome = if self.approve {
+                    crate::policy::approval::ApprovalOutcome::approved(None)
+                } else {
+                    crate::policy::approval::ApprovalOutcome::denied(None)
+                };
+                self.registry.resolve(&approval.id, outcome);
+            }
+        }
+    }
+
+    async fn approval_runtime(
+        approve: bool,
+    ) -> (ToolRuntime, std::sync::Arc<crate::policy::approval::ApprovalRegistry>) {
+        let registry = std::sync::Arc::new(crate::policy::approval::ApprovalRegistry::new());
+        let runtime = ToolRuntime {
+            db: std::sync::Arc::new(Db::open_in_memory().expect("db")),
+            http: reqwest::Client::new(),
+            conversation_id: "conv-1".to_string(),
+            message_id: "msg-1".to_string(),
+            options: TurnOptions::default(),
+            settings: Settings::default(),
+            cancel: CancellationToken::new(),
+            agent_hooks: None,
+            data_dir: std::env::temp_dir(),
+            skills_roots: Vec::new(),
+            approval: Some(registry.clone()),
+            emit: Some(std::sync::Arc::new(AutoApprovalEmitter {
+                registry: registry.clone(),
+                approve,
+            })),
+        };
+        (runtime, registry)
+    }
+
+    fn approval_tool() -> crate::plugins::ToolContribution {
+        serde_json::from_value(json!({
+            "name": "lookup",
+            "description": "Look up a record.",
+            "parameters": { "type": "object", "properties": {} },
+            "risk": "write",
+            "profiles": ["chat", "code"]
+        }))
+        .expect("tool contribution")
+    }
+
+    #[tokio::test]
+    async fn plugin_tools_require_an_approved_interactive_request() {
+        let (runtime, _) = approval_runtime(true).await;
+        assert!(runtime
+            .approve_plugin_tool("com.acme.demo", &approval_tool(), "call-1")
+            .await
+            .is_ok());
+
+        let (runtime, _) = approval_runtime(false).await;
+        let denied = runtime
+            .approve_plugin_tool("com.acme.demo", &approval_tool(), "call-2")
+            .await
+            .expect_err("denied");
+        assert!(denied.is_error);
+        assert!(denied.content.contains("PLUGIN_APPROVAL_DENIED"));
+
+        let mut runtime = runtime;
+        runtime.approval = None;
+        let unavailable = runtime
+            .approve_plugin_tool("com.acme.demo", &approval_tool(), "call-3")
+            .await
+            .expect_err("no approval channel");
+        assert!(unavailable.content.contains("PLUGIN_APPROVAL_UNAVAILABLE"));
     }
 }

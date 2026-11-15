@@ -1972,6 +1972,8 @@ async fn bridge_chat_tool(ctx: &ToolCtx, name: &str, args: &Value) -> ToolOutcom
         agent_hooks: ctx.agent_hooks.clone(),
         data_dir: ctx.data_dir.clone(),
         skills_roots: ctx.skills_roots.clone(),
+        approval: ctx.approval.clone(),
+        emit: ctx.emit.clone(),
     };
     let call = crate::domain::ToolCallRecord {
         id: ctx.tool_call_id.clone(),

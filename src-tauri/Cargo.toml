@@ -21,6 +21,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = "2"
 # Leitura direta do clipboard no backend (arquivos CF_HDROP + imagens) para o
 # Ctrl+V do composer; o plugin acima já traz a mesma versão na árvore.
@@ -72,6 +73,8 @@ chardetng = "1"
 infer = "0.22"
 base64 = "0.23"
 sha2 = "0.11"
+# Plugin packages: publisher and registry signatures (Ed25519).
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 mime_guess = "2"
 include_dir = "0.7"
 url = "2"

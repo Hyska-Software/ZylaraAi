@@ -41,6 +41,7 @@
       "protocol_fallback": "El protocolo de conexión cambió",
       "attachments": "Los adjuntos cambiaron",
       "config_change": "La configuración cambió",
+      "plugin_config_changed": "La configuración de plugins cambió",
       "ttl_expired": "La caché expiró (TTL)",
       "provider_policy": "Regla del proveedor"
     }
@@ -513,6 +514,7 @@
     "openFolder": "Abrir carpeta",
     "addChat": "Añadir sesión de Chat",
     "searchAction": "Buscar",
+    "plugins": "Plugins",
     "skills": "Skills",
     "workspacesHeading": "Espacios de trabajo",
     "searchWorkspaces": "Buscar espacios de trabajo",

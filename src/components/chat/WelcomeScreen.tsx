@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CodeXml, FilePlus, FileText, Globe, type LucideIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useReduceMotion } from '@/components/layout/hooks';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Kbd } from '@/components/ui';
 import { modKey } from '@/lib/utils';
 import { BrandMark } from './BrandMark';
@@ -129,6 +130,8 @@ export function WelcomeScreen() {
           );
         })}
       </div>
+
+      <PluginSlot slot="chat.welcome.actions" className="mt-4 justify-center" compact />
 
       <p className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12px] text-foreground-subtle">
         <span className="flex items-center gap-1.5">

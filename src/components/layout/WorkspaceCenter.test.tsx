@@ -110,6 +110,10 @@ vi.mock('@/components/library', () => ({
   LibraryView: () => <div data-testid="library-view" />,
 }));
 
+vi.mock('@/components/plugins/PluginsView', () => ({
+  PluginsView: () => <div data-testid="plugins-view" />,
+}));
+
 import { useChatStore, useUiStore } from '@/lib/store';
 import { WorkspaceCenter } from './WorkspaceCenter';
 
@@ -118,6 +122,9 @@ beforeEach(() => {
     layoutMode: 'chat',
     codeView: 'session',
     activeView: 'chat',
+    agentView: 'team',
+    activeAgentId: null,
+    activeChannelId: null,
     codeDiffTab: null,
     codeCommitsTab: null,
     codeFileTab: null,
@@ -200,6 +207,17 @@ describe('WorkspaceCenter — modo Code', () => {
     expect(useUiStore.getState().codeView).toBe('session');
   });
 
+  it('opens the Plugins page in the Code center', () => {
+    useUiStore.setState({ layoutMode: 'code', codeView: 'plugins' });
+    render(<WorkspaceCenter />);
+
+    expect(screen.getByTestId('plugins-view')).toBeTruthy();
+    expect(screen.getByTestId('chat-view').parentElement?.className).toContain('hidden');
+    expect(screen.getByTestId('code-session-header').parentElement?.className).toContain(
+      'hidden',
+    );
+  });
+
   it('never renders the Biblioteca, even with a stale activeView', () => {
     useUiStore.setState({ layoutMode: 'code', activeView: 'library' });
     render(<WorkspaceCenter />);
@@ -270,6 +288,22 @@ describe('WorkspaceCenter — modo Code', () => {
 
     expect(screen.getByTestId('chat-view')).toBe(chat);
     expect(screen.getByTestId('custom-welcome')).toBeTruthy();
+  });
+});
+
+describe('WorkspaceCenter — plugins no layout Agentes', () => {
+  it('shows the Plugins page when the Agents sidebar opens it', () => {
+    useUiStore.setState({
+      layoutMode: 'agent',
+      agentView: 'plugins',
+      activeAgentId: null,
+      activeChannelId: null,
+    });
+    useChatStore.setState({ activeId: null });
+    render(<WorkspaceCenter />);
+
+    expect(screen.getByTestId('plugins-view')).toBeTruthy();
+    expect(screen.queryByTestId('chat-view')).toBeNull();
   });
 });
 

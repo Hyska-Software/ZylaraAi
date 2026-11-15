@@ -15,6 +15,8 @@ import { MessageList } from './MessageList';
 import { TurnErrorBanner } from './TurnErrorBanner';
 import { planUsageUrl } from './turnError';
 import { WelcomeScreen } from './WelcomeScreen';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { resolvePluginComponent, usePluginRegistry, type PluginComponent } from '@/lib/plugins/registry';
 
 /** Distance from the bottom (px) still considered "reading the latest message". */
 const BOTTOM_THRESHOLD = 96;
@@ -44,6 +46,7 @@ function lastAssistantFailed(messages: ChatMessage[]): boolean {
  */
 export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
   const { t } = useTranslation('chat');
+  const pluginRegistry = usePluginRegistry();
   const activeMessages = useChatStore(selectActiveMessages);
   const activeId = useChatStore((state) => state.activeId);
   const conversations = useChatStore((state) => state.conversations);
@@ -159,8 +162,20 @@ export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
     return () => window.removeEventListener('zylara:scroll-bottom', onScrollBottom);
   }, [reduceMotion, scrollToBottom]);
 
+  const Welcome = resolvePluginComponent(
+    'chat.welcome',
+    WelcomeScreen as unknown as PluginComponent,
+  );
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center px-3">
+        <PluginSlot
+          slot="chat.header.actions"
+          context={{ conversationId: activeId ?? undefined }}
+          compact
+          className="pointer-events-auto"
+        />
+      </div>
       <div
         ref={scrollRef}
         onScroll={handleScroll}
@@ -170,7 +185,7 @@ export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
           <LoadingSkeleton />
         ) : messages.length === 0 && pendingGateCount === 0 ? (
           <div className="flex min-h-full items-center justify-center">
-            {welcome ?? <WelcomeScreen />}
+            {welcome ?? <Welcome pluginRegistryRevision={pluginRegistry.revision} />}
           </div>
         ) : (
           <div className="mx-auto w-full max-w-3xl px-6 pb-10 pt-6">

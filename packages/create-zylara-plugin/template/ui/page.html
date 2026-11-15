@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="color-scheme" content="light dark" />
+<title>__PLUGIN_NAME__</title>
+<style>
+  html, body { margin: 0; background: var(--background); color: var(--foreground); }
+  body { padding: 20px; font: 14px/1.55 system-ui, sans-serif; }
+  button { font: inherit; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+  pre { overflow: auto; }
+</style>
+<h1>__PLUGIN_NAME__</h1>
+<p id="status">Connecting to Zylara…</p>
+<button id="run">Increment local counter</button>
+<pre id="output"></pre>
+<script src="/@zylara/sdk.js"></script>
+<script>
+  ZylaraPlugin.on('init', ({ context }) => {
+    document.getElementById('status').textContent = `Connected (${context?.conversationId ?? 'no conversation'})`;
+    ZylaraPlugin.resize();
+  });
+  document.getElementById('run').addEventListener('click', async () => {
+    const output = document.getElementById('output');
+    try {
+      const current = await ZylaraPlugin.rpc('storage.get', { key: 'counter' });
+      const next = Number(current?.value ?? 0) + 1;
+      await ZylaraPlugin.rpc('storage.set', { key: 'counter', value: String(next) });
+      output.textContent = `counter = ${next}`;
+    } catch (error) {
+      output.textContent = String(error);
+    }
+    ZylaraPlugin.resize();
+  });
+</script>

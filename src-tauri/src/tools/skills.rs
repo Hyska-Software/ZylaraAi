@@ -61,6 +61,8 @@ pub enum SkillSource {
     /// OpenCode: `$XDG_CONFIG_HOME/opencode/skills`, `~/.config/opencode/skills`
     /// or `%APPDATA%\opencode\skills` on Windows.
     OpenCode,
+    /// Packaged by an enabled plugin; the id is in `plugin_id`.
+    Plugin,
 }
 
 impl SkillSource {
@@ -72,6 +74,7 @@ impl SkillSource {
             Self::Codex => "codex",
             Self::Claude => "claude",
             Self::OpenCode => "opencode",
+            Self::Plugin => "plugin",
         }
     }
 
@@ -91,6 +94,8 @@ impl SkillSource {
 pub struct ExternalSkillRoot {
     pub source: SkillSource,
     pub dir: PathBuf,
+    /// Owning plugin for `SkillSource::Plugin`.
+    pub plugin_id: Option<String>,
 }
 
 /// Standard skills repositories of the current user, in precedence order
@@ -178,7 +183,11 @@ pub fn external_roots_from(
 
     candidates
         .into_iter()
-        .map(|(source, dir)| ExternalSkillRoot { source, dir })
+        .map(|(source, dir)| ExternalSkillRoot {
+            source,
+            dir,
+            plugin_id: None,
+        })
         .filter(|root| root.dir.is_dir())
         .collect()
 }
@@ -227,6 +236,8 @@ pub struct Skill {
     /// Absolute directory that contains `SKILL.md`.
     pub dir: PathBuf,
     pub source: SkillSource,
+    /// Plugin id when `source == SkillSource::Plugin`.
+    pub plugin_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -250,6 +261,15 @@ impl Skill {
         self.source.as_str()
     }
 
+    /// Store/UI label: `plugin:<id>` for packaged skills, plain source id
+    /// otherwise. The prompt and config hash use this label.
+    pub fn source_label(&self) -> String {
+        match (&self.source, &self.plugin_id) {
+            (SkillSource::Plugin, Some(id)) => format!("plugin:{id}"),
+            _ => self.source_str().to_string(),
+        }
+    }
+
     /// Summary flags for the settings/management UI: `enabled` reflects the
     /// persisted `disabled_skills` list (activation is by name) and `deletable`
     /// is only true for user skills (the bundled ones can be disabled instead).
@@ -257,7 +277,7 @@ impl Skill {
         SkillSummary {
             name: self.name.clone(),
             description: self.description.clone(),
-            source: self.source_str().to_string(),
+            source: self.source_label(),
             enabled: is_enabled(&self.name, disabled),
             deletable: self.source == SkillSource::User,
         }
@@ -337,11 +357,23 @@ pub fn catalog_with_roots(
 ) -> anyhow::Result<Vec<Skill>> {
     materialize_bundled(data_dir)?;
     let mut sources: Vec<Vec<Skill>> = Vec::with_capacity(external.len() + 2);
-    sources.push(scan_skills(&data_dir.join(USER_DIR), SkillSource::User));
+    sources.push(scan_skills(
+        &data_dir.join(USER_DIR),
+        SkillSource::User,
+        None,
+    ));
     for root in external {
-        sources.push(scan_skills(&root.dir, root.source));
+        sources.push(scan_skills(
+            &root.dir,
+            root.source,
+            root.plugin_id.clone(),
+        ));
     }
-    sources.push(scan_skills(&data_dir.join(BUNDLED_DIR), SkillSource::Bundled));
+    sources.push(scan_skills(
+        &data_dir.join(BUNDLED_DIR),
+        SkillSource::Bundled,
+        None,
+    ));
     Ok(merge_by_precedence(sources))
 }
 
@@ -416,7 +448,7 @@ fn merge_by_precedence(sources: Vec<Vec<Skill>>) -> Vec<Skill> {
 /// Shallow (one level) scan of `<root>/<skill>/SKILL.md`; hidden directories
 /// (`.system`, …) and invalid skills are skipped so a broken repository never
 /// breaks the whole turn.
-fn scan_skills(root: &Path, source: SkillSource) -> Vec<Skill> {
+fn scan_skills(root: &Path, source: SkillSource, plugin_id: Option<String>) -> Vec<Skill> {
     let entries = match std::fs::read_dir(root) {
         Ok(entries) => entries,
         Err(_) => return Vec::new(),
@@ -435,7 +467,7 @@ fn scan_skills(root: &Path, source: SkillSource) -> Vec<Skill> {
         if hidden || !dir.join(SKILL_FILE).is_file() {
             continue;
         }
-        if let Ok(skill) = load_skill(&dir, source) {
+        if let Ok(skill) = load_skill_with_plugin(&dir, source, plugin_id.clone()) {
             skills.push(skill);
         }
     }
@@ -443,6 +475,14 @@ fn scan_skills(root: &Path, source: SkillSource) -> Vec<Skill> {
 }
 
 fn load_skill(dir: &Path, source: SkillSource) -> anyhow::Result<Skill> {
+    load_skill_with_plugin(dir, source, None)
+}
+
+fn load_skill_with_plugin(
+    dir: &Path,
+    source: SkillSource,
+    plugin_id: Option<String>,
+) -> anyhow::Result<Skill> {
     let path = dir.join(SKILL_FILE);
     let raw = std::fs::read_to_string(&path).with_context(|| {
         let path = path.display().to_string();
@@ -487,6 +527,7 @@ fn load_skill(dir: &Path, source: SkillSource) -> anyhow::Result<Skill> {
         body,
         dir: dir.to_path_buf(),
         source,
+        plugin_id,
     })
 }
 
@@ -1005,7 +1046,7 @@ pub fn run_list(rt: &ToolRuntime) -> ToolOutcome {
                     json!({
                         "name": skill.name,
                         "description": skill.description,
-                        "source": skill.source_str(),
+                        "source": skill.source_label(),
                     })
                 })
                 .collect();
@@ -1189,6 +1230,8 @@ mod tests {
             data_dir: temp.path.clone(),
             // Tests never read the developer's real skill repositories.
             skills_roots: Vec::new(),
+            approval: None,
+            emit: None,
         }
     }
 
@@ -1378,6 +1421,7 @@ mod tests {
             body: String::new(),
             dir: PathBuf::from("bundled/pdf"),
             source: SkillSource::Bundled,
+            plugin_id: None,
         }];
         let user = vec![Skill {
             name: "pdf".to_string(),
@@ -1385,6 +1429,7 @@ mod tests {
             body: String::new(),
             dir: PathBuf::from("user/pdf"),
             source: SkillSource::User,
+            plugin_id: None,
         }];
         let merged = merge_by_precedence(vec![user, bundled]);
         assert_eq!(merged.len(), 1);
@@ -1750,10 +1795,12 @@ mod tests {
             ExternalSkillRoot {
                 source: SkillSource::Agents,
                 dir: agents_root.clone(),
+                plugin_id: None,
             },
             ExternalSkillRoot {
                 source: SkillSource::Codex,
                 dir: codex_root.clone(),
+                plugin_id: None,
             },
         ];
 
@@ -1811,6 +1858,7 @@ mod tests {
         let roots = vec![ExternalSkillRoot {
             source: SkillSource::Codex,
             dir: codex_root,
+            plugin_id: None,
         }];
 
         let all = summaries_with_roots(&data_dir, &[], &roots);
@@ -1847,6 +1895,7 @@ mod tests {
         let roots = vec![ExternalSkillRoot {
             source: SkillSource::Codex,
             dir: codex_root.clone(),
+            plugin_id: None,
         }];
 
         let skill = read_with_roots(&data_dir, "so-codex", &roots)
@@ -1874,6 +1923,7 @@ mod tests {
         rt.skills_roots = vec![ExternalSkillRoot {
             source: SkillSource::Codex,
             dir: codex_root.clone(),
+            plugin_id: None,
         }];
 
         let listed = run_list(&rt);

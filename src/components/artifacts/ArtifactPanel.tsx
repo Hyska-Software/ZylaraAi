@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { t as translate } from '@/lib/i18n';
 import { formatDateTime } from '@/lib/i18n/format';
 import type { ArtifactContent } from '@/lib/types';
@@ -242,6 +243,18 @@ export function ArtifactPanel() {
                 <span className="tabular-nums">{formatBytes(artifact.size)}</span>
                 {artifact.language ? <span>· {artifact.language}</span> : null}
               </div>
+            </div>
+            <div className="flex min-w-0 shrink-0 items-center gap-1">
+              <PluginSlot
+                slot="artifact.preview.toolbar"
+                context={{
+                  artifactId: artifact.id,
+                  artifactKind: artifact.kind,
+                  mimeType: artifact.mimeType,
+                }}
+                compact
+              />
+              <PluginSlot slot="right.panel.header" compact />
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
               <Tooltip content={t('artifacts:panel.viewList')} side="bottom">

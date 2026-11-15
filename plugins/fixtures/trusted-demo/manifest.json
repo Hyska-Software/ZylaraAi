@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "id": "com.acme.trusted-demo",
+  "name": "Acme Trusted Lab",
+  "version": "1.0.0",
+  "description": "Trusted reference plugin: React view/panel, component override, shell wrapper, global CSS and an agent tool.",
+  "author": "Acme",
+  "apiVersion": 1,
+  "engines": { "zylara": ">=0.10.0 <1.0.0" },
+  "publisher": { "id": "acme", "name": "Acme", "keyId": "acme-fixture-2026" },
+  "permissions": [
+    "unsafe.renderer",
+    "ui.slot:chat.sidebar.footer",
+    "ui.view",
+    "ui.panel",
+    "ui.command",
+    "ui.override:chat.welcome",
+    "ui.override:layout.shell",
+    "ui.css.global",
+    "agent.tools",
+    "agent.prompt",
+    "agent.skills",
+    "storage",
+    "notifications",
+    "providers"
+  ],
+  "trusted": true,
+  "contributes": {
+    "ui": {
+      "slots": [
+        {
+          "slot": "chat.sidebar.footer",
+          "title": "Trusted Lab",
+          "titleKey": "toolbar.title",
+          "icon": "Sparkles",
+          "action": { "kind": "openView", "target": "lab" }
+        }
+      ],
+      "views": [
+        {
+          "id": "lab",
+          "title": "Trusted Lab",
+          "titleKey": "views.lab",
+          "description": "A React component running in the main webview.",
+          "descriptionKey": "views.labDescription",
+          "icon": "Sparkles",
+          "surface": "chat",
+          "location": "sidebar",
+          "component": "Lab"
+        }
+      ],
+      "panels": [
+        {
+          "id": "lab-panel",
+          "title": "Trusted panel",
+          "titleKey": "panels.lab",
+          "icon": "PanelRight",
+          "component": "LabPanel",
+          "dock": "right"
+        }
+      ],
+      "commands": [
+        {
+          "id": "open-lab",
+          "title": "Open Trusted Lab",
+          "titleKey": "commands.openLab",
+          "command": "lab",
+          "icon": "Sparkles",
+          "action": { "kind": "openView", "target": "lab" }
+        },
+        {
+          "id": "ping",
+          "title": "Ping trusted handler",
+          "titleKey": "commands.ping",
+          "command": "trusted-ping",
+          "action": { "kind": "execute", "method": "ping" }
+        }
+      ]
+    },
+    "tools": [
+      {
+        "name": "trusted_echo",
+        "description": "Echo text through the trusted plugin runtime.",
+        "risk": "read",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" }
+          },
+          "required": ["text"]
+        }
+      }
+    ],
+    "promptSections": [
+      { "id": "lab", "title": "Trusted Lab", "file": "prompt.md" }
+    ],
+    "skills": ["skills"],
+    "locales": ["locales"],
+    "providers": [
+      {
+        "id": "trusted-gateway",
+        "name": "Trusted Lab Gateway",
+        "shortName": "Trusted",
+        "description": "Fixture declarative provider shipped by the trusted plugin.",
+        "baseUrl": "https://api.trusted.example/v1",
+        "models": [
+          {
+            "id": "trusted-chat-1",
+            "name": "Trusted Chat 1",
+            "protocols": ["openai-chat"],
+            "contextWindow": 128000,
+            "maxOutput": 8192
+          }
+        ]
+      }
+    ]
+  },
+  "runtime": {
+    "ui": "trusted",
+    "entry": "main.js"
+  }
+}

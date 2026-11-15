@@ -242,6 +242,8 @@ pub struct AppState {
     pub questions: Arc<crate::harness::code::questions::QuestionRegistry>,
     /// Global/per-agent turn slots (cost/CPU protection for background agents).
     pub governor: Arc<crate::concurrency::ConcurrencyGovernor>,
+    /// Third-party plugins: install/lifecycle, contributions, broker and tools.
+    pub plugins: Arc<crate::plugins::PluginManager>,
     dynamic_models: RwLock<HashMap<String, DynamicModels>>,
     turns: TurnRegistry,
     close_intent: CloseIntent,
@@ -250,19 +252,28 @@ pub struct AppState {
 impl AppState {
     pub fn init(app: &AppHandle) -> anyhow::Result<Self> {
         // Prime the backend locale before the schedulers run.
-        crate::config::load_settings(app);
+        let settings = crate::config::load_settings(app);
         let data_dir = crate::config::data_dir(app)?;
         crate::computer::browser::init_global(&data_dir);
         let db_path = data_dir.join("zylara.db");
-        let db = Db::open(&db_path)?;
+        let db = Arc::new(Db::open(&db_path)?);
         let catalog = CatalogFile::load()?;
+        let http = crate::http::client();
+        let plugins = crate::plugins::PluginManager::load(
+            &data_dir,
+            db.clone(),
+            http.clone(),
+            Some(app.clone()),
+            &settings,
+            crate::plugins::forced_safe_mode_from_args(),
+        )?;
         let state = Self {
             started_at: crate::domain::now_ms(),
-            db: Arc::new(db),
+            db,
             catalog,
-            http: crate::http::client(),
+            http,
             search_http: crate::http::search_client(),
-        data_dir: data_dir.clone(),
+            data_dir: data_dir.clone(),
             oauth: Arc::new(OAuthState::new()),
             approvals: Arc::new(ApprovalRegistry::new()),
             observed: Arc::new(crate::harness::code::observed::ObservedFiles::new()),
@@ -272,6 +283,7 @@ impl AppState {
             questions: Arc::new(crate::harness::code::questions::QuestionRegistry::new()),
             governor: crate::concurrency::ConcurrencyGovernor::new(),
             jobs: Arc::new(crate::jobs::JobRegistry::new()),
+            plugins,
             dynamic_models: RwLock::new(HashMap::new()),
             turns: TurnRegistry::new(),
             close_intent: CloseIntent::default(),
@@ -340,6 +352,25 @@ impl AppState {
         self.dynamic_models.write().clear();
     }
 
+    /// Bundled catalog plus declarative plugin providers.
+    pub fn catalog_with_plugins(&self) -> CatalogFile {
+        let mut catalog = self.catalog.clone();
+        for provider in self.plugins.providers() {
+            if !catalog.providers.iter().any(|known| known.id == provider.id) {
+                catalog.providers.push(provider);
+            }
+        }
+        catalog
+    }
+
+    /// Provider lookup across the bundled catalog and enabled plugins.
+    pub fn provider(&self, provider_id: &str) -> Option<crate::catalog::ProviderInfo> {
+        self.catalog
+            .provider(provider_id)
+            .cloned()
+            .or_else(|| self.plugins.provider(provider_id))
+    }
+
     /// Merged list: account list first (order preserved), catalog metadata where
     /// available, conservative entries for models only the account knows.
     pub fn models(&self, provider_id: &str) -> Vec<ModelInfo> {
@@ -377,6 +408,13 @@ impl AppState {
             .cloned()
             .or_else(|| {
                 self.dynamic_models_for(provider_id)?
+                    .models
+                    .into_iter()
+                    .find(|model| model.id == model_id)
+            })
+            .or_else(|| {
+                self.plugins
+                    .provider(provider_id)?
                     .models
                     .into_iter()
                     .find(|model| model.id == model_id)

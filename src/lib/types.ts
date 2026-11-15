@@ -557,6 +557,7 @@ export type ToolPresentation =
       usage?: UsageInfo;
     }
   | { kind: 'output'; lines?: number | null; spillId?: string | null }
+  | { kind: 'genui'; source: string }
   | { kind: 'terminal'; sessionId: string; title: string };
 
 /** Snapshot completo da sessão de código (`get_code_session_state`). */
@@ -1083,6 +1084,7 @@ export type CacheBreakReason =
   | 'protocol_fallback'
   | 'attachments'
   | 'config_change'
+  | 'plugin_config_changed'
   | 'ttl_expired'
   | 'provider_policy';
 
@@ -2345,6 +2347,19 @@ export interface Settings {
   providerRetryMaxElapsedMs?: number;
   /** Maior espera aceita de `Retry-After` antes de devolver o erro. */
   providerRetryAfterCapMs?: number;
+  /* ---- plugin platform ---- */
+  /** Third-party plugins are enabled. */
+  pluginsEnabled?: boolean;
+  /** Signed store registry URL. */
+  pluginRegistryUrl?: string;
+  /** Stage updates automatically. */
+  pluginAutoUpdate?: boolean;
+  /** Allow trusted plugins (main-webview JavaScript). */
+  pluginAllowTrusted?: boolean;
+  /** Recovery mode: load no third-party plugins. */
+  pluginSafeMode?: boolean;
+  /** Developer mode: unpacked folders and unsigned packages. */
+  pluginDevMode?: boolean;
 }
 
 export interface ProviderKeyStatus {

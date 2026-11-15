@@ -20,6 +20,7 @@ import {
   sortableDropClassHorizontal,
 } from '@/components/ui';
 import { PanelResizer } from '@/components/layout/PanelResizer';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { api } from '@/lib/api';
 import {
   SIDE_PANEL_WIDTH_DEFAULT,
@@ -453,6 +454,8 @@ export function CodePanel() {
             </div>
           )}
         </SortableList>
+
+        <PluginSlot slot="code.panel.header" compact />
 
         <Tooltip content={t('code:panel.refreshTooltip')} side="bottom">
           <IconButton

@@ -124,7 +124,7 @@ async fn deliver_inbox_item(app: AppHandle, item: AgentInboxItem) {
         db: db.clone(),
         http: state.http.clone(),
         search_http: state.search_http.clone(),
-        catalog: state.catalog.clone(),
+        catalog: state.catalog_with_plugins(),
         data_dir: None,
         skills_roots: None,
         approvals: None,

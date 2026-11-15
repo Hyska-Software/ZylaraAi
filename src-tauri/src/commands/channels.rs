@@ -330,7 +330,7 @@ pub async fn post_agent_channel_message(
         db: db.clone(),
         http: state.http.clone(),
         search_http: state.search_http.clone(),
-        catalog: state.catalog.clone(),
+        catalog: state.catalog_with_plugins(),
         data_dir: None,
         skills_roots: None,
         // Unattended channel replies cannot answer approval/question cards.

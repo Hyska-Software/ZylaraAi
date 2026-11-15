@@ -1,0 +1,12 @@
+{
+  "toolbar": { "title": "Trusted Lab" },
+  "views": {
+    "lab": "Trusted Lab",
+    "labDescription": "A React component running in the main webview."
+  },
+  "panels": { "lab": "Trusted panel" },
+  "commands": {
+    "openLab": "Open Trusted Lab",
+    "ping": "Ping trusted handler"
+  }
+}

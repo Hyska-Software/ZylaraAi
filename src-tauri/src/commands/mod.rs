@@ -21,6 +21,7 @@ pub mod github;
 pub mod models;
 pub mod notifications;
 pub mod oauth;
+pub mod plugins;
 pub mod settings;
 pub mod skills;
 pub mod terminal;

@@ -30,6 +30,7 @@ mod installer;
 mod jobs;
 mod mcp;
 mod oauth;
+mod plugins;
 mod policy;
 mod process_env;
 mod providers;
@@ -41,9 +42,10 @@ mod tray;
 mod update;
 mod workspace;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 pub fn run() {
+    plugins::capture_deep_links(std::env::args());
     #[cfg(unix)]
     if let Some(job) = update::managed::helper_requested() {
         update::managed::run_helper(&job);
@@ -95,15 +97,30 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
         // Must be the first plugin: a second instance focuses the existing
         // window instead of racing the rotating OAuth refresh token and the
         // secrets file.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(url) = plugins::capture_deep_links(argv) {
+                let _ = app.emit("zylara:plugin-deep-link", url);
+            }
             // A hidden window has no taskbar entry: bring it back instead of
             // only focusing it.
             crate::tray::show_main_window(app);
         }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notification::init())
+        // Plugin assets live on their own origin. Only active plugins are
+        // served; the sandboxed iframe never sees the host origin.
+        .register_uri_scheme_protocol("zplugin", |context, request| {
+            let Some(state) = context.app_handle().try_state::<state::AppState>() else {
+                return tauri::http::Response::builder()
+                    .status(503)
+                    .body(Vec::new())
+                    .unwrap_or_else(|_| tauri::http::Response::new(Vec::new()));
+            };
+            plugins::handle_asset_request(&state.plugins, &request)
+        })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() != "main" {
@@ -496,6 +513,39 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             commands::terminal::kill_terminal,
             commands::terminal::close_terminal,
             commands::terminal::list_terminals,
+            /* -------- plugins -------- */
+            commands::plugins::list_plugins,
+            commands::plugins::inspect_plugin_package,
+            commands::plugins::inspect_plugin_folder,
+            commands::plugins::inspect_plugin_url,
+            commands::plugins::install_plugin,
+            commands::plugins::install_plugin_folder,
+            commands::plugins::install_plugin_url,
+            commands::plugins::install_plugin_store,
+            commands::plugins::uninstall_plugin,
+            commands::plugins::set_plugin_enabled,
+            commands::plugins::set_plugin_permissions,
+            commands::plugins::plugin_rpc,
+            commands::plugins::plugin_call_result,
+            commands::plugins::list_plugin_logs,
+            commands::plugins::list_plugin_audit,
+            commands::plugins::list_plugin_tool_calls,
+            commands::plugins::open_plugin_dir,
+            commands::plugins::open_plugins_dir,
+            commands::plugins::plugin_dev_reload,
+            commands::plugins::plugin_runtime_ready,
+            commands::plugins::plugin_leave_safe_mode,
+            commands::plugins::take_plugin_deep_link,
+            commands::plugins::get_plugin_locales,
+            commands::plugins::get_plugin_themes,
+            commands::plugins::plugin_asset_text,
+            commands::plugins::store_refresh,
+            commands::plugins::check_plugin_updates,
+            commands::plugins::update_plugin,
+            commands::plugins::rollback_plugin,
+            commands::plugins::set_plugin_auto_update,
+            commands::plugins::set_plugin_secret,
+            commands::plugins::list_plugin_secrets,
         ])
         .build(context)
         .expect("error while building Zylara");

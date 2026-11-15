@@ -146,6 +146,7 @@
     "model": "Modelo padrão",
     "instructions": "Instruções",
     "tools": "Ferramentas",
+    "plugins": "Plugins",
     "agents": "Agentes",
     "data": "Dados",
     "about": "Sobre"

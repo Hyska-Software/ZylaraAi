@@ -27,7 +27,7 @@ fn to_error(error: impl std::fmt::Display) -> String {
 
 fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
     let provider_ids: Vec<String> = state
-        .catalog
+        .catalog_with_plugins()
         .providers
         .iter()
         .map(|provider| provider.id.clone())
@@ -58,6 +58,7 @@ pub fn save_settings(
     settings: Settings,
 ) -> Result<SettingsView, String> {
     config::save_settings(&app, &settings).map_err(to_error)?;
+    state.plugins.apply_settings(&settings);
     crate::tray::sync(&app, &settings);
     Ok(settings_view(&app, &state))
 }
@@ -116,9 +117,7 @@ pub fn set_provider_key(
     key: Option<String>,
 ) -> Result<SettingsView, String> {
     let provider = state
-        .catalog
         .provider(&provider_id)
-        .cloned()
         .ok_or_else(|| {
             crate::i18n::t_args(
                 "settings.errors.providerUnknown",
@@ -413,9 +412,7 @@ pub async fn validate_provider(
     provider_id: String,
 ) -> Result<ProviderValidation, String> {
     let provider = state
-        .catalog
         .provider(&provider_id)
-        .cloned()
         .ok_or_else(|| {
             crate::i18n::t_args(
                 "settings.errors.providerUnknown",

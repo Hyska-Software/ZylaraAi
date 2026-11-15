@@ -1,7 +1,11 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useUiStore } from '@/lib/store';
 import { isSettingsTabId, SETTINGS_TABS } from '@/lib/settingsTabs';
+import { pluginIcon } from '@/lib/plugins/icons';
+import { pluginLabel, usePluginRegistry } from '@/lib/plugins/registry';
+import { PluginSettingsTabPanel } from '@/components/plugins/PluginHosts';
 import {
   Button,
   Dialog,
@@ -20,6 +24,7 @@ import { DataTab } from './DataTab';
 import { GeneralTab } from './GeneralTab';
 import { InstructionsTab } from './InstructionsTab';
 import { ModelTab } from './ModelTab';
+import { PluginsTab } from './PluginsTab';
 import { ProvidersTab } from './ProvidersTab';
 import { SETTINGS_TAB_ICONS } from './tabIcons';
 import { TerminalTab } from './TerminalTab';
@@ -40,7 +45,21 @@ export function SettingsDialog() {
   const setOpen = useUiStore((state) => state.setSettingsOpen);
   const tab = useUiStore((state) => state.settingsTab);
   const setTab = useUiStore((state) => state.setSettingsTab);
-  const active = SETTINGS_TABS.find((entry) => entry.id === tab) ?? SETTINGS_TABS[0];
+  const registry = usePluginRegistry();
+  const active = SETTINGS_TABS.find((entry) => entry.id === tab);
+  const activePluginTab = registry.settingsTabs.find(
+    (entry) => `plugin:${entry.key}` === tab,
+  );
+  const headerLabel = active
+    ? t(active.labelKey)
+    : activePluginTab
+      ? pluginLabel(activePluginTab.plugin, activePluginTab.tab.titleKey, activePluginTab.tab.title)
+      : t('tabs.general');
+
+  useEffect(() => {
+    if (!open || active || activePluginTab) return;
+    setTab('general');
+  }, [open, active, activePluginTab, setTab]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -74,6 +93,19 @@ export function SettingsDialog() {
                   </TabsTrigger>
                 );
               })}
+              {registry.settingsTabs.map((entry) => {
+                const Icon = pluginIcon(entry.tab.icon);
+                return (
+                  <TabsTrigger
+                    key={`plugin:${entry.key}`}
+                    value={`plugin:${entry.key}`}
+                    variant="sidebar"
+                  >
+                    <Icon aria-hidden className="size-4" />
+                    {pluginLabel(entry.plugin, entry.tab.titleKey, entry.tab.title)}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
             <div className="border-t border-border p-2">
               <Button variant="ghost" size="sm" className="w-full justify-center" onClick={() => setOpen(false)}>
@@ -85,7 +117,7 @@ export function SettingsDialog() {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-3">
               <span className="text-[13px] font-semibold tracking-tight text-foreground">
-                {t(active.labelKey)}
+                {headerLabel}
               </span>
               <span className="text-[11px] text-foreground-subtle">{t('dialog.autoSave')}</span>
             </div>
@@ -113,6 +145,9 @@ export function SettingsDialog() {
                   <TabsContent value="tools">
                     <ToolsTab />
                   </TabsContent>
+                  <TabsContent value="plugins">
+                    <PluginsTab />
+                  </TabsContent>
                   <TabsContent value="agents">
                     <AgentsTab />
                   </TabsContent>
@@ -122,6 +157,11 @@ export function SettingsDialog() {
                   <TabsContent value="about">
                     <AboutTab />
                   </TabsContent>
+                  {registry.settingsTabs.map((entry) => (
+                    <TabsContent key={`plugin:${entry.key}`} value={`plugin:${entry.key}`}>
+                      <PluginSettingsTabPanel tabKey={entry.key} />
+                    </TabsContent>
+                  ))}
                 </div>
               </ScrollArea>
             </div>

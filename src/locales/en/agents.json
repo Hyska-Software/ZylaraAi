@@ -231,6 +231,7 @@
       "protocolFallback": "Wire protocol changed",
       "attachments": "Attachments changed",
       "configChange": "Configuration changed",
+      "pluginConfigChanged": "Plugin configuration changed",
       "ttlExpired": "Cache expired (TTL)",
       "providerPolicy": "Provider rule"
     },
@@ -245,6 +246,7 @@
       "protocolFallback": "the wire protocol changed",
       "attachments": "the attachments changed",
       "configChange": "the configuration changed",
+      "pluginConfigChanged": "the plugin configuration changed",
       "ttlExpired": "the cache expired by TTL",
       "providerPolicy": "the provider rule prevents reuse",
       "unknown": "unidentified reason"
@@ -1813,6 +1815,7 @@
     "createAgent": "Create agent",
     "pinned": "Pinned",
     "noMatch": "No agent or conversation found for “{{query}}”.",
+    "plugins": "Plugins",
     "team": "Team",
     "settings": "Settings",
     "deleteAgentTitle": "Delete agent?",

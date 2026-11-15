@@ -121,6 +121,20 @@ import type {
   WorkspaceGitStatus,
   WorkspaceTreeSnapshot,
 } from './types';
+import type {
+  PluginAuditRow,
+  PluginLogRow,
+  PluginLocaleBundle,
+  PluginPackageInspection,
+  PluginRecord,
+  PluginSnapshot,
+  PluginStoreView,
+  PluginThemeEntry,
+  PluginToolCallEvent,
+  PluginToolCallRow,
+  PluginToolResult,
+  PluginUpdateInfo,
+} from './plugins/types';
 
 export const api = {
   /* -------- app / settings -------- */
@@ -845,6 +859,114 @@ export const api = {
       cursor,
     }),
   killJob: (jobId: string) => invoke<JobView>('kill_job', { jobId }),
+
+  /* -------- plugins -------- */
+  listPlugins: () => invoke<PluginSnapshot>('list_plugins'),
+  inspectPluginPackage: (path: string) =>
+    invoke<PluginPackageInspection>('inspect_plugin_package', { path }),
+  inspectPluginFolder: (path: string) =>
+    invoke<PluginPackageInspection>('inspect_plugin_folder', { path }),
+  inspectPluginUrl: (url: string) =>
+    invoke<PluginPackageInspection>('inspect_plugin_url', { url }),
+  installPlugin: (
+    path: string,
+    grantedPermissions?: string[] | null,
+    allowUnsigned = false,
+    allowKeyRotation = false,
+  ) =>
+    invoke<PluginRecord>('install_plugin', {
+      path,
+      grantedPermissions: grantedPermissions ?? null,
+      allowUnsigned,
+      allowKeyRotation,
+    }),
+  installPluginFolder: (path: string, grantedPermissions?: string[] | null) =>
+    invoke<PluginRecord>('install_plugin_folder', {
+      path,
+      grantedPermissions: grantedPermissions ?? null,
+    }),
+  installPluginUrl: (
+    url: string,
+    grantedPermissions?: string[] | null,
+    allowUnsigned = false,
+    allowKeyRotation = false,
+  ) =>
+    invoke<PluginRecord>('install_plugin_url', {
+      url,
+      grantedPermissions: grantedPermissions ?? null,
+      allowUnsigned,
+      allowKeyRotation,
+    }),
+  installPluginStore: (
+    pluginId: string,
+    url?: string | null,
+    grantedPermissions?: string[] | null,
+    allowKeyRotation = false,
+  ) =>
+    invoke<PluginRecord>('install_plugin_store', {
+      pluginId,
+      url: url ?? null,
+      grantedPermissions: grantedPermissions ?? null,
+      allowKeyRotation,
+    }),
+  uninstallPlugin: (pluginId: string, keepData = false) =>
+    invoke<void>('uninstall_plugin', { pluginId, keepData }),
+  setPluginEnabled: (pluginId: string, enabled: boolean) =>
+    invoke<PluginRecord>('set_plugin_enabled', { pluginId, enabled }),
+  setPluginPermissions: (pluginId: string, permissions: string[]) =>
+    invoke<PluginRecord>('set_plugin_permissions', { pluginId, permissions }),
+  pluginRpc: <T = unknown>(pluginId: string, method: string, params?: unknown) =>
+    invoke<T>('plugin_rpc', { pluginId, method, params: params ?? {} }),
+  pluginCallResult: (result: PluginToolResult) =>
+    invoke<void>('plugin_call_result', { result }),
+  listPluginLogs: (pluginId?: string | null, limit = 100, beforeId?: number | null) =>
+    invoke<PluginLogRow[]>('list_plugin_logs', {
+      pluginId: pluginId ?? null,
+      limit,
+      beforeId: beforeId ?? null,
+    }),
+  listPluginAudit: (pluginId?: string | null, limit = 100) =>
+    invoke<PluginAuditRow[]>('list_plugin_audit', {
+      pluginId: pluginId ?? null,
+      limit,
+    }),
+  listPluginToolCalls: (pluginId: string, limit = 100) =>
+    invoke<PluginToolCallRow[]>('list_plugin_tool_calls', { pluginId, limit }),
+  openPluginDir: (pluginId: string) => invoke<void>('open_plugin_dir', { pluginId }),
+  openPluginsDir: () => invoke<void>('open_plugins_dir'),
+  pluginDevReload: (pluginId?: string | null) =>
+    invoke<void>('plugin_dev_reload', { pluginId: pluginId ?? null }),
+  pluginRuntimeReady: () => invoke<void>('plugin_runtime_ready'),
+  pluginLeaveSafeMode: () => invoke<void>('plugin_leave_safe_mode'),
+  takePluginDeepLink: () => invoke<string | null>('take_plugin_deep_link'),
+  getPluginLocales: () => invoke<PluginLocaleBundle>('get_plugin_locales'),
+  getPluginThemes: () => invoke<PluginThemeEntry[]>('get_plugin_themes'),
+  pluginAssetText: (pluginId: string, path: string) =>
+    invoke<string>('plugin_asset_text', { pluginId, path }),
+  storeRefresh: (url?: string | null, force = false) =>
+    invoke<PluginStoreView>('store_refresh', { url: url ?? null, force }),
+  checkPluginUpdates: (url?: string | null, force = false) =>
+    invoke<PluginUpdateInfo[]>('check_plugin_updates', { url: url ?? null, force }),
+  updatePlugin: (
+    pluginId: string,
+    url?: string | null,
+    grantedPermissions?: string[] | null,
+    allowKeyRotation = false,
+  ) =>
+    invoke<PluginRecord>('update_plugin', {
+      pluginId,
+      url: url ?? null,
+      grantedPermissions: grantedPermissions ?? null,
+      allowKeyRotation,
+    }),
+  rollbackPlugin: (pluginId: string) =>
+    invoke<PluginRecord>('rollback_plugin', { pluginId }),
+  setPluginAutoUpdate: (pluginId: string, enabled: boolean) =>
+    invoke<void>('set_plugin_auto_update', { pluginId, enabled }),
+  setPluginSecret: (pluginId: string, key: string, value: string | null) =>
+    invoke<void>('set_plugin_secret', { pluginId, key, value }),
+  listPluginSecrets: (pluginId: string) =>
+    invoke<string[]>('list_plugin_secrets', { pluginId }),
 
   /**
    * Starts a turn. The promise resolves with the persisted user/assistant

@@ -231,6 +231,7 @@
       "protocolFallback": "Protocolo de wire mudou",
       "attachments": "Anexos mudaram",
       "configChange": "Configuração mudou",
+      "pluginConfigChanged": "Configuração de plugins mudou",
       "ttlExpired": "Cache expirou (TTL)",
       "providerPolicy": "Regra do provedor"
     },
@@ -245,6 +246,7 @@
       "protocolFallback": "o protocolo de wire mudou",
       "attachments": "os anexos mudaram",
       "configChange": "a configuração mudou",
+      "pluginConfigChanged": "a configuração de plugins mudou",
       "ttlExpired": "o cache expirou pelo TTL",
       "providerPolicy": "a regra do provedor impede o reaproveitamento",
       "unknown": "motivo não identificado"
@@ -1813,6 +1815,7 @@
     "createAgent": "Criar agente",
     "pinned": "Fixados",
     "noMatch": "Nenhum agente ou conversa encontrado para “{{query}}”.",
+    "plugins": "Plugins",
     "team": "Equipe",
     "settings": "Configurações",
     "deleteAgentTitle": "Excluir agente?",

@@ -4,7 +4,7 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const NAMESPACES = [
   'common', 'chat', 'composer', 'models', 'settings', 'code', 'agents',
-  'artifacts', 'library', 'palette', 'genui', 'installer',
+  'artifacts', 'library', 'palette', 'genui', 'installer', 'plugins',
 ];
 const PLURAL = /(_|\.)(zero|one|two|few|many|other)$/;
 

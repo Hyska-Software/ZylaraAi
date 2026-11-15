@@ -87,6 +87,8 @@ export function cacheBreakLabel(reason: CacheBreakReason | null | undefined): st
       return t('code:cache.break.attachments');
     case 'config_change':
       return t('code:cache.break.config_change');
+    case 'plugin_config_changed':
+      return t('code:cache.break.plugin_config_changed');
     case 'ttl_expired':
       return t('code:cache.break.ttl_expired');
     case 'provider_policy':

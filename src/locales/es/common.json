@@ -89,6 +89,8 @@
       "openLibrary": "Abrir biblioteca",
       "skills": "Skills",
       "manageSkills": "Gestionar skills",
+      "plugins": "Plugins",
+      "openPlugins": "Abrir plugins",
       "settings": "Configuración",
       "search": "Buscar conversaciones",
       "loading": "Cargando conversaciones",

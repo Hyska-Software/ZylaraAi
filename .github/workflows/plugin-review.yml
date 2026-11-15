@@ -1,0 +1,53 @@
+name: Plugin package review
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Path to a .zplugin package committed to this repository"
+        required: true
+        type: string
+      allow_high_risk:
+        description: "A human reviewed the high-risk/trusted permissions"
+        required: false
+        default: false
+        type: boolean
+  pull_request:
+    paths:
+      - "plugins/**/*.zplugin"
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Static review
+        shell: bash
+        run: |
+          set -euo pipefail
+          flags=()
+          if [ "${{ inputs.allow_high_risk }}" = "true" ]; then
+            flags+=(--allow-high-risk)
+          fi
+          if [ -n "${{ inputs.package }}" ]; then
+            packages=("${{ inputs.package }}")
+          else
+            mapfile -t packages < <(find plugins -name '*.zplugin' -print)
+            if [ "${#packages[@]}" -eq 0 ]; then
+              echo "No plugin packages changed."
+              exit 0
+            fi
+          fi
+          status=0
+          node scripts/plugin/review.mjs "${packages[@]}" "${flags[@]}" --json > review.json || status=$?
+          cat review.json
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plugin-review
+          path: review.json
+          if-no-files-found: ignore

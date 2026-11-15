@@ -354,6 +354,10 @@ Legenda: `P0` bloqueia o MVP; `P1` bloqueia loja/uso real; `P2` avançado. Cada 
   - Entregável: métricas locais e envio opt-in.
   - Aceite: sem conteúdo de conversa; usuário vê o que é enviado; desligado por default.
 
+- [ ] **PLG-709 — Abas nativas de plugin nos painéis Code/Agentes** `P2`
+  - Entregável: contribuição `ui.panelTabs` no manifesto com `host: "code" | "agent"`, `id`, título, ícone, ordem, `entry`/`component` e permissão `ui.panel`; validação Rust/TS/SDK, registry e merge com as abas nativas dos painéis.
+  - Aceite: plugin adiciona aba ao lado de Arquivos/Alterações/Terminal (Code) e Tela/Rotinas/Browser/Dados (Agentes); ids reservados/colisão rejeitados; frame/trusted isolado com error boundary, tema, i18n, a11y e persistência da aba ativa; desabilitar plugin remove a aba; paridade TS/Rust e testes de ordem/teclado.
+
 ## 5. Contratos e dados
 
 ### 5.1 Fonte única
@@ -604,6 +608,7 @@ Regras: permissão concedida no install; mudança em update exige novo consentim
 | Componentes GenUI de plugin? | Adiar para Fase 5; exige contrato runtime e paridade |
 | Dependências plugin→plugin? | Fora do v1; resolver depois |
 | Layouts de plugin? | Views primeiro; layout/shell só trusted |
+| Abas nativas em painéis existentes? | Fora do v1; `ui.panels` permite um painel próprio. `PLG-709` planeja `ui.panelTabs` para Code/Agentes |
 | Loja oficial? | MVP estático assinado; API só quando houver demanda |
 | Pagamentos? | Fora do v1; licença validada pelo publisher |
 | Telemetria? | Opt-in, agregada, sem conteúdo de conversa |

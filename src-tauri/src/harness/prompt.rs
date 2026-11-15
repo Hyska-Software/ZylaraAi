@@ -378,7 +378,7 @@ fn skills_section(skills: &[Skill], options: &TurnOptions) -> String {
         section.push_str(&format!(
             "- `{}` ({}{}): {}\n",
             skill.name,
-            skill.source_str(),
+            &skill.source_label(),
             read_only,
             catalog_description(&skill.description)
         ));
@@ -749,6 +749,7 @@ mod tests {
                 body: "# Instruções\nUse `scripts/make_docx.py`.".to_string(),
                 dir: std::path::PathBuf::from("/data/skills-bundled/office-docx"),
                 source: crate::tools::skills::SkillSource::Bundled,
+                plugin_id: None,
             },
             Skill {
                 name: "minha-skill".to_string(),
@@ -756,6 +757,7 @@ mod tests {
                 body: "# Minha skill".to_string(),
                 dir: std::path::PathBuf::from("/data/skills/minha-skill"),
                 source: crate::tools::skills::SkillSource::User,
+                plugin_id: None,
             },
             Skill {
                 name: "revisao-codigo".to_string(),
@@ -763,6 +765,7 @@ mod tests {
                 body: "# Revisão".to_string(),
                 dir: std::path::PathBuf::from("/home/me/.codex/skills/revisao-codigo"),
                 source: crate::tools::skills::SkillSource::Codex,
+                plugin_id: None,
             },
         ]
     }
@@ -920,6 +923,7 @@ mod tests {
             body: String::new(),
             dir: std::path::PathBuf::from("/tmp/skills/longa"),
             source: crate::tools::skills::SkillSource::User,
+            plugin_id: None,
         }];
         let prompt = build_system_prompt(
             &model(),

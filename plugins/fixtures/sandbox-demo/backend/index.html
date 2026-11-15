@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { margin: 0; font: 12px system-ui; color: var(--foreground); }
+    </style>
+  </head>
+  <body>
+    <script src="/@zylara/sdk.js"></script>
+    <script>
+      async function readNotes() {
+        const response = await ZylaraPlugin.rpc('storage.get', { key: 'notes' });
+        return Array.isArray(response.value) ? response.value : [];
+      }
+      ZylaraPlugin.onTool(async ({ tool, arguments: args }) => {
+        if (tool === 'list_notes') {
+          const notes = await readNotes();
+          return {
+            content: JSON.stringify(notes, null, 2),
+            summary: `${notes.length} note(s)`,
+          };
+        }
+        if (tool === 'save_note') {
+          const notes = await readNotes();
+          const note = {
+            title: String(args.title || 'Untitled').slice(0, 200),
+            body: String(args.body || '').slice(0, 4000),
+          };
+          await ZylaraPlugin.rpc('storage.set', { key: 'notes', value: [note, ...notes].slice(0, 200) });
+          return { content: `Saved note "${note.title}".`, summary: note.title };
+        }
+        throw new Error(`unknown tool: ${tool}`);
+      });
+      ZylaraPlugin.ready();
+    </script>
+  </body>
+</html>

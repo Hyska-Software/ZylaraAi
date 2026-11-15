@@ -76,7 +76,8 @@
       "goal": "Objetivo",
       "git": "Git",
       "context": "Contexto",
-      "project": "Proyecto"
+      "project": "Proyecto",
+      "plugins": "Plugins"
     },
     "commands": {
       "plan": {

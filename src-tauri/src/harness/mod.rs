@@ -1304,6 +1304,11 @@ fn chat_prompt_snapshot(
         }
         None => prompt::build_system_prompt(model, options, settings, skills, &session_date),
     };
+    let mut system_prompt = system_prompt;
+    if !options.plugin_prompt.trim().is_empty() {
+        system_prompt.push_str(&options.plugin_prompt);
+        system_prompt.push('\n');
+    }
     let stable_hash = cache::snapshot::stable_hash(&system_prompt);
     let tools_json = cache::snapshot::tools_json(&tool_definitions);
     if let Err(error) = db.upsert_prompt_snapshot(&crate::db::PromptSnapshotRecord {
@@ -1364,6 +1369,7 @@ fn code_prompt_snapshot(
         options.delegation_depth,
         options.system_prompt_override.as_deref(),
         &settings.locale,
+        &options.plugin_fingerprint,
         tool_definitions,
     );
     let base_key = cache::snapshot::snapshot_key(
@@ -1425,6 +1431,10 @@ fn code_prompt_snapshot(
     // parte do snapshot: mudam a key via tools_hash das definições).
     if !mcp_prompt_section.is_empty() {
         system_prompt.push_str(mcp_prompt_section);
+    }
+    if !options.plugin_prompt.trim().is_empty() {
+        system_prompt.push_str(&options.plugin_prompt);
+        system_prompt.push('\n');
     }
     // Subagente: instruções extras do pai também fazem parte do texto congelado.
     if let Some(extra) = options
@@ -1490,6 +1500,13 @@ fn code_tool_definitions_with_mcp(
                 description: format!("[{}] {}", tool.server, tool.description),
                 parameters: tool.input_schema.clone(),
             });
+        }
+        if let Some(manager) = crate::plugins::global_manager() {
+            for definition in manager.tool_definitions(crate::domain::TurnProfile::Code) {
+                if !definitions.iter().any(|known| known.name == definition.name) {
+                    definitions.push(definition);
+                }
+            }
         }
     }
     cache::snapshot::canonical_tools(&definitions)
@@ -2312,23 +2329,46 @@ pub async fn run_turn(
             crate::config::data_dir(app)?
         }
     };
+    // Plugins contribute prompt sections and tools. The fingerprint is stored
+    // per conversation so a change can be attributed to `plugin_config_changed`
+    // instead of a generic tools/system-prompt break. Subagents never receive
+    // plugin tools or prompt sections.
+    let mut plugin_cache_changed = false;
+    if options.delegation_depth == 0 {
+        if let Some(manager) = crate::plugins::global_manager() {
+            let context = manager.prompt_context();
+            options.plugin_prompt = context.text;
+            options.plugin_fingerprint = context.fingerprint;
+            let current = manager.config_fingerprint();
+            if let Ok(Some(previous)) = deps.db.plugin_cache_fingerprint(&conversation.id) {
+                plugin_cache_changed = previous != current;
+            }
+            let _ = deps
+                .db
+                .plugin_set_cache_fingerprint(&conversation.id, &current);
+        }
+    }
     // A broken skills directory must not abort the whole turn: the agent simply
     // runs without the skills catalog. Disabled skills (Settings) are hidden
     // from the prompt and from `list_skills`/`read_skill`. External repositories
     // (Codex/Claude/OpenCode/Agent Skills) are read automatically in production;
     // tests inject an explicit list through `HarnessDeps::skills_roots`.
     let injected_roots = deps.skills_roots.clone();
-    let skills_roots = injected_roots
+    let mut skills_roots = injected_roots
         .clone()
         .unwrap_or_else(tools::skills::standard_external_roots);
-    let skills = match &injected_roots {
-        Some(roots) => {
-            tools::skills::catalog_enabled_with_roots(&data_dir, &settings.disabled_skills, roots)
+    if options.delegation_depth == 0 {
+        if let Some(manager) = crate::plugins::global_manager() {
+            if manager.data_dir() == data_dir.as_path() {
+                skills_roots.extend(manager.skill_roots());
+            }
         }
-        // Production path: the default-roots variant scans the standard
-        // repositories (agents/codex/claude/opencode + bundled).
-        None => tools::skills::catalog_enabled(&data_dir, &settings.disabled_skills),
     }
+    let skills = tools::skills::catalog_enabled_with_roots(
+        &data_dir,
+        &settings.disabled_skills,
+        &skills_roots,
+    )
     .unwrap_or_default()
     .into_iter()
     .filter(|skill| {
@@ -2435,6 +2475,15 @@ pub async fn run_turn(
             if options.channel_leader {
                 apply_channel_leader_tools(agent, &mut allowed);
             }
+            if options.delegation_depth == 0 {
+                if let Some(manager) = crate::plugins::global_manager() {
+                    for definition in manager.tool_definitions(TurnProfile::Code) {
+                        if !allowed.iter().any(|name| name == &definition.name) {
+                            allowed.push(definition.name);
+                        }
+                    }
+                }
+            }
             options.allowed_tools = Some(allowed);
         }
     }
@@ -2483,6 +2532,21 @@ pub async fn run_turn(
         };
     code_tool_definitions_canonical
         .retain(|tool| tools::tool_allowed(&options, &tool.name));
+    // Plugin tools overlay (top-level turns only). They join both the wire
+    // catalog and the frozen prompt guidance, so the snapshot key changes.
+    if options.delegation_depth == 0 {
+        if let Some(manager) = crate::plugins::global_manager() {
+            for definition in manager.tool_definitions(TurnProfile::Code) {
+                if tools::tool_allowed(&options, &definition.name)
+                    && !code_tool_definitions_canonical
+                        .iter()
+                        .any(|tool| tool.name == definition.name)
+                {
+                    code_tool_definitions_canonical.push(definition);
+                }
+            }
+        }
+    }
     if implicit_agent_workspace {
         for definition in tools::definitions(&options) {
             if matches!(definition.name.as_str(), "create_file" | "run_code" | "list_artifacts" | "read_artifact") {
@@ -2770,6 +2834,8 @@ pub async fn run_turn(
         agent_hooks: agent_hooks.clone(),
         data_dir: data_dir.clone(),
         skills_roots: skills_roots.clone(),
+        approval: deps.approvals.clone(),
+        emit: Some(on_event.clone()),
     };
     // Usage accumulated by subagents in this turn: child cost/tokens are added
     // to the parent `TurnResult.usage` (the child has its own conversation and
@@ -2963,6 +3029,9 @@ pub async fn run_turn(
     // `CacheSample` por request de wire (abaixo), nos dois perfis. O watermark
     // do Chat (`chat_cut_seq`) é preservado em cada upsert (F2b).
     let mut cache_tracker = restore_cache_tracker(persisted_cache_state.as_ref());
+    if plugin_cache_changed {
+        cache_tracker.trigger_epoch_break(CacheBreakReason::PluginConfigChanged);
+    }
     let mut last_usage_cache: Option<TurnUsageCache> = None;
     // Log resumido do plano de cache (uma linha por turno, F4).
     let mut cache_plan_logged = false;
@@ -7497,6 +7566,7 @@ mod agent_loop_tests {
         let roots = vec![tools::skills::ExternalSkillRoot {
             source: tools::skills::SkillSource::Codex,
             dir: repo.path.clone(),
+            plugin_id: None,
         }];
 
         let step = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -12267,6 +12337,7 @@ mod agent_loop_tests {
             options.delegation_depth,
             options.system_prompt_override.as_deref(),
             &settings.locale,
+            &options.plugin_fingerprint,
             tools,
         );
         cache::snapshot::snapshot_key(
@@ -14759,6 +14830,8 @@ mod agent_loop_tests {
             agent_hooks: None,
             data_dir: std::env::temp_dir().join("zylara-agent-tools-test"),
             skills_roots: Vec::new(),
+            approval: None,
+            emit: None,
         }
     }
 

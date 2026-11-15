@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        margin: 0;
+        padding: 14px;
+        font: 12px/1.5 var(--font-sans, system-ui);
+        color: var(--foreground);
+        background: transparent;
+      }
+      h2 { font-size: 12px; margin: 0 0 8px; color: var(--foreground-muted); }
+      ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+      li { border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; }
+      strong { display: block; }
+      span { color: var(--foreground-muted); }
+    </style>
+  </head>
+  <body>
+    <h2>Latest notes</h2>
+    <ul id="list"></ul>
+    <script src="/@zylara/sdk.js"></script>
+    <script>
+      async function load() {
+        const response = await ZylaraPlugin.rpc('storage.get', { key: 'notes' });
+        const notes = Array.isArray(response.value) ? response.value.slice(0, 8) : [];
+        const list = document.getElementById('list');
+        list.innerHTML = '';
+        for (const note of notes) {
+          const item = document.createElement('li');
+          const title = document.createElement('strong');
+          const body = document.createElement('span');
+          title.textContent = note.title;
+          body.textContent = note.body;
+          item.append(title, body);
+          list.appendChild(item);
+        }
+        ZylaraPlugin.resize();
+      }
+      ZylaraPlugin.on('init', () => load().catch(console.error));
+    </script>
+  </body>
+</html>

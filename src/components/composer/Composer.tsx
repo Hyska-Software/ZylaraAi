@@ -14,6 +14,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { toast } from 'sonner';
 import { credentialGateMessage } from '@/components/chat/turnError';
 import { useReduceMotion } from '@/components/layout/hooks';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { usePluginRegistry } from '@/lib/plugins/registry';
 import { ModelPill } from '@/components/models/ModelPill';
 import {
   Button,
@@ -151,6 +153,9 @@ export function Composer() {
 
   const isStreaming = streaming !== null;
   const providerBlocked = selectedProvider !== undefined && !providerReady;
+  const pluginRevision = usePluginRegistry().revision;
+  const pluginCommandCount = usePluginRegistry().commands.length;
+  const slashMenusEnabled = codeMenusEnabled || pluginCommandCount > 0;
   const hasDraft =
     value.trim().length > 0 || mentioned.length > 0 || pendingAttachments.length > 0;
   const canQueue = isStreaming && !providerBlocked && hasDraft;
@@ -158,10 +163,12 @@ export function Composer() {
 
   const slashQuery = menu?.kind === 'slash' ? menu.query : '';
   // The catalog resolves its copy, so the language is a dependency.
-  const slashCommands = useMemo(
-    () => filterSlashCommands(slashQuery),
-    [slashQuery, i18n.language],
-  );
+  const slashCommands = useMemo(() => {
+    const all = filterSlashCommands(slashQuery);
+    // Chat only shows plugin commands (the built-in slash catalog is Code/agent
+    // specific); Code/agent show the full catalog.
+    return codeMenusEnabled ? all : all.filter((command) => command.group === 'plugins');
+  }, [slashQuery, i18n.language, pluginRevision, codeMenusEnabled]);
   const mentionQuery = menu?.kind === 'mention' ? menu.query : null;
   const optionCount =
     menu?.kind === 'mention' ? mentionResults.length : menu?.kind === 'slash' ? slashCommands.length : 0;
@@ -217,6 +224,28 @@ export function Composer() {
     };
   }, [resizeTextarea]);
 
+  /* Plugin declarative actions can insert text into the draft. The backend
+     permission is enforced by the host/action layer; this listener only owns
+     the composer mutation. */
+  useEffect(() => {
+    const onInsertDraft = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | { text?: string; mode?: 'append' | 'replace' }
+        | undefined;
+      const text = detail?.text ?? '';
+      if (!text) return;
+      setValue((current) =>
+        detail?.mode === 'replace' ? text : current ? `${current}\n${text}` : text,
+      );
+      window.setTimeout(() => {
+        resizeTextarea();
+        textareaRef.current?.focus();
+      }, 0);
+    };
+    window.addEventListener('zylara:insert-draft', onInsertDraft);
+    return () => window.removeEventListener('zylara:insert-draft', onInsertDraft);
+  }, [resizeTextarea]);
+
   /* A intenção de objetivo não vaza entre sessões. */
   useEffect(() => {
     setGoalIntent(false);
@@ -239,8 +268,8 @@ export function Composer() {
   /* Fecha os menus quando o contexto deixa de existir (troca para Chat ou
      sessão sem workspace). */
   useEffect(() => {
-    if (!codeMenusEnabled && menu) setMenu(null);
-  }, [codeMenusEnabled, menu]);
+    if (!slashMenusEnabled && menu) setMenu(null);
+  }, [slashMenusEnabled, menu]);
 
   /* Busca de arquivos do `@`: debounce 120 ms, resultado sempre do workspace
      resolvido no momento (guard contra resposta atrasada). */
@@ -292,11 +321,24 @@ export function Composer() {
   /** Detecta `@arquivo` ou `/comando` na posição do cursor. */
   const analyzeTrigger = useCallback(
     (next: string, caret: number) => {
+      const before = next.slice(0, caret);
       if (!codeMenusEnabled) {
-        setMenu(null);
+        // Chat still exposes plugin slash commands; mentions need a workspace.
+        const slashMatch = pluginCommandCount > 0 ? /(^|\s)\/([^\s]*)$/.exec(before) : null;
+        if (slashMatch) {
+          const query = slashMatch[2] ?? '';
+          setMenu({
+            kind: 'slash',
+            query,
+            start: caret - query.length - 1,
+            end: caret,
+            active: 0,
+          });
+        } else {
+          setMenu(null);
+        }
         return;
       }
-      const before = next.slice(0, caret);
       const mentionMatch = /(^|\s)@([^\s@]*)$/.exec(before);
       if (mentionMatch) {
         const query = mentionMatch[2] ?? '';
@@ -323,7 +365,7 @@ export function Composer() {
       }
       setMenu(null);
     },
-    [codeMenusEnabled],
+    [codeMenusEnabled, pluginCommandCount],
   );
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -458,6 +500,10 @@ export function Composer() {
       }
       setValue(value.slice(0, start) + rest);
       focusTextareaAt(start);
+      if (command.run) {
+        void command.run();
+        return;
+      }
       runInvoke(command);
     },
     [focusTextareaAt, menu, runInvoke, value],
@@ -717,7 +763,7 @@ export function Composer() {
                 aria-expanded={menu ? true : undefined}
                 aria-controls={menuControls}
                 aria-activedescendant={activeDescendant}
-                aria-autocomplete={codeMenusEnabled ? 'list' : undefined}
+                aria-autocomplete={slashMenusEnabled ? 'list' : undefined}
                 className={cn(
                   'block max-h-[220px] w-full resize-none bg-transparent px-1.5 py-0.5',
                   'text-[15px] leading-relaxed text-foreground placeholder:text-foreground-subtle',
@@ -798,6 +844,16 @@ export function Composer() {
               />
             </>
           )}
+
+          <PluginSlot
+            slot="chat.composer.toolbar"
+            context={{
+              conversationId: activeConversationId,
+              profile: layoutMode,
+              draft: value,
+            }}
+            compact
+          />
 
           <div className="ml-auto flex items-center gap-1.5">
             {layoutMode === 'chat' && activeConversationId ? (

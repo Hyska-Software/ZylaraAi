@@ -136,6 +136,8 @@ mod tests {
             agent_hooks: None,
             data_dir: temp.path.clone(),
             skills_roots: Vec::new(),
+            approval: None,
+            emit: None,
         }
     }
 

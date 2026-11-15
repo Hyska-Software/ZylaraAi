@@ -41,6 +41,7 @@
       "protocol_fallback": "Wire protocol changed",
       "attachments": "Attachments changed",
       "config_change": "Configuration changed",
+      "plugin_config_changed": "Plugin configuration changed",
       "ttl_expired": "Cache expired (TTL)",
       "provider_policy": "Provider rule"
     }
@@ -513,6 +514,7 @@
     "openFolder": "Open folder",
     "addChat": "Add Chat session",
     "searchAction": "Search",
+    "plugins": "Plugins",
     "skills": "Skills",
     "workspacesHeading": "Workspaces",
     "searchWorkspaces": "Search workspaces",

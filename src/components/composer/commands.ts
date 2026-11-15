@@ -11,9 +11,23 @@
  * follow a runtime language change. `id`, `command` and `invoke` stay stable.
  */
 import { t } from '@/lib/i18n';
+import {
+  commandDescription,
+  commandLabel,
+  commandSlashName,
+  runPluginCommand,
+} from '@/lib/plugins/host';
+import { getPluginRegistryState } from '@/lib/plugins/registry';
 
 /** Stable group ids (labels are resolved through `SLASH_GROUP_LABEL_KEYS`). */
-export type SlashCommandGroup = 'session' | 'plan' | 'goal' | 'git' | 'context' | 'project';
+export type SlashCommandGroup =
+  | 'session'
+  | 'plan'
+  | 'goal'
+  | 'git'
+  | 'context'
+  | 'project'
+  | 'plugins';
 
 /** Grupo labels (literal keys; never built from the id at runtime). */
 export const SLASH_GROUP_LABEL_KEYS: Record<SlashCommandGroup, string> = {
@@ -23,6 +37,7 @@ export const SLASH_GROUP_LABEL_KEYS: Record<SlashCommandGroup, string> = {
   git: 'composer:slash.groups.git',
   context: 'composer:slash.groups.context',
   project: 'composer:slash.groups.project',
+  plugins: 'composer:slash.groups.plugins',
 };
 
 /** Ações diretas suportadas nesta fase (sem backend novo). */
@@ -63,6 +78,8 @@ export interface SlashCommand {
   fillKey?: string;
   /** Ação executada quando `action === 'invoke'`. */
   invoke?: SlashInvoke;
+  /** Plugin commands execute their own action (resolved at runtime). */
+  run?: () => void | Promise<void>;
 }
 
 /** A catalog entry with its copy resolved for the active language. */
@@ -187,12 +204,41 @@ export function localizeSlashCommand(entry: SlashCommand): SlashCommandView {
   };
 }
 
+/** Normalized built-in slash names used to detect plugin conflicts. */
+export function builtinSlashCommandNames(): string[] {
+  return SLASH_COMMANDS.map((entry) => entry.command.toLowerCase());
+}
+
 /** Filtro tolerante (sem caixa) por comando, título ou descrição. */
 export function filterSlashCommands(query: string): SlashCommandView[] {
   const localized = SLASH_COMMANDS.map(localizeSlashCommand);
+  const builtins = new Set(localized.map((entry) => entry.command.toLowerCase()));
+  const pluginCommands: SlashCommandView[] = getPluginRegistryState().commands
+    .filter((resolved) => !builtins.has(commandSlashName(resolved).toLowerCase()))
+    .map(
+    (resolved) => {
+      const title = commandLabel(resolved);
+      const description = commandDescription(resolved);
+      const command = commandSlashName(resolved);
+      return {
+        id: `plugin:${resolved.key}`,
+        command,
+        titleKey: '',
+        descriptionKey: '',
+        group: 'plugins',
+        action: 'invoke',
+        title,
+        description,
+        fill: null,
+        groupLabel: t(SLASH_GROUP_LABEL_KEYS.plugins),
+        run: () => runPluginCommand(resolved),
+      };
+    },
+  );
+  const all = [...localized, ...pluginCommands];
   const needle = query.trim().toLowerCase();
-  if (!needle) return localized;
-  return localized.filter((entry) => {
+  if (!needle) return all;
+  return all.filter((entry) => {
     const haystack = `${entry.command} ${entry.title} ${entry.description}`.toLowerCase();
     return haystack.includes(needle);
   });

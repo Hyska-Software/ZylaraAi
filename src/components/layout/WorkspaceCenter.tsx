@@ -19,8 +19,17 @@ import {
   TerminalPanel,
 } from '@/components/code';
 import { LibraryView } from '@/components/library';
+import { PluginsView } from '@/components/plugins/PluginsView';
+import { PluginViewHost } from '@/components/plugins/PluginHosts';
 import { SkillsView } from '@/components/skills';
 import { useChatStore, useUiStore } from '@/lib/store';
+import { usePluginStore } from '@/lib/plugins/store';
+import {
+  resolvePluginComponent,
+  usePluginRegistry,
+  viewByKey,
+  type PluginComponent,
+} from '@/lib/plugins/registry';
 import { cn } from '@/lib/utils';
 
 /**
@@ -50,14 +59,38 @@ export function WorkspaceCenter() {
   const codeIssueTab = useUiStore((state) => state.codeIssueTab);
   const selectCodeCommit = useUiStore((state) => state.selectCodeCommit);
   const activeView = useUiStore((state) => state.activeView);
+  const agentView = useUiStore((state) => state.agentView);
+  const activeAgentId = useUiStore((state) => state.activeAgentId);
+  const activeChannelId = useUiStore((state) => state.activeChannelId);
   const setActiveView = useUiStore((state) => state.setActiveView);
   const setCodeView = useUiStore((state) => state.setCodeView);
   const goalDialog = useUiStore((state) => state.goalDialog);
   const closeGoalDialog = useUiStore((state) => state.closeGoalDialog);
   /** Sessão ativa no Code (dona do objetivo exibido no painel central). */
   const activeId = useChatStore((state) => state.activeId);
+  const pluginTarget = usePluginStore((state) => state.activeView);
+  usePluginRegistry();
+  const PluginsPage = resolvePluginComponent(
+    'plugins.view',
+    PluginsView as unknown as PluginComponent,
+  );
+  const pluginView = viewByKey(
+    pluginTarget ? `${pluginTarget.pluginId}:${pluginTarget.id}` : null,
+  );
+
+  if (pluginView && (pluginView.view.surface === 'global' || pluginView.view.surface === layoutMode)) {
+    return <PluginViewHost />;
+  }
 
   if (layoutMode === 'agent') {
+    if (
+      agentView === 'plugins' &&
+      activeAgentId === null &&
+      activeChannelId === null &&
+      activeId === null
+    ) {
+      return <PluginsPage />;
+    }
     return (
       <>
         <AgentWorkspace />
@@ -67,6 +100,7 @@ export function WorkspaceCenter() {
   }
 
   const isCode = layoutMode === 'code';
+  const showPlugins = isCode ? codeView === 'plugins' : activeView === 'plugins';
   const showSkills = isCode ? codeView === 'skills' : activeView === 'skills';
   const showLibrary = !isCode && activeView === 'library';
   const showDiff = isCode && codeView === 'diff' && codeDiffTab !== null;
@@ -81,6 +115,7 @@ export function WorkspaceCenter() {
   const showIssues = isCode && codeView === 'issues' && codeIssuesTab !== null;
   const showIssue = isCode && codeView === 'issue' && codeIssueTab !== null;
   const showChat =
+    !showPlugins &&
     !showSkills &&
     !showLibrary &&
     !showDiff &&
@@ -259,6 +294,8 @@ export function WorkspaceCenter() {
           />
         </div>
       ) : null}
+
+      {showPlugins ? <PluginsPage /> : null}
 
       {showSkills ? (
         <SkillsView

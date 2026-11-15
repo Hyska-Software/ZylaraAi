@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "com.acme.gateway",
+  "name": "Acme Gateway",
+  "version": "1.0.0",
+  "description": "Declarative OpenAI-compatible provider fixture.",
+  "author": "Acme",
+  "apiVersion": 1,
+  "engines": { "zylara": ">=0.11.0 <1.0.0" },
+  "publisher": { "id": "acme", "name": "Acme", "keyId": "acme-fixture-2026" },
+  "permissions": ["providers"],
+  "contributes": {
+    "providers": [
+      {
+        "id": "gateway",
+        "name": "Acme Gateway",
+        "shortName": "Acme",
+        "description": "Fixture provider with one OpenAI-compatible model.",
+        "baseUrl": "https://api.acme.example/v1",
+        "consoleUrl": "https://acme.example/console",
+        "endpoints": { "openai-chat": "chat/completions", "models": "models" },
+        "models": [
+          {
+            "id": "acme-chat-1",
+            "name": "Acme Chat 1",
+            "protocols": ["openai-chat"],
+            "contextWindow": 128000,
+            "maxOutput": 8192,
+            "reasoning": false,
+            "attachment": false
+          }
+        ]
+      }
+    ]
+  },
+  "runtime": { "ui": "none" }
+}

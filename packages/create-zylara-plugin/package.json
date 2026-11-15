@@ -1,0 +1,10 @@
+{
+  "name": "create-zylara-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Scaffold a sandboxed Zylara plugin (manifest, iframe UI, backend and test publisher key).",
+  "bin": { "create-zylara-plugin": "./index.mjs" },
+  "files": ["index.mjs", "template"],
+  "engines": { "node": ">=20" }
+}

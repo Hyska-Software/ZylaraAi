@@ -129,7 +129,7 @@ pub fn config_hash(
         .map(|skill| {
             json!({
                 "name": skill.name,
-                "source": skill.source_str(),
+                "source": skill.source_label(),
                 "description": skill.description,
             })
         })
@@ -142,6 +142,7 @@ pub fn config_hash(
             "createFiles": options.create_files,
             "runCode": options.run_code,
             "systemPromptOverride": options.system_prompt_override.as_deref().unwrap_or(""),
+            "pluginFingerprint": options.plugin_fingerprint,
         },
         "settings": {
             "locale": settings.locale,
@@ -179,6 +180,7 @@ pub fn code_config_hash(
     delegation_depth: u32,
     system_prompt_override: Option<&str>,
     locale: &str,
+    plugin_fingerprint: &str,
     tools: &[ToolDefinition],
 ) -> String {
     let project = project.map(|project| {
@@ -209,6 +211,7 @@ pub fn code_config_hash(
         "delegationDepth": delegation_depth,
         "systemPromptOverride": system_prompt_override.unwrap_or(""),
         "locale": locale,
+        "pluginFingerprint": plugin_fingerprint,
         "toolsHash": tools_hash(tools),
     });
     stable_hash(&canonical.to_string())
@@ -281,6 +284,7 @@ mod tests {
                 body: "# Z".to_string(),
                 dir: PathBuf::from("/data/skills/zeta"),
                 source: SkillSource::User,
+                plugin_id: None,
             },
             Skill {
                 name: "alpha".to_string(),
@@ -288,6 +292,7 @@ mod tests {
                 body: "# A".to_string(),
                 dir: PathBuf::from("/data/skills-bundled/alpha"),
                 source: SkillSource::Bundled,
+                plugin_id: None,
             },
         ]
     }
@@ -358,6 +363,18 @@ mod tests {
                 &reversed_skills,
                 &reversed_tools
             )
+        );
+    }
+
+    #[test]
+    fn config_hash_includes_the_plugin_fingerprint() {
+        let (model, options, settings, skills, tools) = config_inputs();
+        let base = config_hash(&model, &options, &settings, &skills, &tools);
+        let mut changed = options.clone();
+        changed.plugin_fingerprint = "plugins:com.acme.notes:1.2.0".to_string();
+        assert_ne!(
+            base,
+            config_hash(&model, &changed, &settings, &skills, &tools)
         );
     }
 
@@ -464,6 +481,7 @@ mod tests {
             0,
             None,
             "pt-BR",
+            "",
             &tools,
         );
         // Estável com os mesmos inputs.
@@ -480,6 +498,7 @@ mod tests {
                 0,
                 None,
                 "pt-BR",
+                "",
                 &tools,
             )
         );
@@ -500,6 +519,7 @@ mod tests {
                 0,
                 None,
                 "pt-BR",
+                "",
                 &tools
             )
         );
@@ -522,6 +542,7 @@ mod tests {
                 0,
                 None,
                 "pt-BR",
+                "",
                 &tools
             )
         );
@@ -538,6 +559,7 @@ mod tests {
                 1,
                 Some("foco em testes"),
                 "pt-BR",
+                "",
                 &tools
             )
         );
@@ -554,6 +576,7 @@ mod tests {
                 0,
                 None,
                 "pt-BR",
+                "",
                 &[tool("read_file")]
             )
         );
@@ -571,6 +594,7 @@ mod tests {
                 0,
                 None,
                 "en",
+                "",
                 &tools
             )
         );

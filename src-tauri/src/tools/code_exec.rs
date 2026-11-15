@@ -1191,6 +1191,8 @@ mod tests {
             data_dir: temp.path.clone(),
             // Tests never read the developer's real skill repositories.
             skills_roots: Vec::new(),
+            approval: None,
+            emit: None,
         }
     }
 
@@ -1463,6 +1465,7 @@ mod tests {
         let roots = vec![crate::tools::skills::ExternalSkillRoot {
             source: crate::tools::skills::SkillSource::Agents,
             dir: agents_root,
+            plugin_id: None,
         }];
 
         let status = environment_status_with_roots(&data_dir, &Settings::default(), &roots);

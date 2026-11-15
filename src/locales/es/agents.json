@@ -231,6 +231,7 @@
       "protocolFallback": "El protocolo de conexión cambió",
       "attachments": "Los adjuntos cambiaron",
       "configChange": "La configuración cambió",
+      "pluginConfigChanged": "La configuración de plugins cambió",
       "ttlExpired": "La caché expiró (TTL)",
       "providerPolicy": "Regla del proveedor"
     },
@@ -245,6 +246,7 @@
       "protocolFallback": "el protocolo de conexión cambió",
       "attachments": "los adjuntos cambiaron",
       "configChange": "la configuración cambió",
+      "pluginConfigChanged": "la configuración de plugins cambió",
       "ttlExpired": "la caché expiró por TTL",
       "providerPolicy": "la regla del proveedor impide la reutilización",
       "unknown": "motivo no identificado"
@@ -1813,6 +1815,7 @@
     "createAgent": "Crear agente",
     "pinned": "Fijados",
     "noMatch": "Ningún agente o conversación encontrado para “{{query}}”.",
+    "plugins": "Plugins",
     "team": "Equipo",
     "settings": "Configuración",
     "deleteAgentTitle": "¿Eliminar agente?",

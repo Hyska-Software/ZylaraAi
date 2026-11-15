@@ -1,5 +1,7 @@
 import { HtmlPreview } from '@/components/genui';
 import { cn } from '@/lib/utils';
+import { artifactViewerForMime, usePluginRegistry } from '@/lib/plugins/registry';
+import { PluginArtifactViewer } from '@/components/plugins/PluginHosts';
 import { ArchivePreview } from './ArchivePreview';
 import { AudioPreview } from './AudioPreview';
 import { BinaryPreview } from './BinaryPreview';
@@ -25,6 +27,18 @@ export type ArtifactPreviewProps = ArtifactViewProps;
  */
 export function ArtifactPreview({ content, className, showArtifactActions }: ArtifactPreviewProps) {
   const { artifact } = content;
+  usePluginRegistry();
+  const pluginViewer = artifactViewerForMime(artifact.mimeType);
+  if (pluginViewer) {
+    return (
+      <PluginArtifactViewer
+        viewer={pluginViewer}
+        content={content}
+        className={className}
+        showArtifactActions={showArtifactActions}
+      />
+    );
+  }
 
   switch (artifact.kind) {
     case 'markdown':

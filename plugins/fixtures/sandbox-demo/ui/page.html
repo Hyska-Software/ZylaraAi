@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acme Notes</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        padding: 18px;
+        font: 13px/1.5 var(--font-sans, system-ui);
+        color: var(--foreground, #1f2937);
+        background: var(--background, #fff);
+      }
+      h1 { font-size: 15px; margin: 0 0 4px; }
+      p.lead { margin: 0 0 14px; color: var(--foreground-muted, #6b7280); }
+      label { display: block; font-size: 11px; color: var(--foreground-muted, #6b7280); margin: 10px 0 4px; }
+      input, textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid var(--border, #d1d5db);
+        border-radius: var(--radius-md, 8px);
+        background: var(--surface-raised, #fff);
+        color: var(--foreground, #111827);
+        padding: 7px 9px;
+        font: inherit;
+      }
+      textarea { min-height: 92px; resize: vertical; }
+      button {
+        margin-top: 10px;
+        border: 0;
+        border-radius: var(--radius-md, 8px);
+        background: var(--accent, #7c3aed);
+        color: var(--accent-foreground, #fff);
+        padding: 7px 12px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+      li { border: 1px solid var(--border, #e5e7eb); border-radius: var(--radius-md, 8px); padding: 8px 10px; }
+      li strong { display: block; font-size: 12px; }
+      li span { color: var(--foreground-muted, #6b7280); white-space: pre-wrap; }
+      .empty { color: var(--foreground-subtle, #9ca3af); border: 1px dashed var(--border, #d1d5db); border-radius: 8px; padding: 14px; text-align: center; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      .row button { margin-top: 0; }
+      .ghost { background: transparent; color: var(--foreground-muted); border: 1px solid var(--border); }
+    </style>
+  </head>
+  <body>
+    <h1>Acme Notes</h1>
+    <p class="lead">Sandboxed reference plugin. Notes live in the plugin KV store; the agent can read and write them through plugin tools.</p>
+    <label for="title">Title</label>
+    <input id="title" placeholder="Release checklist" />
+    <label for="body">Body</label>
+    <textarea id="body" placeholder="What should we remember?"></textarea>
+    <div class="row">
+      <button id="save">Save note</button>
+      <button id="notify" class="ghost">Notify</button>
+    </div>
+    <h2 style="font-size: 12px; margin: 18px 0 8px; color: var(--foreground-muted)">Saved notes</h2>
+    <ul id="notes"></ul>
+    <script src="/@zylara/sdk.js"></script>
+    <script>
+      const notesEl = document.getElementById('notes');
+      let notes = [];
+      async function load() {
+        const response = await ZylaraPlugin.rpc('storage.get', { key: 'notes' });
+        notes = Array.isArray(response.value) ? response.value : [];
+        render();
+      }
+      function render() {
+        notesEl.innerHTML = '';
+        if (notes.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'No notes yet.';
+          notesEl.appendChild(empty);
+          return;
+        }
+        for (const note of notes) {
+          const item = document.createElement('li');
+          const title = document.createElement('strong');
+          const body = document.createElement('span');
+          title.textContent = note.title;
+          body.textContent = note.body;
+          item.append(title, body);
+          notesEl.appendChild(item);
+        }
+      }
+      document.getElementById('save').addEventListener('click', async () => {
+        const title = document.getElementById('title').value.trim();
+        const body = document.getElementById('body').value.trim();
+        if (!title || !body) return;
+        notes = [{ title, body }, ...notes].slice(0, 200);
+        await ZylaraPlugin.rpc('storage.set', { key: 'notes', value: notes });
+        document.getElementById('title').value = '';
+        document.getElementById('body').value = '';
+        render();
+        ZylaraPlugin.resize();
+      });
+      document.getElementById('notify').addEventListener('click', () => {
+        ZylaraPlugin.rpc('notify', { title: 'Acme Notes', body: `${notes.length} note(s) saved` });
+      });
+      ZylaraPlugin.on('init', () => { load().catch(console.error); });
+      ZylaraPlugin.on('theme', () => ZylaraPlugin.resize());
+    </script>
+  </body>
+</html>

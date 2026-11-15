@@ -3,6 +3,7 @@
     "conversas": "Conversations",
     "navegacao": "Navigation",
     "ferramentas": "Tools",
+    "plugins": "Plugins",
     "aparencia": "Appearance",
     "configuracoes": "Settings",
     "sistema": "System"
@@ -92,11 +93,23 @@
     "model": "Default model and thinking mode",
     "instructions": "System instructions",
     "tools": "Web search, file creation, execution and steps",
+    "plugins": "Install, discover and configure third-party plugins",
     "agents": "Concurrency, budget, notifications and computer use",
     "data": "Data folder, export and cleanup",
     "about": "Version and app information"
   },
   "actions": {
+    "openPlugins": {
+      "label": "Open plugins",
+      "description": "Browse installed plugins, the registry and updates",
+      "safeModeDescription": "Plugins are disabled while safe mode is active",
+      "keywords": "plugins extensions marketplace store"
+    },
+    "installPluginFile": {
+      "label": "Install plugin from file",
+      "description": "Choose and inspect a signed .zplugin package",
+      "keywords": "plugin install zplugin package file"
+    },
     "newConversation": {
       "codeLabel": "New session",
       "agentLabel": "New conversation with agent",

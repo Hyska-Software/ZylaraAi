@@ -629,9 +629,13 @@ fn refreshed_at(state: &AppState) -> Option<i64> {
 }
 
 pub fn catalog_view(app: &AppHandle, state: &AppState) -> CatalogView {
-    let mut catalog = state.catalog.clone();
+    let mut catalog = state.catalog_with_plugins();
     for provider in &mut catalog.providers {
-        provider.models = state.models(&provider.id);
+        // Plugin providers already carry their declared models; bundled
+        // providers merge the account-specific list.
+        if state.catalog.provider(&provider.id).is_some() {
+            provider.models = state.models(&provider.id);
+        }
     }
     let provider_ids: Vec<String> = catalog.providers.iter().map(|p| p.id.clone()).collect();
     CatalogView {
@@ -654,9 +658,7 @@ pub async fn refresh_provider_models_impl(
     provider_id: &str,
 ) -> anyhow::Result<CatalogView> {
     let provider = state
-        .catalog
         .provider(provider_id)
-        .cloned()
         .ok_or_else(|| anyhow::anyhow!("provedor desconhecido: {provider_id}"))?;
     let remote = fetch_remote_models(app, state, &provider)
         .await
@@ -674,7 +676,7 @@ pub async fn refresh_catalog(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<CatalogView, String> {
-    let providers = state.catalog.providers.clone();
+    let providers = state.catalog_with_plugins().providers;
     let mut refreshed = false;
     for provider in providers {
         if !provider.endpoints.contains_key("models") {
@@ -712,9 +714,7 @@ pub async fn list_remote_models(
     provider_id: String,
 ) -> Result<Vec<String>, String> {
     let provider = state
-        .catalog
         .provider(&provider_id)
-        .cloned()
         .ok_or_else(|| crate::i18n::t_args("models.errors.providerUnknown", &[("provider_id", &provider_id)]))?;
     let remote = fetch_remote_models(&app, &state, &provider).await?;
     Ok(remote.into_iter().map(|model| model.id).collect())

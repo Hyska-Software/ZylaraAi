@@ -112,7 +112,7 @@ pub async fn run_turn(
         db: state.db.clone(),
         http: state.http.clone(),
         search_http: state.search_http.clone(),
-        catalog: state.catalog.clone(),
+        catalog: state.catalog_with_plugins(),
         // Produção resolve o data dir pelo AppHandle; o campo existe para os
         // testes do harness (sem Tauri) apontarem para um diretório temporário.
         data_dir: None,

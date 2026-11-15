@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { CodeTurnSummary } from '@/components/code/CodeTurnSummary';
 import { AttachmentChips } from '@/components/composer/AttachmentChips';
+import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { useReduceMotion } from '@/components/layout/hooks';
 import { Badge, Button, IconButton, Spinner } from '@/components/ui';
 import { findModel, getModel } from '@/lib/catalog';
@@ -168,6 +169,11 @@ const UserMessageItem = memo(function UserMessageItem({
           >
             {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
           </IconButton>
+          <PluginSlot
+            slot="chat.message.actions"
+            context={{ messageId: message.id, role: 'user' }}
+            compact
+          />
           {!readOnly ? (
             <IconButton
               label={t('message.edit')}
@@ -426,6 +432,11 @@ const AssistantMessageItem = memo(function AssistantMessageItem({
             >
               {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
             </IconButton>
+            <PluginSlot
+              slot="chat.message.actions"
+              context={{ messageId: message.id, role: 'assistant' }}
+              compact
+            />
             {!readOnly ? (
               <>
                 <IconButton
