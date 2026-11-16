@@ -9,6 +9,7 @@ import type {
   Conversation,
   ConversationDetail,
   SubagentLiveState,
+  TraceStep,
   TurnPayload,
   TurnEvent,
 } from '@/lib/types';
@@ -688,10 +689,15 @@ describe('chatStore.send', () => {
 
     await useChatStore.getState().send('Pesquise');
 
-    // While the turn is held open, the first step is already on the timeline.
+    // While the turn is held open, the first step is already on the timeline,
+    // closed with the model time it took (thinking included).
     const streamingMessage = useChatStore.getState().messagesByConversation['conv-1'][1];
     expect(streamingMessage.status).toBe('streaming');
-    expect(streamingMessage.trace).toEqual([{ reasoning: 'Vou pesquisar.', toolCalls: 1 }]);
+    const liveSteps = streamingMessage.trace ?? [];
+    expect(liveSteps).toHaveLength(1);
+    expect(liveSteps[0]).toMatchObject({ reasoning: 'Vou pesquisar.', toolCalls: 1 });
+    expect(typeof liveSteps[0].durationMs).toBe('number');
+    expect(liveSteps[0].durationMs).toBeGreaterThanOrEqual(0);
 
     release();
     await vi.waitFor(() => expect(useChatStore.getState().streaming).toBeNull());
@@ -701,6 +707,61 @@ describe('chatStore.send', () => {
       { reasoning: 'Vou pesquisar.', toolCalls: 1 },
       { reasoning: 'Concluído.', toolCalls: 0 },
     ]);
+  });
+
+  it('stamps the model time of each live step and keeps a total on a failed turn', async () => {
+    let firstStep: TraceStep | undefined;
+    let toolStep: TraceStep | undefined;
+    const liveTrace = () =>
+      useChatStore.getState().messagesByConversation['conv-1'][1]?.trace ?? [];
+
+    mocks.api.runTurn.mockImplementation(
+      async (payload: TurnPayload) => {
+        emitBus(payload, {
+          type: 'turn_started',
+          turnId: payload.turnId!,
+          userMessageId: 'user-1',
+          assistantMessageId: 'assistant-1',
+        });
+        emitBus(payload, { type: 'step_started', step: 1 });
+        emitBus(payload, { type: 'reasoning_delta', delta: 'Vou ler o arquivo.' });
+        emitBus(payload, { type: 'reasoning_done' });
+        emitBus(payload, { type: 'step_started', step: 2 });
+        firstStep = liveTrace()[0];
+        emitBus(payload, { type: 'reasoning_delta', delta: 'Lendo.' });
+        emitBus(payload, { type: 'reasoning_done' });
+        emitBus(payload, {
+          type: 'tool_call_started',
+          toolCall: { id: 'tool-1', name: 'read_file', arguments: '', status: 'running' },
+        });
+        toolStep = liveTrace()[1];
+        emitBus(payload, { type: 'error', message: 'gateway falhou', code: 'PROVIDER_ERROR' });
+        return {
+          userMessage: userMessage(),
+          assistantMessage: assistantMessage({ content: '' }),
+          usage: null,
+          error: null,
+          conversation: conversation({ messageCount: 2 }),
+        };
+      },
+    );
+
+    await useChatStore.getState().send('Leia o arquivo');
+
+    // The step that only reasoned was closed with its own model time...
+    expect(firstStep).toMatchObject({ reasoning: 'Vou ler o arquivo.', toolCalls: 0 });
+    expect(typeof firstStep?.durationMs).toBe('number');
+    // ...and so was the step that moved on to tools.
+    expect(toolStep).toMatchObject({ reasoning: 'Lendo.', toolCalls: 1 });
+    expect(typeof toolStep?.durationMs).toBe('number');
+
+    await vi.waitFor(() => expect(useChatStore.getState().streaming).toBeNull());
+    // A turn that dies without a persisted usage still reports a total (the
+    // wall clock), so "Trabalhou por …" never degrades to the tool time alone.
+    const failed = useChatStore.getState().messagesByConversation['conv-1'][1];
+    expect(failed.status).toBe('error');
+    expect(typeof failed.usage?.durationMs).toBe('number');
+    expect(failed.usage?.durationMs).toBeGreaterThanOrEqual(0);
   });
 });
 

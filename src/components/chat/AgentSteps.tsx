@@ -369,6 +369,7 @@ export function AgentSteps({ message, streaming, phase, startedAt, className }: 
         phase={phase}
         collapsedByDefault={collapsedByDefault}
         turnDurationMs={message.usage?.durationMs ?? null}
+        liveElapsed={liveElapsed}
         className={className}
       />
     );
@@ -462,6 +463,7 @@ function SegmentedTimeline({
   phase,
   collapsedByDefault,
   turnDurationMs,
+  liveElapsed,
   className,
 }: {
   blocks: AgentResponseBlock[];
@@ -470,6 +472,8 @@ function SegmentedTimeline({
   collapsedByDefault: boolean;
   /** Total turn time, shown on the last execution line once it ends. */
   turnDurationMs: number | null;
+  /** Wall clock since the turn started while it streams (thinking included). */
+  liveElapsed: number | null;
   className?: string;
 }) {
   let lastExecution = -1;
@@ -490,6 +494,7 @@ function SegmentedTimeline({
             entries={block.entries}
             durationMs={block.durationMs}
             turnDurationMs={turnDurationMs}
+            liveElapsed={liveElapsed}
             isLast={index === lastExecution}
             streaming={streaming}
             phase={phase}
@@ -508,6 +513,8 @@ interface ExecutionGroupProps {
   durationMs: number;
   /** Total turn time, shown on the last line once the turn ends. */
   turnDurationMs: number | null;
+  /** Wall clock since the turn started while it streams (thinking included). */
+  liveElapsed: number | null;
   isLast: boolean;
   streaming: boolean;
   phase: AgentStepsPhase | null;
@@ -526,6 +533,7 @@ function ExecutionGroup({
   entries,
   durationMs,
   turnDurationMs,
+  liveElapsed,
   isLast,
   streaming,
   phase,
@@ -556,8 +564,13 @@ function ExecutionGroup({
   }, [live, collapsedByDefault]);
 
   // The last line closes the turn, so it reports the whole turn time; earlier
-  // stretches report their own work time.
-  const elapsed = isLast ? (turnDurationMs ?? durationMs) : durationMs;
+  // stretches report their own work time. The model time of every step belongs
+  // to its stretch, and the closing total is never smaller than its parts: while
+  // the answer streams, the backend usage is not known yet, so the live wall
+  // clock (which includes the thinking) is what keeps the total honest.
+  const elapsed = isLast
+    ? Math.max(turnDurationMs ?? 0, liveElapsed ?? 0, durationMs)
+    : durationMs;
   const finishedDuration = elapsed > 0 ? formatThinkingDuration(elapsed) : null;
   const finishedLabel = finishedDuration
     ? t('trace.workedFor', { duration: finishedDuration })

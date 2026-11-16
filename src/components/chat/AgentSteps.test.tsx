@@ -1133,6 +1133,56 @@ describe('AgentSteps — execução separada por resposta (Code e Agentes)', () 
     expect(screen.getByRole('button', { name: 'Raciocínio 2s' })).toBeTruthy();
   });
 
+  it('conta o tempo de raciocínio no total do turno enquanto a resposta chega', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ layoutMode: 'code' });
+
+    render(
+      <AgentSteps
+        streaming
+        phase="text"
+        startedAt={Date.now() - 12_000}
+        message={message({
+          status: 'streaming',
+          content: 'Agora a verificação final completa desta rodada.',
+          reasoning: 'Vou checar o fixture.\n\nVerificação final.',
+          toolCalls: [
+            tool({
+              id: 'tool-shell',
+              name: 'run_command',
+              arguments: '{"command":"pnpm test"}',
+              result: 'ok',
+              startedAt: 1_000,
+              finishedAt: 1_400,
+            }),
+          ],
+          trace: [
+            {
+              reasoning: 'Vou checar o fixture.',
+              text: 'Ambos rejeitados (exit 65).',
+              durationMs: 2_000,
+              toolCalls: 1,
+            },
+            { reasoning: 'Verificação final.', durationMs: 4_000, toolCalls: 0 },
+          ],
+        })}
+      />,
+    );
+
+    // The stretch before the narration keeps its own work time (2s of model
+    // time + 0.4s of tool).
+    expect(
+      screen.getByRole('button', { name: 'Trabalhou por 2s', expanded: false }),
+    ).toBeTruthy();
+    // The closing line is the wall clock of the turn (thinking included), not
+    // the 4s of its last model request nor the 1s of tool executions.
+    const closing = screen.getByRole('button', { name: 'Trabalhou por 12s', expanded: false });
+    expect(closing).toBeTruthy();
+
+    await user.click(closing);
+    expect(screen.getByRole('button', { name: 'Raciocínio 4s' })).toBeTruthy();
+  });
+
   it('mantém o bloco único no layout Chat, sem separar a execução', () => {
     useUiStore.setState({ layoutMode: 'chat' });
 

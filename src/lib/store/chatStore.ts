@@ -20,6 +20,7 @@ import type {
   TurnProfile,
   TurnResult,
   TurnKind,
+  UsageInfo,
 } from '../types';
 import { deriveTitle, newId, compareConversationOrder, createSerialRunner } from '../utils';
 import { inputFromAgent } from '../agentInput';
@@ -544,6 +545,31 @@ function addTraceToolCall(trace: TraceStep[]): TraceStep[] {
   return [...steps.slice(0, -1), { ...last, toolCalls: last.toolCalls + 1 }];
 }
 
+/**
+ * Stamps the model time of the current step on its trace entry. The backend
+ * writes the authoritative `durationMs` (provider request wall time) when the
+ * turn is persisted; until then the renderer measures it, so the reasoning rows
+ * and the "Trabalhou por …" totals already count the thinking time instead of
+ * only the tool execution time.
+ */
+function stampTraceStepDuration(trace: TraceStep[], durationMs: number): TraceStep[] {
+  if (trace.length === 0) return trace;
+  const last = trace[trace.length - 1];
+  if (last.durationMs != null) return trace;
+  return [...trace.slice(0, -1), { ...last, durationMs: Math.max(0, Math.round(durationMs)) }];
+}
+
+/**
+ * Guarantees a turn duration on a row the backend could not close with its own
+ * usage (cancelled/errored turns without a persisted usage). The wall clock
+ * since the turn was dispatched includes the thinking time, so the
+ * "Trabalhou por …" total never degrades to the sum of the tool executions.
+ */
+function withTurnDuration(usage: UsageInfo | null | undefined, elapsedMs: number): UsageInfo {
+  if (usage?.durationMs != null) return usage;
+  return { ...(usage ?? {}), durationMs: Math.max(0, Math.round(elapsedMs)) };
+}
+
 export const useChatStore = create<ChatState>()((set, get) => {
   const patchMessage = (
     conversationId: string,
@@ -824,6 +850,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
     let started = false;
     /** Primeiro texto depois de um novo passo ganha um parágrafo. */
     let pendingTextBreak = false;
+    /** Renderer clock for the current step's model request (thinking time). */
+    let stepStartedAt: number | null = null;
     /** Fecho terminal: `cancelled`/`error` não têm `done.result`. */
     let terminal: 'cancelled' | 'error' | null = null;
 
@@ -850,6 +878,22 @@ export const useChatStore = create<ChatState>()((set, get) => {
           content: message.content + delta,
         }));
       }
+    };
+
+    /**
+     * Closes the current step: stamps the time its provider request took on the
+     * trace entry, so the reasoning rows and the stretch totals include the
+     * model time while the turn is still streaming (the persisted message
+     * replaces this trace at `done`). Callers flush the buffers first.
+     */
+    const closeStep = () => {
+      if (stepStartedAt == null) return;
+      const elapsed = Date.now() - stepStartedAt;
+      stepStartedAt = null;
+      patchMessage(context.conversationId, context.assistantId, (message) => ({
+        ...message,
+        trace: stampTraceStepDuration(message.trace ?? [], elapsed),
+      }));
     };
 
     /**
@@ -956,6 +1000,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
           // belongs to its own timeline entry. The text of this step starts a
           // new paragraph once it arrives (not on an empty step).
           flush();
+          // The previous step ended here: its model time (reasoning included)
+          // belongs to the entry that is about to be closed.
+          closeStep();
+          stepStartedAt = Date.now();
           pendingTextBreak = true;
           patchMessage(context.conversationId, context.assistantId, (message) => ({
             ...message,
@@ -1003,6 +1051,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
           break;
         case 'tool_call_started': {
           flush();
+          // The step stopped producing tokens and moved on to tools: close its
+          // model time before the tool execution clock starts.
+          closeStep();
           const moveNarration = shouldMoveNarrationToTrace();
           patchStream(context.conversationId, (stream) => ({ ...stream, phase: 'tool' }));
           patchMessage(context.conversationId, context.assistantId, (message) => {
@@ -1148,6 +1199,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           break;
         case 'cancelled': {
           flush();
+          closeStep();
           finished = true;
           terminal = 'cancelled';
           if (turnId) terminalTurnIds.add(turnId);
@@ -1156,6 +1208,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
           patchMessage(context.conversationId, context.assistantId, (message) => ({
             ...message,
             status: 'cancelled',
+            // A cancelled turn keeps the renderer trace, which has no persisted
+            // usage yet: the wall clock is the only honest total.
+            usage: withTurnDuration(message.usage, Date.now() - dispatchedAt),
           }));
           // If settle already delivered the "Enviar agora" item before this
           // event (invoke-first ordering), the queue must keep moving too.
@@ -1185,6 +1240,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         }
         case 'error': {
           flush();
+          closeStep();
           finished = true;
           terminal = 'error';
           if (turnId) terminalTurnIds.add(turnId);
@@ -1202,6 +1258,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
               retryable: event.retryable ?? false,
               attempts: event.attempts ?? 0,
             },
+            // No persisted usage on this path: close the total with the wall
+            // clock so the thinking time is not dropped from "Trabalhou por …".
+            usage: withTurnDuration(message.usage, Date.now() - dispatchedAt),
           }));
           const queuedItem = get().streamsByConversation[context.conversationId]?.queuedItem;
           setStream(context.conversationId, null);
@@ -3360,6 +3419,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           patchMessage(conversationId, assistantId, (message) => ({
             ...message,
             status: 'cancelled',
+            usage: withTurnDuration(message.usage, Date.now() - stream.startedAt),
           }));
           if (get().streamsByConversation[conversationId]?.turnId === turnId) {
             setStream(conversationId, null);
@@ -3384,6 +3444,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
               retryable: event.retryable ?? false,
               attempts: event.attempts ?? 0,
             },
+            usage: withTurnDuration(message.usage, Date.now() - stream.startedAt),
           }));
           if (get().streamsByConversation[conversationId]?.turnId === turnId) {
             setStream(conversationId, null);
