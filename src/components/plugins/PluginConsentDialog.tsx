@@ -107,7 +107,7 @@ export function PluginConsentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[620px] max-w-[calc(100vw-2rem)] p-0" aria-describedby={undefined}>
-        <DialogHeader className="border-b border-border px-5 pb-3 pt-5">
+        <DialogHeader className="border-b border-border px-5 pb-3 pr-12 pt-5">
           <DialogTitle className="text-[16px]">
             {mode === 'update'
               ? t('consent.updateTitle', { name: data.name })

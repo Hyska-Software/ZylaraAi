@@ -33,6 +33,7 @@ import {
   TabsList,
   TabsTrigger,
   Spinner,
+  Switch,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
@@ -76,10 +77,12 @@ function PluginCard({
   plugin,
   onOpen,
   onToggle,
+  busy,
 }: {
   plugin: PluginRecord;
   onOpen: () => void;
-  onToggle: () => void;
+  onToggle: (enabled: boolean) => void;
+  busy?: boolean;
 }) {
   const { t } = useTranslation('plugins');
   return (
@@ -138,28 +141,13 @@ function PluginCard({
           </span>
         </span>
       </button>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={plugin.enabled}
+      <Switch
+        checked={plugin.enabled}
+        disabled={busy}
+        onCheckedChange={onToggle}
         aria-label={t('installed.toggleAria', { name: plugin.name })}
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggle();
-        }}
-        className={cn(
-          'relative mt-0.5 h-4 w-7 shrink-0 rounded-full transition-colors',
-          plugin.enabled ? 'bg-accent' : 'bg-border-strong',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-0.5 size-3 rounded-full bg-background transition-transform',
-            plugin.enabled ? 'translate-x-3.5' : 'translate-x-0.5',
-          )}
-        />
-      </button>
+        className="mt-0.5 shrink-0"
+      />
     </div>
   );
 }
@@ -463,9 +451,9 @@ export function PluginsView() {
     }
   };
 
-  const togglePlugin = async (plugin: PluginRecord) => {
+  const togglePlugin = async (plugin: PluginRecord, enabled: boolean) => {
     try {
-      await usePluginStore.getState().setEnabled(plugin.id, !plugin.enabled);
+      await usePluginStore.getState().setEnabled(plugin.id, enabled);
     } catch (error) {
       toast.error(t('errors.toggleFailed'), { description: String(error) });
     }
@@ -636,8 +624,9 @@ export function PluginsView() {
                       <PluginCard
                         key={plugin.id}
                         plugin={plugin}
+                        busy={busy}
                         onOpen={() => setDetailId(plugin.id)}
-                        onToggle={() => void togglePlugin(plugin)}
+                        onToggle={(enabled) => void togglePlugin(plugin, enabled)}
                       />
                     ))}
                   </div>

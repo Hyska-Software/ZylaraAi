@@ -287,7 +287,7 @@ export function PluginDetailDialog({
   return (
     <Dialog open={Boolean(pluginId)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="h-[620px] w-[760px] max-w-[calc(100vw-2rem)] gap-0 p-0" aria-describedby={undefined}>
-        <DialogHeader className="shrink-0 border-b border-border px-5 pb-3 pt-5">
+        <DialogHeader className="shrink-0 border-b border-border px-5 pb-3 pr-14 pt-5">
           <div className="flex items-start gap-3">
             <div className="relative shrink-0">
               <PluginAvatar plugin={plugin} size={42} />
