@@ -80,6 +80,11 @@ export function DesignTab() {
             {prefs.enabled ? t('design.disable') : t('design.enable')}
           </Button>
         </div>
+        {!prefs.enabled ? (
+          <p className="rounded-xl bg-warning-soft/30 px-3 py-2 text-[11.5px] leading-relaxed text-warning">
+            {t('design.paused')}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -169,7 +174,14 @@ export function DesignTab() {
       ) : null}
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-[13px] font-medium text-foreground">{t('design.modifications')}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-[13px] font-medium text-foreground">{t('design.modifications')}</h3>
+          {!prefs.enabled ? (
+            <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-medium text-warning">
+              {t('design.pausedBadge')}
+            </span>
+          ) : null}
+        </div>
         {modifications.length === 0 ? (
           <p className="text-[12px] text-foreground-subtle">{t('design.empty')}</p>
         ) : (

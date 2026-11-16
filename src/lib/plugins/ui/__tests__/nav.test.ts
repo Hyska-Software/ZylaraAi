@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useUiStore } from '@/lib/store/uiStore';
 import { navEntries, HOST_NAV, openNavTarget } from '@/lib/plugins/ui/nav';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { setPluginUiState } from '@/lib/plugins/ui/registry';
 import type { NavEntry } from '@/lib/plugins/ui/types';
 
@@ -104,5 +105,19 @@ describe('plugin navigation', () => {
     expect(HOST_NAV.some((entry) => entry.layouts.includes('agent'))).toBe(true);
     expect(HOST_NAV.some((entry) => entry.layouts.includes('code'))).toBe(true);
     expect(HOST_NAV.some((entry) => entry.layouts.includes('chat'))).toBe(true);
+  });
+
+  it('hides plugin entries while the global plugin UI switch is off', () => {
+    usePluginUiPrefs.setState({ enabled: false });
+    try {
+      const keys = navEntries('chat', [pluginEntry]).map((entry) => entry.key);
+      expect(keys).not.toContain('com.acme:nav:notes');
+      expect(keys).toContain('host:library');
+    } finally {
+      usePluginUiPrefs.setState({ enabled: true });
+    }
+    expect(navEntries('chat', [pluginEntry]).map((entry) => entry.key)).toContain(
+      'com.acme:nav:notes',
+    );
   });
 });

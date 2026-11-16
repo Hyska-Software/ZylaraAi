@@ -29,6 +29,7 @@ import { SIDE_PANEL_DOCK_MIN_VIEWPORT, useViewportWidth } from '@/lib/sidePanel'
 import { resolveHotkey, type HotkeyCommand } from '@/lib/hotkeys';
 import { ComputerControlBanner } from '@/components/computer/ComputerControlBanner';
 import { PluginSafeModeBanner } from '@/components/plugins/PluginSafeModeBanner';
+import { PluginUiDisabledBanner } from '@/components/plugins/PluginUiDisabledBanner';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SplashScreen } from '@/components/SplashScreen';
 import type {
@@ -633,6 +634,7 @@ export default function App() {
           hideConversationId={agentThreadHeaderVisible ? activeConversation?.id ?? null : null}
         />
         <PluginSafeModeBanner />
+        <PluginUiDisabledBanner />
       </ErrorBoundary>
       <Toaster
         className="zylara-toaster"

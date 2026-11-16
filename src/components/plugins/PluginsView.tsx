@@ -39,7 +39,8 @@ import { api } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { useUiStore } from '@/lib/store/uiStore';
 import { usePluginStore } from '@/lib/plugins/store';
-import { usePluginRegistry } from '@/lib/plugins/registry';
+import { pluginContributesUi, usePluginRegistry } from '@/lib/plugins/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { commandSlashName } from '@/lib/plugins/host';
 import { builtinSlashCommandNames } from '@/components/composer/commands';
 import type {
@@ -85,6 +86,8 @@ function PluginCard({
   busy?: boolean;
 }) {
   const { t } = useTranslation('plugins');
+  const pluginUiEnabled = usePluginUiPrefs((state) => state.enabled);
+  const hiddenByPref = !pluginUiEnabled && pluginContributesUi(plugin);
   return (
     <div
       className={cn(
@@ -136,6 +139,12 @@ function PluginCard({
                         ? t('installed.userDisabled')
                         : plugin.disabledReason}
                 </span>
+              </>
+            ) : null}
+            {hiddenByPref ? (
+              <>
+                <span>·</span>
+                <span className="text-accent">{t('installed.pluginUiOff')}</span>
               </>
             ) : null}
           </span>

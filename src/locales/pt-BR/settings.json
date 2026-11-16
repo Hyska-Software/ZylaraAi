@@ -161,6 +161,8 @@
     "hostDefault": "Padrão do app",
     "disable": "Desativar UI de plugins",
     "enable": "Ativar UI de plugins",
+    "paused": "A UI de plugins está desativada: abas do sidebar, páginas, painéis e slots contribuídos por plugins ficam ocultos em todos os layouts até você reativar.",
+    "pausedBadge": "Pausado",
     "presets": "Presets",
     "variants": "Variantes de componentes",
     "conflicts": "Conflitos",

@@ -161,6 +161,8 @@
     "hostDefault": "Host default",
     "disable": "Disable plugin UI",
     "enable": "Enable plugin UI",
+    "paused": "Plugin UI is turned off: sidebar entries, pages, dock panels and slots contributed by plugins are hidden in every layout until you turn it back on.",
+    "pausedBadge": "Paused",
     "presets": "Presets",
     "variants": "Component variants",
     "conflicts": "Conflicts",

@@ -25,6 +25,7 @@
     "installUrl": "Install from URL",
     "settings": "Plugin settings",
     "openFolder": "Open folder",
+    "manageInstalled": "Manage installed plugins",
     "openDataFolder": "Open data folder",
     "refresh": "Refresh",
     "retry": "Retry",
@@ -46,6 +47,7 @@
     "inactive": "inactive",
     "activationRequired": "installed by the agent — review and activate",
     "permissionsIncomplete": "permissions incomplete",
+    "pluginUiOff": "plugin UI is off",
     "userDisabled": "disabled by the user",
     "toggleAria": "Enable or disable {{name}}"
   },
@@ -108,6 +110,9 @@
     "noDescription": "No description provided.",
     "enableAria": "Enable plugin",
     "inactiveReason": "Why this plugin is inactive",
+    "pluginUiOffTitle": "Hidden by the plugin UI switch",
+    "pluginUiOffBody": "This plugin is installed and enabled, but Settings → Design has plugin UI turned off, so none of its interface is displayed.",
+    "pluginUiOffAction": "Turn on plugin UI",
     "publisher": "Publisher",
     "installedAt": "Installed",
     "signature": "Signature",
@@ -187,6 +192,12 @@
     "title": "Safe mode is active",
     "body": "Third-party plugins are not loaded. Use this recovery mode to enable plugins one by one.",
     "recover": "Leave safe mode"
+  },
+  "uiDisabled": {
+    "title": "Plugin UI is turned off",
+    "body": "Sidebar tabs, pages, dock panels and slots contributed by active plugins stay hidden while this switch is off.",
+    "turnOn": "Turn on plugin UI",
+    "review": "Open design settings"
   },
   "url": {
     "title": "Install from URL",

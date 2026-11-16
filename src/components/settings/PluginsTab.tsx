@@ -198,6 +198,20 @@ export function PluginsTab() {
         </Button>
         <Button
           size="sm"
+          variant="secondary"
+          onClick={() => {
+            const ui = useUiStore.getState();
+            setSettingsOpen(false);
+            if (ui.layoutMode === 'code') ui.setCodeView('plugins');
+            else if (ui.layoutMode === 'agent') ui.setAgentView('plugins');
+            else setActiveView('plugins');
+          }}
+        >
+          <Puzzle aria-hidden className="size-3.5" />
+          {t('actions.manageInstalled')}
+        </Button>
+        <Button
+          size="sm"
           variant="ghost"
           onClick={() =>
             void usePluginStore

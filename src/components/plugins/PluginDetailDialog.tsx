@@ -39,7 +39,8 @@ import { api } from '@/lib/api';
 import { PluginSlot } from './PluginHosts';
 import { openPluginPanel, openPluginView } from '@/lib/plugins/host';
 import { pluginIcon } from '@/lib/plugins/icons';
-import { pluginLabel, usePluginRegistry } from '@/lib/plugins/registry';
+import { pluginLabel, pluginContributesUi, usePluginRegistry } from '@/lib/plugins/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { usePluginStore } from '@/lib/plugins/store';
 import { BUILTIN_THEME_ID, useThemeStore } from '@/lib/store/themeStore';
 import { useUiStore } from '@/lib/store/uiStore';
@@ -131,6 +132,8 @@ export function PluginDetailDialog({
   const themes = useThemeStore((state) => state.themes);
   const activeId = useThemeStore((state) => state.activeId);
   const registry = usePluginRegistry();
+  const pluginUiEnabled = usePluginUiPrefs((state) => state.enabled);
+  const setPluginUiEnabled = usePluginUiPrefs((state) => state.setEnabled);
   const [tab, setTab] = useState('overview');
   const [grants, setGrants] = useState<Record<string, boolean>>({});
   const [logs, setLogs] = useState<PluginLogRow[] | null>(null);
@@ -355,6 +358,23 @@ export function PluginDetailDialog({
                                 : plugin.disabledReason}
                           </p>
                         </div>
+                      </div>
+                    ) : null}
+
+                    {!pluginUiEnabled && pluginContributesUi(plugin) ? (
+                      <div className="rounded-xl bg-accent-soft/30 px-3 py-2 text-[12px] text-foreground">
+                        <p className="font-semibold">{t('detail.pluginUiOffTitle')}</p>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-foreground-muted">
+                          {t('detail.pluginUiOffBody')}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="mt-2"
+                          onClick={() => setPluginUiEnabled(true)}
+                        >
+                          {t('detail.pluginUiOffAction')}
+                        </Button>
                       </div>
                     ) : null}
 

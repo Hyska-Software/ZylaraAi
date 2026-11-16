@@ -81,6 +81,24 @@ export function supportsLayout(layouts: readonly LayoutId[], layout: LayoutId): 
   return layouts.length === 0 || layouts.includes(layout);
 }
 
+/**
+ * True when an active plugin contributes UI the user can reach in `layout`.
+ * Used to explain the global plugin-UI switch: with it off every one of these
+ * surfaces is hidden, so the app must not look "healthy but empty".
+ */
+export function hasPluginUiContributions(state: PluginUiState, layout?: LayoutId): boolean {
+  const visible = (layouts: readonly LayoutId[]): boolean =>
+    !layout || supportsLayout(layouts, layout);
+  return (
+    state.nav.some((entry) => visible(entry.layouts)) ||
+    state.pages.some((page) => visible(page.layouts)) ||
+    state.panelTabs.some((tab) => visible(tab.layouts)) ||
+    state.slots.some((slot) => visible(slot.layouts)) ||
+    state.settingsTabs.length > 0 ||
+    state.artifactViewers.length > 0
+  );
+}
+
 export function contributionEnabled(key: string, disabled: readonly string[]): boolean {
   return !disabled.includes(key);
 }

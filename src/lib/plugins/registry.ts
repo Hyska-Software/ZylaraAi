@@ -155,6 +155,23 @@ export function pluginHasPermission(plugin: PluginRecord, required: string): boo
   return hasPermission(plugin, required);
 }
 
+/**
+ * True when the manifest ships any renderer surface. Used to warn that the
+ * global plugin-UI switch (Settings → Design) hides everything this plugin
+ * contributes even while it is enabled and active.
+ */
+export function pluginContributesUi(plugin: PluginRecord): boolean {
+  const ui = plugin.manifest.contributes.ui;
+  return (
+    ui.views.length > 0 ||
+    ui.nav.length > 0 ||
+    ui.panels.length > 0 ||
+    ui.slots.length > 0 ||
+    ui.settingsTabs.length > 0 ||
+    ui.css.length > 0
+  );
+}
+
 export function riskForPermission(permission: PluginPermissionView): string {
   return pluginPermissionSpec(pluginPermissionBase(permission.id))?.risk ?? permission.risk;
 }

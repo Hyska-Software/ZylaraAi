@@ -25,6 +25,7 @@
     "installUrl": "Instalar por URL",
     "settings": "Configurações de plugins",
     "openFolder": "Abrir pasta",
+    "manageInstalled": "Gerenciar plugins instalados",
     "openDataFolder": "Abrir pasta de dados",
     "refresh": "Atualizar",
     "retry": "Tentar de novo",
@@ -46,6 +47,7 @@
     "inactive": "inativo",
     "activationRequired": "instalado pelo agente — revise e ative",
     "permissionsIncomplete": "permissões incompletas",
+    "pluginUiOff": "UI de plugins desativada",
     "userDisabled": "desativado pelo usuário",
     "toggleAria": "Ativar ou desativar {{name}}"
   },
@@ -108,6 +110,9 @@
     "noDescription": "Sem descrição.",
     "enableAria": "Ativar plugin",
     "inactiveReason": "Por que este plugin está inativo",
+    "pluginUiOffTitle": "Oculto pelo interruptor de UI de plugins",
+    "pluginUiOffBody": "Este plugin está instalado e ativado, mas Configurações → Design está com a UI de plugins desligada, então nenhuma interface dele aparece.",
+    "pluginUiOffAction": "Ativar UI de plugins",
     "publisher": "Publisher",
     "installedAt": "Instalado em",
     "signature": "Assinatura",
@@ -187,6 +192,12 @@
     "title": "Modo seguro ativo",
     "body": "Plugins de terceiros não foram carregados. Use este modo de recuperação para ativar os plugins um por um.",
     "recover": "Sair do modo seguro"
+  },
+  "uiDisabled": {
+    "title": "A UI de plugins está desativada",
+    "body": "Abas do sidebar, páginas, painéis e slots contribuídos por plugins ativos ficam ocultos enquanto este interruptor estiver desligado.",
+    "turnOn": "Ativar UI de plugins",
+    "review": "Abrir configurações de design"
   },
   "url": {
     "title": "Instalar por URL",
