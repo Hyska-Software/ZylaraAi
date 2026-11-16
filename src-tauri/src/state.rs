@@ -374,7 +374,12 @@ impl AppState {
     /// Merged list: account list first (order preserved), catalog metadata where
     /// available, conservative entries for models only the account knows.
     pub fn models(&self, provider_id: &str) -> Vec<ModelInfo> {
-        let Some(provider) = self.catalog.provider(provider_id) else {
+        let Some(provider) = self
+            .catalog
+            .provider(provider_id)
+            .cloned()
+            .or_else(|| self.plugins.provider(provider_id))
+        else {
             return Vec::new();
         };
         let Some(dynamic) = self.dynamic_models_for(provider_id) else {

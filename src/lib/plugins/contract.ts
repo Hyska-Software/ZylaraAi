@@ -93,6 +93,8 @@ export interface PluginContract {
   styleRecipes: Record<string, string[]>;
   slots: PluginSlotSpec[];
   components: PluginComponentSpec[];
+  reservedSlots: string[];
+  reservedComponents: string[];
   events: PluginEventSpec[];
   permissions: PluginPermissionSpec[];
 }
@@ -105,11 +107,16 @@ export const PLUGIN_HOST_PAGES = PLUGIN_CONTRACT.hostPages;
 export const PLUGIN_STYLE_RECIPES = PLUGIN_CONTRACT.styleRecipes;
 export const PLUGIN_SLOTS = PLUGIN_CONTRACT.slots;
 export const PLUGIN_COMPONENTS = PLUGIN_CONTRACT.components;
+export const PLUGIN_RESERVED_SLOTS = PLUGIN_CONTRACT.reservedSlots;
+export const PLUGIN_RESERVED_COMPONENTS = PLUGIN_CONTRACT.reservedComponents;
 export const PLUGIN_EVENTS = PLUGIN_CONTRACT.events;
 export const PLUGIN_PERMISSIONS = PLUGIN_CONTRACT.permissions;
 
 export const PLUGIN_SLOT_IDS = PLUGIN_SLOTS.map((slot) => slot.id);
 export const PLUGIN_COMPONENT_IDS = PLUGIN_COMPONENTS.map((component) => component.id);
+
+const RESERVED_SLOT_SET = new Set(PLUGIN_RESERVED_SLOTS);
+const RESERVED_COMPONENT_SET = new Set(PLUGIN_RESERVED_COMPONENTS);
 
 const SLOT_MAP = new Map(PLUGIN_SLOTS.map((slot) => [slot.id, slot]));
 const COMPONENT_MAP = new Map(PLUGIN_COMPONENTS.map((component) => [component.id, component]));
@@ -127,6 +134,16 @@ export function pluginComponentSpec(id: string): PluginComponentSpec | undefined
 
 export function pluginComponentExists(id: string): boolean {
   return COMPONENT_MAP.has(id);
+}
+
+/** Slot ids the host does not mount; manifests must not target them. */
+export function pluginSlotReserved(id: string): boolean {
+  return RESERVED_SLOT_SET.has(id);
+}
+
+/** Component ids the host cannot replace/wrap (variants may still apply). */
+export function pluginComponentReserved(id: string): boolean {
+  return RESERVED_COMPONENT_SET.has(id);
 }
 
 export function pluginPermissionBase(permission: string): string {

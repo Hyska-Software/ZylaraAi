@@ -90,8 +90,8 @@ symlink, ADS, nomes reservados do Windows, colisão case-insensitive, ZIP bomb
       "themes": [{
         "id": "paper",
         "name": "Paper",
-        "light": { "--accent": "#8b5cf6" },
-        "dark": { "--accent": "#a78bfa" }
+        "light": { "accent": "#8b5cf6" },
+        "dark": { "accent": "#a78bfa" }
       }]
     },
     "tools": [{
@@ -282,6 +282,12 @@ Sidebar → **Plugins** (Installed / Discover / Updates), detalhe com publisher,
 assinatura, permissões, tools, prompt, skills, logs/auditoria, segredos, temas,
 auto-update, rollback e uninstall. Configurações → Plugins: registry,
 auto-update, developer mode, trusted, safe mode e "desativar todos".
+
+Temas contribuídos por plugins (`ui.themes`) aparecem no seletor normal
+Configurações → Temas, com selo de plugin, e são persistidos em
+`settings.themeId` como qualquer tema instalado. Não existe seletor separado
+de temas de plugin; desabilitar ou desinstalar o plugin remove o tema e volta
+o seletor para o tema ativo padrão.
 
 O painel/views de plugins ocupam o centro/painel direito; slots aparecem na
 titlebar, sidebar, composer e detalhe. Templates/shapes são os componentes do

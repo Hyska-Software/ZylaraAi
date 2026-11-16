@@ -670,7 +670,7 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
         hidden: prefs.navHidden,
         order: prefs.navOrder,
       }),
-    [ui.nav, prefs.navHidden, prefs.navOrder],
+    [ui.nav, prefs.enabled, prefs.navHidden, prefs.navOrder],
   );
 
   const openRoutines = (agentId: string | null) => {

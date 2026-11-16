@@ -469,13 +469,3 @@ export interface PluginToolCallRow {
 export type PluginLocaleBundle = {
   entries: Record<string, Record<string, unknown>>;
 };
-
-export interface PluginThemeEntry {
-  pluginId: string;
-  theme: ThemeContribution;
-}
-
-export interface PluginThemeSelection {
-  pluginId: string;
-  themeId: string;
-}

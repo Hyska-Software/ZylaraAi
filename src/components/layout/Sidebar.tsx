@@ -238,7 +238,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
         hidden: prefs.navHidden,
         order: prefs.navOrder,
       }),
-    [ui.nav, prefs.navHidden, prefs.navOrder, i18n.language],
+    [ui.nav, prefs.enabled, prefs.navHidden, prefs.navOrder, i18n.language],
   );
 
   const [renamingId, setRenamingId] = useState<string | null>(null);

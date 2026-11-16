@@ -129,7 +129,6 @@ import type {
   PluginRecord,
   PluginSnapshot,
   PluginStoreView,
-  PluginThemeEntry,
   PluginToolCallEvent,
   PluginToolCallRow,
   PluginToolResult,
@@ -942,7 +941,6 @@ export const api = {
   pluginLeaveSafeMode: () => invoke<void>('plugin_leave_safe_mode'),
   takePluginDeepLink: () => invoke<string | null>('take_plugin_deep_link'),
   getPluginLocales: () => invoke<PluginLocaleBundle>('get_plugin_locales'),
-  getPluginThemes: () => invoke<PluginThemeEntry[]>('get_plugin_themes'),
   pluginAssetText: (pluginId: string, path: string) =>
     invoke<string>('plugin_asset_text', { pluginId, path }),
   storeRefresh: (url?: string | null, force = false) =>

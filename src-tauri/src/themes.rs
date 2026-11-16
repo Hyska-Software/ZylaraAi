@@ -35,6 +35,10 @@ const BUNDLED_MANIFESTS: &[&str] = &[
 const THEMES_DIR: &str = "themes";
 const THEME_MANIFEST: &str = "theme.json";
 
+/// Theme ids under this prefix belong to enabled plugin contributions
+/// (`pluginThemeId` in the renderer); host packages must never claim them.
+const PLUGIN_THEME_ID_PREFIX: &str = "plugin-";
+
 const MAX_ARCHIVE_BYTES: u64 = 24 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES: u64 = 24 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES: usize = 256;
@@ -89,6 +93,44 @@ pub fn is_known_theme_token(token: &str) -> bool {
 
 pub fn is_theme_length_token(token: &str) -> bool {
     optional_length_tokens().iter().any(|value| value == token)
+}
+
+/// Validates a partial palette contributed by a plugin theme or preset.
+///
+/// Unlike installed host themes, plugin themes do not need to provide every
+/// required token; missing values fall back to the host CSS defaults. Token
+/// names/values still use the exact host allowlist.
+pub fn validate_contributed_tokens(
+    variant: &str,
+    tokens: &BTreeMap<String, String>,
+    label: &str,
+) -> Result<(), String> {
+    if tokens.len() > MAX_TOKENS {
+        return Err(format!(
+            "PLUGIN_THEME_TOKEN_LIMIT: {label} `{variant}` has more than {MAX_TOKENS} tokens"
+        ));
+    }
+    for (key, raw) in tokens {
+        let token = key.strip_prefix("--").unwrap_or(key);
+        let Some(kind) = token_kind(token) else {
+            return Err(format!(
+                "PLUGIN_THEME_TOKEN_UNKNOWN: {label} `{variant}` has unknown token `{key}`"
+            ));
+        };
+        let value = raw.trim();
+        let valid = !value.is_empty()
+            && value.chars().count() <= MAX_TOKEN_VALUE_CHARS
+            && match kind {
+                TokenKind::Color => is_color(value),
+                TokenKind::Length => is_length(value),
+            };
+        if !valid {
+            return Err(format!(
+                "PLUGIN_THEME_TOKEN_INVALID: {label} `{variant}` has invalid value for `{key}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "gif"];
@@ -489,6 +531,9 @@ pub fn list_themes(data_dir: &Path) -> Vec<ThemeInfo> {
         if directory_name.starts_with('.') || is_builtin_theme_id(directory_name) {
             continue;
         }
+        if directory_name.starts_with(PLUGIN_THEME_ID_PREFIX) {
+            continue;
+        }
         let manifest_path = entry.path().join(THEME_MANIFEST);
         let Ok(bytes) = fs::read(&manifest_path) else {
             continue;
@@ -529,7 +574,7 @@ fn remove_path(path: &Path) -> std::io::Result<()> {
 
 /// Removes an installed theme. Missing directories are idempotent.
 pub fn uninstall_theme(data_dir: &Path, id: &str) -> Result<Vec<ThemeInfo>, String> {
-    if is_builtin_theme_id(id) {
+    if is_builtin_theme_id(id) || id.starts_with(PLUGIN_THEME_ID_PREFIX) {
         return Err(error_key("themes.errors.reservedId"));
     }
     if !is_valid_theme_id(id) {
@@ -839,7 +884,7 @@ pub fn install_theme(data_dir: &Path, archive_path: &Path) -> Result<ThemeInstal
         )
     })?;
     let manifest = parse_manifest(&raw)?;
-    if is_builtin_theme_id(&manifest.id) {
+    if is_builtin_theme_id(&manifest.id) || manifest.id.starts_with(PLUGIN_THEME_ID_PREFIX) {
         return Err(error_key("themes.errors.reservedId"));
     }
 
@@ -1203,5 +1248,48 @@ mod tests {
             .expect("installed theme");
         assert!(!installed.built_in);
         assert!(!listed.iter().any(|theme| theme.id == "bad"));
+    }
+
+    #[test]
+    fn plugin_theme_namespace_is_reserved_for_contributions() {
+        assert!(is_valid_theme_id("plugin-0123456789abcdef"));
+
+        let dir = temp_dir();
+        let zip_path = dir.path().join("plugin-theme.zip");
+        write_zip(
+            &zip_path,
+            &[(
+                "plugin-feedface/theme.json",
+                manifest("plugin-feedface").as_bytes(),
+            )],
+        );
+        assert!(install_theme(dir.path(), &zip_path).is_err());
+
+        let themes = themes_dir(dir.path());
+        fs::create_dir_all(themes.join("plugin-deadbeef")).expect("theme dir");
+        fs::write(
+            themes.join("plugin-deadbeef/theme.json"),
+            manifest("plugin-deadbeef"),
+        )
+        .expect("manifest");
+        assert!(list_themes(dir.path())
+            .iter()
+            .all(|theme| !theme.id.starts_with(PLUGIN_THEME_ID_PREFIX)));
+        assert!(uninstall_theme(dir.path(), "plugin-deadbeef").is_err());
+    }
+
+    #[test]
+    fn contributed_tokens_use_the_host_allowlist() {
+        let mut tokens = BTreeMap::new();
+        tokens.insert("--accent".to_string(), "#8b5cf6".to_string());
+        tokens.insert("surface".to_string(), "#faf9ff".to_string());
+        assert!(validate_contributed_tokens("light", &tokens, "paper").is_ok());
+
+        tokens.insert("dangerous-token".to_string(), "red".to_string());
+        assert!(validate_contributed_tokens("light", &tokens, "paper").is_err());
+
+        let mut invalid = BTreeMap::new();
+        invalid.insert("accent".to_string(), "url(https://example.com)".to_string());
+        assert!(validate_contributed_tokens("dark", &invalid, "paper").is_err());
     }
 }

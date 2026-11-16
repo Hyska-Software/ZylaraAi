@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/api', () => ({ api: mocks }));
 
 import { useAppStore } from '@/lib/store/appStore';
-import { useThemeStore } from '@/lib/store/themeStore';
+import { BUILTIN_THEME, useThemeStore } from '@/lib/store/themeStore';
 import { useUiStore } from '@/lib/store/uiStore';
 import { THEME_CACHE_KEY } from '@/lib/theme/apply';
 import type { Settings, ThemeInfo } from '@/lib/types';
@@ -142,5 +142,83 @@ describe('themeStore', () => {
     expect(mocks.saveSettings).toHaveBeenCalledWith(
       expect.objectContaining({ themeId: 'zylara' }),
     );
+  });
+
+  it('merges plugin themes, applies them and persists their id', async () => {
+    const pluginTheme = theme({
+      id: 'plugin-0123456789abcdef',
+      name: 'Acme paper',
+      author: 'Acme',
+      builtIn: false,
+      pluginId: 'com.acme.notes',
+      pluginName: 'Acme Notes',
+      light: { tokens: { accent: '#8b5cf6', surface: '#faf9ff' }, wallpaper: null },
+      dark: { tokens: { accent: '#a78bfa', surface: '#17131f' }, wallpaper: null },
+    });
+    useThemeStore.setState({
+      hostThemes: [BUILTIN_THEME],
+      pluginThemes: [],
+      themes: [BUILTIN_THEME],
+      activeId: 'zylara',
+      ready: true,
+    });
+    useUiStore.setState({ theme: 'dark' });
+
+    useThemeStore.getState().setPluginThemes([pluginTheme]);
+    expect(useThemeStore.getState().themes.map((entry) => entry.id)).toEqual([
+      'zylara',
+      pluginTheme.id,
+    ]);
+
+    await useThemeStore.getState().setActive(pluginTheme.id);
+
+    expect(useThemeStore.getState().activeId).toBe(pluginTheme.id);
+    expect(mocks.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ themeId: pluginTheme.id }),
+    );
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#a78bfa');
+    expect(document.documentElement.style.getPropertyValue('--surface')).toBe('#17131f');
+  });
+
+  it('falls back to Zylara when an active plugin theme disappears', async () => {
+    const pluginTheme = theme({
+      id: 'plugin-0123456789abcdef',
+      pluginId: 'com.acme.notes',
+      pluginName: 'Acme Notes',
+    });
+    useThemeStore.setState({
+      hostThemes: [BUILTIN_THEME],
+      pluginThemes: [pluginTheme],
+      themes: [BUILTIN_THEME, pluginTheme],
+      activeId: pluginTheme.id,
+      ready: true,
+    });
+
+    useThemeStore.getState().setPluginThemes([]);
+
+    expect(useThemeStore.getState().activeId).toBe('zylara');
+    expect(useThemeStore.getState().themes.map((entry) => entry.id)).toEqual(['zylara']);
+    expect(mocks.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ themeId: 'zylara' }),
+    );
+  });
+
+  it('keeps a host theme selected when plugin themes are registered', async () => {
+    const pluginTheme = theme({
+      id: 'plugin-0123456789abcdef',
+      pluginId: 'com.acme.notes',
+      pluginName: 'Acme Notes',
+    });
+    useThemeStore.setState({
+      hostThemes: [theme()],
+      pluginThemes: [],
+      themes: [BUILTIN_THEME, theme()],
+      activeId: 'ocean',
+      ready: true,
+    });
+
+    useThemeStore.getState().setPluginThemes([pluginTheme]);
+
+    expect(useThemeStore.getState().activeId).toBe('ocean');
   });
 });

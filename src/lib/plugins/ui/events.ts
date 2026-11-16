@@ -1,9 +1,11 @@
 /** Normalized host events delivered to plugin UI (trusted and sandboxed). */
 import { useChatStore } from '@/lib/store/chatStore';
 import { useUiStore } from '@/lib/store/uiStore';
+import { THEME_APPLIED_EVENT } from '@/lib/theme/apply';
 import { getPluginRegistryState, pluginHasPermission } from '@/lib/plugins/registry';
 import { emitPluginFrameEvent } from '@/lib/plugins/frame';
 import { emitTrustedEvent } from '@/lib/plugins/trusted';
+import { usePluginUiPrefs } from './prefs';
 
 const WINDOW_MS = 1000;
 const MAX_PER_WINDOW = 50;
@@ -115,9 +117,20 @@ export function startPluginEventBridge(): () => void {
     }
   });
 
+  const onTheme = () => {
+    emitPluginEvent('theme/changed', {
+      mode: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+      preset: usePluginUiPrefs.getState().presets[useUiStore.getState().layoutMode] ?? null,
+    });
+  };
+  if (typeof window !== 'undefined') window.addEventListener(THEME_APPLIED_EVENT, onTheme);
+
   return () => {
     unUi();
     unChat();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener(THEME_APPLIED_EVENT, onTheme);
+    }
     windows.clear();
   };
 }

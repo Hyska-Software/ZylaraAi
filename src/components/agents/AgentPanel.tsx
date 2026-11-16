@@ -22,6 +22,7 @@ import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
 import { pluginIcon } from '@/lib/plugins/icons';
 import { pluginLabel } from '@/lib/plugins/registry';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { IconButton, Tooltip } from '@/components/ui';
 import { api } from '@/lib/api';
 import {
@@ -69,9 +70,16 @@ export function AgentPanel() {
   const pluginDock = useUiStore((state) => state.pluginDockTab.agent);
   const openPluginDockTab = useUiStore((state) => state.openPluginDockTab);
   const ui = usePluginUi();
+  const disabledPluginUi = usePluginUiPrefs((state) => state.disabled);
   const pluginTabs = useMemo(
-    () => ui.panelTabs.filter((entry) => entry.layouts.includes('agent') && !entry.takeover),
-    [ui.panelTabs],
+    () =>
+      ui.panelTabs.filter(
+        (entry) =>
+          entry.layouts.includes('agent') &&
+          !entry.takeover &&
+          !disabledPluginUi.includes(entry.key),
+      ),
+    [disabledPluginUi, ui.panelTabs],
   );
   const setOpen = useUiStore((state) => state.setAgentPanelOpen);
   const openEditor = useUiStore((state) => state.openAgentEditor);

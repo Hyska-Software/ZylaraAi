@@ -22,7 +22,10 @@ const plugin = {
   name: 'Demo',
   version: '1.0.0',
   manifest: { contributes: { ui: {} } },
-  permissions: [],
+  permissions: [
+    { id: 'ui.override:chat.message.user', granted: true },
+    { id: 'ui.slot:chat.markdown.fence', granted: true },
+  ],
   trusted: true,
   active: true,
   enabled: true,

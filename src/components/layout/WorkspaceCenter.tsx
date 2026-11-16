@@ -20,15 +20,11 @@ import {
 } from '@/components/code';
 import { LibraryView } from '@/components/library';
 import { PluginsView } from '@/components/plugins/PluginsView';
-import { PluginViewHost } from '@/components/plugins/PluginHosts';
 import { PluginPageHost } from '@/components/plugins/ui/PluginPageHost';
 import { SkillsView } from '@/components/skills';
 import { useChatStore, useUiStore } from '@/lib/store';
-import { usePluginStore } from '@/lib/plugins/store';
-import {
-  usePluginRegistry,
-  viewByKey,
-} from '@/lib/plugins/registry';
+import { usePluginRegistry } from '@/lib/plugins/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
 import type { PluginComponent } from '@/lib/plugins/ui/types';
 import { cn } from '@/lib/utils';
@@ -69,16 +65,10 @@ export function WorkspaceCenter() {
   const closeGoalDialog = useUiStore((state) => state.closeGoalDialog);
   /** Sessão ativa no Code (dona do objetivo exibido no painel central). */
   const activeId = useChatStore((state) => state.activeId);
-  const pluginTarget = usePluginStore((state) => state.activeView);
-  const pluginPage = useUiStore((state) => state.pluginPages[state.layoutMode]);
+  const pluginUiEnabled = usePluginUiPrefs((state) => state.enabled);
+  const rawPluginPage = useUiStore((state) => state.pluginPages[state.layoutMode]);
+  const pluginPage = pluginUiEnabled ? rawPluginPage : null;
   usePluginRegistry();
-  const pluginView = viewByKey(
-    pluginTarget ? `${pluginTarget.pluginId}:${pluginTarget.id}` : null,
-  );
-
-  if (pluginView && (pluginView.view.surface === 'global' || pluginView.view.surface === layoutMode)) {
-    return <PluginViewHost />;
-  }
 
   const codePluginPage = layoutMode === 'code' ? pluginPage : null;
   if (pluginPage && layoutMode !== 'code') {
@@ -108,20 +98,21 @@ export function WorkspaceCenter() {
   }
 
   const isCode = layoutMode === 'code';
-  const showPlugins = isCode ? codeView === 'plugins' : activeView === 'plugins';
-  const showSkills = isCode ? codeView === 'skills' : activeView === 'skills';
-  const showLibrary = !isCode && activeView === 'library';
-  const showDiff = isCode && codeView === 'diff' && codeDiffTab !== null;
-  const showFile = isCode && codeView === 'file' && codeFileTab !== null;
-  const showPlan = isCode && codeView === 'plan' && codePlanTab !== null;
-  const showGoal = isCode && codeView === 'goal' && activeId !== null;
-  const showCommits = isCode && codeView === 'commits' && codeCommitsTab !== null;
-  const showSubagent = isCode && codeView === 'subagent' && codeSubagentTab !== null;
-  const showTerminal = isCode && codeView === 'terminal';
-  const showPullRequests = isCode && codeView === 'prs' && codePullRequestsTab !== null;
-  const showPullRequest = isCode && codeView === 'pr' && codePullRequestTab !== null;
-  const showIssues = isCode && codeView === 'issues' && codeIssuesTab !== null;
-  const showIssue = isCode && codeView === 'issue' && codeIssueTab !== null;
+  const centralHost = !codePluginPage;
+  const showPlugins = centralHost && (isCode ? codeView === 'plugins' : activeView === 'plugins');
+  const showSkills = centralHost && (isCode ? codeView === 'skills' : activeView === 'skills');
+  const showLibrary = centralHost && !isCode && activeView === 'library';
+  const showDiff = centralHost && isCode && codeView === 'diff' && codeDiffTab !== null;
+  const showFile = centralHost && isCode && codeView === 'file' && codeFileTab !== null;
+  const showPlan = centralHost && isCode && codeView === 'plan' && codePlanTab !== null;
+  const showGoal = centralHost && isCode && codeView === 'goal' && activeId !== null;
+  const showCommits = centralHost && isCode && codeView === 'commits' && codeCommitsTab !== null;
+  const showSubagent = centralHost && isCode && codeView === 'subagent' && codeSubagentTab !== null;
+  const showTerminal = centralHost && isCode && codeView === 'terminal';
+  const showPullRequests = centralHost && isCode && codeView === 'prs' && codePullRequestsTab !== null;
+  const showPullRequest = centralHost && isCode && codeView === 'pr' && codePullRequestTab !== null;
+  const showIssues = centralHost && isCode && codeView === 'issues' && codeIssuesTab !== null;
+  const showIssue = centralHost && isCode && codeView === 'issue' && codeIssueTab !== null;
   const showChat =
     !codePluginPage &&
     !showPlugins &&

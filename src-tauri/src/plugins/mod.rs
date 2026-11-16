@@ -43,8 +43,8 @@ use crate::tools::{ToolImage, ToolOutcome};
 
 pub use manifest::{
     CommandContribution, PanelContribution, PluginAction, PluginContributions, PluginManifest,
-    ProviderContribution, SettingsTabContribution, SlotContribution, ThemeContribution,
-    ToolContribution, ViewContribution,
+    ProviderContribution, SettingsTabContribution, SlotContribution, ToolContribution,
+    ViewContribution,
 };
 pub use store::{
     PluginStoreView, RegistryIndex, RegistryPlugin, RegistryPublisher, RevokedPlugin,
@@ -82,8 +82,9 @@ pub fn capture_deep_links<I: IntoIterator<Item = String>>(args: I) -> Option<Str
         if target.is_none() {
             let path = url.path().trim_start_matches('/');
             // `zylara://plugin/https%3A%2F%2F...` is accepted as a convenience.
-            if path.starts_with("https://") {
-                target = Some(path.to_string());
+            let decoded = percent_encoding::percent_decode_str(path).decode_utf8_lossy();
+            if decoded.starts_with("https://") {
+                target = Some(decoded.into_owned());
             }
         }
         if let Some(target) = target {
@@ -594,25 +595,6 @@ impl PluginManager {
             };
             let root = PathBuf::from(&stored.root);
             let grants = self.db.plugin_granted_permissions(&stored.id).unwrap_or_default();
-            let loaded_tools = match resolve_tools_from_root(&manifest, &root) {
-                Ok(tools) => tools,
-                Err(error) => {
-                    let _ = self.db.plugin_log(
-                        &stored.id,
-                        "error",
-                        &format!("tools could not be loaded: {error:#}"),
-                    );
-                    Vec::new()
-                }
-            };
-            let prompt = load_prompt(&manifest, &root).unwrap_or_else(|error| {
-                let _ = self.db.plugin_log(
-                    &stored.id,
-                    "warn",
-                    &format!("prompt could not be loaded: {error:#}"),
-                );
-                String::new()
-            });
             let mut reason: Option<String> = stored.disabled_reason.clone();
             let mut effective = stored.enabled && options.active();
             if !options.plugins_enabled {
@@ -633,12 +615,47 @@ impl PluginManager {
             } else if let Err(error) = permissions::validate_declared(&stored_permissions(&manifest)) {
                 effective = false;
                 reason = Some(format!("invalid_permissions: {error}"));
+            } else if !manifest
+                .permissions
+                .iter()
+                .all(|permission| permissions::granted_any(&grants, permission))
+            {
+                effective = false;
+                reason = Some("permissions_incomplete".to_string());
             }
             if stored.enabled && !effective && reason.as_deref() == Some("missing_files") {
                 let _ =
                     self.db
                         .plugin_log(&stored.id, "error", "plugin files are missing");
             }
+            // Inactive plugins never read package files at boot.
+            let loaded_tools = if effective {
+                match resolve_tools_from_root(&manifest, &root) {
+                    Ok(tools) => tools,
+                    Err(error) => {
+                        let _ = self.db.plugin_log(
+                            &stored.id,
+                            "error",
+                            &format!("tools could not be loaded: {error:#}"),
+                        );
+                        Vec::new()
+                    }
+                }
+            } else {
+                Vec::new()
+            };
+            let prompt = if effective {
+                load_prompt(&manifest, &root).unwrap_or_else(|error| {
+                    let _ = self.db.plugin_log(
+                        &stored.id,
+                        "warn",
+                        &format!("prompt could not be loaded: {error:#}"),
+                    );
+                    String::new()
+                })
+            } else {
+                String::new()
+            };
             // Reserve wire names only for effective plugins, detecting
             // collisions deterministically (plugin ids are sorted by the DB).
             let mut plugin_tools = Vec::new();
@@ -902,29 +919,6 @@ impl PluginManager {
             }
         }
         definitions
-    }
-
-    /// Plugin tool descriptors for a profile (UI detail and prompt guidance).
-    pub fn tool_views(&self) -> Vec<PluginToolView> {
-        let state = self.state.read();
-        let mut tools = Vec::new();
-        for plugin in &state.active {
-            let grants = &plugin.grants;
-            if !permissions::granted_any(grants, "agent.tools") {
-                continue;
-            }
-            for tool in &plugin.tools {
-                tools.push(PluginToolView {
-                    name: tool.name.clone(),
-                    wire_name: tool_wire_name(&plugin.stored.id, &tool.name),
-                    description: tool.description.clone(),
-                    risk: tool.risk.clone(),
-                    profiles: tool.profiles.clone(),
-                    parameters: tool.parameters.clone(),
-                });
-            }
-        }
-        tools
     }
 
     pub fn tool_owner(&self, wire_name: &str) -> Option<(String, ToolContribution)> {
@@ -1281,23 +1275,6 @@ impl PluginManager {
         bundle
     }
 
-    pub fn theme_contributions(&self) -> Vec<(String, ThemeContribution)> {
-        self.state
-            .read()
-            .active
-            .iter()
-            .flat_map(|plugin| {
-                plugin
-                    .manifest
-                    .contributes
-                    .ui
-                    .themes
-                    .iter()
-                    .map(|theme| (plugin.stored.id.clone(), theme.clone()))
-            })
-            .collect()
-    }
-
     /* ------------------------------------------------------------- */
     /* Install / lifecycle                                           */
     /* ------------------------------------------------------------- */
@@ -1428,19 +1405,44 @@ impl PluginManager {
         if manifest.is_trusted() && !options_state.allow_trusted {
             bail!("PLUGIN_TRUSTED_DISABLED: trusted plugins are disabled in Settings → Plugins");
         }
-        if package.verified.is_none() && !options.allow_unsigned {
-            bail!("PLUGIN_UNSIGNED: a signed package is required");
+        if package.verified.is_none() {
+            if !options.allow_unsigned {
+                bail!("PLUGIN_UNSIGNED: a signed package is required");
+            }
+            if !options_state.dev_mode {
+                bail!("PLUGIN_UNSIGNED_DEV_ONLY: enable developer mode to install unsigned packages");
+            }
         }
         if let Some(verified) = &package.verified {
             self.check_publisher_key(verified, options.allow_unsigned, allow_key_rotation)?;
         }
-        let tools = package::resolve_tools(&package)?;
+        package::resolve_tools(&package)?;
         let permissions_list = permissions::normalize_permissions(&manifest.permissions);
         permissions::validate_declared(&permissions_list)?;
         let granted = self.resolve_grants(&manifest, options.granted_permissions)?;
         let permissions_complete = granted.values().all(|granted| *granted);
         let existing = self.db.plugin_get(&manifest.id)?;
+        let previously_enabled = existing.as_ref().map(|entry| entry.enabled).unwrap_or(true);
+        let enabled =
+            permissions_complete && mode == InstallMode::User && previously_enabled;
+        let disabled_reason = if mode == InstallMode::Agent {
+            Some("activation_required".to_string())
+        } else if !permissions_complete {
+            Some("permissions_incomplete".to_string())
+        } else if !enabled {
+            existing
+                .as_ref()
+                .and_then(|entry| entry.disabled_reason.clone())
+                .or_else(|| Some("user_disabled".to_string()))
+        } else {
+            None
+        };
         if let Some(existing) = &existing {
+            if existing.publisher_id.as_deref() != Some(manifest.publisher.id.as_str()) {
+                bail!(
+                    "PLUGIN_PUBLISHER_CHANGED: uninstall the plugin before installing a package from another publisher"
+                );
+            }
             if existing.version == manifest.version {
                 // Reinstall of the same version is allowed; the previous root
                 // stays available only if it was a different directory.
@@ -1485,7 +1487,7 @@ impl PluginManager {
             version: manifest.version.clone(),
             api_version: manifest.api_version,
             root: target.to_string_lossy().to_string(),
-            enabled: permissions_complete && mode == InstallMode::User,
+            enabled,
             trusted: manifest.is_trusted(),
             source: options.source,
             signature_status: if package.verified.is_some() {
@@ -1518,11 +1520,7 @@ impl PluginManager {
                 .unwrap_or(false),
             previous_version: existing.as_ref().map(|existing| existing.version.clone()),
             previous_root: existing.as_ref().map(|existing| existing.root.clone()),
-            disabled_reason: if mode == InstallMode::Agent {
-                Some("activation_required".to_string())
-            } else {
-                (!permissions_complete).then(|| "permissions_incomplete".to_string())
-            },
+            disabled_reason,
             size_bytes: size as i64,
         };
         if let Err(error) = self.db.plugin_upsert(&stored) {
@@ -1807,6 +1805,12 @@ impl PluginManager {
                 bail!("PLUGIN_TRUSTED_DISABLED: trusted plugins are disabled");
             }
             let manifest: PluginManifest = serde_json::from_str(&stored.manifest_json)?;
+            if !Path::new(&stored.root).is_dir() {
+                bail!("PLUGIN_FILES_MISSING: reinstall the plugin before enabling it");
+            }
+            if !manifest.supports_current_app() {
+                bail!("PLUGIN_INCOMPATIBLE_APP: the plugin targets an unsupported app version");
+            }
             let grants = self.db.plugin_granted_permissions(plugin_id)?;
             let missing: Vec<&str> = manifest
                 .permissions
@@ -1908,6 +1912,18 @@ impl PluginManager {
         }
         let manifest_json = std::fs::read_to_string(Path::new(&root).join(package::MANIFEST_PATH))?;
         let manifest = PluginManifest::parse(manifest_json.as_bytes())?;
+        let current_grants = self.db.plugin_permissions(plugin_id)?;
+        let grants: BTreeMap<String, bool> = manifest
+            .permissions
+            .iter()
+            .map(|permission| {
+                (
+                    permission.clone(),
+                    current_grants.get(permission).copied().unwrap_or(false),
+                )
+            })
+            .collect();
+        let permissions_complete = grants.values().all(|granted| *granted);
         let current_root = stored.root.clone();
         let current_version = stored.version.clone();
         let mut next = stored.clone();
@@ -1918,15 +1934,12 @@ impl PluginManager {
         next.previous_version = Some(current_version);
         next.previous_root = Some(current_root);
         next.package_hash = String::new();
+        if !permissions_complete {
+            next.enabled = false;
+            next.disabled_reason = Some("permissions_incomplete".to_string());
+        }
         self.db.plugin_upsert(&next)?;
-        self.db.plugin_replace_permissions(
-            plugin_id,
-            &manifest
-                .permissions
-                .iter()
-                .map(|permission| (permission.clone(), true))
-                .collect(),
-        )?;
+        self.db.plugin_replace_permissions(plugin_id, &grants)?;
         let _ = self
             .db
             .plugin_audit(plugin_id, "rollback", None, &format!("rolled back to {version}"));

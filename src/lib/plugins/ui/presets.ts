@@ -1,20 +1,14 @@
 /** Applies one declarative design preset per layout. */
 import { useEffect } from 'react';
 
-import themeTokens from '@data/theme-tokens.json';
 import { useThemeStore } from '@/lib/store/themeStore';
 import { useUiStore } from '@/lib/store/uiStore';
+import { normalizeThemeTokens } from '@/lib/theme/tokens';
 
 import { sanitizePluginCss } from './css';
 import { usePluginUiPrefs } from './prefs';
 import { usePluginUi } from './registry';
 import type { LayoutId, PresetSpec } from './types';
-
-const TOKEN_ALLOWLIST = new Set<string>([
-  ...themeTokens.required,
-  ...themeTokens.optionalColor,
-  ...themeTokens.optionalLength,
-]);
 
 const appliedTokens = new Set<string>();
 let presetStyle: HTMLStyleElement | null = null;
@@ -50,10 +44,8 @@ export function applyPresetForLayout(
     return;
   }
   const dark = root.classList.contains('dark');
-  const tokens = dark ? preset.tokens.dark : preset.tokens.light;
-  for (const [name, value] of Object.entries(tokens)) {
-    const token = name.startsWith('--') ? name.slice(2) : name;
-    if (!TOKEN_ALLOWLIST.has(token) || !value.trim()) continue;
+  const tokens = normalizeThemeTokens(dark ? preset.tokens.dark : preset.tokens.light);
+  for (const [token, value] of Object.entries(tokens)) {
     const variable = `--${token}`;
     root.style.setProperty(variable, value);
     appliedTokens.add(variable);
@@ -79,6 +71,7 @@ export function useApplyPresets(): void {
   const prefs = usePluginUiPrefs();
   const ui = usePluginUi();
   const theme = useUiStore((state) => state.theme);
+  const activeThemeId = useThemeStore((state) => state.activeId);
 
   useEffect(() => {
     applyPresetForLayout(
@@ -87,5 +80,5 @@ export function useApplyPresets(): void {
       ui.presets,
       prefs.enabled,
     );
-  }, [layout, prefs.enabled, prefs.presets, theme, ui.presets, ui.revision]);
+  }, [layout, prefs.enabled, prefs.presets, theme, activeThemeId, ui.presets, ui.revision]);
 }

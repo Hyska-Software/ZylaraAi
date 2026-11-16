@@ -2088,11 +2088,17 @@ mod tests {
         });
         assert_eq!(invalid.theme_id, crate::themes::BUILTIN_THEME_ID);
 
-        let valid = normalize_settings(Settings {
+        let mut valid = normalize_settings(Settings {
             theme_id: "ocean".into(),
             ..Settings::default()
         });
         assert_eq!(valid.theme_id, "ocean");
+
+        valid = normalize_settings(Settings {
+            theme_id: "plugin-0123456789abcdef".into(),
+            ..Settings::default()
+        });
+        assert_eq!(valid.theme_id, "plugin-0123456789abcdef");
 
         let empty = normalize_settings(Settings {
             theme_id: String::new(),

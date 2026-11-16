@@ -120,6 +120,8 @@
       "version": "v{{version}}",
       "by": "por {{author}}"
     },
+    "pluginBadge": "Plugin",
+    "pluginFrom": "Del plugin {{name}}",
     "loading": "Cargando temas…",
     "empty": "Aún no hay temas personalizados. Instala un paquete .zip para añadir uno.",
     "loadFailed": "No se pudieron cargar los temas instalados.",

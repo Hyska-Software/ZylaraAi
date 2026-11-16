@@ -24,7 +24,11 @@ const plugin = {
   name: 'Demo',
   version: '1.0.0',
   manifest: { contributes: { ui: {} } },
-  permissions: [],
+  permissions: [
+    { id: 'ui.slot:chat.message.actions', granted: true },
+    { id: 'ui.slot:chat.message.node', granted: true },
+    { id: 'ui.override:chat.welcome', granted: true },
+  ],
   trusted: true,
   active: true,
   enabled: true,

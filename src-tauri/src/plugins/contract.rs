@@ -28,6 +28,10 @@ pub struct PluginContract {
     pub style_recipes: BTreeMap<String, Vec<String>>,
     pub slots: Vec<SlotSpec>,
     pub components: Vec<ComponentSpec>,
+    #[serde(default)]
+    pub reserved_slots: Vec<String>,
+    #[serde(default)]
+    pub reserved_components: Vec<String>,
     pub events: Vec<EventSpec>,
     pub permissions: Vec<PermissionSpec>,
 }
@@ -233,6 +237,26 @@ fn validate(contract: &PluginContract) {
             }
         }
     }
+    for id in &contract.reserved_slots {
+        assert!(
+            contract.slots.iter().any(|slot| &slot.id == id),
+            "reserved slot {id} is not in slots"
+        );
+    }
+    for id in &contract.reserved_components {
+        assert!(
+            contract.components.iter().any(|component| &component.id == id),
+            "reserved component {id} is not in components"
+        );
+    }
+    let mut reserved = std::collections::HashSet::new();
+    for id in contract
+        .reserved_slots
+        .iter()
+        .chain(contract.reserved_components.iter())
+    {
+        assert!(reserved.insert(id), "duplicate reserved surface {id}");
+    }
     for permission in &contract.permissions {
         assert!(
             matches!(permission.risk.as_str(), "low" | "medium" | "high" | "critical"),
@@ -376,11 +400,19 @@ pub fn slot_spec(id: &str) -> Option<&'static SlotSpec> {
     CONTRACT.slots.iter().find(|slot| slot.id == id)
 }
 
+pub fn slot_reserved(id: &str) -> bool {
+    CONTRACT.reserved_slots.iter().any(|slot| slot == id)
+}
+
 pub fn component_spec(id: &str) -> Option<&'static ComponentSpec> {
     CONTRACT
         .components
         .iter()
         .find(|component| component.id == id)
+}
+
+pub fn component_reserved(id: &str) -> bool {
+    CONTRACT.reserved_components.iter().any(|component| component == id)
 }
 
 pub fn event_spec(name: &str) -> Option<&'static EventSpec> {

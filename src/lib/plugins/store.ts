@@ -1,16 +1,19 @@
 /**
  * Installed plugin state. The Rust manager is the source of truth for
- * activation/permissions; this store only mirrors snapshots and coordinates UI
- * state (open view/panel, selected declarative theme).
+ * activation/permissions; this store mirrors snapshots and coordinates UI
+ * state (locales, open pages and dock tabs).
  */
 import { create } from 'zustand';
 
 import { i18n } from '@/lib/i18n';
 import { api } from '@/lib/api';
-import { resolveDark, useUiStore } from '@/lib/store/uiStore';
 import { useAppStore } from '@/lib/store/appStore';
-import { useThemeStore } from '@/lib/store/themeStore';
+import { useUiStore } from '@/lib/store/uiStore';
+import { BUILTIN_THEME_ID, useThemeStore } from '@/lib/store/themeStore';
+import { pluginThemeId, pluginThemeInfos } from './themes';
+import { pluginI18nKey } from './i18n';
 import { setPluginSnapshot, usePluginRegistry } from './registry';
+import { pluginUiState } from './ui/registry';
 import type {
   PluginLogRow,
   PluginAuditRow,
@@ -19,8 +22,6 @@ import type {
   PluginRecord,
   PluginSnapshot,
   PluginStoreView,
-  PluginThemeEntry,
-  PluginThemeSelection,
   PluginUpdateInfo,
 } from './types';
 
@@ -33,12 +34,7 @@ const EMPTY_SNAPSHOT: PluginSnapshot = {
   configFingerprint: '',
 };
 
-const THEME_STORAGE_KEY = 'zylara.plugin.theme';
-
-interface ActiveTarget {
-  pluginId: string;
-  id: string;
-}
+const LEGACY_THEME_STORAGE_KEY = 'zylara.plugin.theme';
 
 interface PluginState {
   snapshot: PluginSnapshot;
@@ -52,10 +48,6 @@ interface PluginState {
   updatesLoading: boolean;
   busyPluginId: string | null;
   localeBundle: PluginLocaleBundle;
-  themes: PluginThemeEntry[];
-  activeTheme: PluginThemeSelection | null;
-  activeView: ActiveTarget | null;
-  activePanel: ActiveTarget | null;
   lastInspection: PluginPackageInspection | null;
   init: () => Promise<void>;
   reload: () => Promise<void>;
@@ -94,29 +86,68 @@ interface PluginState {
   openDir: (pluginId: string) => Promise<void>;
   logs: (pluginId: string, limit?: number) => Promise<PluginLogRow[]>;
   audit: (pluginId: string, limit?: number) => Promise<PluginAuditRow[]>;
-  openView: (pluginId: string, viewId: string) => void;
-  openPanel: (pluginId: string, panelId: string) => void;
   closeOverlays: () => void;
   leaveSafeMode: () => Promise<void>;
-  setActiveTheme: (selection: PluginThemeSelection | null) => void;
   saveSecret: (pluginId: string, key: string, value: string | null) => Promise<void>;
   listSecrets: (pluginId: string) => Promise<string[]>;
 }
 
 let initialized: Promise<void> | null = null;
-let themeListenerInstalled = false;
 
-function readStoredTheme(): PluginThemeSelection | null {
+interface LegacyThemeSelection {
+  pluginId: string;
+  themeId: string;
+}
+
+function readLegacyTheme(): LegacyThemeSelection | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const raw = window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<PluginThemeSelection>;
+    const parsed = JSON.parse(raw) as Partial<LegacyThemeSelection>;
     return typeof parsed.pluginId === 'string' && typeof parsed.themeId === 'string'
       ? { pluginId: parsed.pluginId, themeId: parsed.themeId }
       : null;
   } catch {
     return null;
+  }
+}
+
+function clearLegacyTheme(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(LEGACY_THEME_STORAGE_KEY);
+  } catch {
+    // Persisting the visual preference is best-effort.
+  }
+}
+
+function syncPluginThemes(snapshot: PluginSnapshot): void {
+  useThemeStore.getState().setPluginThemes(pluginThemeInfos(snapshot.plugins));
+}
+
+/** Drops center pages and dock tabs whose contribution no longer exists. */
+function syncPluginTargets(): void {
+  const ui = useUiStore.getState();
+  const pages = pluginUiState().pages;
+  const tabs = pluginUiState().panelTabs;
+  for (const layout of ['chat', 'code', 'agent'] as const) {
+    const page = ui.pluginPages[layout];
+    if (
+      page &&
+      !pages.some(
+        (entry) =>
+          entry.pluginId === page.pluginId &&
+          entry.pageId === page.pageId &&
+          entry.layouts.includes(layout),
+      )
+    ) {
+      ui.closePluginPage(layout);
+    }
+    const key = ui.pluginDockTab[layout];
+    if (key && !tabs.some((entry) => entry.key === key)) {
+      ui.closePluginDockTab(layout);
+    }
   }
 }
 
@@ -155,55 +186,26 @@ function flattenedPluginLocales(bundle: PluginLocaleBundle): void {
         locale === 'en'
           ? (value as Record<string, unknown>)
           : mergeLocaleFallback(english, value as Record<string, unknown>);
-      i18n.addResourceBundle(locale, 'plugins', { [pluginId]: merged }, true, true);
+      i18n.addResourceBundle(
+        locale,
+        'plugins',
+        { [pluginI18nKey(pluginId)]: merged },
+        true,
+        true,
+      );
     }
   }
 }
 
-const appliedThemeKeys = new Set<string>();
-
-function clearPluginTheme(): void {
-  if (typeof document === 'undefined') return;
-  const root = document.documentElement;
-  for (const key of appliedThemeKeys) root.style.removeProperty(key);
-  appliedThemeKeys.clear();
-  // The theme store owns every host token. Re-applying it restores the active
-  // theme after a plugin override is removed.
-  useThemeStore.getState().apply();
-}
-
-function applyPluginTheme(selection: PluginThemeSelection | null): void {
-  if (typeof document === 'undefined') return;
-  clearPluginTheme();
-  if (!selection) return;
-  const entry = usePluginStore
-    .getState()
-    .themes.find(
-      (candidate) =>
-        candidate.pluginId === selection.pluginId && candidate.theme.id === selection.themeId,
-    );
-  if (!entry) return;
-  const dark = resolveDark(useUiStore.getState().theme);
-  const tokens = dark ? entry.theme.dark : entry.theme.light;
-  const root = document.documentElement;
-  for (const [key, value] of Object.entries(tokens)) {
-    if (!key.startsWith('--') || typeof value !== 'string') continue;
-    root.style.setProperty(key, value);
-    appliedThemeKeys.add(key);
-  }
-}
-
-function rememberTheme(selection: PluginThemeSelection | null): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (selection) {
-      window.localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(selection));
-    } else {
-      window.localStorage.removeItem(THEME_STORAGE_KEY);
-    }
-  } catch {
-    // Persisting the visual preference is best-effort.
-  }
+function applyLegacyThemeSelection(): void {
+  const legacy = readLegacyTheme();
+  if (!legacy) return;
+  clearLegacyTheme();
+  const settings = useAppStore.getState().settings;
+  if (settings.themeId && settings.themeId !== BUILTIN_THEME_ID) return;
+  const id = pluginThemeId(legacy.pluginId, legacy.themeId);
+  if (!useThemeStore.getState().themes.some((theme) => theme.id === id)) return;
+  void useThemeStore.getState().setActive(id);
 }
 
 async function runAutoUpdate(): Promise<void> {
@@ -242,10 +244,6 @@ export const usePluginStore = create<PluginState>()((set, get) => ({
   updatesLoading: false,
   busyPluginId: null,
   localeBundle: { entries: {} },
-  themes: [],
-  activeTheme: readStoredTheme(),
-  activeView: null,
-  activePanel: null,
   lastInspection: null,
 
   init: async () => {
@@ -256,25 +254,16 @@ export const usePluginStore = create<PluginState>()((set, get) => ({
         const snapshot = await api.listPlugins();
         setPluginSnapshot(snapshot);
         set({ snapshot, loading: false, initialized: true, error: null });
+        syncPluginThemes(snapshot);
+        syncPluginTargets();
         try {
-          const [localeBundle, themes] = await Promise.all([
-            api.getPluginLocales(),
-            api.getPluginThemes(),
-          ]);
+          const localeBundle = await api.getPluginLocales();
           flattenedPluginLocales(localeBundle);
-          set({ localeBundle, themes });
+          set({ localeBundle });
         } catch {
-          // Locales/themes are optional; installed contributions still work.
+          // Locales are optional; installed contributions still work.
         }
-        get().setActiveTheme(readStoredTheme());
-        if (!themeListenerInstalled && typeof window !== 'undefined') {
-          themeListenerInstalled = true;
-          useUiStore.subscribe((next, previous) => {
-            if (next.theme !== previous.theme) {
-              applyPluginTheme(usePluginStore.getState().activeTheme);
-            }
-          });
-        }
+        applyLegacyThemeSelection();
         const appSettings = useAppStore.getState().settings;
         if (
           appSettings.pluginAutoUpdate &&
@@ -300,33 +289,13 @@ export const usePluginStore = create<PluginState>()((set, get) => ({
       const snapshot = await api.listPlugins();
       setPluginSnapshot(snapshot);
       set({ snapshot, error: null });
-      const [localeBundle, themes] = await Promise.all([
-        api.getPluginLocales().catch(() => ({ entries: {} })),
-        api.getPluginThemes().catch(() => [] as PluginThemeEntry[]),
-      ]);
+      syncPluginThemes(snapshot);
+      syncPluginTargets();
+      const localeBundle = await api
+        .getPluginLocales()
+        .catch(() => ({ entries: {} }));
       flattenedPluginLocales(localeBundle);
-      set({ localeBundle, themes });
-      // A missing plugin invalidates the selected theme/targets.
-      const activeTheme = get().activeTheme;
-      if (
-        activeTheme &&
-        !themes.some(
-          (entry) =>
-            entry.pluginId === activeTheme.pluginId && entry.theme.id === activeTheme.themeId,
-        )
-      ) {
-        set({ activeTheme: null });
-        rememberTheme(null);
-      }
-      applyPluginTheme(get().activeTheme);
-      const activeView = get().activeView;
-      const activePanel = get().activePanel;
-      if (activeView && !snapshot.plugins.some((plugin) => plugin.id === activeView.pluginId)) {
-        set({ activeView: null });
-      }
-      if (activePanel && !snapshot.plugins.some((plugin) => plugin.id === activePanel.pluginId)) {
-        set({ activePanel: null });
-      }
+      set({ localeBundle });
       void useAppStore.getState().reloadCatalog();
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
@@ -512,11 +481,13 @@ export const usePluginStore = create<PluginState>()((set, get) => ({
   logs: (pluginId, limit = 100) => api.listPluginLogs(pluginId, limit),
   audit: (pluginId, limit = 100) => api.listPluginAudit(pluginId, limit),
 
-  openView: (pluginId, viewId) =>
-    set({ activeView: { pluginId, id: viewId }, activePanel: null }),
-  openPanel: (pluginId, panelId) =>
-    set({ activePanel: { pluginId, id: panelId }, activeView: null }),
-  closeOverlays: () => set({ activeView: null, activePanel: null }),
+  closeOverlays: () => {
+    const ui = useUiStore.getState();
+    for (const layout of ['chat', 'code', 'agent'] as const) {
+      ui.closePluginPage(layout);
+      ui.closePluginDockTab(layout);
+    }
+  },
 
   leaveSafeMode: async () => {
     await useAppStore.getState().saveSettings({
@@ -527,12 +498,6 @@ export const usePluginStore = create<PluginState>()((set, get) => ({
     await get().reload();
   },
 
-  setActiveTheme: (selection) => {
-    rememberTheme(selection);
-    set({ activeTheme: selection });
-    applyPluginTheme(selection);
-  },
-
   saveSecret: (pluginId, key, value) => api.setPluginSecret(pluginId, key, value),
   listSecrets: (pluginId) => api.listPluginSecrets(pluginId),
 }));
@@ -541,10 +506,6 @@ export function activePlugin(pluginId: string): PluginRecord | undefined {
   return usePluginStore
     .getState()
     .snapshot.plugins.find((plugin) => plugin.id === pluginId);
-}
-
-export function pluginThemeEntries(): PluginThemeEntry[] {
-  return usePluginStore.getState().themes;
 }
 
 export { usePluginRegistry };

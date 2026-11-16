@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Zylara fixtures",
-  "generatedAt": "2026-11-15T15:20:18.136Z",
+  "generatedAt": "2026-11-16T16:08:59.565Z",
   "plugins": [
     {
       "id": "com.acme.gateway",
@@ -17,7 +17,7 @@
       "summary": "Declarative OpenAI-compatible provider fixture.",
       "description": "Declarative OpenAI-compatible provider fixture.",
       "packageUrl": "provider-demo-1.0.0.zplugin",
-      "packageSha256": "d75c6dfc6bee93b16e557cae28c34981381bb0f3f03f1072d6a0a73efdacaff3",
+      "packageSha256": "a73303efc8de92c46f4cf3eeea458a0b969434be5ec77d855ca6f82d82773bf1",
       "packageSize": 2183,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -25,7 +25,7 @@
         "providers"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-15T15:20:18.099Z"
+      "publishedAt": "2026-11-16T16:08:59.542Z"
     },
     {
       "id": "com.acme.notes",
@@ -41,8 +41,8 @@
       "summary": "Reference sandboxed plugin: nav tab, dock tab, variants, preset, scoped CSS, GenUI, tools and skills.",
       "description": "Reference sandboxed plugin: nav tab, dock tab, variants, preset, scoped CSS, GenUI, tools and skills.",
       "packageUrl": "sandbox-demo-1.2.0.zplugin",
-      "packageSha256": "6d1ddffb2dde0031e06b3d468cfc67d72855761a9ceb822d9b7a2132add8631d",
-      "packageSize": 20890,
+      "packageSha256": "c5b5d326a4eee453c0adcee9f78b250bcd591fecf6db5db514e425ebbf71247d",
+      "packageSize": 20878,
       "minAppVersion": "0.11.0",
       "channel": "stable",
       "permissions": [
@@ -66,7 +66,7 @@
         "hotkeys"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-15T15:20:18.116Z"
+      "publishedAt": "2026-11-16T16:08:59.547Z"
     },
     {
       "id": "com.acme.trusted-demo",
@@ -82,7 +82,7 @@
       "summary": "Trusted reference plugin: React page/panel, per-layout nav, variants, presets, GenUI and an agent tool.",
       "description": "Trusted reference plugin: React page/panel, per-layout nav, variants, presets, GenUI and an agent tool.",
       "packageUrl": "trusted-demo-1.0.0.zplugin",
-      "packageSha256": "d28e851ae7e648e462d4bb1394d4860da898a0c5ba18bbb366d4d849deed99bd",
+      "packageSha256": "08d8f1a0877a0524a3ea7b6ee201d1720912e11054da54c8829abf6e12495c8c",
       "packageSize": 15885,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -108,7 +108,7 @@
         "providers"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-15T15:20:18.122Z"
+      "publishedAt": "2026-11-16T16:08:59.551Z"
     }
   ],
   "revoked": [],
@@ -117,6 +117,6 @@
     "algorithm": "ed25519",
     "keyId": "registry-fixture-2026",
     "publicKey": "WO4w8KkOFvUAd+1BbK94946rGnviHQvKID39iRaEgXc=",
-    "signature": "5Z+mRql7SHNdbYEHgvX8jlI2eGm6+E+n6x01gPHfSawiX28zkVkzrkDjr6qHQuTPiciPaOa1+ALdP3Dh6mRQBQ=="
+    "signature": "DsB56cW4dXPYLRz6UL7iLekuYhd77KhCdTksv0rhG5Y4ya0n9s/HvaNFBesfiHl3NGMhY1bGoU4bYxaHk9UwBQ=="
   }
 }

@@ -36,10 +36,12 @@ import {
   Spinner,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { PluginSlot } from './PluginHosts';
 import { openPluginPanel, openPluginView } from '@/lib/plugins/host';
 import { pluginIcon } from '@/lib/plugins/icons';
 import { pluginLabel, usePluginRegistry } from '@/lib/plugins/registry';
 import { usePluginStore } from '@/lib/plugins/store';
+import { BUILTIN_THEME_ID, useThemeStore } from '@/lib/store/themeStore';
 import { useUiStore } from '@/lib/store/uiStore';
 import { copyText } from '@/lib/utils';
 import type {
@@ -126,8 +128,8 @@ export function PluginDetailDialog({
     state.snapshot.plugins.find((candidate) => candidate.id === pluginId),
   );
   const updates = usePluginStore((state) => state.updates);
-  const themes = usePluginStore((state) => state.themes);
-  const activeTheme = usePluginStore((state) => state.activeTheme);
+  const themes = useThemeStore((state) => state.themes);
+  const activeId = useThemeStore((state) => state.activeId);
   const registry = usePluginRegistry();
   const [tab, setTab] = useState('overview');
   const [grants, setGrants] = useState<Record<string, boolean>>({});
@@ -917,31 +919,29 @@ export function PluginDetailDialog({
                       ) : (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {pluginThemes.map((entry) => {
-                            const selected =
-                              activeTheme?.pluginId === plugin.id &&
-                              activeTheme.themeId === entry.theme.id;
+                            const selected = activeId === entry.id;
                             return (
                               <Button
-                                key={entry.theme.id}
+                                key={entry.id}
                                 size="sm"
                                 variant={selected ? 'secondary' : 'ghost'}
                                 onClick={() =>
-                                  usePluginStore.getState().setActiveTheme(
-                                    selected
-                                      ? null
-                                      : { pluginId: plugin.id, themeId: entry.theme.id },
-                                  )
+                                  void useThemeStore
+                                    .getState()
+                                    .setActive(selected ? BUILTIN_THEME_ID : entry.id)
                                 }
                               >
-                                {entry.theme.name}
+                                {entry.name}
                               </Button>
                             );
                           })}
-                          {activeTheme?.pluginId === plugin.id ? (
+                          {pluginThemes.some((entry) => entry.id === activeId) ? (
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => usePluginStore.getState().setActiveTheme(null)}
+                              onClick={() =>
+                                void useThemeStore.getState().setActive(BUILTIN_THEME_ID)
+                              }
                             >
                               {t('detail.resetTheme')}
                             </Button>
@@ -957,6 +957,14 @@ export function PluginDetailDialog({
         </Tabs>
 
         <DialogFooter className="shrink-0 border-t border-border px-5 py-3">
+          <div className="mr-auto min-w-0">
+            <PluginSlot
+              slot="plugins.detail.actions"
+              context={{ pluginId: plugin.id }}
+              compact
+              onlyPluginId={plugin.id}
+            />
+          </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t('host.close')}
           </Button>

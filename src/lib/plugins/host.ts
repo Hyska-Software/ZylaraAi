@@ -49,7 +49,11 @@ export function openPluginView(
   const page = pluginUiState().pages.find(
     (entry) => entry.pluginId === plugin.id && entry.pageId === viewId,
   );
-  const targetLayout = layout ?? page?.layouts[0] ?? undefined;
+  const current = useUiStore.getState().layoutMode;
+  const targetLayout =
+    layout ??
+    (page && page.layouts.includes(current) ? current : page?.layouts[0]) ??
+    undefined;
   if (targetLayout) useUiStore.getState().setLayoutMode(targetLayout);
   else switchLayoutForSurface(view.view.surface);
   useUiStore.getState().openPluginPage({ pluginId: plugin.id, pageId: viewId }, targetLayout);

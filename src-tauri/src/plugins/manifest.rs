@@ -609,6 +609,19 @@ impl PluginManifest {
             if !trusted_ui && permissions::is_trusted_only(permission) {
                 bail!("permission `{permission}` requires the trusted runtime");
             }
+            if contract::permission_base(permission) == "ui.override" {
+                let component = permission
+                    .strip_prefix("ui.override:")
+                    .unwrap_or_default();
+                if contract::component_spec(component).is_none() {
+                    bail!("ui.override permission `{permission}` targets an unknown component");
+                }
+                if contract::component_reserved(component) {
+                    bail!(
+                        "PLUGIN_COMPONENT_RESERVED: component `{component}` cannot be overridden"
+                    );
+                }
+            }
         }
         if self.permissions.len() > 64 {
             bail!("too many permissions");
@@ -617,6 +630,9 @@ impl PluginManifest {
         for slot in &self.contributes.ui.slots {
             let spec = contract::slot_spec(&slot.slot)
                 .ok_or_else(|| anyhow::anyhow!("unknown slot `{}`", slot.slot))?;
+            if contract::slot_reserved(&slot.slot) {
+                bail!("PLUGIN_SURFACE_RESERVED: slot `{}` is not available", slot.slot);
+            }
             let mode = if trusted_ui {
                 "trusted"
             } else if self.runtime.ui == "sandbox" {
@@ -639,6 +655,9 @@ impl PluginManifest {
             }
             if slot.component.is_some() && !trusted_ui {
                 bail!("slot `{}` declares `component` outside the trusted runtime", slot.slot);
+            }
+            if let Some(component) = &slot.component {
+                validate_component_name(component, "slot")?;
             }
             if let Some(id) = &slot.id {
                 validate_entry_id(id, "slot entry")?;
@@ -709,6 +728,9 @@ impl PluginManifest {
             if let Some(entry) = &view.entry {
                 validate_relative_path(entry)?;
             }
+            if let Some(component) = &view.component {
+                validate_component_name(component, "view")?;
+            }
             if view.entry.is_none() && view.component.is_none() {
                 bail!("view `{}` needs `entry` or `component`", view.id);
             }
@@ -765,6 +787,9 @@ impl PluginManifest {
             if let Some(entry) = &panel.entry {
                 validate_relative_path(entry)?;
             }
+            if let Some(component) = &panel.component {
+                validate_component_name(component, "panel")?;
+            }
             if panel.entry.is_none() && panel.component.is_none() {
                 bail!("panel `{}` needs `entry` or `component`", panel.id);
             }
@@ -794,11 +819,18 @@ impl PluginManifest {
         if !self.contributes.ui.settings_tabs.is_empty() && !self.has_permission("ui.settings") {
             bail!("ui.settingsTabs requires the `ui.settings` permission");
         }
+        let mut settings_tab_ids = HashSet::new();
         for tab in &self.contributes.ui.settings_tabs {
             validate_contribution_id(&tab.id, "settings tab")?;
+            if !settings_tab_ids.insert(tab.id.as_str()) {
+                bail!("duplicate settings tab id `{}`", tab.id);
+            }
             validate_order(tab.order, "settings tab order")?;
             if let Some(entry) = &tab.entry {
                 validate_relative_path(entry)?;
+            }
+            if let Some(component) = &tab.component {
+                validate_component_name(component, "settings tab")?;
             }
             if tab.entry.is_none() && tab.component.is_none() {
                 bail!("settings tab `{}` needs `entry` or `component`", tab.id);
@@ -816,16 +848,10 @@ impl PluginManifest {
             if theme.name.trim().is_empty() {
                 bail!("theme `{}` needs a name", theme.id);
             }
-            for (key, value) in theme.light.iter().chain(theme.dark.iter()) {
-                if key.chars().count() > 80 {
-                    bail!("theme `{}` has invalid token `{key}`", theme.id);
-                }
-                if value.chars().count() > 300 || value.contains([';', '{', '}']) {
-                    bail!("theme `{}` has invalid value for `{key}`", theme.id);
-                }
-                // Tokens outside the allowlist stay in the manifest but the
-                // renderer only applies the known ones.
-            }
+            crate::themes::validate_contributed_tokens("light", &theme.light, &theme.id)
+                .map_err(|error| anyhow::anyhow!("{error}"))?;
+            crate::themes::validate_contributed_tokens("dark", &theme.dark, &theme.id)
+                .map_err(|error| anyhow::anyhow!("{error}"))?;
         }
         if !self.contributes.ui.variants.is_empty() && !self.has_permission("ui.variant") {
             bail!("ui.variants requires the `ui.variant` permission");
@@ -893,15 +919,18 @@ impl PluginManifest {
                     bail!("preset `{}` has an invalid density", preset.id);
                 }
             }
-            for (key, value) in preset.tokens.light.iter().chain(preset.tokens.dark.iter()) {
-                let token = key.strip_prefix("--").unwrap_or(key);
-                if !crate::themes::is_known_theme_token(token) {
-                    bail!("preset `{}` has unknown token `{key}`", preset.id);
-                }
-                if value.chars().count() > 300 || value.contains([';', '{', '}']) {
-                    bail!("preset `{}` has invalid value for `{key}`", preset.id);
-                }
-            }
+            crate::themes::validate_contributed_tokens(
+                "light",
+                &preset.tokens.light,
+                &format!("preset {}", preset.id),
+            )
+            .map_err(|error| anyhow::anyhow!("{error}"))?;
+            crate::themes::validate_contributed_tokens(
+                "dark",
+                &preset.tokens.dark,
+                &format!("preset {}", preset.id),
+            )
+            .map_err(|error| anyhow::anyhow!("{error}"))?;
             for (component, variant) in &preset.variants {
                 let spec = contract::component_spec(component)
                     .ok_or_else(|| anyhow::anyhow!("preset `{}` references unknown component `{component}`", preset.id))?;
@@ -1066,6 +1095,9 @@ impl PluginManifest {
             if let Some(entry) = &viewer.entry {
                 validate_relative_path(entry)?;
             }
+            if let Some(component) = &viewer.component {
+                validate_component_name(component, "artifact viewer")?;
+            }
             if viewer.entry.is_none() && viewer.component.is_none() {
                 bail!("artifact viewer `{}` needs `entry` or `component`", viewer.id);
             }
@@ -1203,6 +1235,20 @@ fn validate_action(action: &PluginAction) -> Result<()> {
                 }
             }
         }
+    }
+    Ok(())
+}
+
+fn validate_component_name(id: &str, what: &str) -> Result<()> {
+    let mut chars = id.chars();
+    let Some(first) = chars.next() else {
+        bail!("{what} component name is empty");
+    };
+    if id.chars().count() > 64
+        || !first.is_ascii_alphanumeric()
+        || !chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-'))
+    {
+        bail!("{what} component name `{id}` is invalid");
     }
     Ok(())
 }
@@ -1567,6 +1613,54 @@ mod tests {
             );
         }
         assert!(validate_relative_path("ui/page.html").is_ok());
+    }
+
+    #[test]
+    fn theme_tokens_use_the_host_allowlist() {
+        let mut value = manifest_json();
+        value["permissions"]
+            .as_array_mut()
+            .expect("permissions")
+            .push(serde_json::json!("ui.theme"));
+        value["contributes"]["ui"]["themes"] = serde_json::json!([{
+            "id": "paper",
+            "name": "Paper",
+            "light": { "accent": "#8b5cf6", "--surface": "#faf9ff" },
+            "dark": { "accent": "#a78bfa" }
+        }]);
+        assert!(parse(value.clone()).is_ok());
+
+        value["contributes"]["ui"]["themes"][0]["light"]["dangerous-token"] =
+            serde_json::json!("red");
+        assert!(parse(value.clone()).is_err());
+
+        value["contributes"]["ui"]["themes"][0]["light"] =
+            serde_json::json!({ "accent": "url(https://example.com/x.css)" });
+        assert!(parse(value.clone()).is_err());
+
+        value["contributes"]["ui"]["themes"][0]["light"] =
+            serde_json::json!({ "accent": "#8b5cf6;" });
+        assert!(parse(value).is_err());
+    }
+
+    #[test]
+    fn rejects_reserved_slots_and_overrides() {
+        let mut value = manifest_json();
+        value["permissions"]
+            .as_array_mut()
+            .expect("permissions")
+            .push(serde_json::json!("ui.slot:app.overlay"));
+        value["contributes"]["ui"]["slots"] = serde_json::json!([
+            { "slot": "app.overlay", "entry": "ui/overlay.html" }
+        ]);
+        assert!(parse(value).is_err());
+
+        let mut value = manifest_json();
+        value["permissions"]
+            .as_array_mut()
+            .expect("permissions")
+            .push(serde_json::json!("ui.override:layout.right-panel"));
+        assert!(parse(value).is_err());
     }
 
     #[test]

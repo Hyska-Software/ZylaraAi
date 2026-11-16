@@ -5,7 +5,7 @@ import { pluginSlotSpec } from '@/lib/plugins/contract';
 import { PluginFrame } from '@/lib/plugins/frame';
 import { runSlotAction, slotLabel } from '@/lib/plugins/host';
 import { pluginIcon } from '@/lib/plugins/icons';
-import { pluginLabel } from '@/lib/plugins/registry';
+import { pluginHasPermission, pluginLabel } from '@/lib/plugins/registry';
 import { useUiStore } from '@/lib/store/uiStore';
 import { cn } from '@/lib/utils';
 
@@ -148,8 +148,9 @@ export function Slot({
       entryKey,
       onlyPluginId,
       disabled: prefs.disabled,
-    });
-  }, [prefs.disabled, prefs.enabled, name, resolvedLayout, entryKey, onlyPluginId, spec, ui.slots]);
+      owner,
+    }).filter((entry) => pluginHasPermission(entry.plugin, `ui.slot:${entry.slot}`));
+  }, [prefs.disabled, prefs.enabled, name, resolvedLayout, entryKey, onlyPluginId, owner, spec, ui.slots]);
 
   if (!spec) {
     if (!warned.has(name)) {
@@ -248,7 +249,7 @@ export function useSlotContributions(
       entryKey: options.entryKey ?? null,
       onlyPluginId: options.onlyPluginId,
       disabled: prefs.disabled,
-    });
+    }).filter((entry) => pluginHasPermission(entry.plugin, `ui.slot:${entry.slot}`));
   }, [prefs.disabled, prefs.enabled, name, options.layout, options.entryKey, options.onlyPluginId, currentLayout, ui.slots]);
 }
 
@@ -296,7 +297,11 @@ export function ComponentSlot({ name, fallback, props = {}, onlyPluginId }: Comp
         entry.component === name &&
         contributionMatchesLayout(entry, currentLayout) &&
         (!onlyPluginId || entry.pluginId === onlyPluginId) &&
-        !prefs.disabled.includes(entry.key),
+        !prefs.disabled.includes(entry.key) &&
+        pluginHasPermission(
+          entry.plugin,
+          name === 'layout.shell' ? 'ui.shell' : `ui.override:${name}`,
+        ),
     );
   }, [prefs.disabled, prefs.enabled, name, currentLayout, onlyPluginId, ui.replacements]);
 
@@ -308,7 +313,8 @@ export function ComponentSlot({ name, fallback, props = {}, onlyPluginId }: Comp
           entry.component === name &&
           contributionMatchesLayout(entry, currentLayout) &&
           (!onlyPluginId || entry.pluginId === onlyPluginId) &&
-          !prefs.disabled.includes(entry.key),
+          !prefs.disabled.includes(entry.key) &&
+          pluginHasPermission(entry.plugin, `ui.override:${name}`),
       )
       .sort((left, right) => left.order - right.order || left.priority - right.priority);
   }, [prefs.disabled, prefs.enabled, name, currentLayout, onlyPluginId, ui.wraps]);

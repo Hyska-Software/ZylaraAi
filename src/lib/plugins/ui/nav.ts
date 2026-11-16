@@ -2,6 +2,9 @@
 import { useAppStore } from '@/lib/store/appStore';
 import { useUiStore, type LayoutMode, type PluginPageTarget } from '@/lib/store/uiStore';
 import { t } from '@/lib/i18n';
+import { PLUGIN_HOST_PAGES } from '../contract';
+import { usePluginUiPrefs } from './prefs';
+import { pluginUiState } from './registry';
 
 import type { NavEntry } from './types';
 
@@ -122,7 +125,7 @@ export function navEntries(
   }));
   const merged = [
     ...host,
-    ...pluginEntries.filter(
+    ...(usePluginUiPrefs.getState().enabled ? pluginEntries : []).filter(
       (entry) =>
         entry.source === 'plugin' &&
         entry.layouts.includes(layout) &&
@@ -143,29 +146,43 @@ export function navEntries(
 
 export function openNavTarget(entry: NavEntry): void {
   const ui = useUiStore.getState();
+  const layout = entry.layouts.includes(ui.layoutMode)
+    ? ui.layoutMode
+    : (entry.layouts[0] ?? ui.layoutMode);
   if (entry.source === 'plugin' && entry.pluginId) {
+    const isPluginPage = pluginUiState().pages.some(
+      (page) => page.pluginId === entry.pluginId && page.pageId === entry.page,
+    );
+    if (!isPluginPage && PLUGIN_HOST_PAGES.includes(entry.page)) {
+      openHostNavTarget(entry.page, layout);
+      return;
+    }
     const target: PluginPageTarget = { pluginId: entry.pluginId, pageId: entry.page };
-    ui.openPluginPage(target, entry.layouts[0] ?? ui.layoutMode);
-    if (entry.layouts.length === 1) ui.setLayoutMode(entry.layouts[0]);
+    ui.openPluginPage(target, layout);
+    if (layout !== ui.layoutMode) ui.setLayoutMode(layout);
     return;
   }
-  const layout = entry.layouts[0] ?? ui.layoutMode;
+  openHostNavTarget(entry.page, layout);
+}
+
+function openHostNavTarget(page: string, layout: LayoutMode): void {
+  const ui = useUiStore.getState();
   ui.setLayoutMode(layout);
   if (layout === 'code') {
-    if (entry.page === 'plugins') ui.setCodeView('plugins');
-    else if (entry.page === 'skills') ui.setCodeView('skills');
+    if (page === 'plugins') ui.setCodeView('plugins');
+    else if (page === 'skills') ui.setCodeView('skills');
     else ui.setCodeView('session');
     return;
   }
   if (layout === 'agent') {
-    if (entry.page === 'plugins') ui.setAgentView('plugins');
-    else if (entry.page === 'routines') ui.setAgentView('routines');
-    else if (entry.page === 'stats') ui.setAgentView('stats');
+    if (page === 'plugins') ui.setAgentView('plugins');
+    else if (page === 'routines') ui.setAgentView('routines');
+    else if (page === 'stats') ui.setAgentView('stats');
     else ui.setAgentView('team');
     return;
   }
-  if (entry.page === 'library' || entry.page === 'skills' || entry.page === 'plugins') {
-    ui.setActiveView(entry.page);
+  if (page === 'library' || page === 'skills' || page === 'plugins') {
+    ui.setActiveView(page);
   } else {
     ui.setActiveView('chat');
   }

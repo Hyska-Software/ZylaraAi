@@ -2485,6 +2485,9 @@ pub async fn run_turn(
             if options.delegation_depth == 0 {
                 if let Some(manager) = crate::plugins::global_manager() {
                     for definition in manager.tool_definitions(TurnProfile::Code) {
+                        if !agent.capabilities.allows_tool(&definition.name) {
+                            continue;
+                        }
                         if !allowed.iter().any(|name| name == &definition.name) {
                             allowed.push(definition.name);
                         }

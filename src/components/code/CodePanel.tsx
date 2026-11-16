@@ -27,6 +27,7 @@ import { pluginIcon } from '@/lib/plugins/icons';
 import { pluginLabel } from '@/lib/plugins/registry';
 import { RecipeDiv } from '@/lib/plugins/ui/recipe';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { api } from '@/lib/api';
 import {
   SIDE_PANEL_WIDTH_DEFAULT,
@@ -141,9 +142,16 @@ export function CodePanel() {
   const pluginDock = useUiStore((state) => state.pluginDockTab.code);
   const openPluginDockTab = useUiStore((state) => state.openPluginDockTab);
   const ui = usePluginUi();
+  const disabledPluginUi = usePluginUiPrefs((state) => state.disabled);
   const pluginTabs = useMemo(
-    () => ui.panelTabs.filter((entry) => entry.layouts.includes('code') && !entry.takeover),
-    [ui.panelTabs],
+    () =>
+      ui.panelTabs.filter(
+        (entry) =>
+          entry.layouts.includes('code') &&
+          !entry.takeover &&
+          !disabledPluginUi.includes(entry.key),
+      ),
+    [disabledPluginUi, ui.panelTabs],
   );
   /* A docked key can outlive its plugin (disable/uninstall). Falling back to the
      host tab keeps the Changes/Files/Terminal content visible instead of a

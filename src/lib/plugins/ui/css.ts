@@ -51,23 +51,61 @@ export function rewritePluginCssUrls(css: string, pluginId: string, file: string
   });
 }
 
+interface CachedCss {
+  version: string;
+  updatedAt: number;
+  css: string;
+}
+
+function sameCssVersion(
+  cached: CachedCss | undefined,
+  entry: CssEntry,
+): boolean {
+  return Boolean(
+    cached &&
+      cached.version === (entry.plugin?.version ?? '') &&
+      cached.updatedAt === (entry.plugin?.updatedAt ?? 0),
+  );
+}
+
 export function usePluginStyles(): void {
   const ui = usePluginUi();
   const prefs = usePluginUiPrefs();
   const layout = useUiStore((state) => state.layoutMode);
-  const [files, setFiles] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<Record<string, CachedCss>>({});
 
   useEffect(() => {
     let cancelled = false;
+    const activeKeys = new Set(ui.css.map((entry) => entry.key));
+    setFiles((current) => {
+      const next: Record<string, CachedCss> = {};
+      let changed = false;
+      for (const [key, value] of Object.entries(current)) {
+        if (activeKeys.has(key)) next[key] = value;
+        else changed = true;
+      }
+      return changed ? next : current;
+    });
     for (const entry of ui.css) {
-      if (!entry.file || !entry.pluginId || files[entry.key] !== undefined) continue;
+      if (!entry.file || !entry.pluginId || !entry.plugin) continue;
+      if (sameCssVersion(files[entry.key], entry)) continue;
+      const version = entry.plugin.version;
+      const updatedAt = entry.plugin.updatedAt;
       void api
         .pluginAssetText(entry.pluginId, entry.file)
         .then((text) => {
-          if (!cancelled) setFiles((current) => ({ ...current, [entry.key]: text }));
+          if (cancelled) return;
+          setFiles((current) => ({
+            ...current,
+            [entry.key]: { version, updatedAt, css: text },
+          }));
         })
         .catch(() => {
-          if (!cancelled) setFiles((current) => ({ ...current, [entry.key]: '' }));
+          if (cancelled) return;
+          setFiles((current) => ({
+            ...current,
+            [entry.key]: { version, updatedAt, css: '' },
+          }));
         });
     }
     return () => {
@@ -84,7 +122,7 @@ export function usePluginStyles(): void {
           !prefs.disabled.includes(entry.key),
       );
       for (const entry of entries) {
-        const source = entry.css ?? (entry.file ? files[entry.key] : '');
+        const source = entry.css ?? (entry.file ? files[entry.key]?.css : '');
         if (!source) continue;
         const sanitized = sanitizePluginCss(source);
         if (sanitized.error || !entry.pluginId) {

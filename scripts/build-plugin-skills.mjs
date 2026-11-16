@@ -19,6 +19,8 @@ const contract = readJson('data/plugin-contract.json');
 const manifestSchema = readJson('data/plugin-manifest.schema.json');
 const genui = readJson('data/genui-contract.json');
 const themeTokens = readJson('data/theme-tokens.json');
+const reservedSlots = new Set(contract.reservedSlots ?? []);
+const reservedComponents = new Set(contract.reservedComponents ?? []);
 
 const SKILLS = {
   manifest: 'src-tauri/skills/plugin-manifest/SKILL.md',
@@ -41,20 +43,23 @@ function list(values) {
 }
 
 function slotRows() {
-  return (contract.slots ?? []).map((slot) => [
-    `\`${slot.id}\``,
-    slot.kind,
-    slot.scope,
-    list(slot.layouts),
-    list(slot.modes),
-    list(slot.props),
-    slot.description ?? '',
-  ]);
+  return (contract.slots ?? [])
+    .filter((slot) => !reservedSlots.has(slot.id))
+    .map((slot) => [
+      `\`${slot.id}\``,
+      slot.kind,
+      slot.scope,
+      list(slot.layouts),
+      list(slot.modes),
+      list(slot.props),
+      slot.description ?? '',
+    ]);
 }
 
 function componentRows() {
   return (contract.components ?? []).map((component) => [
     `\`${component.id}\``,
+    reservedComponents.has(component.id) ? 'reserved' : 'available',
     list(component.layouts),
     list(component.variants ?? []),
     list(component.props ?? []),
@@ -156,11 +161,15 @@ function contractBlock(kind) {
       '',
       '### Slots',
       '',
+      'Reserved slots are not mounted by this host version; a manifest that targets one is rejected.',
+      '',
       table(['Slot', 'Kind', 'Scope', 'Layouts', 'Modes', 'Props', 'Description'], slotRows()),
       '',
       '### Components',
       '',
-      table(['Component', 'Layouts', 'Variants', 'Props', 'Built-in recipes'], componentRows()),
+      'Components marked `reserved` still support variants/presets but cannot be replaced or wrapped in this host version.',
+      '',
+      table(['Component', 'Override', 'Layouts', 'Variants', 'Props', 'Built-in recipes'], componentRows()),
       '',
       '### Style recipe enums',
       '',

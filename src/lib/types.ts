@@ -2193,6 +2193,9 @@ export interface ThemeInfo {
   author: string;
   description: string;
   builtIn: boolean;
+  /** Set only for themes synthesized from an enabled plugin contribution. */
+  pluginId?: string | null;
+  pluginName?: string | null;
   light: ThemeVariant;
   dark: ThemeVariant;
   fonts: ThemeFontPaths;

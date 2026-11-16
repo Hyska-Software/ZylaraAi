@@ -54,25 +54,6 @@ impl PluginManager {
     pub fn provider(&self, id: &str) -> Option<ProviderInfo> {
         self.providers().into_iter().find(|provider| provider.id == id)
     }
-
-    /// Plugin id that owns a namespaced provider.
-    pub fn provider_owner(&self, provider_id: &str) -> Option<String> {
-        self.providers()
-            .into_iter()
-            .find(|provider| provider.id == provider_id)
-            .and_then(|provider| {
-                let state = self.state.read();
-                state
-                    .active
-                    .iter()
-                    .find(|plugin| {
-                        plugin.manifest.contributes.providers.iter().any(|contribution| {
-                            self::provider_id(&plugin.stored.id, &contribution.id) == provider.id
-                        })
-                    })
-                    .map(|plugin| plugin.stored.id.clone())
-            })
-    }
 }
 
 fn to_provider(plugin: &super::LoadedPlugin, contribution: &super::ProviderContribution) -> ProviderInfo {

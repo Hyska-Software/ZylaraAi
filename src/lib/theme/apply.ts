@@ -6,6 +6,7 @@
  * bundled fonts and exposes the wallpaper. It never injects CSS or HTML.
  */
 import type { ThemeInfo } from '@/lib/types';
+import { normalizeThemeTokens } from './tokens';
 
 export const BUILTIN_THEME_ID = 'zylara';
 /** Pre-paint cache consumed by the inline script in `index.html`. */
@@ -64,17 +65,13 @@ export function readCssToken(name: string, fallback: string): string {
 function cacheTokens(theme: ThemeInfo): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    const hasTokens =
-      Object.keys(theme.light.tokens ?? {}).length > 0 ||
-      Object.keys(theme.dark.tokens ?? {}).length > 0;
-    if (!hasTokens) {
+    const light = normalizeThemeTokens(theme.light.tokens);
+    const dark = normalizeThemeTokens(theme.dark.tokens);
+    if (Object.keys(light).length === 0 && Object.keys(dark).length === 0) {
       localStorage.removeItem(THEME_CACHE_KEY);
       return;
     }
-    localStorage.setItem(
-      THEME_CACHE_KEY,
-      JSON.stringify({ light: theme.light.tokens, dark: theme.dark.tokens }),
-    );
+    localStorage.setItem(THEME_CACHE_KEY, JSON.stringify({ light, dark }));
   } catch {
     // localStorage may be unavailable in restricted webviews; runtime state stays correct.
   }
@@ -107,8 +104,7 @@ export function applyThemeTokens(theme: ThemeInfo, dark: boolean): void {
   delete root.dataset.themeTokens;
 
   const variant = dark ? theme.dark : theme.light;
-  for (const [key, value] of Object.entries(variant.tokens ?? {})) {
-    if (!/^[a-z0-9-]+$/.test(key) || typeof value !== 'string' || value.trim().length === 0) continue;
+  for (const [key, value] of Object.entries(normalizeThemeTokens(variant.tokens))) {
     const variable = cssVariableForToken(key);
     root.style.setProperty(variable, value);
     appliedVariables.add(variable.slice(2));

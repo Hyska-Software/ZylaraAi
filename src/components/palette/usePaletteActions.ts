@@ -59,6 +59,8 @@ import {
   type ResolvedView,
 } from '@/lib/plugins/registry';
 import { usePluginStore } from '@/lib/plugins/store';
+import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import {
   modelLockCopy,
   modelLockReason,
@@ -296,6 +298,8 @@ export function usePaletteActions(): PaletteAction[] {
   const codeView = useUiStore((state) => state.codeView);
   const artifacts = useUiStore((state) => state.artifacts);
   const pluginRegistry = usePluginRegistry();
+  const pluginUi = usePluginUi();
+  const pluginUiPrefs = usePluginUiPrefs();
   const pluginSafeMode = usePluginStore((state) => state.snapshot.safeMode);
   // Chat locks the model of a started conversation; a Code session can switch it
   // between turns (a running turn locks it in every layout).
@@ -732,7 +736,7 @@ export function usePaletteActions(): PaletteAction[] {
     });
   }
 
-  for (const tab of pluginRegistry.settingsTabs) {
+  for (const tab of pluginUiPrefs.enabled ? pluginRegistry.settingsTabs : []) {
     const label = pluginLabel(tab.plugin, tab.tab.titleKey, tab.tab.title);
     actions.push({
       id: `config-plugin-${tab.key}`,
@@ -799,7 +803,9 @@ export function usePaletteActions(): PaletteAction[] {
       );
     },
   });
-  for (const view of pluginViewsForSurface(layoutMode, 'sidebar')) {
+  for (const view of pluginUiPrefs.enabled
+    ? pluginViewsForSurface(layoutMode, 'sidebar')
+    : []) {
     const label = pluginLabel(view.plugin, view.view.titleKey, view.view.title);
     actions.push({
       id: `plugin-view-${view.key}`,
@@ -809,6 +815,24 @@ export function usePaletteActions(): PaletteAction[] {
       icon: pluginIcon(view.view.icon),
       keywords: `${view.plugin.name} plugin`,
       run: () => openPluginView(view.plugin, view.view.id),
+    });
+  }
+  for (const tab of pluginUi.panelTabs) {
+    if (
+      !pluginUiPrefs.enabled ||
+      !tab.layouts.includes(layoutMode) ||
+      pluginUiPrefs.disabled.includes(tab.key)
+    ) {
+      continue;
+    }
+    actions.push({
+      id: `plugin-panel-${tab.key}`,
+      group: 'plugins',
+      label: pluginLabel(tab.plugin, tab.titleKey, tab.title),
+      description: tab.plugin.name,
+      icon: pluginIcon(tab.icon),
+      keywords: `${tab.plugin.name} panel plugin`,
+      run: () => useUiStore.getState().openPluginDockTab(tab.key, layoutMode),
     });
   }
   for (const command of pluginRegistry.commands) {

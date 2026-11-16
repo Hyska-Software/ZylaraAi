@@ -22,22 +22,16 @@ plugin GenUI components read `plugin-genui`.
 
 ### Slots
 
+Reserved slots are not mounted by this host version; a manifest that targets one is rejected.
+
 | Slot | Kind | Scope | Layouts | Modes | Props | Description |
 | --- | --- | --- | --- | --- | --- | --- |
 | `titlebar.actions` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Actions in the window title bar. |
-| `app.titlebar.brand` | single | root | chat, code, agent | trusted | — | Brand block in the title bar. |
-| `app.overlay` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Floating layer above the shell. |
 | `chat.sidebar.header` | list | layout | chat | declarative, sandbox, trusted | — | Header of the chat sidebar. |
 | `chat.sidebar.footer` | list | layout | chat | declarative, sandbox, trusted | — | Footer of the chat sidebar. |
 | `sidebar.nav.before` | list | layout | chat, code, agent | declarative, sandbox, trusted | — | Content before the navigation items. |
 | `sidebar.nav.after` | list | layout | chat, code, agent | declarative, sandbox, trusted | — | Content after the navigation items. |
-| `sidebar.conversation.row.frame` | hoc | layout | chat, code | trusted | conversation, active | Wraps each conversation row. |
-| `code.sidebar.header` | list | layout | code | declarative, sandbox, trusted | — | Header of the code sidebar. |
-| `code.sidebar.footer` | list | layout | code | declarative, sandbox, trusted | — | Footer of the code sidebar. |
-| `agent.sidebar.header` | list | layout | agent | declarative, sandbox, trusted | — | Header of the agents sidebar. |
 | `agent.sidebar.footer` | list | layout | agent | declarative, sandbox, trusted | — | Footer of the agents sidebar. |
-| `agent.thread.row.frame` | hoc | layout | agent | trusted | conversation, active | Wraps each agent thread row. |
-| `agent.channel.row.frame` | hoc | layout | agent | trusted | channel, active | Wraps each agent channel row. |
 | `chat.header.actions` | list | conversation | chat, code | declarative, sandbox, trusted | — | Actions in the chat header. |
 | `chat.header.leading` | list | conversation | chat, code | declarative, sandbox, trusted | — | Content before the chat header title. |
 | `chat.header.trailing` | list | conversation | chat, code | declarative, sandbox, trusted | — | Content after the chat header actions. |
@@ -51,7 +45,6 @@ plugin GenUI components read `plugin-genui`.
 | `chat.message.body.frame` | hoc | message | chat, code | trusted | — | Wraps the message body. |
 | `chat.reasoning.body.frame` | hoc | message | chat, code | trusted | — | Wraps the reasoning body. |
 | `chat.message.tool` | keyed | message | chat, code | trusted | tool | Per-tool renderer keyed by tool name. |
-| `chat.message.tool.group.frame` | hoc | message | chat, code | trusted | — | Wraps each tool group. |
 | `chat.message.usage` | single | message | chat, code | trusted | — | Token/usage footer of a message. |
 | `chat.message.usage.actions` | list | message | chat, code | declarative, sandbox, trusted | — | Actions next to the usage footer. |
 | `chat.message.attachments.frame` | hoc | message | chat, code | trusted | attachments | Wraps message attachment chips. |
@@ -61,102 +54,74 @@ plugin GenUI components read `plugin-genui`.
 | `chat.markdown.fence` | keyed | message | chat, code | trusted | language, code | Fence renderer keyed by language. |
 | `chat.turn.error.frame` | hoc | conversation | chat, code | trusted | — | Wraps the turn error banner. |
 | `chat.queue.frame` | hoc | conversation | chat, code | trusted | — | Wraps the queued message bar. |
-| `chat.scroll.jump` | single | conversation | chat, code | trusted | — | Jump-to-latest control. |
 | `chat.composer.frame` | hoc | composer | chat, code | trusted | — | Wraps the composer card. |
-| `chat.composer.input.frame` | hoc | composer | chat, code | trusted | — | Wraps the composer input. |
 | `chat.composer.toolbar` | list | composer | chat, code | declarative, sandbox, trusted | draft | Composer toolbar items. |
 | `chat.composer.actions` | list | composer | chat, code | declarative, sandbox, trusted | streaming, canSend | Actions next to send/stop. |
 | `chat.composer.attachments` | list | composer | chat, code | declarative, sandbox, trusted | — | Content above the composer input. |
-| `chat.composer.notice` | list | composer | chat, code | declarative, sandbox, trusted | — | Notice row above the composer. |
 | `chat.composer.slash` | list | composer | chat, code | declarative, sandbox, trusted | query | Extra slash-command rows. |
 | `chat.welcome.actions` | list | layout | chat, code | declarative, sandbox, trusted | — | Actions on the welcome screen. |
 | `chat.welcome.suggestions` | list | layout | chat, code | declarative, sandbox, trusted | — | Suggestion chips on the welcome screen. |
 | `code.header.actions` | list | conversation | code | declarative, sandbox, trusted | workspaceId | Actions in the code session header. |
-| `code.session.header.frame` | hoc | layout | code | trusted | — | Wraps the code session header. |
-| `code.tabs.before` | list | layout | code | declarative, sandbox, trusted | — | Content before the code tab strip. |
-| `code.tabs.after` | list | layout | code | declarative, sandbox, trusted | — | Content after the code tab strip. |
-| `code.tab.strip.frame` | hoc | layout | code | trusted | — | Wraps the code tab strip. |
 | `code.panel.header` | list | layout | code | declarative, sandbox, trusted | — | Header of the code right panel. |
 | `code.panel.tabs` | list | layout | code | declarative, sandbox, trusted | — | Extra tabs in the code right panel. |
-| `code.panel.body.frame` | hoc | layout | code | trusted | — | Wraps the code right panel body. |
-| `code.terminal.toolbar` | list | layout | code | declarative, sandbox, trusted | — | Actions in the terminal toolbar. |
-| `code.diff.toolbar` | list | layout | code | declarative, sandbox, trusted | — | Actions in the diff toolbar. |
-| `code.welcome.actions` | list | layout | code | declarative, sandbox, trusted | — | Actions on the code welcome screen. |
-| `agent.header.actions` | list | layout | agent | declarative, sandbox, trusted | — | Actions in the agent thread header. |
-| `agent.tabs` | list | layout | agent | declarative, sandbox, trusted | — | Extra tabs in the agents center. |
 | `agent.panel.tabs` | list | layout | agent | declarative, sandbox, trusted | — | Extra tabs in the agent right panel. |
-| `agent.panel.header` | list | layout | agent | declarative, sandbox, trusted | — | Header of the agent right panel. |
 | `right.panel.header` | list | layout | chat, code, agent | declarative, sandbox, trusted | — | Header of the right dock. |
-| `right.panel.tabs` | list | layout | chat, code, agent | declarative, sandbox, trusted | — | Extra tabs in the right dock. |
-| `right.panel.body.frame` | hoc | layout | chat, code, agent | trusted | — | Wraps the active right dock panel. |
 | `settings.plugins.header` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Header of the plugins settings tab. |
-| `settings.rail.before` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Content before the settings rail items. |
-| `settings.rail.after` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Content after the settings rail items. |
-| `settings.page.header` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Header of the active settings page. |
-| `palette.actions` | list | root | chat, code, agent | declarative, trusted | query | Extra rows in the command palette. |
-| `palette.footer` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Footer of the command palette. |
 | `plugins.detail.actions` | list | root | chat, code, agent | declarative, sandbox, trusted | pluginId | Actions in the plugin detail dialog. |
-| `plugins.view.header` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Header of the plugins page. |
 | `artifact.preview.toolbar` | list | root | chat, code, agent | declarative, sandbox, trusted | artifactId, artifactKind, mimeType | Toolbar of the artifact preview. |
-| `artifact.card.actions` | list | root | chat, code, agent | declarative, sandbox, trusted | artifactId, artifactKind | Actions on an artifact card. |
-| `agent.thread.view.frame` | hoc | layout | agent | trusted | agentId, conversationId | Wraps the agent thread view. |
-| `agent.channel.view.frame` | hoc | layout | agent | trusted | channelId | Wraps the agent channel view. |
-| `agent.channel.message.before` | chain | message | agent | declarative, sandbox, trusted | agentId, channelId, message | Chain before each channel message. |
-| `agent.channel.message.after` | chain | message | agent | declarative, sandbox, trusted | agentId, channelId, message | Chain after each channel message. |
-| `agent.channel.message.body.frame` | hoc | message | agent | trusted | agentId, channelId, message | Wraps the channel message body. |
-| `agent.channel.composer.frame` | hoc | composer | agent | trusted | agentId, channelId | Wraps the channel composer. |
-| `agent.channel.composer.actions` | list | composer | agent | declarative, sandbox, trusted | agentId, channelId | Actions next to the channel composer. |
 
 ### Components
 
-| Component | Layouts | Variants | Props | Built-in recipes |
-| --- | --- | --- | --- | --- |
-| `layout.shell` | chat, code, agent | — | children, sidebar, sidebarLabel, rightPanel, rightPanelOpen | — |
-| `layout.titlebar` | chat, code, agent | — | — | — |
-| `layout.sidebar` | chat, code, agent | — | layout, onClose | — |
-| `layout.center` | chat, code, agent | — | — | — |
-| `layout.right-panel` | chat, code, agent | default, flush, card | layout | default, flush, card |
-| `chat.view` | chat, code | — | conversationId, layout, welcome | — |
-| `chat.header` | chat, code | default, minimal, floating | conversationId | default, minimal, floating |
-| `chat.welcome` | chat, code | default, hero, compact | — | default, hero, compact |
-| `chat.message.list` | chat, code | — | messages, streaming, readOnly | — |
-| `chat.message.item` | chat, code | — | message, isStreaming, isGroupStart, readOnly | — |
-| `chat.message.user` | chat, code | bubble, plain, card, compact | message, conversationId | bubble, plain, card, compact |
-| `chat.message.assistant` | chat, code | plain, card, framed, compact | message, conversationId, isStreaming | plain, card, framed, compact |
-| `chat.message.system` | chat, code | — | message | — |
-| `chat.message.goal-round` | chat, code | — | message | — |
-| `chat.message.avatar` | chat, code | — | role, message | — |
-| `chat.message.markdown` | chat, code | — | content, streaming | — |
-| `chat.message.reasoning` | chat, code | — | message | — |
-| `chat.message.tool-group` | chat, code | — | message | — |
-| `chat.message.tool-row` | chat, code | — | tool | — |
-| `chat.turn.error` | chat, code | — | code, hint, planProvider, usageUrl | — |
-| `chat.queue.bar` | chat, code | — | conversationId | — |
-| `chat.composer` | chat, code | card, flat, outline, dock | — | card, flat, outline, dock |
-| `chat.composer.input` | chat, code | — | — | — |
-| `sidebar.nav.item` | chat, code, agent | default, pill, underline | icon, label, active, badge, onSelect | default, pill, underline |
-| `sidebar.conversation.row` | chat, code | default, compact, card | conversation, active | default, compact, card |
-| `code.workbench` | code | — | — | — |
-| `code.session.header` | code | — | — | — |
-| `code.tab.strip` | code | default, segmented, underline | — | default, segmented, underline |
-| `code.panel` | code | — | — | — |
-| `code.welcome` | code | — | — | — |
-| `agent.workspace` | agent | — | — | — |
-| `agent.sidebar` | agent | — | — | — |
-| `agent.tab.strip` | agent | default, segmented, underline | — | default, segmented, underline |
-| `agent.thread.view` | agent | — | agentId, conversationId | — |
-| `agent.channel.view` | agent | — | channelId | — |
-| `agent.channel.message` | agent | — | message, channelId | — |
-| `agent.channel.composer` | agent | — | channelId | — |
-| `agent.panel` | agent | — | — | — |
-| `settings.dialog` | chat, code, agent | default, wide, compact | — | default, wide, compact |
-| `settings.page` | chat, code, agent | — | tab | — |
-| `settings.rail` | chat, code, agent | — | — | — |
-| `plugins.view` | chat, code, agent | — | — | — |
-| `plugins.detail` | chat, code, agent | — | pluginId | — |
-| `artifact.panel` | chat, code, agent | — | — | — |
-| `artifact.preview` | chat, code, agent | — | artifactId | — |
-| `palette.dialog` | chat, code, agent | — | — | — |
+Components marked `reserved` still support variants/presets but cannot be replaced or wrapped in this host version.
+
+| Component | Override | Layouts | Variants | Props | Built-in recipes |
+| --- | --- | --- | --- | --- | --- |
+| `layout.shell` | available | chat, code, agent | — | children, sidebar, sidebarLabel, rightPanel, rightPanelOpen | — |
+| `layout.titlebar` | available | chat, code, agent | — | — | — |
+| `layout.sidebar` | available | chat, code, agent | — | layout, onClose | — |
+| `layout.center` | available | chat, code, agent | — | — | — |
+| `layout.right-panel` | reserved | chat, code, agent | default, flush, card | layout | default, flush, card |
+| `chat.view` | available | chat, code | — | conversationId, layout, welcome | — |
+| `chat.header` | available | chat, code | default, minimal, floating | conversationId | default, minimal, floating |
+| `chat.welcome` | available | chat, code | default, hero, compact | — | default, hero, compact |
+| `chat.message.list` | available | chat, code | — | messages, streaming, readOnly | — |
+| `chat.message.item` | available | chat, code | — | message, isStreaming, isGroupStart, readOnly | — |
+| `chat.message.user` | available | chat, code | bubble, plain, card, compact | message, conversationId | bubble, plain, card, compact |
+| `chat.message.assistant` | available | chat, code | plain, card, framed, compact | message, conversationId, isStreaming | plain, card, framed, compact |
+| `chat.message.system` | available | chat, code | — | message | — |
+| `chat.message.goal-round` | available | chat, code | — | message | — |
+| `chat.message.avatar` | available | chat, code | — | role, message | — |
+| `chat.message.markdown` | available | chat, code | — | content, streaming | — |
+| `chat.message.reasoning` | available | chat, code | — | message | — |
+| `chat.message.tool-group` | reserved | chat, code | — | message | — |
+| `chat.message.tool-row` | reserved | chat, code | — | tool | — |
+| `chat.turn.error` | reserved | chat, code | — | code, hint, planProvider, usageUrl | — |
+| `chat.queue.bar` | reserved | chat, code | — | conversationId | — |
+| `chat.composer` | available | chat, code | card, flat, outline, dock | — | card, flat, outline, dock |
+| `chat.composer.input` | reserved | chat, code | — | — | — |
+| `sidebar.nav.item` | available | chat, code, agent | default, pill, underline | icon, label, active, badge, onSelect | default, pill, underline |
+| `sidebar.conversation.row` | reserved | chat, code | default, compact, card | conversation, active | default, compact, card |
+| `code.workbench` | reserved | code | — | — | — |
+| `code.session.header` | reserved | code | — | — | — |
+| `code.tab.strip` | reserved | code | default, segmented, underline | — | default, segmented, underline |
+| `code.panel` | reserved | code | — | — | — |
+| `code.welcome` | reserved | code | — | — | — |
+| `agent.workspace` | reserved | agent | — | — | — |
+| `agent.sidebar` | reserved | agent | — | — | — |
+| `agent.tab.strip` | reserved | agent | default, segmented, underline | — | default, segmented, underline |
+| `agent.thread.view` | reserved | agent | — | agentId, conversationId | — |
+| `agent.channel.view` | reserved | agent | — | channelId | — |
+| `agent.channel.message` | reserved | agent | — | message, channelId | — |
+| `agent.channel.composer` | reserved | agent | — | channelId | — |
+| `agent.panel` | reserved | agent | — | — | — |
+| `settings.dialog` | available | chat, code, agent | default, wide, compact | — | default, wide, compact |
+| `settings.page` | reserved | chat, code, agent | — | tab | — |
+| `settings.rail` | reserved | chat, code, agent | — | — | — |
+| `plugins.view` | available | chat, code, agent | — | — | — |
+| `plugins.detail` | reserved | chat, code, agent | — | pluginId | — |
+| `artifact.panel` | reserved | chat, code, agent | — | — | — |
+| `artifact.preview` | reserved | chat, code, agent | — | artifactId | — |
+| `palette.dialog` | reserved | chat, code, agent | — | — | — |
 
 ### Style recipe enums
 

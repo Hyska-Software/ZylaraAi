@@ -2,6 +2,7 @@
 import { useChatStore } from '@/lib/store/chatStore';
 import { useUiStore, type LayoutMode, type PluginPageTarget } from '@/lib/store/uiStore';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { pluginLabel } from '@/lib/plugins/registry';
 import { runPluginHostAction } from '@/lib/plugins/ui/hostActions';
 import { PluginFrame } from '@/lib/plugins/frame';
@@ -18,7 +19,9 @@ export function PluginPageHost({
   className?: string;
 }) {
   const ui = usePluginUi();
+  const enabled = usePluginUiPrefs((state) => state.enabled);
   const conversationId = useChatStore((state) => state.activeId);
+  if (!enabled) return null;
   const page = ui.pages.find(
     (entry) =>
       entry.pluginId === target.pluginId &&

@@ -1,6 +1,7 @@
 import { HtmlPreview } from '@/components/genui';
 import { cn } from '@/lib/utils';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { PluginArtifactViewer } from '@/components/plugins/PluginHosts';
 import { ArchivePreview } from './ArchivePreview';
 import { AudioPreview } from './AudioPreview';
@@ -28,8 +29,9 @@ export type ArtifactPreviewProps = ArtifactViewProps;
 export function ArtifactPreview({ content, className, showArtifactActions }: ArtifactPreviewProps) {
   const { artifact } = content;
   const ui = usePluginUi();
+  const pluginUiEnabled = usePluginUiPrefs((state) => state.enabled);
   const mime = artifact.mimeType.trim().toLowerCase();
-  const viewer = [...ui.artifactViewers]
+  const viewer = (pluginUiEnabled ? [...ui.artifactViewers] : [])
     .sort((left, right) => left.priority - right.priority)
     .find((entry) =>
       entry.mimeTypes.some((pattern) => {

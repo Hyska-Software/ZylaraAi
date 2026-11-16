@@ -227,6 +227,31 @@
     { "id": "artifact.preview", "title": "Artifact preview", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": ["artifactId"], "variants": [], "risk": "medium", "description": "Artifact preview body." },
     { "id": "palette.dialog", "title": "Command palette", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": [], "variants": [], "risk": "low", "description": "Command palette dialog." }
   ],
+  "reservedSlots": [
+    "app.titlebar.brand", "app.overlay", "sidebar.conversation.row.frame",
+    "code.sidebar.header", "code.sidebar.footer", "agent.sidebar.header",
+    "agent.thread.row.frame", "agent.channel.row.frame", "chat.message.tool.group.frame",
+    "chat.scroll.jump", "chat.composer.input.frame", "chat.composer.notice",
+    "code.session.header.frame", "code.tabs.before", "code.tabs.after",
+    "code.tab.strip.frame", "code.panel.body.frame", "code.terminal.toolbar",
+    "code.diff.toolbar", "code.welcome.actions", "agent.header.actions", "agent.tabs",
+    "agent.panel.header", "right.panel.tabs", "right.panel.body.frame",
+    "settings.rail.before", "settings.rail.after", "settings.page.header",
+    "palette.actions", "palette.footer", "plugins.view.header", "artifact.card.actions",
+    "agent.thread.view.frame", "agent.channel.view.frame", "agent.channel.message.before",
+    "agent.channel.message.after", "agent.channel.message.body.frame",
+    "agent.channel.composer.frame", "agent.channel.composer.actions"
+  ],
+  "reservedComponents": [
+    "layout.right-panel", "chat.message.tool-group", "chat.message.tool-row",
+    "chat.turn.error", "chat.queue.bar", "chat.composer.input",
+    "sidebar.conversation.row", "code.workbench", "code.session.header",
+    "code.tab.strip", "code.panel", "code.welcome", "agent.workspace",
+    "agent.sidebar", "agent.tab.strip", "agent.thread.view", "agent.channel.view",
+    "agent.channel.message", "agent.channel.composer", "agent.panel",
+    "settings.page", "settings.rail", "plugins.detail", "artifact.panel",
+    "artifact.preview", "palette.dialog"
+  ],
   "events": [
     { "name": "layout/changed", "scope": "ui", "props": ["layout"], "description": "The active layout changed." },
     { "name": "page/changed", "scope": "ui", "props": ["layout", "page"], "description": "The active center page changed." },

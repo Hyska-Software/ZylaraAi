@@ -538,7 +538,6 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             commands::plugins::plugin_leave_safe_mode,
             commands::plugins::take_plugin_deep_link,
             commands::plugins::get_plugin_locales,
-            commands::plugins::get_plugin_themes,
             commands::plugins::plugin_asset_text,
             commands::plugins::store_refresh,
             commands::plugins::check_plugin_updates,

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useUiStore } from '@/lib/store/uiStore';
 import { navEntries, HOST_NAV, openNavTarget } from '@/lib/plugins/ui/nav';
+import { setPluginUiState } from '@/lib/plugins/ui/registry';
 import type { NavEntry } from '@/lib/plugins/ui/types';
 
 const pluginEntry: NavEntry = {
@@ -20,6 +21,20 @@ const pluginEntry: NavEntry = {
 };
 
 beforeEach(() => {
+  setPluginUiState({
+    slots: [],
+    replacements: [],
+    wraps: [],
+    pages: [],
+    panelTabs: [],
+    nav: [],
+    settingsTabs: [],
+    artifactViewers: [],
+    variants: [],
+    presets: [],
+    css: [],
+    genui: [],
+  });
   useUiStore.setState({
     layoutMode: 'chat',
     activeView: 'chat',
@@ -66,6 +81,12 @@ describe('plugin navigation', () => {
     });
     expect(useUiStore.getState().pluginPages.chat).toBeNull();
     expect(useUiStore.getState().layoutMode).toBe('code');
+  });
+
+  it('routes a plugin nav that targets a host page through the host view', () => {
+    openNavTarget({ ...pluginEntry, page: 'plugins', layouts: ['chat'] });
+    expect(useUiStore.getState().activeView).toBe('plugins');
+    expect(useUiStore.getState().pluginPages.chat).toBeNull();
   });
 
   it('opens host pages without leaving a plugin page active', () => {

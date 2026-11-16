@@ -129,7 +129,9 @@ function PluginCard({
                     ? t('installed.activationRequired')
                     : plugin.disabledReason === 'permissions_incomplete'
                       ? t('installed.permissionsIncomplete')
-                      : plugin.disabledReason}
+                      : plugin.disabledReason === 'user_disabled'
+                        ? t('installed.userDisabled')
+                        : plugin.disabledReason}
                 </span>
               </>
             ) : null}

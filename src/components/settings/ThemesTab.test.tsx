@@ -205,13 +205,42 @@ describe('ThemesTab', () => {
     );
   });
 
-  it('does not remove anything when the confirmation is cancelled', async () => {
+  it('renders a plugin theme with a badge and without a remove action', async () => {
     const user = userEvent.setup();
-    mocks.confirm.mockResolvedValue(false);
+    const pluginTheme: ThemeInfo = {
+      ...OCEAN,
+      id: 'plugin-0123456789abcdef',
+      name: 'Acme paper',
+      author: 'Acme',
+      description: 'Paper palette.',
+      pluginId: 'com.acme.notes',
+      pluginName: 'Acme Notes',
+    };
+    useThemeStore.setState({
+      hostThemes: [BUILTIN, OCEAN],
+      pluginThemes: [pluginTheme],
+      themes: [BUILTIN, OCEAN, pluginTheme],
+      activeId: 'zylara',
+      ready: true,
+    });
+
     render(<ThemesTab />);
 
-    await user.click(screen.getByRole('button', { name: 'Remover o tema Ocean' }));
+    expect(screen.getByText('Acme paper')).toBeTruthy();
+    expect(screen.getByText('Plugin')).toBeTruthy();
+    expect(screen.getByText(/Do plugin Acme Notes/)).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Remover o tema Acme paper' }),
+    ).toBeNull();
 
-    expect(mocks.uninstallTheme).not.toHaveBeenCalled();
+    const card = screen.getByText('Acme paper').closest('article');
+    await user.click(within(card as HTMLElement).getByRole('button', { name: 'Usar' }));
+
+    await waitFor(() =>
+      expect(useThemeStore.getState().activeId).toBe(pluginTheme.id),
+    );
+    expect(mocks.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ themeId: pluginTheme.id }),
+    );
   });
 });

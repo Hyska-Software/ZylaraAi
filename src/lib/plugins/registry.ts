@@ -9,6 +9,7 @@
 import { type ComponentType } from 'react';
 import { useSyncExternalStore } from 'react';
 import { t } from '@/lib/i18n';
+import { pluginI18nKey } from './i18n';
 import {
   PLUGIN_SLOTS,
   pluginPermissionBase,
@@ -26,7 +27,6 @@ import type {
   PluginSnapshot,
   SettingsTabContribution,
   SlotContribution as ManifestSlotContribution,
-  ThemeContribution,
   ViewContribution,
 } from './types';
 import { setPluginUiState } from './ui/registry';
@@ -109,12 +109,6 @@ export interface ResolvedArtifactViewer {
   component: PluginComponent | null;
 }
 
-export interface ResolvedTheme {
-  plugin: PluginRecord;
-  theme: ThemeContribution;
-  key: string;
-}
-
 export interface PluginConflict {
   kind: 'command' | 'hotkey' | 'override';
   value: string;
@@ -130,7 +124,6 @@ export interface PluginRegistryState {
   commands: ResolvedCommand[];
   settingsTabs: ResolvedSettingsTab[];
   artifactViewers: ResolvedArtifactViewer[];
-  themes: ResolvedTheme[];
   conflicts: PluginConflict[];
   revision: number;
 }
@@ -178,7 +171,6 @@ let state: PluginRegistryState = {
   commands: [],
   settingsTabs: [],
   artifactViewers: [],
-  themes: [],
   conflicts: [],
   revision: 0,
 };
@@ -208,7 +200,6 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
   const commandsByHotkey = new Map<string, string>();
   const settingsTabs: ResolvedSettingsTab[] = [];
   const artifactViewers: ResolvedArtifactViewer[] = [];
-  const themes: ResolvedTheme[] = [];
   const conflicts: PluginConflict[] = [];
   const overrideOwners = new Map<string, string[]>();
   const shellOwners: string[] = [];
@@ -477,7 +468,10 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
     }
     if (hasPermission(plugin, 'ui.settings')) {
       plugin.manifest.contributes.ui.settingsTabs.forEach((tab) => {
-        const component = registration?.settingsTabs.get(tab.id) ?? null;
+        const component =
+          registration?.settingsTabs.get(tab.id) ??
+          registration?.components.get(tab.id) ??
+          null;
         settingsTabs.push({
           plugin,
           tab,
@@ -595,25 +589,6 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
         });
       });
     }
-    if (hasPermission(plugin, 'ui.theme')) {
-      plugin.manifest.contributes.ui.themes.forEach((theme) => {
-        themes.push({ plugin, theme, key: `${plugin.id}:${theme.id}` });
-        uiPresets.push({
-          key: `${plugin.id}:theme:${theme.id}`,
-          plugin,
-          pluginId: plugin.id,
-          source: 'plugin',
-          order: 90,
-          layouts: ALL_LAYOUTS,
-          presetId: `theme:${theme.id}`,
-          title: theme.name,
-          tokens: { light: theme.light, dark: theme.dark },
-          density: null,
-          variants: {},
-          css: null,
-        });
-      });
-    }
   }
   for (const [componentId, owners] of overrideOwners) {
     if (owners.length > 1) {
@@ -661,7 +636,6 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
     commands,
     settingsTabs,
     artifactViewers,
-    themes,
     conflicts,
     revision: state.revision + 1,
   };
@@ -694,7 +668,16 @@ export function usePluginRegistry(): PluginRegistryState {
 }
 
 export function registerTrustedPlugin(registration: TrustedRegistration) {
+  if (trusted.has(registration.pluginId)) {
+    unregisterTrustedPlugin(registration.pluginId);
+  }
   trusted.set(registration.pluginId, registration);
+  commit(build(state.snapshot));
+}
+
+/** Republishes an already registered trusted plugin after a dynamic change. */
+export function refreshTrustedPlugin(pluginId: string) {
+  if (!trusted.has(pluginId)) return;
   commit(build(state.snapshot));
 }
 
@@ -741,7 +724,8 @@ export function pluginViewsForSurface(
   return state.views.filter(
     (view) =>
       (view.view.surface === surface || view.view.surface === 'global') &&
-      view.view.location === location,
+      view.view.location === location &&
+      (surface === 'global' || viewLayouts(view.view).includes(surface)),
   );
 }
 
@@ -768,7 +752,7 @@ export function pluginLabel(
 ): string {
   if (!key) return fallback;
   if (key.includes(':')) return t(key);
-  return t(`plugins:${plugin.id}.${key}`, { defaultValue: fallback }) as string;
+  return t(`plugins:${pluginI18nKey(plugin.id)}.${key}`, { defaultValue: fallback }) as string;
 }
 
 export function pluginT(
@@ -778,7 +762,7 @@ export function pluginT(
 ): string {
   if (!key) return fallback;
   if (key.includes(':')) return t(key) as string;
-  return t(`plugins:${pluginId}.${key}`, { defaultValue: fallback }) as string;
+  return t(`plugins:${pluginI18nKey(pluginId)}.${key}`, { defaultValue: fallback }) as string;
 }
 
 export function pluginManifest(pluginId: string): PluginManifest | undefined {

@@ -136,6 +136,12 @@ fn parses_plugin_deep_links_without_scheme_smuggling() {
     .expect("deep link");
     assert_eq!(target, "https://example.com/plugin.zplugin");
     assert_eq!(super::take_pending_deep_link().as_deref(), Some(target.as_str()));
+    let convenience = super::capture_deep_links(vec![
+        "zylara://plugin/https%3A%2F%2Fexample.com%2Fconvenience.zplugin".to_string(),
+    ])
+    .expect("convenience deep link");
+    assert_eq!(convenience, "https://example.com/convenience.zplugin");
+    let _ = super::take_pending_deep_link();
     assert!(super::capture_deep_links(vec![
         "zylara://plugin/install?url=http%3A%2F%2Fevil.example%2Fplugin.zplugin".to_string()
     ])
@@ -364,6 +370,155 @@ fn update_requires_consent_for_new_permissions_and_rolls_back() {
     let rolled_back = manager.rollback("com.acme.demo").expect("rollback");
     assert_eq!(rolled_back.version, "1.0.0");
     assert!(rolled_back.active);
+}
+
+#[test]
+fn updating_a_user_disabled_plugin_keeps_it_disabled() {
+    let temp = tempfile::tempdir().expect("temp");
+    let settings = Settings {
+        plugin_dev_mode: true,
+        ..Settings::default()
+    };
+    let manager = manager(&temp, &settings);
+    let v1 = write_package(
+        temp.path(),
+        "v1.zplugin",
+        &build_package(
+            "1.0.0",
+            &["ui.view", "agent.tools", "agent.prompt", "agent.skills"],
+        ),
+    );
+    manager
+        .install(
+            &v1,
+            super::InstallOptions {
+                source: "test".to_string(),
+                allow_unsigned: false,
+                granted_permissions: None,
+            },
+        )
+        .expect("install v1");
+    manager
+        .set_enabled("com.acme.demo", false)
+        .expect("disable plugin");
+
+    let v2 = write_package(
+        temp.path(),
+        "v2.zplugin",
+        &build_package(
+            "1.1.0",
+            &["ui.view", "agent.tools", "agent.prompt", "agent.skills"],
+        ),
+    );
+    let record = manager
+        .install(
+            &v2,
+            super::InstallOptions {
+                source: "test".to_string(),
+                allow_unsigned: false,
+                granted_permissions: None,
+            },
+        )
+        .expect("update v2");
+
+    assert_eq!(record.version, "1.1.0");
+    assert!(!record.enabled);
+    assert!(!record.active);
+    assert_eq!(record.disabled_reason.as_deref(), Some("user_disabled"));
+    assert!(manager.active_ids().is_empty());
+}
+
+#[test]
+fn rollback_does_not_regrant_permissions_missing_from_the_current_map() {
+    let temp = tempfile::tempdir().expect("temp");
+    let settings = Settings {
+        plugin_dev_mode: true,
+        ..Settings::default()
+    };
+    let manager = manager(&temp, &settings);
+    let v1 = write_package(
+        temp.path(),
+        "v1.zplugin",
+        &build_package("1.0.0", &["storage"]),
+    );
+    manager
+        .install(
+            &v1,
+            super::InstallOptions {
+                source: "test".to_string(),
+                allow_unsigned: false,
+                granted_permissions: None,
+            },
+        )
+        .expect("install v1");
+
+    let v2 = write_package(temp.path(), "v2.zplugin", &build_package("1.1.0", &[]));
+    manager
+        .install(
+            &v2,
+            super::InstallOptions {
+                source: "test".to_string(),
+                allow_unsigned: false,
+                granted_permissions: None,
+            },
+        )
+        .expect("update v2 without storage");
+
+    let rolled_back = manager.rollback("com.acme.demo").expect("rollback");
+    assert_eq!(rolled_back.version, "1.0.0");
+    assert!(!rolled_back.enabled);
+    assert!(!rolled_back.active);
+    assert_eq!(
+        rolled_back.disabled_reason.as_deref(),
+        Some("permissions_incomplete")
+    );
+    assert!(manager.active_ids().is_empty());
+}
+
+#[test]
+fn registry_revocation_reloads_the_live_runtime() {
+    let temp = tempfile::tempdir().expect("temp");
+    let settings = Settings {
+        plugin_dev_mode: true,
+        ..Settings::default()
+    };
+    let manager = manager(&temp, &settings);
+    let package = write_package(
+        temp.path(),
+        "demo.zplugin",
+        &build_package("1.0.0", &[]),
+    );
+    manager
+        .install(
+            &package,
+            super::InstallOptions {
+                source: "test".to_string(),
+                allow_unsigned: false,
+                granted_permissions: None,
+            },
+        )
+        .expect("install");
+    assert!(!manager.active_ids().is_empty());
+
+    let index = super::RegistryIndex {
+        schema_version: 1,
+        name: "test".to_string(),
+        generated_at: String::new(),
+        plugins: Vec::new(),
+        revoked: vec![super::RevokedPlugin {
+            id: "com.acme.demo".to_string(),
+            version: "1.0.0".to_string(),
+            reason: "test".to_string(),
+        }],
+        signature: None,
+    };
+    manager.apply_revocations(&index).expect("revocation");
+
+    assert!(manager.active_ids().is_empty());
+    let record = manager.record("com.acme.demo").expect("record");
+    assert!(!record.enabled);
+    assert!(!record.active);
+    assert_eq!(record.disabled_reason.as_deref(), Some("revoked"));
 }
 
 #[test]

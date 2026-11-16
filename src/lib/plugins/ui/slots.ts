@@ -2,6 +2,7 @@
 import type { PluginSlotSpec } from '../contract';
 
 import type { LayoutId, SlotContribution, SlotOwner } from './types';
+import { orderedContributions } from './registry';
 
 export function contributionMatchesLayout(
   contribution: { layouts: LayoutId[] },
@@ -32,16 +33,19 @@ export function selectSlotContributions(
     entryKey?: string | null;
     onlyPluginId?: string | null;
     disabled?: readonly string[];
+    owner?: SlotOwner;
   },
 ): SlotContribution[] {
-  return contributions.filter((entry) => {
+  const filtered = contributions.filter((entry) => {
     if (entry.slot !== options.slot) return false;
     if (options.onlyPluginId && entry.pluginId !== options.onlyPluginId) return false;
     if (options.disabled?.includes(entry.key)) return false;
     if (!contributionMatchesLayout(entry, options.layout)) return false;
     if (entry.keyMatch !== null && entry.keyMatch !== options.entryKey) return false;
+    if (!whenMatches(entry.when, options.owner ?? {})) return false;
     return true;
   });
+  return orderedContributions(filtered);
 }
 
 /** First chain contribution that accepts the owner (`matched` is the owner). */

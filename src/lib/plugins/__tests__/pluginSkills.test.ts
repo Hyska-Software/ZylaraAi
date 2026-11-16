@@ -138,8 +138,11 @@ describe('bundled plugin skills', () => {
   it('covers every contract id and recipe value', () => {
     const body = allBodies();
     const contract = readJson('data/plugin-contract.json');
+    const reservedSlots = new Set<string>(contract.reservedSlots ?? []);
     const ids = [
-      ...(contract.slots ?? []).map((entry: { id: string }) => entry.id),
+      ...(contract.slots ?? [])
+        .filter((entry: { id: string }) => !reservedSlots.has(entry.id))
+        .map((entry: { id: string }) => entry.id),
       ...(contract.components ?? []).map((entry: { id: string }) => entry.id),
       ...(contract.permissions ?? []).map((entry: { id: string }) => entry.id),
       ...(contract.events ?? []).map((entry: { name: string }) => entry.name),

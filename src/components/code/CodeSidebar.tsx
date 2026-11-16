@@ -768,7 +768,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
         hidden: prefs.navHidden,
         order: prefs.navOrder,
       }),
-    [ui.nav, prefs.navHidden, prefs.navOrder],
+    [ui.nav, prefs.enabled, prefs.navHidden, prefs.navOrder],
   );
 
   const {

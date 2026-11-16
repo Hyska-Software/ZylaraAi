@@ -5,7 +5,6 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { listen } from '@tauri-apps/api/event';
 import { AppShell } from '@/components/layout/AppShell';
 import { WorkspaceCenter } from '@/components/layout/WorkspaceCenter';
-import { PluginPanelHost } from '@/components/plugins/PluginHosts';
 import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
@@ -54,8 +53,10 @@ function bootstrap(): Promise<void> {
       useUiStore.getState().setTheme(settings.theme);
     }
     applyFontScale(settings.fontScale);
-    await useThemeStore.getState().init();
+    // Plugin themes must be registered before the host theme store resolves
+    // the persisted `themeId`, which may be a plugin-namespaced id.
     await usePluginStore.getState().init();
+    await useThemeStore.getState().init();
     await useChatStore.getState().init();
     await useAgentStore.getState().initialize();
     // A webview reload must reattach turns that kept running in Rust before a
@@ -156,12 +157,15 @@ export default function App() {
   const activeChannelId = useUiStore((state) => state.activeChannelId);
   const artifactPanelOpen = useUiStore((state) => state.artifactPanelOpen);
   const sourcesPanelOpen = useUiStore((state) => state.sourcesPanelOpen);
-  const pluginPanel = usePluginStore((state) => state.activePanel);
-  const chatPluginDock = useUiStore((state) => state.pluginDockTab.chat);
+  const pluginDockTab = useUiStore((state) => state.pluginDockTab);
+  const pluginDockClosed = useUiStore((state) => state.pluginDockClosed);
   const pluginUi = usePluginUi();
-  const takeoverDock = pluginUi.panelTabs.find(
-    (entry) => entry.takeover && entry.layouts.includes(layoutMode),
-  );
+  const activeDockKey = pluginDockTab[layoutMode];
+  const takeoverDock = pluginDockClosed[layoutMode]
+    ? undefined
+    : pluginUi.panelTabs.find(
+        (entry) => entry.takeover && entry.layouts.includes(layoutMode),
+      );
   const activeConversation = useChatStore((state) => {
     const id = state.activeId;
     return id ? state.conversations.find((conversation) => conversation.id === id) : undefined;
@@ -583,12 +587,10 @@ export default function App() {
                 : layoutMode === 'agent'
                   ? translate('shell.labels.agents')
                   : translate('shell.labels.conversations'),
-            rightPanel: takeoverDock ? (
+            rightPanel: activeDockKey ? (
+              <PluginDockTabHost layout={layoutMode} tabKey={activeDockKey} />
+            ) : takeoverDock ? (
               <PluginDockTabHost layout={layoutMode} tabKey={takeoverDock.key} />
-            ) : pluginPanel ? (
-              <PluginPanelHost />
-            ) : chatPluginDock ? (
-              <PluginDockTabHost layout="chat" tabKey={chatPluginDock} />
             ) : layoutMode === 'code' ? (
               <CodePanel />
             ) : agentPanelVisible ? (
@@ -604,9 +606,8 @@ export default function App() {
               </>
             ),
             rightPanelOpen:
-              (Boolean(takeoverDock) ||
-                Boolean(pluginPanel) ||
-                Boolean(chatPluginDock) ||
+              (Boolean(activeDockKey) ||
+                Boolean(takeoverDock) ||
                 layoutMode === 'code' ||
                 (agentPanelVisible &&
                   (agentWorkspacePanel ? codePanelOpen : agentPanelOpen))) &&

@@ -299,8 +299,18 @@
       "properties": {
         "id": { "type": "string", "maxLength": 64 },
         "name": { "type": "string", "maxLength": 120 },
-        "light": { "type": "object", "additionalProperties": { "type": "string", "maxLength": 200 } },
-        "dark": { "type": "object", "additionalProperties": { "type": "string", "maxLength": 200 } }
+        "light": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": { "pattern": "^(--)?[a-z0-9-]+$" },
+          "additionalProperties": { "type": "string", "maxLength": 64 }
+        },
+        "dark": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": { "pattern": "^(--)?[a-z0-9-]+$" },
+          "additionalProperties": { "type": "string", "maxLength": 64 }
+        }
       },
       "additionalProperties": false
     },

@@ -13,13 +13,16 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { i18n } from '@/lib/i18n';
+import { pluginI18nKey } from './i18n';
 import { useAppStore, useChatStore } from '@/lib/store';
 import { useUiStore } from '@/lib/store/uiStore';
 import type { SettingsTabId } from '@/lib/settingsTabs';
 import {
   PLUGIN_UI_LIMITS,
   pluginComponentExists,
+  pluginComponentReserved,
   pluginComponentSpec,
+  pluginSlotReserved,
   pluginSlotSpec,
 } from './contract';
 import type {
@@ -37,6 +40,7 @@ import type {
 } from './ui/types';
 import {
   pluginHasPermission,
+  refreshTrustedPlugin,
   registerTrustedPlugin,
   unregisterTrustedPlugin,
   type PluginComponent,
@@ -48,8 +52,15 @@ import type { PluginRecord } from './types';
 
 const loaded = new Map<
   string,
-  { registration: TrustedRegistration; deactivate?: () => void; version: string }
+  {
+    registration: TrustedRegistration;
+    deactivate?: () => void;
+    activateCleanup?: () => void;
+    version: string;
+    updatedAt: number;
+  }
 >();
+const loading = new Map<string, Promise<void>>();
 const failures = new Map<string, number>();
 const eventHandlers = new Map<string, Map<string, Set<(detail: unknown) => void>>>();
 
@@ -105,6 +116,13 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
       const dispose = <T extends { key: string }>(list: T[], key: string) => () => {
         const index = list.findIndex((entry) => entry.key === key);
         if (index >= 0) list.splice(index, 1);
+        refreshTrustedPlugin(plugin.id);
+      };
+      const changed = () => refreshTrustedPlugin(plugin.id);
+      const push = <T extends { key: string }>(list: T[], entry: T) => {
+        list.push(entry);
+        changed();
+        return dispose(list, entry.key);
       };
       return {
         registerSlot(
@@ -123,6 +141,9 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
           ensure(`ui.slot:${spec.slot}`);
           const slotSpec = pluginSlotSpec(spec.slot);
           if (!slotSpec) throw new Error(`EPLUGIN_UNKNOWN_SLOT: ${spec.slot}`);
+          if (pluginSlotReserved(spec.slot)) {
+            throw new Error(`PLUGIN_SURFACE_RESERVED: ${spec.slot}`);
+          }
           if (registration.uiSlots.length >= PLUGIN_UI_LIMITS.slotEntriesPerPlugin) {
             throw new Error('PLUGIN_LIMIT_REACHED: slots');
           }
@@ -141,8 +162,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             when: spec.when ?? null,
             select: spec.select,
           };
-          registration.uiSlots.push(entry);
-          return dispose(registration.uiSlots, entry.key);
+          return push(registration.uiSlots, entry);
         },
         replace(
           spec: { component: string; id?: string; priority?: number; layouts?: LayoutId[] },
@@ -151,7 +171,14 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
           if (!pluginComponentExists(spec.component)) {
             throw new Error(`unknown component id: ${spec.component}`);
           }
-          ensure(`ui.override:${spec.component}`);
+          if (pluginComponentReserved(spec.component)) {
+            throw new Error(`PLUGIN_COMPONENT_RESERVED: ${spec.component}`);
+          }
+          ensure(
+            spec.component === 'layout.shell'
+              ? 'ui.shell'
+              : `ui.override:${spec.component}`,
+          );
           if (registration.uiReplacements.length >= 64) {
             throw new Error('PLUGIN_LIMIT_REACHED: replacements');
           }
@@ -161,8 +188,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             entryId: spec.id ?? spec.component,
             componentFn: component,
           };
-          registration.uiReplacements.push(entry);
-          return dispose(registration.uiReplacements, entry.key);
+          return push(registration.uiReplacements, entry);
         },
         wrap(
           spec: {
@@ -177,6 +203,9 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
           if (!pluginComponentExists(spec.component)) {
             throw new Error(`unknown component id: ${spec.component}`);
           }
+          if (pluginComponentReserved(spec.component)) {
+            throw new Error(`PLUGIN_COMPONENT_RESERVED: ${spec.component}`);
+          }
           ensure(`ui.override:${spec.component}`);
           const entry = {
             ...base('wrap', `${spec.component}:${spec.id}`, spec.layouts, spec.order, spec.priority),
@@ -184,8 +213,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             entryId: spec.id,
             wrapper,
           };
-          registration.uiWraps.push(entry);
-          return dispose(registration.uiWraps, entry.key);
+          return push(registration.uiWraps, entry);
         },
         registerVariant(spec: {
           component: string;
@@ -206,8 +234,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             title: spec.title,
             recipe: spec.recipe,
           };
-          registration.uiVariants.push(entry);
-          return dispose(registration.uiVariants, entry.key);
+          return push(registration.uiVariants, entry);
         },
         registerPreset(spec: {
           id: string;
@@ -232,8 +259,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             variants: spec.variants ?? {},
             css: spec.css ?? null,
           };
-          registration.uiPresets.push(entry);
-          return dispose(registration.uiPresets, entry.key);
+          return push(registration.uiPresets, entry);
         },
         registerPage(
           spec: {
@@ -259,8 +285,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             entry: null,
             component,
           };
-          registration.uiPages.push(entry);
-          return dispose(registration.uiPages, entry.key);
+          return push(registration.uiPages, entry);
         },
         registerPanelTab(
           spec: {
@@ -287,8 +312,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             component,
             takeover: false,
           };
-          registration.uiPanelTabs.push(entry);
-          return dispose(registration.uiPanelTabs, entry.key);
+          return push(registration.uiPanelTabs, entry);
         },
         registerSettingsTab(
           spec: {
@@ -310,8 +334,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             entry: null,
             component,
           };
-          registration.uiSettingsTabs.push(entry);
-          return dispose(registration.uiSettingsTabs, entry.key);
+          return push(registration.uiSettingsTabs, entry);
         },
         registerNav(spec: {
           id: string;
@@ -341,8 +364,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             order: spec.order ?? 200,
             badge: spec.badge ?? null,
           };
-          registration.uiNav.push(entry);
-          return dispose(registration.uiNav, entry.key);
+          return push(registration.uiNav, entry);
         },
         registerGenuiComponent(
           spec: {
@@ -369,8 +391,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             render: { kind: 'trusted', component: spec.id },
             component,
           };
-          registration.uiGenui.push(entry);
-          return dispose(registration.uiGenui, entry.key);
+          return push(registration.uiGenui, entry);
         },
         addCss(css: string, opts?: { layouts?: LayoutId[]; id?: string }) {
           ensure('ui.css.global');
@@ -385,8 +406,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
             layouts: opts?.layouts?.length ? opts.layouts : allLayouts,
             order: 100,
           };
-          registration.uiCss.push(entry);
-          return dispose(registration.uiCss, entry.key);
+          return push(registration.uiCss, entry);
         },
         openPage(pageId: string, opts?: { layout?: LayoutId }) {
           const layout = opts?.layout ?? useUiStore.getState().layoutMode;
@@ -479,41 +499,79 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
     },
     registerComponent(id: string, component: PluginComponent) {
       registration.components.set(id, component);
+      refreshTrustedPlugin(plugin.id);
     },
     registerView(id: string, component: PluginComponent) {
+      if (!requirePermission(plugin, 'ui.view')) return;
+      if (!plugin.manifest.contributes.ui.views.some((view) => view.id === id)) {
+        throw new Error(`PLUGIN_VIEW_UNKNOWN: ${id}`);
+      }
       registration.views.set(id, component);
+      refreshTrustedPlugin(plugin.id);
     },
     registerPanel(id: string, component: PluginComponent) {
+      if (!requirePermission(plugin, 'ui.panel')) return;
+      if (!plugin.manifest.contributes.ui.panels.some((panel) => panel.id === id)) {
+        throw new Error(`PLUGIN_PANEL_UNKNOWN: ${id}`);
+      }
       registration.panels.set(id, component);
+      refreshTrustedPlugin(plugin.id);
     },
     registerSlot(slotId: string, component: PluginComponent) {
+      if (!requirePermission(plugin, `ui.slot:${slotId}`)) return;
+      if (!pluginSlotSpec(slotId)) throw new Error(`PLUGIN_SLOT_UNKNOWN: ${slotId}`);
+      if (pluginSlotReserved(slotId)) throw new Error(`PLUGIN_SURFACE_RESERVED: ${slotId}`);
+      if (
+        registration.slots.size + registration.uiSlots.length >=
+        PLUGIN_UI_LIMITS.slotEntriesPerPlugin
+      ) {
+        throw new Error('PLUGIN_LIMIT_REACHED: slots');
+      }
       registration.slots.set(slotId, component);
+      refreshTrustedPlugin(plugin.id);
     },
     registerSettingsTab(id: string, component: PluginComponent) {
+      if (!requirePermission(plugin, 'ui.settings')) return;
+      if (!plugin.manifest.contributes.ui.settingsTabs.some((tab) => tab.id === id)) {
+        throw new Error(`PLUGIN_SETTINGS_TAB_UNKNOWN: ${id}`);
+      }
       registration.settingsTabs.set(id, component);
+      refreshTrustedPlugin(plugin.id);
     },
     registerArtifactViewer(id: string, component: PluginComponent) {
+      if (!requirePermission(plugin, 'ui.artifact')) return;
+      if (!plugin.manifest.contributes.artifactViewers.some((viewer) => viewer.id === id)) {
+        throw new Error(`PLUGIN_ARTIFACT_VIEWER_UNKNOWN: ${id}`);
+      }
       registration.artifactViewers.set(id, component);
+      refreshTrustedPlugin(plugin.id);
     },
     replaceComponent(id: string, component: PluginComponent) {
       if (!pluginComponentExists(id)) {
         throw new Error(`unknown component id: ${id}`);
       }
-      if (!requirePermission(plugin, `ui.override:${id}`)) return;
+      if (pluginComponentReserved(id)) throw new Error(`PLUGIN_COMPONENT_RESERVED: ${id}`);
+      if (!requirePermission(plugin, id === 'layout.shell' ? 'ui.shell' : `ui.override:${id}`)) {
+        return;
+      }
       registration.overrides.set(id, component);
+      refreshTrustedPlugin(plugin.id);
     },
     wrapComponent(id: string, wrapper: PluginComponent) {
       if (!pluginComponentExists(id)) {
         throw new Error(`unknown component id: ${id}`);
       }
+      if (pluginComponentReserved(id)) throw new Error(`PLUGIN_COMPONENT_RESERVED: ${id}`);
       if (!requirePermission(plugin, `ui.override:${id}`)) return;
       const list = registration.wrappers.get(id) ?? [];
       list.push(wrapper);
       registration.wrappers.set(id, list);
+      refreshTrustedPlugin(plugin.id);
     },
     replaceShell(component: PluginComponent) {
       if (!requirePermission(plugin, 'ui.shell')) return;
       registration.shell = component;
+      refreshTrustedPlugin(plugin.id);
     },
     addGlobalCss(css: string) {
       if (!requirePermission(plugin, 'ui.css.global')) return;
@@ -527,6 +585,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
         layouts: ['chat', 'code', 'agent'],
         order: 100,
       });
+      refreshTrustedPlugin(plugin.id);
     },
     registerToolHandler(
       name: string,
@@ -591,7 +650,7 @@ function createHost(plugin: PluginRecord, registration: TrustedRegistration) {
     },
     log,
     t(key: string, fallback?: string) {
-      return i18n.t(`plugins:${plugin.id}.${key}`, {
+      return i18n.t(`plugins:${pluginI18nKey(plugin.id)}.${key}`, {
         defaultValue: fallback ?? key,
       }) as string;
     },
@@ -613,14 +672,20 @@ export function emitTrustedEvent(pluginId: string, event: string, detail: unknow
   return true;
 }
 
-export async function loadTrustedPlugin(plugin: PluginRecord): Promise<void> {
-  const existing = loaded.get(plugin.id);
-  if (existing) {
-    if (existing.version === plugin.version) return;
-    unloadTrustedPlugin(plugin.id);
-  }
+const loadTokens = new Map<string, number>();
+
+async function loadTrustedPluginInner(plugin: PluginRecord, token: number): Promise<void> {
   const settings = usePluginStore.getState().snapshot;
-  if (!plugin.trusted || !settings.allowTrusted) return;
+  if (
+    !plugin.trusted ||
+    !plugin.active ||
+    !plugin.enabled ||
+    !settings.allowTrusted ||
+    settings.safeMode ||
+    !settings.pluginsEnabled
+  ) {
+    return;
+  }
   if (!pluginHasPermission(plugin, 'unsafe.renderer')) {
     toast.error(i18n.t('plugins:errors.trustedPermission'), { description: plugin.name });
     return;
@@ -696,22 +761,34 @@ export async function loadTrustedPlugin(plugin: PluginRecord): Promise<void> {
       activate?: (host: unknown) => unknown;
       deactivate?: () => void;
     } | null;
+    let activateCleanup: (() => void) | undefined;
     if (activation && typeof activation.activate === 'function') {
-      await Promise.race([
+      let timer: number | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = window.setTimeout(
+          () => reject(new Error('PLUGIN_TRUSTED_ACTIVATE_TIMEOUT')),
+          5_000,
+        );
+      });
+      const result = await Promise.race([
         Promise.resolve(activation.activate(host)),
-        new Promise((_, reject) =>
-          window.setTimeout(
-            () => reject(new Error('PLUGIN_TRUSTED_ACTIVATE_TIMEOUT')),
-            5_000,
-          ),
-        ),
-      ]);
+        timeout,
+      ]).finally(() => {
+        if (timer !== undefined) window.clearTimeout(timer);
+      });
+      if (typeof result === 'function') activateCleanup = result as () => void;
+    }
+    if (loadTokens.get(plugin.id) !== token) {
+      unregisterSafe(registration);
+      return;
     }
     registerTrustedPlugin(registration);
     loaded.set(plugin.id, {
       registration,
       deactivate: activation?.deactivate?.bind(activation),
+      activateCleanup,
       version: plugin.version,
+      updatedAt: plugin.updatedAt,
     });
     failures.delete(plugin.id);
   } catch (error) {
@@ -729,6 +806,27 @@ export async function loadTrustedPlugin(plugin: PluginRecord): Promise<void> {
   }
 }
 
+export function loadTrustedPlugin(plugin: PluginRecord): Promise<void> {
+  const existing = loaded.get(plugin.id);
+  if (
+    existing &&
+    existing.version === plugin.version &&
+    existing.updatedAt === plugin.updatedAt
+  ) {
+    return Promise.resolve();
+  }
+  const pending = loading.get(plugin.id);
+  if (pending) return pending;
+  if (loaded.has(plugin.id)) unloadTrustedPlugin(plugin.id);
+  const token = (loadTokens.get(plugin.id) ?? 0) + 1;
+  loadTokens.set(plugin.id, token);
+  const promise = loadTrustedPluginInner(plugin, token).finally(() => {
+    if (loading.get(plugin.id) === promise) loading.delete(plugin.id);
+  });
+  loading.set(plugin.id, promise);
+  return promise;
+}
+
 function unregisterSafe(registration: TrustedRegistration) {
   for (const cleanup of registration.cleanup) {
     try {
@@ -744,6 +842,8 @@ export function loadedTrustedPluginIds(): string[] {
 }
 
 export function unloadTrustedPlugin(pluginId: string) {
+  loadTokens.set(pluginId, (loadTokens.get(pluginId) ?? 0) + 1);
+  loading.delete(pluginId);
   const entry = loaded.get(pluginId);
   if (!entry) return;
   try {
@@ -751,13 +851,15 @@ export function unloadTrustedPlugin(pluginId: string) {
   } catch {
     // A failing deactivate cannot keep the plugin mounted.
   }
+  try {
+    entry.activateCleanup?.();
+  } catch {
+    // A failing activation cleanup cannot keep the plugin mounted.
+  }
   unregisterSafe(entry.registration);
   unregisterTrustedPlugin(pluginId);
   loaded.delete(pluginId);
   eventHandlers.delete(pluginId);
-  document
-    .querySelectorAll(`style[data-zylara-plugin-css="${CSS.escape(pluginId)}"]`)
-    .forEach((style) => style.remove());
 }
 
 export function unloadAllTrusted() {

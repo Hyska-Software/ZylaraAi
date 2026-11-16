@@ -130,6 +130,23 @@ for (const component of contract.components ?? []) {
   }
 }
 
+const reservedSlots = contract.reservedSlots ?? [];
+const reservedComponents = contract.reservedComponents ?? [];
+if (!Array.isArray(reservedSlots) || !Array.isArray(reservedComponents)) {
+  fail('reservedSlots and reservedComponents must be arrays');
+}
+for (const id of reservedSlots) {
+  if (typeof id !== 'string' || !slotIds.has(id)) fail(`reservedSlots has unknown slot: ${id}`);
+}
+for (const id of reservedComponents) {
+  if (typeof id !== 'string' || !componentIds.has(id)) fail(`reservedComponents has unknown component: ${id}`);
+}
+if (new Set(reservedSlots).size !== reservedSlots.length) fail('reservedSlots has duplicates');
+if (new Set(reservedComponents).size !== reservedComponents.length) fail('reservedComponents has duplicates');
+if (reservedSlots.some((id) => reservedComponents.includes(id))) {
+  fail('reservedSlots and reservedComponents must be disjoint');
+}
+
 const permissionIds = new Set();
 for (const permission of contract.permissions ?? []) {
   if (!/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/.test(permission.id)) {
@@ -232,6 +249,14 @@ pub static COMPONENT_IDS: &[&str] = &[
 ${stringArray(contract.components.map((component) => component.id))}
 ];
 
+pub static RESERVED_SLOT_IDS: &[&str] = &[
+${stringArray(reservedSlots)}
+];
+
+pub static RESERVED_COMPONENT_IDS: &[&str] = &[
+${stringArray(reservedComponents)}
+];
+
 pub static PERMISSION_IDS: &[&str] = &[
 ${stringArray(contract.permissions.map((permission) => permission.id))}
 ];
@@ -312,6 +337,14 @@ export const COMPONENT_IDS = [
 ${stringArray(contract.components.map((component) => component.id))}
 ] as const;
 export type PluginComponentId = (typeof COMPONENT_IDS)[number];
+
+export const RESERVED_SLOT_IDS = [
+${stringArray(reservedSlots)}
+] as const;
+
+export const RESERVED_COMPONENT_IDS = [
+${stringArray(reservedComponents)}
+] as const;
 
 export const PERMISSION_IDS = [
 ${stringArray(contract.permissions.map((permission) => permission.id))}

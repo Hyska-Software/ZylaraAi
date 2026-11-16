@@ -29,11 +29,31 @@ export function DesignTab() {
         .map((entry) => entry.component),
     ),
   );
-  const modifications = [
-    ...ui.slots.map((entry) => ({ key: entry.key, label: `slot · ${entry.slot}` })),
-    ...ui.replacements.map((entry) => ({ key: entry.key, label: `component · ${entry.component}` })),
-    ...ui.panelTabs.map((entry) => ({ key: entry.key, label: `dock · ${entry.title}` })),
-    ...ui.nav.map((entry) => ({ key: entry.key, label: `nav · ${entry.title}` })),
+  const modifications: Array<{
+    key: string;
+    label: string;
+    kind: 'slot' | 'component' | 'dock' | 'nav';
+  }> = [
+    ...ui.slots.map((entry) => ({
+      key: entry.key,
+      label: `slot · ${entry.slot}`,
+      kind: 'slot' as const,
+    })),
+    ...ui.replacements.map((entry) => ({
+      key: entry.key,
+      label: `component · ${entry.component}`,
+      kind: 'component' as const,
+    })),
+    ...ui.panelTabs.map((entry) => ({
+      key: entry.key,
+      label: `dock · ${entry.title}`,
+      kind: 'dock' as const,
+    })),
+    ...ui.nav.map((entry) => ({
+      key: entry.key,
+      label: `nav · ${entry.title}`,
+      kind: 'nav' as const,
+    })),
   ];
 
   return (
@@ -153,16 +173,39 @@ export function DesignTab() {
         {modifications.length === 0 ? (
           <p className="text-[12px] text-foreground-subtle">{t('design.empty')}</p>
         ) : (
-          modifications.map((entry) => (
-            <label key={entry.key} className="flex items-center gap-2 text-[12px]">
-              <input
-                type="checkbox"
-                checked={!prefs.disabled.includes(entry.key)}
-                onChange={(event) => prefs.setDisabled(entry.key, !event.target.checked)}
-              />
-              <span className="text-foreground-muted">{entry.label}</span>
-            </label>
-          ))
+          modifications.map((entry) => {
+            const disabled =
+              entry.kind === 'nav'
+                ? prefs.navHidden[layout].includes(entry.key)
+                : prefs.disabled.includes(entry.key);
+            return (
+              <label key={entry.key} className="flex items-center gap-2 text-[12px]">
+                <input
+                  type="checkbox"
+                  checked={!disabled}
+                  onChange={(event) => {
+                    const nextDisabled = !event.target.checked;
+                    if (entry.kind === 'nav') {
+                      const hidden = new Set(prefs.navHidden[layout]);
+                      if (nextDisabled) hidden.add(entry.key);
+                      else hidden.delete(entry.key);
+                      prefs.setNavHidden(layout, [...hidden]);
+                      return;
+                    }
+                    prefs.setDisabled(entry.key, nextDisabled);
+                    if (
+                      entry.kind === 'dock' &&
+                      nextDisabled &&
+                      useUiStore.getState().pluginDockTab[layout] === entry.key
+                    ) {
+                      useUiStore.getState().closePluginDockTab(layout);
+                    }
+                  }}
+                />
+                <span className="text-foreground-muted">{entry.label}</span>
+              </label>
+            );
+          })
         )}
         <div className="flex gap-1.5 pt-1">
           <Button size="sm" variant="secondary" onClick={() => prefs.resetLayout(layout)}>

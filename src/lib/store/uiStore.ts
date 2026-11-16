@@ -384,6 +384,8 @@ interface UiState {
   pluginPages: Record<LayoutMode, PluginPageTarget | null>;
   /** Plugin dock tab active in each layout (null = the host dock tab). */
   pluginDockTab: Record<LayoutMode, string | null>;
+  /** A takeover panel was explicitly dismissed in this layout. */
+  pluginDockClosed: Record<LayoutMode, boolean>;
   activeArtifactId: string | null;
   artifacts: Artifact[];
 
@@ -506,6 +508,8 @@ interface UiState {
   openPluginDockTab: (key: string, layout?: LayoutMode) => void;
   /** Closes the plugin dock tab of one layout (default: the active layout). */
   closePluginDockTab: (layout?: LayoutMode) => void;
+  /** Dismisses a takeover panel for one layout (default: the active layout). */
+  dismissPluginDockTakeover: (layout?: LayoutMode) => void;
   /** Opens the panel on the artifact preview (or the list when there is none). */
   openArtifactPanel: (artifactId?: string | null) => void;
   /** Opens the panel on the generated-artifact list. */
@@ -622,6 +626,7 @@ export const useUiStore = create<UiState>()(
       activeView: 'chat',
       pluginPages: { chat: null, code: null, agent: null },
       pluginDockTab: { chat: null, code: null, agent: null },
+      pluginDockClosed: { chat: false, code: false, agent: false },
       activeArtifactId: null,
       artifacts: [],
 
@@ -996,16 +1001,29 @@ export const useUiStore = create<UiState>()(
         set((state) => {
           const targetLayout = layout ?? state.layoutMode;
           const pluginDockTab = { ...state.pluginDockTab, [targetLayout]: key };
+          const pluginDockClosed = {
+            ...state.pluginDockClosed,
+            [targetLayout]: false,
+          };
           if (targetLayout === 'chat') {
-            return { pluginDockTab, artifactPanelOpen: true, sourcesPanelOpen: false };
+            return { pluginDockTab, pluginDockClosed, artifactPanelOpen: true, sourcesPanelOpen: false };
           }
-          if (targetLayout === 'code') return { pluginDockTab, codePanelOpen: true };
-          return { pluginDockTab, agentPanelOpen: true, agentRightPanel: 'agent' };
+          if (targetLayout === 'code') return { pluginDockTab, pluginDockClosed, codePanelOpen: true };
+          return { pluginDockTab, pluginDockClosed, agentPanelOpen: true, agentRightPanel: 'agent' };
         }),
       closePluginDockTab: (layout) =>
         set((state) => {
           const targetLayout = layout ?? state.layoutMode;
-          return { pluginDockTab: { ...state.pluginDockTab, [targetLayout]: null } };
+          return {
+            pluginDockTab: { ...state.pluginDockTab, [targetLayout]: null },
+          };
+        }),
+      dismissPluginDockTakeover: (layout) =>
+        set((state) => {
+          const targetLayout = layout ?? state.layoutMode;
+          return {
+            pluginDockClosed: { ...state.pluginDockClosed, [targetLayout]: true },
+          };
         }),
       openArtifactPanel: (artifactId) =>
         set((state) => {

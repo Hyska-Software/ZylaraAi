@@ -67,6 +67,27 @@ describe('slot routing', () => {
     expect(orderedContributions(entries).map((entry) => entry.key)).toEqual(['b', 'a', 'c']);
     expect(pickWinner(entries)?.key).toBe('b');
     expect(pickWinner(entries, 'c')?.key).toBe('c');
+    expect(
+      selectSlotContributions(entries, {
+        slot: 'chat.message.actions',
+        layout: 'chat',
+      }).map((entry) => entry.key),
+    ).toEqual(['b', 'a', 'c']);
+  });
+
+  it('filters list contributions through declarative when', () => {
+    const entries = [
+      slot({ key: 'user', when: { role: 'user' } }),
+      slot({ key: 'assistant', when: { role: 'assistant' } }),
+      slot({ key: 'always' }),
+    ];
+    expect(
+      selectSlotContributions(entries, {
+        slot: 'chat.message.actions',
+        layout: 'chat',
+        owner: { role: 'assistant' },
+      }).map((entry) => entry.key),
+    ).toEqual(['always', 'assistant']);
   });
 
   it('elects chain entries through select or declarative when', () => {

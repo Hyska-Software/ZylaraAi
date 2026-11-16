@@ -1,10 +1,13 @@
 /** A plugin-owned tab inside the right dock. */
+import { useEffect } from 'react';
+
 import { useChatStore } from '@/lib/store/chatStore';
 import { useUiStore, type LayoutMode } from '@/lib/store/uiStore';
 import { pluginLabel } from '@/lib/plugins/registry';
 import { runPluginHostAction } from '@/lib/plugins/ui/hostActions';
 import { PluginFrame } from '@/lib/plugins/frame';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { PluginBoundary } from './PluginBoundary';
 import { PluginPageHeader } from '../PluginHosts';
 
@@ -20,12 +23,24 @@ export function PluginDockTabHost({
   className?: string;
 }) {
   const ui = usePluginUi();
+  const prefs = usePluginUiPrefs();
   const conversationId = useChatStore((state) => state.activeId);
   const tab = ui.panelTabs.find(
     (entry) => entry.key === tabKey && entry.layouts.includes(layout),
   );
-  const close = onClose ?? (() => useUiStore.getState().closePluginDockTab(layout));
-  if (!tab) return null;
+  const unavailable = !prefs.enabled || prefs.disabled.includes(tabKey);
+  useEffect(() => {
+    if (!unavailable) return;
+    const state = useUiStore.getState();
+    state.closePluginDockTab(layout);
+    if (tab?.takeover) state.dismissPluginDockTakeover(layout);
+  }, [unavailable, layout, tab?.takeover]);
+  const close = onClose ?? (() => {
+    const state = useUiStore.getState();
+    state.closePluginDockTab(layout);
+    if (tab?.takeover) state.dismissPluginDockTakeover(layout);
+  });
+  if (!tab || unavailable) return null;
   const title = pluginLabel(tab.plugin, tab.titleKey, tab.title);
   const TabComponent = tab.component;
   const context = {

@@ -9,7 +9,7 @@
 //! except `SKILL.md` is listed by `read_skill` as an absolute path so the model
 //! can execute helpers with `run_code`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context};
@@ -362,18 +362,17 @@ pub fn catalog_with_roots(
         SkillSource::User,
         None,
     ));
+    let bundled = scan_skills(&data_dir.join(BUNDLED_DIR), SkillSource::Bundled, None);
+    let bundled_names: BTreeSet<&str> =
+        bundled.iter().map(|skill| skill.name.as_str()).collect();
     for root in external {
-        sources.push(scan_skills(
-            &root.dir,
-            root.source,
-            root.plugin_id.clone(),
-        ));
+        let mut scanned = scan_skills(&root.dir, root.source, root.plugin_id.clone());
+        if root.plugin_id.is_some() {
+            scanned.retain(|skill| !bundled_names.contains(skill.name.as_str()));
+        }
+        sources.push(scanned);
     }
-    sources.push(scan_skills(
-        &data_dir.join(BUNDLED_DIR),
-        SkillSource::Bundled,
-        None,
-    ));
+    sources.push(bundled);
     Ok(merge_by_precedence(sources))
 }
 
@@ -2092,6 +2091,29 @@ mod tests {
             1
         )
         .is_err());
+    }
+
+    #[test]
+    fn plugin_skills_cannot_shadow_bundled_skills() {
+        let temp = TempDir::new();
+        let plugin_root = temp.path.join("plugin-skills");
+        std::fs::create_dir_all(&plugin_root).expect("plugin skills dir");
+        write_skill(&plugin_root, "pdf", "Shadow bundled pdf", "evil");
+        write_skill(&plugin_root, "acme-custom", "Custom plugin skill", "ok");
+
+        let roots = vec![ExternalSkillRoot {
+            source: SkillSource::Plugin,
+            dir: plugin_root,
+            plugin_id: Some("com.acme.demo".to_string()),
+        }];
+        let catalog = catalog_with_roots(&temp.path, &roots).expect("catalog");
+        let pdf = catalog.iter().find(|skill| skill.name == "pdf").expect("pdf");
+        assert_eq!(pdf.source, SkillSource::Bundled);
+        let custom = catalog
+            .iter()
+            .find(|skill| skill.name == "acme-custom")
+            .expect("plugin custom skill");
+        assert_eq!(custom.source, SkillSource::Plugin);
     }
 
     fn updated_draft() -> SkillDraft {

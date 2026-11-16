@@ -115,6 +115,15 @@ pub fn install_plugin_folder(
     path: String,
     granted_permissions: Option<Vec<String>>,
 ) -> Result<PluginRecord, String> {
+    let existing = manager(&state)
+        .inspect_dev_folder(std::path::Path::new(&path))
+        .ok()
+        .map(|inspection| inspection.manifest.id)
+        .and_then(|id| manager(&state).record(&id))
+        .is_some();
+    if existing && !state.active_turns().is_empty() {
+        return Err(active_turn_error("updating a plugin"));
+    }
     manager(&state)
         .install_dev_folder(std::path::Path::new(&path), granted_permissions)
         .map_err(to_error)
@@ -315,17 +324,6 @@ pub fn take_plugin_deep_link() -> Option<String> {
 #[tauri::command]
 pub fn get_plugin_locales(state: State<'_, AppState>) -> PluginLocaleBundle {
     manager(&state).locale_bundle()
-}
-
-#[tauri::command]
-pub fn get_plugin_themes(
-    state: State<'_, AppState>,
-) -> Vec<serde_json::Value> {
-    manager(&state)
-        .theme_contributions()
-        .into_iter()
-        .map(|(plugin_id, theme)| serde_json::json!({ "pluginId": plugin_id, "theme": theme }))
-        .collect()
 }
 
 #[tauri::command]

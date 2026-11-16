@@ -46,6 +46,7 @@
     "inactive": "inactive",
     "activationRequired": "installed by the agent — review and activate",
     "permissionsIncomplete": "permissions incomplete",
+    "userDisabled": "disabled by the user",
     "toggleAria": "Enable or disable {{name}}"
   },
   "empty": {

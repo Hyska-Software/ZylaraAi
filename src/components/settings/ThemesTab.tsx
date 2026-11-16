@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { confirm, open } from '@tauri-apps/plugin-dialog';
-import { FolderOpen, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { FolderOpen, Plus, Puzzle, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { BrandMark } from '@/components/chat/BrandMark';
@@ -208,6 +208,9 @@ export function ThemesTab() {
               {themes.map((entry) => {
                 const active = entry.id === activeId;
                 const meta = [
+                  entry.pluginName
+                    ? t('themes.pluginFrom', { name: entry.pluginName })
+                    : null,
                   entry.author ? t('themes.meta.by', { author: entry.author }) : null,
                   entry.version ? t('themes.meta.version', { version: entry.version }) : null,
                 ]
@@ -253,9 +256,17 @@ export function ThemesTab() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold text-foreground">
-                        {displayName(entry)}
-                      </p>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <p className="truncate text-[13px] font-semibold text-foreground">
+                          {displayName(entry)}
+                        </p>
+                        {entry.pluginId ? (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+                            <Puzzle aria-hidden className="size-2.5" strokeWidth={2} />
+                            {t('themes.pluginBadge')}
+                          </span>
+                        ) : null}
+                      </div>
                       {meta ? (
                         <p className="mt-0.5 truncate text-[11px] text-foreground-subtle">{meta}</p>
                       ) : null}
@@ -275,7 +286,7 @@ export function ThemesTab() {
                       >
                         {active ? t('themes.actions.active') : t('themes.actions.use')}
                       </Button>
-                      {entry.builtIn ? null : (
+                      {entry.builtIn || entry.pluginId ? null : (
                         <IconButton
                           label={t('themes.actions.removeAria', { name: displayName(entry) })}
                           variant="ghost"

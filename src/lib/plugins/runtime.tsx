@@ -183,7 +183,12 @@ export function PluginRuntime() {
 
   useEffect(() => {
     const trustedPlugins = snapshot.plugins.filter(
-      (plugin) => plugin.active && plugin.enabled && plugin.trusted,
+      (plugin) =>
+        plugin.active &&
+        plugin.enabled &&
+        plugin.trusted &&
+        snapshot.pluginsEnabled &&
+        !snapshot.safeMode,
     );
     const activeIds = new Set(trustedPlugins.map((plugin) => plugin.id));
     for (const pluginId of [...backendRequested]) {

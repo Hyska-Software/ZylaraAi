@@ -5,20 +5,17 @@
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Puzzle, X } from 'lucide-react';
+import { ArrowLeft, Puzzle } from 'lucide-react';
 
-import { useChatStore, useUiStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
-import { usePluginStore } from '@/lib/plugins/store';
 import {
   pluginLabel,
   usePluginRegistry,
-  viewByKey,
-  panelByKey,
   type ResolvedArtifactViewer,
 } from '@/lib/plugins/registry';
 import { PluginFrame, reportPluginFailure } from '@/lib/plugins/frame';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { Slot } from './ui/Slot';
 import type { ArtifactContent } from '@/lib/types';
 import type { PluginRecord } from '@/lib/plugins/types';
@@ -128,137 +125,11 @@ export function PluginPageHeader({
   );
 }
 
-export function PluginViewHost() {
-  const { t } = useTranslation('plugins');
-  const active = usePluginStore((state) => state.activeView);
-  const close = usePluginStore((state) => state.closeOverlays);
-  usePluginRegistry();
-  const conversationId = useChatStore((state) => state.activeId);
-  const layoutMode = useUiStore((state) => state.layoutMode);
-  const resolved = viewByKey(active ? `${active.pluginId}:${active.id}` : null);
-  if (!active || !resolved) return null;
-  const { plugin, view } = resolved;
-  if (view.surface !== 'global' && view.surface !== layoutMode) return null;
-  const title = pluginLabel(plugin, view.titleKey, view.title);
-  const subtitle = pluginLabel(plugin, view.descriptionKey, view.description ?? plugin.name);
-  const context = { conversationId, layoutMode, pluginId: plugin.id, viewId: view.id };
-  return (
-    <div className="flex h-full min-h-0 flex-col bg-background" data-plugin-view={resolved.key}>
-      <PluginPageHeader
-        title={title}
-        subtitle={subtitle}
-        pluginId={plugin.id}
-        onClose={close}
-      />
-      <div className="min-h-0 flex-1">
-        {resolved.component ? (
-          (() => {
-            const Component = resolved.component;
-            return (
-              <PluginContributionBoundary plugin={plugin}>
-                <Component
-                  plugin={plugin}
-                  view={view}
-                  context={context}
-                  className="h-full min-h-0"
-                />
-              </PluginContributionBoundary>
-            );
-          })()
-        ) : view.entry ? (
-          <PluginFrame
-            plugin={plugin}
-            entry={view.entry}
-            kind="view"
-            title={title}
-            context={context}
-            className="h-full min-h-0"
-            maxHeight={100_000}
-            minHeight={320}
-          />
-        ) : (
-          <div className="p-6 text-[13px] text-foreground-muted">
-            {t('host.viewUnavailable')}
-          </div>
-        )}
-      </div>
-      <div className="shrink-0 border-t border-border px-3 py-2">
-        <PluginSlot
-          slot="plugins.detail.actions"
-          context={{ ...context, pluginId: plugin.id }}
-          compact
-          onlyPluginId={plugin.id}
-        />
-      </div>
-    </div>
-  );
-}
-
-export function PluginPanelHost() {
-  const { t } = useTranslation('plugins');
-  const active = usePluginStore((state) => state.activePanel);
-  const close = usePluginStore((state) => state.closeOverlays);
-  usePluginRegistry();
-  const conversationId = useChatStore((state) => state.activeId);
-  const layoutMode = useUiStore((state) => state.layoutMode);
-  const resolved = panelByKey(active ? `${active.pluginId}:${active.id}` : null);
-  if (!active || !resolved) return null;
-  const { plugin, panel } = resolved;
-  const title = pluginLabel(plugin, panel.titleKey, panel.title);
-  const context = { conversationId, layoutMode, pluginId: plugin.id, panelId: panel.id };
-  return (
-    <aside
-      className="relative flex h-full min-h-0 w-[340px] max-w-[45vw] shrink-0 flex-col border-l border-border bg-surface"
-      aria-label={title}
-      data-plugin-panel={resolved.key}
-    >
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[12px] font-semibold text-foreground">{title}</h2>
-          <p className="truncate text-[10.5px] text-foreground-subtle">{plugin.name}</p>
-        </div>
-        <button
-          type="button"
-          onClick={close}
-          aria-label={t('host.close')}
-          title={t('host.close')}
-          className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-        >
-          <X aria-hidden className="size-4" strokeWidth={2} />
-        </button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-hidden">
-        {resolved.component ? (
-          (() => {
-            const Component = resolved.component;
-            return (
-              <PluginContributionBoundary plugin={plugin}>
-                <Component plugin={plugin} panel={panel} context={context} className="h-full" />
-              </PluginContributionBoundary>
-            );
-          })()
-        ) : panel.entry ? (
-          <PluginFrame
-            plugin={plugin}
-            entry={panel.entry}
-            kind="panel"
-            title={title}
-            context={context}
-            className="h-full"
-            maxHeight={100_000}
-            minHeight={320}
-          />
-        ) : (
-          <div className="p-4 text-[12px] text-foreground-muted">{t('host.panelUnavailable')}</div>
-        )}
-      </div>
-    </aside>
-  );
-}
-
 export function PluginSettingsTabPanel({ tabKey }: { tabKey: string }) {
   const { t } = useTranslation('plugins');
   const registry = usePluginRegistry();
+  const enabled = usePluginUiPrefs((state) => state.enabled);
+  if (!enabled) return null;
   const tab = registry.settingsTabs.find((candidate) => candidate.key === tabKey);
   if (!tab) {
     return (

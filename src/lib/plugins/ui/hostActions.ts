@@ -2,8 +2,9 @@
 import { toast } from 'sonner';
 
 import { useUiStore, type LayoutMode } from '@/lib/store/uiStore';
+import { pluginHasPermission } from '@/lib/plugins/registry';
 import type { PluginRecord } from '@/lib/plugins/types';
-import { pluginUiState } from './registry';
+import { notifyPluginUi, pluginUiState } from './registry';
 
 const LAYOUTS: LayoutMode[] = ['chat', 'code', 'agent'];
 
@@ -77,12 +78,16 @@ export function runPluginHostAction(
       return { ok: true };
     }
     case 'setBadge': {
+      if (!pluginHasPermission(plugin, 'ui.nav')) {
+        throw new Error('PLUGIN_PERMISSION_DENIED: ui.nav');
+      }
       const navId = String(params.id ?? '');
       const nav = pluginUiState().nav.find(
         (entry) => entry.pluginId === plugin.id && entry.id === navId,
       );
       if (!nav) throw new Error(`PLUGIN_NAV_MISSING: ${navId}`);
       nav.badge = typeof params.badge === 'string' ? params.badge : null;
+      notifyPluginUi();
       return { ok: true };
     }
     default:

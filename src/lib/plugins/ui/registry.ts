@@ -37,6 +37,12 @@ export function setPluginUiState(next: Omit<PluginUiState, 'revision'>): void {
   for (const listener of [...listeners]) listener();
 }
 
+/** Republishes in-place mutations (for example a nav badge) without a rebuild. */
+export function notifyPluginUi(): void {
+  state = { ...state, revision: state.revision + 1 };
+  for (const listener of [...listeners]) listener();
+}
+
 export function subscribePluginUi(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

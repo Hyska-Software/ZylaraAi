@@ -120,6 +120,8 @@
       "version": "v{{version}}",
       "by": "by {{author}}"
     },
+    "pluginBadge": "Plugin",
+    "pluginFrom": "From {{name}}",
     "loading": "Loading themes…",
     "empty": "No custom themes yet. Install a .zip package to add one.",
     "loadFailed": "Could not load the installed themes.",

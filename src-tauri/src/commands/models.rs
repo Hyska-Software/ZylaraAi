@@ -631,11 +631,7 @@ fn refreshed_at(state: &AppState) -> Option<i64> {
 pub fn catalog_view(app: &AppHandle, state: &AppState) -> CatalogView {
     let mut catalog = state.catalog_with_plugins();
     for provider in &mut catalog.providers {
-        // Plugin providers already carry their declared models; bundled
-        // providers merge the account-specific list.
-        if state.catalog.provider(&provider.id).is_some() {
-            provider.models = state.models(&provider.id);
-        }
+        provider.models = state.models(&provider.id);
     }
     let provider_ids: Vec<String> = catalog.providers.iter().map(|p| p.id.clone()).collect();
     CatalogView {

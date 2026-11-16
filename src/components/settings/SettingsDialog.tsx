@@ -5,6 +5,7 @@ import { useUiStore } from '@/lib/store';
 import { isSettingsTabId, SETTINGS_TABS } from '@/lib/settingsTabs';
 import { pluginIcon } from '@/lib/plugins/icons';
 import { pluginLabel, usePluginRegistry } from '@/lib/plugins/registry';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { PluginSettingsTabPanel } from '@/components/plugins/PluginHosts';
 import {
   Button,
@@ -47,8 +48,10 @@ export function SettingsDialog() {
   const tab = useUiStore((state) => state.settingsTab);
   const setTab = useUiStore((state) => state.setSettingsTab);
   const registry = usePluginRegistry();
+  const pluginUiEnabled = usePluginUiPrefs((state) => state.enabled);
+  const pluginTabs = pluginUiEnabled ? registry.settingsTabs : [];
   const active = SETTINGS_TABS.find((entry) => entry.id === tab);
-  const activePluginTab = registry.settingsTabs.find(
+  const activePluginTab = pluginTabs.find(
     (entry) => `plugin:${entry.key}` === tab,
   );
   const headerLabel = active
@@ -94,7 +97,7 @@ export function SettingsDialog() {
                   </TabsTrigger>
                 );
               })}
-              {registry.settingsTabs.map((entry) => {
+              {pluginTabs.map((entry) => {
                 const Icon = pluginIcon(entry.tab.icon);
                 return (
                   <TabsTrigger
@@ -161,7 +164,7 @@ export function SettingsDialog() {
                   <TabsContent value="about">
                     <AboutTab />
                   </TabsContent>
-                  {registry.settingsTabs.map((entry) => (
+                  {pluginTabs.map((entry) => (
                     <TabsContent key={`plugin:${entry.key}`} value={`plugin:${entry.key}`}>
                       <PluginSettingsTabPanel tabKey={entry.key} />
                     </TabsContent>

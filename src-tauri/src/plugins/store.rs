@@ -681,7 +681,8 @@ impl PluginManager {
             .any(|entry| entry.id == id && entry.version == version)
     }
 
-    fn apply_revocations(&self, index: &RegistryIndex) -> Result<()> {
+    pub(crate) fn apply_revocations(&self, index: &RegistryIndex) -> Result<()> {
+        let mut changed = false;
         for entry in &index.revoked {
             if let Some(stored) = self.db().plugin_get(&entry.id)? {
                 if stored.version == entry.version && stored.enabled {
@@ -696,8 +697,13 @@ impl PluginManager {
                     let _ = self
                         .db()
                         .plugin_audit(&entry.id, "revocation", None, "disabled");
+                    changed = true;
                 }
             }
+        }
+        if changed {
+            self.reload();
+            self.emit_changed();
         }
         Ok(())
     }

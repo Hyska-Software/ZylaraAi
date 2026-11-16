@@ -152,14 +152,14 @@
           "id": "acme-paper",
           "name": "Acme paper",
           "light": {
-            "--accent": "#8b5cf6",
-            "--accent-soft": "#ede9fe",
-            "--surface": "#faf9ff"
+            "accent": "#8b5cf6",
+            "accent-soft": "#ede9fe",
+            "surface": "#faf9ff"
           },
           "dark": {
-            "--accent": "#a78bfa",
-            "--accent-soft": "#2e1f4d",
-            "--surface": "#17131f"
+            "accent": "#a78bfa",
+            "accent-soft": "#2e1f4d",
+            "surface": "#17131f"
           }
         }
       ]

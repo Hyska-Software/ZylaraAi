@@ -46,6 +46,7 @@
     "inactive": "inactivo",
     "activationRequired": "instalado por el agente — revísalo y actívalo",
     "permissionsIncomplete": "permisos incompletos",
+    "userDisabled": "desactivado por el usuario",
     "toggleAria": "Activar o desactivar {{name}}"
   },
   "empty": {
