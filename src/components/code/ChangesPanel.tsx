@@ -858,87 +858,9 @@ export function ChangesPanel({
   return (
     <div className={cn('flex h-full min-h-0 flex-col', className)}>
       {detail ?? (
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {gitError ? (
-          <div
-            role="alert"
-            className="flex items-start gap-2 border-b border-border bg-danger-soft px-3 py-2 text-[11.5px] text-danger"
-          >
-            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
-            <span>{gitError}</span>
-          </div>
-        ) : null}
-
-        {gitStatus && !gitStatus.isRepo ? (
-          <div className="flex items-start gap-2 border-b border-border bg-surface px-3 py-2 text-[11.5px] text-foreground-muted">
-            <GitBranch aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
-            <span>
-              <span className="font-medium text-foreground">{t('code:changes.notRepoTitle')}</span>{' '}
-              {t('code:changes.notRepoDescription')}
-            </span>
-          </div>
-        ) : null}
-
-        {conflicted ? (
-          <div
-            role="alert"
-            className="flex items-start gap-2 border-b border-border bg-warning-soft px-3 py-2 text-[11.5px] text-warning"
-          >
-            <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
-            <span>{t('code:changes.conflicts')}</span>
-          </div>
-        ) : null}
-
-        {sessionError ? (
-          <div
-            role="alert"
-            className="flex items-start gap-2 border-b border-border bg-danger-soft px-3 py-2 text-[11.5px] text-danger"
-          >
-            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
-            <span>{sessionError}</span>
-          </div>
-        ) : null}
-
-        {filterKind === 'commit' && commitError ? (
-          <div
-            role="alert"
-            className="flex items-start gap-2 border-b border-border bg-danger-soft px-3 py-2 text-[11.5px] text-danger"
-          >
-            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
-            <span className="min-w-0 flex-1">{commitError}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 shrink-0 px-2 text-[11px]"
-              onClick={() => {
-                if (filterCommitHash) void loadCommit(filterCommitHash);
-              }}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        ) : null}
-
-        {filterKind === 'branch' && branchError ? (
-          <div
-            role="alert"
-            className="flex items-start gap-2 border-b border-border bg-danger-soft px-3 py-2 text-[11.5px] text-danger"
-          >
-            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
-            <span className="min-w-0 flex-1">{branchError}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 shrink-0 px-2 text-[11px]"
-              onClick={() => {
-                if (filterBranchBase) void loadBranch(filterBranchBase);
-              }}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        ) : null}
-
+      <div className="flex min-h-0 flex-1 flex-col">
+        {/* Toolbar stays outside the scroll area: it must not scroll with the
+            list nor count towards the empty-state height. */}
         {isRepo ? (
           <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border px-2">
             <ChangesFilterMenu
@@ -994,9 +916,89 @@ export function ChangesPanel({
             ) : null}
           </div>
         ) : null}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {gitError ? (
+          <div
+            role="alert"
+            className="flex shrink-0 items-start gap-2 border-b border-border bg-danger-soft px-3 py-2 text-[11.5px] text-danger"
+          >
+            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
+            <span>{gitError}</span>
+          </div>
+        ) : null}
+
+        {gitStatus && !gitStatus.isRepo ? (
+          <div className="flex shrink-0 items-start gap-2 border-b border-border bg-surface px-3 py-2 text-[11.5px] text-foreground-muted">
+            <GitBranch aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
+            <span>
+              <span className="font-medium text-foreground">{t('code:changes.notRepoTitle')}</span>{' '}
+              {t('code:changes.notRepoDescription')}
+            </span>
+          </div>
+        ) : null}
+
+        {conflicted ? (
+          <div
+            role="alert"
+            className="flex shrink-0 items-start gap-2 border-b border-border bg-warning-soft px-3 py-2 text-[11.5px] text-warning"
+          >
+            <TriangleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
+            <span>{t('code:changes.conflicts')}</span>
+          </div>
+        ) : null}
+
+        {sessionError ? (
+          <div
+            role="alert"
+            className="flex shrink-0 items-start gap-2 border-b border-border bg-danger-soft px-3 py-2 text-[11.5px] text-danger"
+          >
+            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
+            <span>{sessionError}</span>
+          </div>
+        ) : null}
+
+        {filterKind === 'commit' && commitError ? (
+          <div
+            role="alert"
+            className="flex shrink-0 items-start gap-2 border-b border-border bg-danger-soft px-3 py-2 text-[11.5px] text-danger"
+          >
+            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="min-w-0 flex-1">{commitError}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 shrink-0 px-2 text-[11px]"
+              onClick={() => {
+                if (filterCommitHash) void loadCommit(filterCommitHash);
+              }}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        ) : null}
+
+        {filterKind === 'branch' && branchError ? (
+          <div
+            role="alert"
+            className="flex shrink-0 items-start gap-2 border-b border-border bg-danger-soft px-3 py-2 text-[11.5px] text-danger"
+          >
+            <CircleAlert aria-hidden className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="min-w-0 flex-1">{branchError}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 shrink-0 px-2 text-[11px]"
+              onClick={() => {
+                if (filterBranchBase) void loadBranch(filterBranchBase);
+              }}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        ) : null}
 
         {loading && visibleRows.length === 0 && !commitError && !branchError ? (
-          <div aria-hidden className="space-y-1.5 p-2">
+          <div aria-hidden className="shrink-0 space-y-1.5 p-2">
             {[0, 1, 2, 3].map((row) => (
               <div
                 key={row}
@@ -1006,7 +1008,7 @@ export function ChangesPanel({
             ))}
           </div>
         ) : visibleRows.length === 0 && !commitError && !branchError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 py-8 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6 py-8 text-center">
             <FileDiff aria-hidden className="size-5 text-foreground-subtle" strokeWidth={1.75} />
             <p className="text-[12.5px] font-medium text-foreground">{emptyCopy.title}</p>
             <p className="max-w-64 text-[12px] leading-relaxed text-foreground-muted">
@@ -1026,7 +1028,7 @@ export function ChangesPanel({
             ) : null}
           </div>
         ) : (
-          <div>
+          <div className="shrink-0">
             {sections.map(({ group: groupId, rows: groupRows }) => {
               const label =
                 groupId === 'commit' && activeFilter.kind === 'commit'
@@ -1132,6 +1134,7 @@ export function ChangesPanel({
             })}
           </div>
         )}
+        </div>
       </div>
       )}
 

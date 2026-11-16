@@ -102,7 +102,7 @@ export function ChangesFilterMenu({
           aria-label={t('code:changesFilter.aria')}
           title={label}
           className={cn(
-            'h-7 min-w-0 gap-1 px-2 text-[11.5px] font-medium',
+            'h-7 min-w-0 justify-start gap-1 px-2 text-[11.5px] font-medium',
             className,
           )}
         >
