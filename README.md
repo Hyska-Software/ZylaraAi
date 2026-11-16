@@ -70,6 +70,9 @@ pnpm brand
 
 Regera `public/brand/*.svg`, o master `app-icon.png`, `src-tauri/icons` com fundo
 transparente no Windows/Linux e o `icon.icns` do macOS com o tile grafite-claro.
+Também reescreve as camadas tipadas do símbolo usadas pelo tema ativo em
+`src/components/chat/brandMarkArt.ts` (`node scripts/build-brand.mjs --skip-icons`
+regera só os vetores e esse módulo).
 
 Build de produção e instalador (script único, sempre com a build mais recente):
 

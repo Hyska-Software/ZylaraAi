@@ -18,8 +18,9 @@ Princípios:
 | Nome | Zylara |
 | Símbolo | mascote roedor estilizado em violeta `#5E34FB`, com orelhas arredondadas, olho escuro, focinho lilás `#EADFFC` com nariz em Y e pata lilás sobre a barriga |
 | Ícone | Windows/Linux: o símbolo recortado sobre **fundo transparente**, com ~7% de respiro nas laterais; macOS, favicon e instalador: o mesmo símbolo sobre tile grafite-claro `#EBEBEB` (cantos arredondados, bordas transparentes) |
-| Arquivos | `assets/Zylara_Logo.svg` (original); vetores usados pelo app em `public/brand/zylara-tile.svg` e `public/brand/zylara-mark.svg`; `assets/app-icon.svg` (master quadrado transparente) gera `app-icon.png` (1024×1024) e `src-tauri/icons` com `pnpm brand` |
+| Arquivos | `assets/Zylara_Logo.svg` (original); vetores usados pelo app em `public/brand/zylara-tile.svg` e `public/brand/zylara-mark.svg`; `assets/app-icon.svg` (master quadrado transparente) gera `app-icon.png` (1024×1024) e `src-tauri/icons` com `pnpm brand`, que também regenera as camadas tipadas do símbolo em `src/components/chat/brandMarkArt.ts` |
 | Uso | tile → favicon, UI do instalador e ícone do macOS; marca sem fundo → titlebar, avatar do assistente, boas-vindas, splash, Sobre e ícones do Windows/Linux |
+| Tema | no tema embutido **Zylara** (claro e escuro) o símbolo mantém as cores oficiais; em qualquer outro tema ele assume a cor principal (`accent` no corpo, `background` nos recortes do focinho/orelhas/pata e `foreground` no olho). O tile, o favicon e os ícones do SO nunca são recoloridos |
 | Voz | português brasileiro, direta, sem excesso de exclamações; termos técnicos em inglês quando consagrados |
 
 ## 3. Paleta (tokens em `src/styles/globals.css`)
@@ -42,7 +43,7 @@ Princípios:
 | danger | `#dc2626` | `#f87171` |
 | user-bubble | `#f2f2f4` | `#242429` |
 
-Regras: nunca usar hex solto em componentes — sempre `bg-background`, `text-foreground-muted`, `divide-border`, etc. **Nenhum elemento desenha contorno sólido** (`border` sem lado, `outline` estático ou anel usado como moldura): a contenção vem do contraste entre `background` → `surface` → `surface-hover`/`surface-raised`. `border`/`border-strong` existem apenas para divisores de 1px (`border-t|b|l|r|x|y`, `divide-*`, `hr`, `Separator`), barras de rolagem, trilho do slider e o grid do calendário. Exceções: anéis transitórios de `:focus-visible` e o trilho animado do composer. GenUI e Markdown mantêm as molduras que já tinham. A marca é servida como asset vetorial (`public/brand/`, ver §2) e não recebe recolorização por tema; o botão de enviar ativo e o estado "pensando" usam apenas `accent`/`accent-soft`.
+Regras: nunca usar hex solto em componentes — sempre `bg-background`, `text-foreground-muted`, `divide-border`, etc. **Nenhum elemento desenha contorno sólido** (`border` sem lado, `outline` estático ou anel usado como moldura): a contenção vem do contraste entre `background` → `surface` → `surface-hover`/`surface-raised`. `border`/`border-strong` existem apenas para divisores de 1px (`border-t|b|l|r|x|y`, `divide-*`, `hr`, `Separator`), barras de rolagem, trilho do slider e o grid do calendário. Exceções: anéis transitórios de `:focus-visible` e o trilho animado do composer. GenUI e Markdown mantêm as molduras que já tinham. A marca é servida como asset vetorial (`public/brand/`, ver §2): no tema embutido Zylara as cores oficiais são preservadas e, em qualquer outro tema, o símbolo é recolorizado pelos tokens (`BrandMark` com `tint="theme"` — corpo em `accent`, recortes em `background`, olho em `foreground`; `tint="brand"` força a arte oficial, como no card do tema padrão em Configurações › Temas). O botão de enviar ativo e o estado "pensando" usam apenas `accent`/`accent-soft`.
 
 ## 4. Tipografia
 

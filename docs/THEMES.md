@@ -114,6 +114,8 @@ Obrigatórios nos dois modos (todos cores):
 
 As cores de borda (`border`, `border-strong`) **não desenham molduras**: o app não usa contorno fechado em nenhum elemento. Elas alimentam divisores de 1px (`divide-*`, `border-b`, `hr`, `Separator`), barras de rolagem, o trilho do slider e o grid do calendário. A separação entre blocos vem do contraste de superfície, então `background`, `surface`, `surface-raised` e `surface-hover` precisam ser visivelmente distintas entre si nos dois modos — um tema com superfícies iguais deixa os blocos sem contorno visível.
 
+O símbolo do app (titlebar, boas-vindas, splash, avatar do assistente e Sobre) acompanha a marca do tema: o corpo usa `accent`, os recortes do focinho/orelhas/pata usam `background` e o olho usa `foreground`. O tema embutido Zylara mantém a arte oficial, e o tile, o favicon e os ícones do sistema nunca são recoloridos.
+
 Opcionais:
 
 - Cores: `accent-ring`, `context-system`, `context-tools`, `context-messages`, `assistant-bubble`, `terminal-ansi-{black,red,green,yellow,blue,magenta,cyan,white}` e `terminal-ansi-bright-{black,red,green,yellow,blue,magenta,cyan,white}`.
@@ -192,7 +194,7 @@ O ZIP precisa ter `theme.json` na raiz **ou** uma única pasta contendo `theme.j
 ### Checklist antes de publicar
 
 - [ ] O ZIP instala sem erro e o card aparece em Temas.
-- [ ] **Usar** altera superfícies, texto, accent e raios.
+- [ ] **Usar** altera superfícies, texto, accent, raios e a cor do símbolo do app.
 - [ ] Claro, Escuro e Sistema mostram as duas paletas corretamente.
 - [ ] Fontes e wallpaper aparecem quando configurados; sem eles, o tema continua legível.
 - [ ] Reiniciar o app mantém o tema ativo.

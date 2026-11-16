@@ -2,9 +2,21 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { BRAND_MARK_BOX, BRAND_MARK_PATHS } from '@/components/chat/brandMarkArt';
+
 const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8');
 const pathsOf = (svg: string) =>
   [...svg.matchAll(/<path[^>]*\sd="([^"]+)"[^>]*>/g)].map((match) => match[1]);
+
+/** Official fills → the layer tone used by the themed rendering. */
+const TONE_BY_FILL = new Map([
+  ['#5e34fb', 'body'],
+  ['#5e34fa', 'body'],
+  ['#eadffc', 'detail'],
+  ['#e9defc', 'detail'],
+  ['#e8defc', 'detail'],
+  ['#0f0f0f', 'eye'],
+]);
 
 const source = read('../../../assets/Zylara_Logo.svg');
 const mark = read('../../../public/brand/zylara-mark.svg');
@@ -55,5 +67,27 @@ describe('brand assets', () => {
     expect({ width, height }).toEqual({ width: 1024, height: 1024 });
     expect(bitDepth).toBe(8);
     expect(colorType).toBe(6);
+  });
+
+  it('mantém a arte do renderer idêntica ao símbolo oficial', () => {
+    const layers = [...mark.matchAll(/<path\b[^>]*>/g)].map(([element]) => ({
+      d: element.match(/\sd="([^"]+)"/)?.[1] ?? '',
+      fill: (element.match(/fill:(#[0-9a-f]{6})/i)?.[1] ?? '').toLowerCase(),
+    }));
+
+    expect(layers).toHaveLength(11);
+    expect(BRAND_MARK_PATHS.map((path) => path.d)).toEqual(layers.map((layer) => layer.d));
+    // A camada de cada path vem do preenchimento oficial: corpo, recortes e olho.
+    expect(BRAND_MARK_PATHS.map((path) => path.tone)).toEqual(
+      layers.map((layer) => TONE_BY_FILL.get(layer.fill) ?? `preenchimento desconhecido: ${layer.fill}`),
+    );
+    expect(BRAND_MARK_PATHS.filter((path) => path.tone === 'body')).toHaveLength(3);
+    expect(BRAND_MARK_PATHS.filter((path) => path.tone === 'detail')).toHaveLength(7);
+    expect(BRAND_MARK_PATHS.filter((path) => path.tone === 'eye')).toHaveLength(1);
+
+    const [x, y, width, height] = (mark.match(/viewBox="([^"]+)"/)?.[1] ?? '')
+      .split(' ')
+      .map(Number);
+    expect(BRAND_MARK_BOX).toEqual({ x, y, width, height });
   });
 });

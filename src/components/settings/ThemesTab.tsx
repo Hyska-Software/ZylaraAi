@@ -233,7 +233,7 @@ export function ThemesTab() {
                     >
                       {entry.id === BUILTIN_THEME_ID ? (
                         <div className="flex h-full items-center justify-center">
-                          <BrandMark size={44} />
+                          <BrandMark size={44} tint="brand" />
                         </div>
                       ) : (
                         <div className="grid h-full grid-cols-3 grid-rows-2">
