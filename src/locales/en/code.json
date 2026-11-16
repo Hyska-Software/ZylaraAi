@@ -539,6 +539,7 @@
     "sessions_one": "{{count}} session",
     "sessions_other": "{{count}} sessions",
     "unassigned": "No workspace",
+    "newUnassignedSession": "New session without a workspace",
     "expandUnassigned": "Expand sessions without a workspace",
     "collapseUnassigned": "Collapse sessions without a workspace",
     "settings": "Settings",

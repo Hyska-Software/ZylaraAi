@@ -17,6 +17,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Plus,
   RefreshCw,
   Search,
   Settings,
@@ -1013,6 +1014,21 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     if (isCompact) onClose?.();
   };
 
+  /** Starts a session in the "No workspace" scope, regardless of the active workspace. */
+  const handleNewUnassignedSession = async () => {
+    if (creatingSession || openingFolder) return;
+    useUiStore.getState().setCodeView('session');
+    useUiStore.getState().setActiveWorkspace(null);
+    setCreatingSession(true);
+    try {
+      const conversationId = await startSession(null);
+      if (conversationId) setUnassignedCollapsed(false);
+    } finally {
+      setCreatingSession(false);
+    }
+    if (isCompact) onClose?.();
+  };
+
   /**
    * Opens a terminal in the workspace folder without creating a session: the
    * PTY runs in the project path and its tab joins the central tab strip.
@@ -1417,10 +1433,17 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
               </button>
               <h2
                 id="code-unassigned-heading"
-                className="min-w-0 truncate text-[11px] font-medium tracking-tight text-foreground-subtle"
+                className="min-w-0 flex-1 truncate text-[11px] font-medium tracking-tight text-foreground-subtle"
               >
                 {t('code:sidebar.unassigned')}
               </h2>
+              <SectionIconButton
+                label={t('code:sidebar.newUnassignedSession')}
+                disabled={creatingSession || openingFolder}
+                onClick={() => void handleNewUnassignedSession()}
+              >
+                <Plus aria-hidden className="size-3.5" strokeWidth={1.75} />
+              </SectionIconButton>
             </div>
             <div
               id="code-unassigned-sessions"

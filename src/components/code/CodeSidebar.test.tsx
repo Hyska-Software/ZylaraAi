@@ -487,6 +487,25 @@ describe('CodeSidebar — Workspaces reais', () => {
     expect(screen.getByRole('button', { name: 'Sessão órfã' })).toBeTruthy();
   });
 
+  it('cria uma sessão no grupo "Sem workspace" pelo botão +', async () => {
+    mocks.listWorkspaces.mockResolvedValue([workspace()]);
+    useUiStore.setState({ activeWorkspaceId: 'ws-1', codeView: 'skills' });
+    useChatStore.setState({
+      conversations: [conversation({ id: 'c-1', title: 'Sessão órfã', workspaceId: null })],
+    });
+    renderSidebar();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Nova sessão sem workspace' }));
+
+    await waitFor(() => expect(mocks.createConversation).toHaveBeenCalledTimes(1));
+    expect(mocks.createConversation.mock.calls[0]?.[3]).toBe('code');
+    expect(mocks.setConversationWorkspace).not.toHaveBeenCalled();
+    await waitFor(() => expect(useChatStore.getState().activeId).toBe('c-new'));
+    expect(useUiStore.getState().activeWorkspaceId).toBeNull();
+    expect(useUiStore.getState().codeView).toBe('session');
+    expect(useUiStore.getState().openSessionsByWorkspace.__sem_workspace__).toEqual(['c-new']);
+  });
+
   it('recolhe e expande o grupo "Sem workspace"', async () => {
     mocks.listWorkspaces.mockResolvedValue([workspace()]);
     useChatStore.setState({
