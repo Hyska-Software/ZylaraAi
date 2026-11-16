@@ -1446,7 +1446,7 @@ pub struct Settings {
     pub thinking_collapsed_by_default: bool,
     pub font_scale: f32,
     /// Custom font stack for the integrated terminal (CSS font-family list).
-    /// Empty follows the theme's monospace token (`--font-mono`).
+    /// Empty means the bundled JetBrains Mono stack.
     pub terminal_font_family: String,
     /// Integrated terminal font size in px (TERMINAL_FONT_SIZE_MIN..=MAX).
     pub terminal_font_size: u32,

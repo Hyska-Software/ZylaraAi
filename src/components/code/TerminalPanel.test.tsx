@@ -68,6 +68,7 @@ vi.mock('sonner', () => ({ toast: toastMock }));
 import { useAppStore, useChatStore, useUiStore } from '@/lib/store';
 import { TerminalPanel } from './TerminalPanel';
 import { __resetTerminalManagerForTests } from './terminalManager';
+import { TERMINAL_DEFAULT_FONT_FAMILY } from './terminalTheme';
 
 class ResizeObserverStub {
   observe() {}
@@ -171,7 +172,10 @@ describe('TerminalPanel', () => {
     });
 
     await waitFor(() => {
-      expect(xtermRegistry.options[0]?.fontFamily).toBe('Fira Code');
+      // A preference without a generic family keeps JetBrains Mono as its fallback.
+      expect(xtermRegistry.options[0]?.fontFamily).toBe(
+        `Fira Code, ${TERMINAL_DEFAULT_FONT_FAMILY}`,
+      );
       expect(xtermRegistry.options[0]?.fontSize).toBe(18);
     });
   });

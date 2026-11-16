@@ -83,7 +83,7 @@ describe('TerminalTab — tipografia do terminal', () => {
 
     expect(screen.getByText('Aparência do terminal')).toBeTruthy();
     expect(familyInput().value).toBe('');
-    expect(familyInput().getAttribute('placeholder')).toBe('Padrão do tema');
+    expect(familyInput().getAttribute('placeholder')).toBe('JetBrains Mono Variable');
     expect(sizeSlider().value).toBe('12');
     expect(screen.getByText('12px')).toBeTruthy();
   });
@@ -102,7 +102,7 @@ describe('TerminalTab — tipografia do terminal', () => {
     expect(useAppStore.getState().settings.terminalFontFamily).toBe('Fira Code');
   });
 
-  it('limpar o campo volta a usar a fonte do tema', async () => {
+  it('limpar o campo volta a usar o JetBrains Mono embutido', async () => {
     useAppStore.setState({ settings: settings({ terminalFontFamily: 'Fira Code' }) });
 
     render(<TerminalTab />);

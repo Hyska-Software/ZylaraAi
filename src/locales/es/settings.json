@@ -64,8 +64,8 @@
     },
     "fontFamily": {
       "label": "Familia de la fuente",
-      "description": "Lista CSS de font-family. Déjalo vacío para usar la fuente monoespaciada del tema.",
-      "placeholder": "Predeterminado del tema",
+      "description": "Lista CSS de font-family. Déjalo vacío para usar el JetBrains Mono incluido.",
+      "placeholder": "JetBrains Mono Variable",
       "aria": "Familia de la fuente del terminal"
     },
     "fontSize": {

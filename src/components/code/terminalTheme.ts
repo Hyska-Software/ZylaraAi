@@ -32,8 +32,30 @@ const FALLBACK_THEME: ITheme = {
   brightWhite: '#ffffff',
 };
 
-const FONT_FALLBACK =
+/**
+ * Bundled monospace stack of the terminal. It is the terminal's own default
+ * (it does not follow `--font-mono`), so neither a theme nor a stale preference
+ * can replace JetBrains Mono behind the user's back.
+ */
+export const TERMINAL_DEFAULT_FONT_FAMILY =
   "'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', 'Fira Code', monospace";
+
+/** Generic CSS families that already terminate a valid font stack. */
+const GENERIC_FAMILIES = new Set([
+  'monospace',
+  'ui-monospace',
+  'system-ui',
+  'sans-serif',
+  'serif',
+  'cursive',
+  'fantasy',
+]);
+
+/** True when the stack ends in a generic family (`Fira Code, monospace`). */
+function endsWithGenericFamily(stack: string): boolean {
+  const last = stack.split(',').pop()?.trim().replace(/^['"]+|['"]+$/g, '').toLowerCase() ?? '';
+  return GENERIC_FAMILIES.has(last);
+}
 
 function readToken(name: string, fallback: string): string {
   if (typeof document === 'undefined') return fallback;
@@ -84,12 +106,16 @@ export function buildTerminalTheme(): ITheme {
   };
 }
 
-/** Monospace stack shared with the rest of the code surfaces; a non-empty
- * custom stack wins over the theme token. */
+/**
+ * Terminal font stack. An empty preference keeps the bundled JetBrains Mono
+ * stack (the terminal never follows the theme token); a non-empty preference
+ * wins, and when it has no generic family JetBrains Mono stays as its fallback
+ * so a missing font cannot degrade the terminal to the browser default.
+ */
 export function terminalFontFamily(custom?: string): string {
   const trimmed = custom?.trim();
-  if (trimmed) return trimmed;
-  return readToken('--font-mono', FONT_FALLBACK);
+  if (!trimmed) return TERMINAL_DEFAULT_FONT_FAMILY;
+  return endsWithGenericFamily(trimmed) ? trimmed : `${trimmed}, ${TERMINAL_DEFAULT_FONT_FAMILY}`;
 }
 
 /** Cursor blink and the running indicator should respect reduced motion. */

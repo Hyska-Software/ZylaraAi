@@ -2235,7 +2235,7 @@ export interface Settings {
    */
   thinkingCollapsedByDefault: boolean;
   fontScale: number;
-  /** Custom font stack for the code terminal; empty = theme mono (`--font-mono`). */
+  /** Custom font stack for the code terminal; empty = the bundled JetBrains Mono stack. */
   terminalFontFamily?: string;
   /** Terminal font size in px (8–32). */
   terminalFontSize?: number;

@@ -64,8 +64,8 @@
     },
     "fontFamily": {
       "label": "Font family",
-      "description": "CSS font-family list. Leave empty to use the theme's monospace stack.",
-      "placeholder": "Theme default",
+      "description": "CSS font-family list. Leave empty to use the bundled JetBrains Mono stack.",
+      "placeholder": "JetBrains Mono Variable",
       "aria": "Terminal font family"
     },
     "fontSize": {

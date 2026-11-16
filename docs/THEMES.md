@@ -125,7 +125,7 @@ Tokens ausentes e opcionais preservam o valor embutido correspondente ao modo at
 
 ### Fontes
 
-`fonts.sans` e `fonts.mono` são opcionais e apontam para arquivos `woff2`, `woff`, `ttf` ou `otf` (até 4 MB cada). A fonte é registrada com um nome interno do tema e usada pela interface e pelo terminal; se o arquivo falhar, o tema mantém a fonte padrão.
+`fonts.sans` e `fonts.mono` são opcionais e apontam para arquivos `woff2`, `woff`, `ttf` ou `otf` (até 4 MB cada). A fonte é registrada com um nome interno do tema e usada pela interface; se o arquivo falhar, o tema mantém a fonte padrão. O terminal integrado mantém o **JetBrains Mono** embutido como padrão e só troca de família quando o usuário escolhe outra em Configurações → Terminal.
 
 ### Papel de parede
 
