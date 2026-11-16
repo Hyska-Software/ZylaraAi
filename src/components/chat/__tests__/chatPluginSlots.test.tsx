@@ -135,6 +135,19 @@ describe('chat plugin surfaces', () => {
     error.mockRestore();
   });
 
+  it('keeps the host bubble when no variant is selected', () => {
+    const { container } = render(
+      <MessageItem message={message as never} isStreaming={false} isGroupStart />,
+    );
+    const bubble = container.querySelector('[data-variant]');
+    expect(bubble).toBeNull();
+    const text = screen.getByText('Ajuste os arquivos.');
+    expect(text.className).toContain('rounded-3xl');
+    expect(text.className).toContain('px-4');
+    expect(text.className).not.toContain('rounded-2xl');
+    expect(text.className).not.toContain('p-3');
+  });
+
   it('applies a variant recipe through the component slot', () => {
     usePluginUiPrefs.setState({
       ...EMPTY_PREFS,

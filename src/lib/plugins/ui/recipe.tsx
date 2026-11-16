@@ -1,8 +1,15 @@
 /** Declarative style recipes shared by host components and plugin variants. */
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 
 import { PLUGIN_STYLE_RECIPES, pluginComponentSpec } from '../contract';
 import { useUiStore } from '@/lib/store/uiStore';
+import { cn } from '@/lib/utils';
 import { usePluginUi } from './registry';
 import { usePluginUiPrefs, variantKey } from './prefs';
 import type { StyleRecipe } from './types';
@@ -81,14 +88,60 @@ export function recipeClasses(recipe: StyleRecipe | null | undefined): string {
   return classes.join(' ');
 }
 
-interface VariantContextValue {
+interface ResolvedVariant {
   component: string;
   variantId: string;
-  recipe: StyleRecipe | null;
+  recipe: StyleRecipe;
 }
 
-const VariantContext = createContext<VariantContextValue | null>(null);
+/**
+ * Resolves the recipe of a host component for the active layout. The user's
+ * explicit choice in Settings → Design wins over the active preset default;
+ * with neither, recipes stay opt-in and the host keeps its own classes.
+ */
+function useVariantResolution(component: string): ResolvedVariant | null {
+  const layout = useUiStore((state) => state.layoutMode);
+  const prefs = usePluginUiPrefs();
+  const ui = usePluginUi();
+  return useMemo(() => {
+    const spec = pluginComponentSpec(component);
+    if (!spec || spec.variants.length === 0 || !prefs.enabled) return null;
+    const presetKey = prefs.presets[layout];
+    const preset = presetKey
+      ? ui.presets.find(
+          (entry) =>
+            entry.key === presetKey &&
+            (entry.layouts.length === 0 || entry.layouts.includes(layout)),
+        )
+      : null;
+    // An explicit choice in Settings → Design wins over the preset default.
+    // With neither, the host keeps its own classes: recipes are opt-in.
+    const selected = prefs.variants[variantKey(component, layout)] ?? preset?.variants[component];
+    if (!selected) return null;
+    if (selected.startsWith('builtin:')) {
+      const id = selected.slice('builtin:'.length);
+      const recipe = spec.builtinRecipes?.[id];
+      return recipe ? { component, variantId: id, recipe } : null;
+    }
+    const builtin = spec.builtinRecipes?.[selected];
+    if (builtin) return { component, variantId: selected, recipe: builtin };
+    const separator = selected.indexOf(':');
+    const pluginId = separator > 0 ? selected.slice(0, separator) : preset?.pluginId ?? null;
+    const variantId = separator > 0 ? selected.slice(separator + 1) : selected;
+    const variant = ui.variants.find(
+      (entry) =>
+        (!pluginId || entry.pluginId === pluginId) &&
+        entry.component === component &&
+        entry.variantId === variantId &&
+        (entry.layouts.length === 0 || entry.layouts.includes(layout)),
+    );
+    return variant ? { component, variantId, recipe: variant.recipe } : null;
+  }, [component, layout, prefs.enabled, prefs.presets, prefs.variants, ui.presets, ui.variants]);
+}
 
+const VariantContext = createContext<ResolvedVariant | null>(null);
+
+/** Provides one resolved recipe to host components inside a slot. */
 export function VariantProvider({
   component,
   children,
@@ -96,38 +149,7 @@ export function VariantProvider({
   component: string;
   children: ReactNode;
 }) {
-  const layout = useUiStore((state) => state.layoutMode);
-  const prefs = usePluginUiPrefs();
-  const ui = usePluginUi();
-  const resolved = useMemo(() => {
-    const spec = pluginComponentSpec(component);
-    if (!spec || spec.variants.length === 0) return null;
-    const selected = prefs.variants[variantKey(component, layout)];
-    if (selected?.startsWith('builtin:')) {
-      const id = selected.slice('builtin:'.length);
-      const recipe = spec.builtinRecipes?.[id];
-      return recipe ? { component, variantId: id, recipe } : null;
-    }
-    if (selected) {
-      const separator = selected.indexOf(':');
-      const pluginId = selected.slice(0, separator);
-      const variantId = selected.slice(separator + 1);
-      const variant = ui.variants.find(
-        (entry) =>
-          entry.pluginId === pluginId &&
-          entry.component === component &&
-          entry.variantId === variantId &&
-          (entry.layouts.length === 0 || entry.layouts.includes(layout)),
-      );
-      if (variant) return { component, variantId, recipe: variant.recipe };
-    }
-    const fallbackId = spec.variants[0];
-    const fallback = fallbackId ? spec.builtinRecipes?.[fallbackId] : null;
-    return fallbackId && fallback
-      ? { component, variantId: fallbackId, recipe: fallback }
-      : null;
-  }, [component, layout, prefs.variants, ui.variants]);
-
+  const resolved = useVariantResolution(component);
   return <VariantContext.Provider value={resolved}>{children}</VariantContext.Provider>;
 }
 
@@ -140,9 +162,42 @@ export function useStyleRecipe(
   return useMemo(() => {
     const classes = recipeClasses(resolved?.recipe);
     return {
-      className: [baseClassName, classes].filter(Boolean).join(' '),
+      className: cn(baseClassName, classes),
       variantId: resolved?.variantId ?? null,
       recipe: resolved?.recipe ?? null,
     };
   }, [baseClassName, resolved]);
+}
+
+/**
+ * Host element whose skin comes from a component recipe. Keeps the host classes
+ * when no variant is selected and lets callers use recipes outside a slot.
+ */
+export function RecipeDiv({
+  component,
+  className,
+  children,
+  ...props
+}: { component: string } & ComponentProps<'div'>) {
+  return (
+    <VariantProvider component={component}>
+      <RecipeDivBody component={component} className={className} {...props}>
+        {children}
+      </RecipeDivBody>
+    </VariantProvider>
+  );
+}
+
+function RecipeDivBody({
+  component,
+  className,
+  children,
+  ...props
+}: { component: string } & ComponentProps<'div'>) {
+  const style = useStyleRecipe(component, className ?? '');
+  return (
+    <div {...props} data-variant={style.variantId ?? undefined} className={style.className}>
+      {children}
+    </div>
+  );
 }

@@ -25,6 +25,7 @@ import { Slot } from '@/components/plugins/ui/Slot';
 import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
 import { pluginIcon } from '@/lib/plugins/icons';
 import { pluginLabel } from '@/lib/plugins/registry';
+import { RecipeDiv } from '@/lib/plugins/ui/recipe';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { api } from '@/lib/api';
 import {
@@ -144,6 +145,12 @@ export function CodePanel() {
     () => ui.panelTabs.filter((entry) => entry.layouts.includes('code') && !entry.takeover),
     [ui.panelTabs],
   );
+  /* A docked key can outlive its plugin (disable/uninstall). Falling back to the
+     host tab keeps the Changes/Files/Terminal content visible instead of a
+     blank body with a stale selected tab. */
+  const activePluginDock = pluginTabs.some((entry) => entry.key === pluginDock)
+    ? pluginDock
+    : null;
   const setOpen = useUiStore((state) => state.setCodePanelOpen);
   const openCodeDiff = useUiStore((state) => state.openCodeDiff);
   const openCodeCommits = useUiStore((state) => state.openCodeCommits);
@@ -394,7 +401,8 @@ export function CodePanel() {
           onReorder={(ids) => setTabOrder(ids as CodePanelTab[])}
         >
           {(sortable) => (
-            <div
+            <RecipeDiv
+              component="code.tab.strip"
               ref={sortable.containerRef}
               role="tablist"
               aria-label={t('code:panel.tablist')}
@@ -463,37 +471,38 @@ export function CodePanel() {
                   </div>
                 );
               })}
-            </div>
+              {pluginTabs.map((entry) => {
+                const Icon = pluginIcon(entry.icon);
+                const selected = activePluginDock === entry.key;
+                const label = pluginLabel(entry.plugin, entry.titleKey, entry.title);
+                return (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={PANEL_BODY_ID}
+                    aria-label={label}
+                    title={label}
+                    onClick={() => openPluginDockTab(entry.key, 'code')}
+                    className={cn(
+                      'flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium',
+                      'transition-colors duration-150',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                      selected
+                        ? 'bg-surface-active text-foreground'
+                        : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
+                      compactTabs && 'px-2',
+                    )}
+                  >
+                    <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
+                    {compactTabs ? null : label}
+                  </button>
+                );
+              })}
+            </RecipeDiv>
           )}
         </SortableList>
-
-        {pluginTabs.map((entry) => {
-          const Icon = pluginIcon(entry.icon);
-          const selected = pluginDock === entry.key;
-          const label = pluginLabel(entry.plugin, entry.titleKey, entry.title);
-          return (
-            <button
-              key={entry.key}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-label={label}
-              title={label}
-              onClick={() => openPluginDockTab(entry.key, 'code')}
-              className={cn(
-                'flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium',
-                'transition-colors duration-150',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-                selected
-                  ? 'bg-surface-active text-foreground'
-                  : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
-              )}
-            >
-              <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
-              {compactTabs ? null : label}
-            </button>
-          );
-        })}
 
         <Slot name="code.panel.tabs" owner={{ layout: 'code' }} />
 
@@ -521,8 +530,8 @@ export function CodePanel() {
         aria-labelledby={`code-panel-tab-${tab}`}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        {pluginDock ? (
-          <PluginDockTabHost layout="code" tabKey={pluginDock} />
+        {activePluginDock ? (
+          <PluginDockTabHost layout="code" tabKey={activePluginDock} />
         ) : tab === 'changes' ? (
           <div className="flex min-h-0 flex-1 flex-col">
             {/* Workspace + branch só na aba Alterações (as abas Arquivos/Terminal

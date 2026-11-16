@@ -45,6 +45,7 @@ import {
   sortableDropClassHorizontal,
 } from '@/components/ui';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { RecipeDiv } from '@/lib/plugins/ui/recipe';
 import type { SortableListApi } from '@/components/ui';
 import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
@@ -1119,7 +1120,8 @@ export function CodeSessionHeader() {
           onReorder={setCodeTabOrder}
         >
           {(sortable) => (
-            <div
+            <RecipeDiv
+              component="code.tab.strip"
               ref={(node) => {
                 tabStripRef.current = node;
                 sortable.containerRef.current = node;
@@ -1664,7 +1666,7 @@ export function CodeSessionHeader() {
                   </div>
                 );
               })}
-            </div>
+            </RecipeDiv>
           )}
         </SortableList>
 

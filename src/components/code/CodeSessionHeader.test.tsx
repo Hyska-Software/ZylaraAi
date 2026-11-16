@@ -107,6 +107,7 @@ vi.mock('./terminalManager', () => ({
 
 // Imported after the API mock.
 import { emptyCodeSession, useAppStore, useChatStore, useCodeStore, useUiStore } from '@/lib/store';
+import { EMPTY_PREFS, usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { __resetWorkspacesForTests } from './useWorkspaces';
 import { CodeSessionHeader } from './CodeSessionHeader';
 
@@ -234,6 +235,7 @@ beforeEach(() => {
     conversation({ id, workspaceId }),
   );
   useAppStore.setState({ settings: settings(), appInfo: appInfo() });
+  usePluginUiPrefs.setState({ ...EMPTY_PREFS });
   useChatStore.setState({
     conversations: [],
     conversationsLoading: false,
@@ -355,6 +357,20 @@ describe('CodeSessionHeader — cabeçalho da sessão', () => {
 
     fireEvent.wheel(strip, { deltaY: 5000 });
     expect(strip.scrollLeft).toBe(600);
+  });
+
+  it('aplica a variante de design na barra de abas', () => {
+    usePluginUiPrefs.setState({
+      ...EMPTY_PREFS,
+      variants: { 'code.tab.strip:code': 'builtin:segmented' },
+    });
+
+    render(<CodeSessionHeader />);
+
+    const strip = screen.getByRole('tablist', { name: 'Abas abertas' });
+    expect(strip.getAttribute('data-variant')).toBe('segmented');
+    expect(strip.className).toContain('bg-surface');
+    expect(strip.className).toContain('p-1');
   });
 
   it('mostra badge "Aguardando aprovação" quando há pedido pendente', async () => {

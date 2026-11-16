@@ -58,6 +58,7 @@ import {
   useCodeStore,
   useUiStore,
 } from '@/lib/store';
+import { EMPTY_PREFS, usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import type { Conversation, Workspace, WorkspaceGitStatus } from '@/lib/types';
 import { __resetWorkspacesForTests } from './useWorkspaces';
 import { CodePanel } from './CodePanel';
@@ -86,6 +87,7 @@ function resetPanelState(): void {
     sidebarWidth: 272,
     codeView: 'session',
     codeFileTab: null,
+    pluginDockTab: { chat: null, code: null, agent: null },
   });
 }
 
@@ -144,6 +146,7 @@ beforeEach(() => {
   apiMock.listTerminals.mockResolvedValue([]);
   setViewport(1440);
   resetPanelState();
+  usePluginUiPrefs.setState({ ...EMPTY_PREFS });
   __resetWorkspacesForTests();
   useChatStore.setState({ conversations: [], activeId: null });
   useCodeStore.setState({ byConversation: {} });
@@ -169,6 +172,29 @@ describe('CodePanel — visibilidade', () => {
     expect(aside.className).toContain('bg-surface');
     expect(aside.className).not.toContain('bg-surface-raised');
     expect(screen.getByRole('tablist', { name: 'Conteúdo do painel' })).toBeTruthy();
+  });
+
+  it('aplica a variante de design na barra de abas', () => {
+    useUiStore.setState({ layoutMode: 'code' });
+    usePluginUiPrefs.setState({
+      ...EMPTY_PREFS,
+      variants: { 'code.tab.strip:code': 'builtin:segmented' },
+    });
+
+    render(<CodePanel />);
+
+    const strip = screen.getByRole('tablist', { name: 'Conteúdo do painel' });
+    expect(strip.getAttribute('data-variant')).toBe('segmented');
+    expect(strip.className).toContain('bg-surface');
+    expect(strip.className).toContain('p-1');
+  });
+
+  it('volta à aba nativa quando a aba de plugin ativa não existe mais', () => {
+    useUiStore.setState({ pluginDockTab: { chat: null, code: 'missing-plugin-tab', agent: null } });
+
+    render(<CodePanel />);
+
+    expect(screen.getByText('Nenhum workspace aberto')).toBeTruthy();
   });
 
   it('fiche-se oculto quando codePanelOpen é falso', () => {
