@@ -40,6 +40,7 @@ export interface CodeSessionUi {
   conversationId: string;
   permissionMode: PermissionMode;
   planMode: boolean;
+  creatorMode: boolean;
   plan: PlanView | null;
   /** Objetivo persistente da sessão (docs/goals/code-goals/PLAN.md). */
   goal: GoalView | null;
@@ -75,6 +76,7 @@ export function emptyCodeSession(conversationId: string): CodeSessionUi {
     // Autônomo (a sessão real sempre carrega o modo persistido em seguida).
     permissionMode: 'autonomous',
     planMode: false,
+    creatorMode: false,
     plan: null,
     goal: null,
     goalRounds: [],
@@ -328,6 +330,7 @@ export function fromSnapshot(
     conversationId: snapshot.conversationId,
     permissionMode: snapshot.permissionMode,
     planMode: snapshot.planMode,
+    creatorMode: snapshot.creatorMode ?? false,
     plan: snapshot.plan ?? null,
     goal,
     goalRounds: sameGoal ? (previous?.goalRounds ?? []) : [],
@@ -375,6 +378,8 @@ interface CodeStoreState {
   ) => Promise<boolean>;
   setPermissionMode: (conversationId: string, mode: PermissionMode) => Promise<boolean>;
   setPlanMode: (conversationId: string, enabled: boolean) => Promise<boolean>;
+  /** Liga/desliga o modo Plugin Creator (`/creator`) da sessão Code. */
+  setCreatorMode: (conversationId: string, enabled: boolean) => Promise<boolean>;
   /** Cria o objetivo da sessão (UI: diálogo "Criar e começar"). */
   createGoal: (conversationId: string, input: CreateGoalInput) => Promise<boolean>;
   /**
@@ -606,6 +611,34 @@ export const useCodeStore = create<CodeStoreState>()((set, get) => ({
         }));
       }
       toast.error(t('code:store.planModeError'), { description: String(error) });
+      return false;
+    }
+  },
+
+  setCreatorMode: async (conversationId, enabled) => {
+    const previous = get().byConversation[conversationId];
+    set((state) => ({
+      byConversation: patch(state.byConversation, conversationId, (current) => ({
+        ...current,
+        creatorMode: enabled,
+      })),
+    }));
+    try {
+      const snapshot = await api.setCreatorMode(conversationId, enabled);
+      set((state) => ({
+        byConversation: {
+          ...state.byConversation,
+          [conversationId]: fromSnapshot(snapshot, previous),
+        },
+      }));
+      return true;
+    } catch (error) {
+      if (previous) {
+        set((state) => ({
+          byConversation: { ...state.byConversation, [conversationId]: previous },
+        }));
+      }
+      toast.error(t('code:store.creatorModeError'), { description: String(error) });
       return false;
     }
   },

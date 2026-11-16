@@ -375,7 +375,97 @@ pub struct InstallOptions {
     pub granted_permissions: Option<Vec<String>>,
 }
 
+/// Installation initiated by the user (enabled when permissions are complete)
+/// versus by an agent (always staged disabled until the user activates it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InstallMode {
+    User,
+    Agent,
+}
+
 impl PluginManager {
+    /// Installs a plugin asked for by the agent. The package is validated and
+    /// extracted, every declared permission is recorded, but the plugin stays
+    /// disabled (`activation_required`) until the user enables it. Existing
+    /// plugins are never replaced silently.
+    pub fn install_for_activation(&self, path: &Path) -> Result<PluginRecord> {
+        let allow_unsigned = self.options().dev_mode;
+        let package = package::read_file(path, allow_unsigned)?;
+        self.install_for_activation_package(package, "agent:file")
+    }
+
+    /// Same as [`Self::install_for_activation`] for an already downloaded
+    /// package. Unsigned packages are rejected here: URLs have no local
+    /// developer-mode context.
+    pub fn install_bytes_for_activation(&self, bytes: &[u8]) -> Result<PluginRecord> {
+        let package = package::read_bytes(bytes, false)?;
+        self.install_for_activation_package(package, "agent:url")
+    }
+
+    /// Downloads an HTTPS package and stages it disabled for user activation.
+    pub async fn install_url_for_activation(
+        &self,
+        url: &str,
+        expected_sha256: Option<&str>,
+    ) -> Result<PluginRecord> {
+        let parsed = url::Url::parse(url)?;
+        if parsed.scheme() != "https" {
+            bail!("PLUGIN_PACKAGE_URL: package URL must use https");
+        }
+        let mut response = self
+            .http
+            .get(parsed)
+            .timeout(std::time::Duration::from_secs(120))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            bail!("PLUGIN_PACKAGE_HTTP: status {}", response.status());
+        }
+        let limit = contract::limits().trusted_package_bytes as usize;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await? {
+            if bytes.len() + chunk.len() > limit {
+                bail!("PLUGIN_PACKAGE_TOO_LARGE: package exceeds the limit");
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        if let Some(expected) = expected_sha256 {
+            let actual = signature::sha256_hex(&bytes);
+            if !actual.eq_ignore_ascii_case(expected.trim()) {
+                bail!("PLUGIN_PACKAGE_HASH: expected {expected}, got {actual}");
+            }
+        }
+        self.install_bytes_for_activation(&bytes)
+    }
+
+    fn install_for_activation_package(
+        &self,
+        package: package::PackageFiles,
+        source: &str,
+    ) -> Result<PluginRecord> {
+        let manifest = &package.manifest;
+        if self.db.plugin_get(&manifest.id)?.is_some() {
+            bail!(
+                "PLUGIN_ALREADY_INSTALLED: `{}` is already installed; update or uninstall it from Settings → Plugins",
+                manifest.id
+            );
+        }
+        if package.verified.is_none() && !self.options().dev_mode {
+            bail!("PLUGIN_UNSIGNED: a signed package is required");
+        }
+        let grants = Some(permissions::normalize_permissions(&manifest.permissions));
+        self.install_package_with_mode(
+            package,
+            InstallOptions {
+                source: source.to_string(),
+                allow_unsigned: self.options().dev_mode,
+                granted_permissions: grants,
+            },
+            false,
+            InstallMode::Agent,
+        )
+    }
+
     pub fn load(
         data_dir: &Path,
         db: Arc<Db>,
@@ -1296,9 +1386,30 @@ impl PluginManager {
         options: InstallOptions,
         allow_key_rotation: bool,
     ) -> Result<PluginRecord> {
+        self.install_package_with_mode(
+            package,
+            options,
+            allow_key_rotation,
+            InstallMode::User,
+        )
+    }
+
+    fn install_package_with_mode(
+        &self,
+        package: package::PackageFiles,
+        options: InstallOptions,
+        allow_key_rotation: bool,
+        mode: InstallMode,
+    ) -> Result<PluginRecord> {
         let _mutation = self.install_lock.lock();
         let manifest = package.manifest.clone();
         let options_state = self.options();
+        if mode == InstallMode::Agent && self.db.plugin_get(&manifest.id)?.is_some() {
+            bail!(
+                "PLUGIN_ALREADY_INSTALLED: `{}` is already installed; update or uninstall it from Settings → Plugins",
+                manifest.id
+            );
+        }
         if manifest.is_trusted() && !options_state.allow_trusted {
             bail!("PLUGIN_TRUSTED_DISABLED: trusted plugins are disabled in Settings → Plugins");
         }
@@ -1359,7 +1470,7 @@ impl PluginManager {
             version: manifest.version.clone(),
             api_version: manifest.api_version,
             root: target.to_string_lossy().to_string(),
-            enabled: permissions_complete,
+            enabled: permissions_complete && mode == InstallMode::User,
             trusted: manifest.is_trusted(),
             source: options.source,
             signature_status: if package.verified.is_some() {
@@ -1392,7 +1503,11 @@ impl PluginManager {
                 .unwrap_or(false),
             previous_version: existing.as_ref().map(|existing| existing.version.clone()),
             previous_root: existing.as_ref().map(|existing| existing.root.clone()),
-            disabled_reason: (!permissions_complete).then(|| "permissions_incomplete".to_string()),
+            disabled_reason: if mode == InstallMode::Agent {
+                Some("activation_required".to_string())
+            } else {
+                (!permissions_complete).then(|| "permissions_incomplete".to_string())
+            },
             size_bytes: size as i64,
         };
         if let Err(error) = self.db.plugin_upsert(&stored) {

@@ -135,6 +135,9 @@ async fn session_state(state: &AppState, conversation_id: &str) -> Result<CodeSe
     // `harness::code::session` — este módulo não recalcula nada.
     let plan_mode = crate::harness::code::session::plan_mode_active(&state.db, conversation_id)
         .map_err(map_err)?;
+    let creator_mode =
+        crate::harness::code::session::creator_mode_active(&state.db, conversation_id)
+            .map_err(map_err)?;
     let plan = crate::harness::code::session::plan_view(&state.db, conversation_id)
         .map_err(map_err)?;
     // Uma revisão sem aprovação `submit_plan` pendente não tem gate ativo
@@ -156,6 +159,7 @@ async fn session_state(state: &AppState, conversation_id: &str) -> Result<CodeSe
         conversation_id: conversation_id.to_string(),
         permission_mode: conversation.permission_mode,
         plan_mode,
+        creator_mode,
         plan,
         goal,
         todos,
@@ -358,6 +362,27 @@ fn apply_plan_mode(
 ) -> Result<(), String> {
     ensure_conversation(db, conversation_id)?;
     crate::harness::code::session::set_plan_mode(db, conversation_id, plan_mode).map_err(map_err)
+}
+
+/// Liga/desliga o modo Plugin Creator (`/creator`) da sessão Code.
+#[tauri::command]
+pub async fn set_creator_mode(
+    state: State<'_, AppState>,
+    conversation_id: String,
+    creator_mode: bool,
+) -> Result<CodeSessionState, String> {
+    apply_creator_mode(&state.db, &conversation_id, creator_mode)?;
+    session_state(&state, &conversation_id).await
+}
+
+fn apply_creator_mode(
+    db: &crate::db::Db,
+    conversation_id: &str,
+    creator_mode: bool,
+) -> Result<(), String> {
+    ensure_conversation(db, conversation_id)?;
+    crate::harness::code::session::set_creator_mode(db, conversation_id, creator_mode)
+        .map_err(map_err)
 }
 
 fn ensure_conversation(
@@ -1614,6 +1639,23 @@ mod tests {
 
         apply_plan_mode(&db, &conversation_id, true).expect("ligar plano");
         assert!(session::plan_mode_active(&db, &conversation_id).expect("modo"));
+    }
+
+    #[test]
+    fn set_creator_mode_validates_the_conversation_before_writing() {
+        let (db, conversation_id) = db_with_conversation();
+        assert!(apply_creator_mode(&db, "nao-existe", true).is_err());
+        assert!(
+            db.latest_code_event("nao-existe", session::KIND_CREATOR_MODE)
+                .expect("ler")
+                .is_none(),
+            "id inválido não pode gravar evento"
+        );
+
+        apply_creator_mode(&db, &conversation_id, true).expect("ligar creator");
+        assert!(session::creator_mode_active(&db, &conversation_id).expect("modo"));
+        apply_creator_mode(&db, &conversation_id, false).expect("desligar creator");
+        assert!(!session::creator_mode_active(&db, &conversation_id).expect("modo"));
     }
 
     #[test]

@@ -4,6 +4,7 @@ import type { CodeSessionState, GoalView } from '@/lib/types';
 const mocks = vi.hoisted(() => ({
   getCodeSessionState: vi.fn(),
   setPlanMode: vi.fn(),
+  setCreatorMode: vi.fn(),
   setPermissionMode: vi.fn(),
   respondApproval: vi.fn(),
   createGoal: vi.fn(),
@@ -86,6 +87,37 @@ describe('codeStore — ações de plano/aprovação (Fase 0)', () => {
     expect(useCodeStore.getState().byConversation['c-1'].planMode).toBe(false);
     expect(toast.error).toHaveBeenCalledWith(
       'Não foi possível alterar o modo Plano',
+      expect.objectContaining({ description: 'Error: negado' }),
+    );
+  });
+
+  it('setCreatorMode é otimista e confirma com o snapshot', async () => {
+    seed();
+    let resolveSnapshot: (value: CodeSessionState) => void = () => undefined;
+    mocks.setCreatorMode.mockReturnValue(
+      new Promise<CodeSessionState>((resolve) => {
+        resolveSnapshot = resolve;
+      }),
+    );
+
+    const pending = useCodeStore.getState().setCreatorMode('c-1', true);
+    expect(useCodeStore.getState().byConversation['c-1'].creatorMode).toBe(true);
+
+    resolveSnapshot(sessionState({ creatorMode: true }));
+    await expect(pending).resolves.toBe(true);
+    expect(mocks.setCreatorMode).toHaveBeenCalledWith('c-1', true);
+    expect(useCodeStore.getState().byConversation['c-1'].creatorMode).toBe(true);
+  });
+
+  it('setCreatorMode faz rollback quando o backend falha', async () => {
+    seed();
+    mocks.setCreatorMode.mockRejectedValue(new Error('negado'));
+
+    await expect(useCodeStore.getState().setCreatorMode('c-1', true)).resolves.toBe(false);
+
+    expect(useCodeStore.getState().byConversation['c-1'].creatorMode).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(
+      'Não foi possível alterar o modo Criador de plugins',
       expect.objectContaining({ description: 'Error: negado' }),
     );
   });

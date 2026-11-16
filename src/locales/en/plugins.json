@@ -44,6 +44,8 @@
     "toolCount": "{{count}} tools",
     "rollbackAvailable": "rollback {{version}}",
     "inactive": "inactive",
+    "activationRequired": "installed by the agent — review and activate",
+    "permissionsIncomplete": "permissions incomplete",
     "toggleAria": "Enable or disable {{name}}"
   },
   "empty": {

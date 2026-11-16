@@ -565,6 +565,8 @@ export interface CodeSessionState {
   conversationId: string;
   permissionMode: PermissionMode;
   planMode: boolean;
+  /** Plugin Creator mode (`/creator`); absent in older snapshots. */
+  creatorMode?: boolean;
   plan?: PlanView | null;
   /** Objetivo persistente da sessão (ausente em snapshots antigos). */
   goal?: GoalView | null;

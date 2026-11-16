@@ -64,6 +64,9 @@ pub struct CodeTurnContext {
     pub todos: Vec<TodoItem>,
     pub plan: Option<PlanView>,
     pub plan_mode: bool,
+    /// Plugin Creator mode (`/creator`): adds the plugin workflow and the
+    /// `validate_plugin` tool without changing Plan/permission modes.
+    pub creator_mode: bool,
     /// Objetivo persistente da sessão (`docs/goals/code-goals/PLAN.md`).
     pub goal: Option<GoalView>,
     /// Tipo do turno: `goal_round` (rodada automática) muda o texto da seção
@@ -100,6 +103,7 @@ impl CodeTurnContext {
             todos: self.todos.clone(),
             plan: self.plan.clone(),
             plan_mode: self.plan_mode,
+            creator_mode: self.creator_mode,
             permission_mode: self.permission_mode,
             goal: self.goal.clone(),
             turn_kind: self.turn_kind,
@@ -156,6 +160,7 @@ pub async fn build_for_turn(
         todos: session::todos(db, &conversation.id).unwrap_or_default(),
         plan: session::plan_view(db, &conversation.id).ok().flatten(),
         plan_mode: session::plan_mode_active(db, &conversation.id).unwrap_or(false),
+        creator_mode: session::creator_mode_active(db, &conversation.id).unwrap_or(false),
         goal: goal::current(db, &conversation.id).ok().flatten(),
         turn_kind,
         ..Default::default()

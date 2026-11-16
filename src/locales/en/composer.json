@@ -74,6 +74,7 @@
       "session": "Session",
       "plan": "Plan",
       "goal": "Goal",
+      "creator": "Plugin Creator",
       "git": "Git",
       "context": "Context",
       "project": "Project",
@@ -92,6 +93,14 @@
       "goal": {
         "title": "Create session goal",
         "description": "Activates the goal chip; the next message describes the task and the agent creates the goal."
+      },
+      "creator": {
+        "title": "Plugin Creator mode",
+        "description": "Gives the agent the plugin-authoring workflow and the validate/install plugin tools; the user activates the plugin afterwards."
+      },
+      "creatorOff": {
+        "title": "Leave Plugin Creator mode",
+        "description": "Disables Plugin Creator mode for the active session."
       },
       "permissions": {
         "title": "Permission mode",
@@ -141,9 +150,14 @@
     "noActiveSession": "No active session",
     "noActiveSessionPlanOnHint": "Open a code session to enable Plan mode.",
     "noActiveSessionPlanOffHint": "Open a code session to disable Plan mode.",
+    "noActiveSessionCreatorOnHint": "Open a code session to enable Plugin Creator mode.",
+    "noActiveSessionCreatorOffHint": "Open a code session to disable Plugin Creator mode.",
     "planAlreadyActive": "Plan mode is already active",
+    "creatorAlreadyActive": "Plugin Creator mode is already active",
     "planEnabled": "Plan mode enabled",
-    "planDisabled": "Plan mode disabled"
+    "planDisabled": "Plan mode disabled",
+    "creatorEnabled": "Plugin Creator mode enabled",
+    "creatorDisabled": "Plugin Creator mode disabled"
   },
   "permissions": {
     "readOnly": {
@@ -187,6 +201,11 @@
     "tooltip": "Plan mode active — click to disable",
     "disable": "Disable Plan mode",
     "label": "Plan"
+  },
+  "creatorMode": {
+    "tooltip": "Plugin Creator mode active — click to disable",
+    "disable": "Disable Plugin Creator mode",
+    "label": "Plugin Creator"
   },
   "goal": {
     "tooltipActive": "Goal active — click to disable",

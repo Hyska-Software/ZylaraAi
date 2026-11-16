@@ -247,6 +247,9 @@ fn read_artifact_schema() -> Value {
 fn validate_ui_schema() -> Value {
     crate::tools::genui::definition().parameters
 }
+fn install_plugin_schema() -> Value {
+    crate::tools::plugins::schema_value()
+}
 
 /// Perfis em que a tool aparece. O Code reutiliza tools do Chat (web, skills,
 /// artefatos) quando o prompt do perfil for montado — decisão da tarefa do
@@ -256,7 +259,7 @@ const CHAT_ONLY: &[TurnProfile] = &[TurnProfile::Chat];
 
 /// Catálogo do Chat na mesma ordem de [`crate::tools::definitions`] (a ordem
 /// faz parte do prompt/cache: não reordene sem atualizar os testes).
-pub static CHAT_SPECS: [ToolSpec; 9] = [
+pub static CHAT_SPECS: [ToolSpec; 10] = [
     ToolSpec {
         name: "web_search",
         description: "Search the web.",
@@ -356,6 +359,17 @@ pub static CHAT_SPECS: [ToolSpec; 9] = [
         profiles: CHAT_ONLY,
         guidance: "Validate `ui` blocks with `validate_ui` before emitting them; the contract is in `data/genui-contract.json`.",
     },
+    ToolSpec {
+        name: "install_plugin",
+        description: "Install a plugin package, disabled until the user activates it.",
+        schema: install_plugin_schema,
+        parallel: ParallelClass::Exclusive,
+        risk: RiskClass::Write,
+        mutating: true,
+        requires_workspace: false,
+        profiles: CHAT_ONLY,
+        guidance: "Use `install_plugin` only when the user asks to install a plugin; it stages the package disabled, so tell the user to review and enable it in Settings → Plugins.",
+    },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -363,7 +377,7 @@ pub static CHAT_SPECS: [ToolSpec; 9] = [
 /* ------------------------------------------------------------------ */
 
 /// Ordem estável do catálogo Code (a ordem entra no prompt: não reordene).
-static CODE_SPECS: [&ToolSpec; 25] = [
+static CODE_SPECS: [&ToolSpec; 26] = [
     &code::fs_read::READ_FILE_SPEC,
     &code::fs_read::LIST_DIR_SPEC,
     &code::fs_read::SEARCH_FILES_SPEC,
@@ -389,6 +403,7 @@ static CODE_SPECS: [&ToolSpec; 25] = [
     &CODE_LIST_SKILLS_SPEC,
     &CODE_READ_SKILL_SPEC,
     &CODE_VALIDATE_UI_SPEC,
+    &crate::tools::plugins::CODE_SPEC,
 ];
 
 /// Perfil Code reaproveita web/skills do Chat (`TOOLS.md` §2.7).
@@ -569,6 +584,8 @@ pub enum ToolExec {
     ListSkills,
     ReadSkill,
     ValidateUi,
+    InstallPlugin,
+    ValidatePlugin,
 }
 
 impl ToolExec {
@@ -600,6 +617,8 @@ impl ToolExec {
             "list_skills" => Self::ListSkills,
             "read_skill" => Self::ReadSkill,
             "validate_ui" => Self::ValidateUi,
+            "install_plugin" => Self::InstallPlugin,
+            "validate_plugin" => Self::ValidatePlugin,
             _ => return None,
         })
     }
@@ -631,6 +650,8 @@ impl ToolExec {
             Self::ListSkills => "list_skills",
             Self::ReadSkill => "read_skill",
             Self::ValidateUi => "validate_ui",
+            Self::InstallPlugin => "install_plugin",
+            Self::ValidatePlugin => "validate_plugin",
         }
     }
 
@@ -649,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn chat_catalog_keeps_the_exact_nine_tools_in_order() {
+    fn chat_catalog_keeps_the_exact_ten_tools_in_order() {
         assert_eq!(
             chat_spec_refs().iter().map(|spec| spec.name).collect::<Vec<_>>(),
             vec![
@@ -662,13 +683,14 @@ mod tests {
                 "list_artifacts",
                 "read_artifact",
                 "validate_ui",
+                "install_plugin",
             ]
         );
-        assert_eq!(chat_specs().len(), 9);
+        assert_eq!(chat_specs().len(), 10);
     }
 
     #[test]
-    fn code_catalog_lists_the_twenty_five_tools_in_order() {
+    fn code_catalog_lists_the_twenty_six_tools_in_order() {
         assert_eq!(
             names(&code_spec_refs()),
             vec![
@@ -697,9 +719,10 @@ mod tests {
                 "list_skills",
                 "read_skill",
                 "validate_ui",
+                "install_plugin",
             ]
         );
-        assert_eq!(code_specs().len(), 25);
+        assert_eq!(code_specs().len(), 26);
     }
 
     #[test]
@@ -763,6 +786,7 @@ mod tests {
             "list_skills",
             "read_skill",
             "validate_ui",
+            "install_plugin",
         ];
         let code_only: Vec<&str> = code_spec_refs()
             .iter()
@@ -803,7 +827,7 @@ mod tests {
     #[test]
     fn code_definitions_expose_wire_fields_only() {
         let definitions = definitions_for(TurnProfile::Code);
-        assert_eq!(definitions.len(), 25);
+        assert_eq!(definitions.len(), 26);
         for definition in &definitions {
             assert!(!definition.description.is_empty(), "{}", definition.name);
             assert_eq!(definition.parameters["type"], "object", "{}", definition.name);
@@ -843,6 +867,10 @@ mod tests {
             assert_eq!(exec.name(), spec.name);
         }
         assert_eq!(ToolExec::for_tool("web_search").map(ToolExec::name), Some("web_search"));
+        assert_eq!(
+            ToolExec::for_tool("validate_plugin").map(ToolExec::name),
+            Some("validate_plugin")
+        );
         // `ToolCtx` de teste continua construível com todos os campos novos.
         let ctx = test_ctx();
         assert!(ctx.workspace_root().is_some());

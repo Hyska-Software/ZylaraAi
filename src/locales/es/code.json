@@ -1048,6 +1048,7 @@
     "answerError": "No se pudo enviar la respuesta",
     "permissionError": "No se pudo cambiar el modo de permiso",
     "planModeError": "No se pudo cambiar el modo Plan",
+    "creatorModeError": "No se pudo cambiar el modo Creador de plugins",
     "goalCreateError": "No se pudo crear el objetivo",
     "goalChanged": "El objetivo cambió en otra acción",
     "goalUpdateError": "No se pudo actualizar el objetivo",

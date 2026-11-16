@@ -19,6 +19,7 @@ use crate::domain::{ContextBreakdown, ContextStats, PlanState, PlanView, TodoIte
 pub const KIND_APPROVAL_DECIDED: &str = "approval/decided";
 pub const KIND_PERMISSION_MODE: &str = "permission/mode";
 pub const KIND_PLAN_MODE: &str = "plan/mode";
+pub const KIND_CREATOR_MODE: &str = "creator/mode";
 pub const KIND_PLAN_SUBMITTED: &str = "plan/submitted";
 pub const KIND_PLAN_FEEDBACK: &str = "plan/feedback";
 pub const KIND_PLAN_APPROVED: &str = "plan/approved";
@@ -124,6 +125,26 @@ pub fn set_plan_mode(db: &Db, conversation_id: &str, active: bool) -> anyhow::Re
         conversation_id,
         None,
         KIND_PLAN_MODE,
+        &serde_json::json!({ "active": active }),
+    )
+}
+
+/// Modo Plugin Creator ativo nesta sessão? É um modo persistente da sessão,
+/// independente do modo Plano: injeta o workflow de plugin e libera a tool
+/// `validate_plugin`, mas nunca ativa plugins automaticamente.
+pub fn creator_mode_active(db: &Db, conversation_id: &str) -> anyhow::Result<bool> {
+    Ok(latest::<ModePayload>(db, conversation_id, KIND_CREATOR_MODE)?
+        .map(|payload| payload.active)
+        .unwrap_or(false))
+}
+
+/// Liga/desliga o modo Plugin Creator (append-only; último evento vence).
+pub fn set_creator_mode(db: &Db, conversation_id: &str, active: bool) -> anyhow::Result<()> {
+    append(
+        db,
+        conversation_id,
+        None,
+        KIND_CREATOR_MODE,
         &serde_json::json!({ "active": active }),
     )
 }
@@ -634,6 +655,29 @@ mod tests {
             last_event(&db, KIND_PLAN_APPROVED).created_at
         );
         assert!(!plan_mode_active(&db, "conv-1").expect("modo"));
+    }
+
+    #[test]
+    fn creator_mode_is_persistent_and_independent_from_plan_mode() {
+        let db = db();
+        assert!(!creator_mode_active(&db, "conv-1").expect("modo"));
+        set_creator_mode(&db, "conv-1", true).expect("modo creator");
+        assert!(creator_mode_active(&db, "conv-1").expect("modo"));
+        assert!(!plan_mode_active(&db, "conv-1").expect("plano"));
+        assert_eq!(
+            last_event(&db, KIND_CREATOR_MODE).payload,
+            "{\"active\":true}"
+        );
+
+        // Plan mode and creator mode coexist: the creator workflow can be
+        // investigation-only while Plan is active.
+        set_plan_mode(&db, "conv-1", true).expect("modo plano");
+        assert!(creator_mode_active(&db, "conv-1").expect("creator"));
+        assert!(plan_mode_active(&db, "conv-1").expect("plano"));
+
+        set_creator_mode(&db, "conv-1", false).expect("creator off");
+        assert!(!creator_mode_active(&db, "conv-1").expect("modo"));
+        assert!(plan_mode_active(&db, "conv-1").expect("plano"));
     }
 
     #[test]

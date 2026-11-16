@@ -124,7 +124,13 @@ function PluginCard({
             {plugin.disabledReason ? (
               <>
                 <span>·</span>
-                <span className="text-warning">{plugin.disabledReason}</span>
+                <span className="text-warning">
+                  {plugin.disabledReason === 'activation_required'
+                    ? t('installed.activationRequired')
+                    : plugin.disabledReason === 'permissions_incomplete'
+                      ? t('installed.permissionsIncomplete')
+                      : plugin.disabledReason}
+                </span>
               </>
             ) : null}
           </span>

@@ -563,6 +563,8 @@ export const api = {
     invoke<CodeSessionState>('set_permission_mode', { conversationId, mode }),
   setPlanMode: (conversationId: string, planMode: boolean) =>
     invoke<CodeSessionState>('set_plan_mode', { conversationId, planMode }),
+  setCreatorMode: (conversationId: string, creatorMode: boolean) =>
+    invoke<CodeSessionState>('set_creator_mode', { conversationId, creatorMode }),
   respondApproval: (
     approvalId: string,
     decision: ApprovalDecision,

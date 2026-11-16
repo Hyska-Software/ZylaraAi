@@ -1048,6 +1048,7 @@
     "answerError": "Could not send the answer",
     "permissionError": "Could not change the permission mode",
     "planModeError": "Could not change Plan mode",
+    "creatorModeError": "Could not change Plugin Creator mode",
     "goalCreateError": "Could not create the goal",
     "goalChanged": "The goal changed in another action",
     "goalUpdateError": "Could not update the goal",

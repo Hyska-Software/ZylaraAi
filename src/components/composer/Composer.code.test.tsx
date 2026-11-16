@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   searchWorkspaceFiles: vi.fn(),
   compactSession: vi.fn(),
   setPlanMode: vi.fn(),
+  setCreatorMode: vi.fn(),
   setPermissionMode: vi.fn(),
   createConversation: vi.fn(),
   listConversations: vi.fn(),
@@ -96,6 +97,15 @@ beforeEach(() => {
     conversationId: 'c-1',
     permissionMode: 'edit',
     planMode: false,
+    todos: [],
+    jobs: [],
+    approvals: [],
+  });
+  mocks.setCreatorMode.mockResolvedValue({
+    conversationId: 'c-1',
+    permissionMode: 'edit',
+    planMode: false,
+    creatorMode: false,
     todos: [],
     jobs: [],
     approvals: [],
@@ -504,6 +514,62 @@ describe('Composer — comandos /', () => {
     });
 
     expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('/creator ativa o modo Plugin Creator no codeStore', async () => {
+    mocks.setCreatorMode.mockResolvedValue({
+      conversationId: 'c-1',
+      permissionMode: 'edit',
+      planMode: false,
+      creatorMode: true,
+      todos: [],
+      jobs: [],
+      approvals: [],
+    });
+    render(<Composer />);
+
+    typeInComposer('/creator');
+    fireEvent.keyDown(textarea(), { key: 'Enter' });
+
+    await waitFor(() => expect(mocks.setCreatorMode).toHaveBeenCalledWith('c-1', true));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Desativar modo Criador de plugins' })).toBeTruthy(),
+    );
+  });
+
+  it('/creator off desativa o modo pelo store e remove o chip', async () => {
+    useCodeStore.setState({
+      byConversation: { 'c-1': { ...emptyCodeSession('c-1'), creatorMode: true } },
+    });
+    render(<Composer />);
+
+    typeInComposer('/');
+    await screen.findByRole('option', { name: /\/creator off/ });
+    fireEvent.click(screen.getByRole('option', { name: /\/creator off/ }));
+
+    await waitFor(() => expect(mocks.setCreatorMode).toHaveBeenCalledWith('c-1', false));
+    await waitFor(() =>
+      expect(useCodeStore.getState().byConversation['c-1']?.creatorMode).toBe(false),
+    );
+  });
+
+  it('chip do Plugin Creator desativa o modo pelo codeStore', async () => {
+    useCodeStore.setState({
+      byConversation: { 'c-1': { ...emptyCodeSession('c-1'), creatorMode: true } },
+    });
+    mocks.setCreatorMode.mockResolvedValue({
+      conversationId: 'c-1',
+      permissionMode: 'edit',
+      planMode: false,
+      creatorMode: false,
+      todos: [],
+      jobs: [],
+      approvals: [],
+    });
+    render(<Composer />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desativar modo Criador de plugins' }));
+    await waitFor(() => expect(mocks.setCreatorMode).toHaveBeenCalledWith('c-1', false));
   });
 });
 

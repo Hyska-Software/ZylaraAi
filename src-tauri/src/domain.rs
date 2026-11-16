@@ -2465,6 +2465,8 @@ pub struct CodeSessionState {
     pub permission_mode: PermissionMode,
     pub plan_mode: bool,
     #[serde(default)]
+    pub creator_mode: bool,
+    #[serde(default)]
     pub plan: Option<PlanView>,
     /// Objetivo persistente da sessão (`docs/goals/code-goals/PLAN.md`).
     #[serde(default)]

@@ -175,6 +175,44 @@ fn committed_fixtures_validate() {
 }
 
 #[test]
+fn agent_install_stages_the_plugin_disabled_until_the_user_activates_it() {
+    let temp = tempfile::tempdir().expect("temp");
+    let manager = manager(&temp, &Settings::default());
+    let path = write_package(
+        temp.path(),
+        "agent-demo-1.0.0.zplugin",
+        &build_package("1.0.0", &["ui.view", "storage"]),
+    );
+    let record = manager
+        .install_for_activation(&path)
+        .expect("agent install");
+    assert!(!record.enabled);
+    assert!(!record.active);
+    assert_eq!(record.disabled_reason.as_deref(), Some("activation_required"));
+    assert!(
+        record.permissions.iter().all(|permission| permission.granted),
+        "activation is a single user decision; permissions stay recorded until then"
+    );
+    assert!(manager.active_ids().is_empty(), "no contribution may load");
+    assert!(
+        manager.tool_definitions(TurnProfile::Chat).is_empty(),
+        "agent install cannot expose plugin tools before activation"
+    );
+
+    let duplicate = manager
+        .install_for_activation(&path)
+        .expect_err("agent install must not replace an installed plugin");
+    assert!(duplicate.to_string().contains("PLUGIN_ALREADY_INSTALLED"));
+
+    let activated = manager
+        .set_enabled("com.acme.demo", true)
+        .expect("user activation");
+    assert!(activated.enabled);
+    assert!(activated.active);
+    assert_eq!(manager.active_ids(), vec!["com.acme.demo"]);
+}
+
+#[test]
 fn installs_lifecycle_and_exposes_tools_prompt_and_skills() {
     let temp = tempfile::tempdir().expect("temp");
     let settings = Settings {

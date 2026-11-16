@@ -5485,21 +5485,28 @@ fn code_enabled_specs(
 ) -> Vec<&'static crate::tools::registry::ToolSpec> {
     let has_workspace = ctx.root.is_some();
     let subagent = delegation_depth > 0;
-    crate::tools::registry::code_spec_refs()
-        .into_iter()
-        .filter(|spec| has_workspace || !spec.requires_workspace)
-        .filter(|spec| settings.shell_enabled || spec.name != "run_command")
-        .filter(|spec| settings.web_search_enabled || spec.name != "web_search")
-        // Subagents: read-only scouts or autonomous workers (write + shell).
-        .filter(|spec| {
-            !subagent
-                || if subagent_write {
-                    code::subagent::worker_tools().contains(&spec.name)
-                } else {
-                    code::subagent::readonly_tools().contains(&spec.name)
-                }
-        })
-        .collect()
+    let mut specs: Vec<&'static crate::tools::registry::ToolSpec> =
+        crate::tools::registry::code_spec_refs()
+            .into_iter()
+            .filter(|spec| has_workspace || !spec.requires_workspace)
+            .filter(|spec| settings.shell_enabled || spec.name != "run_command")
+            .filter(|spec| settings.web_search_enabled || spec.name != "web_search")
+            // Subagents: read-only scouts or autonomous workers (write + shell).
+            .filter(|spec| {
+                !subagent
+                    || if subagent_write {
+                        code::subagent::worker_tools().contains(&spec.name)
+                    } else {
+                        code::subagent::readonly_tools().contains(&spec.name)
+                    }
+            })
+            .collect();
+    // Plugin Creator is a top-level session mode: subagents never validate or
+    // install plugins on the host.
+    if ctx.creator_mode && !subagent && has_workspace {
+        specs.push(&crate::tools::plugins::VALIDATE_SPEC);
+    }
+    specs
 }
 
 /// Definições wire das tools do perfil Code.
@@ -10016,6 +10023,10 @@ mod agent_loop_tests {
         assert!(
             tool_names.contains(&"validate_ui"),
             "o perfil Code valida blocos `ui` com `validate_ui`"
+        );
+        assert!(
+            tool_names.contains(&"install_plugin"),
+            "o perfil Code pode preparar plugins para ativação do usuário"
         );
         assert!(
             !tool_names.contains(&"create_file") && !tool_names.contains(&"run_code"),
@@ -14728,7 +14739,7 @@ mod agent_loop_tests {
     }
 
     /// Subagente (somente leitura) não recebe a tool `goal`; o turno de topo
-    /// recebe (25 tools no catálogo Code, incluindo `validate_ui`).
+    /// recebe (26 tools no catálogo Code, incluindo `validate_ui`).
     #[test]
     fn subagent_catalog_excludes_the_goal_tool() {
         let mut context = code::context::CodeTurnContext::default();
@@ -14740,7 +14751,7 @@ mod agent_loop_tests {
             .collect();
         assert!(top_level.contains(&"goal"));
         assert!(top_level.contains(&"validate_ui"));
-        assert_eq!(top_level.len(), 25, "catálogo Code: 25 tools");
+        assert_eq!(top_level.len(), 26, "catálogo Code: 26 tools");
         let subagent: Vec<&str> = code_enabled_specs(&context, &settings, 1, false)
             .iter()
             .map(|spec| spec.name)
@@ -14751,7 +14762,37 @@ mod agent_loop_tests {
             !subagent.contains(&"validate_ui"),
             "subagente não emite UI generativa"
         );
+        assert!(
+            !subagent.contains(&"install_plugin"),
+            "subagente não instala plugins no host"
+        );
         assert!(subagent.contains(&"read_file"));
+    }
+
+    #[test]
+    fn creator_mode_adds_validate_plugin_only_for_top_level_turns() {
+        let mut context = code::context::CodeTurnContext::default();
+        context.root = Some(PathBuf::from("C:/workspace"));
+        let settings = Settings::default();
+        let normal: Vec<&str> = code_enabled_specs(&context, &settings, 0, false)
+            .iter()
+            .map(|spec| spec.name)
+            .collect();
+        assert!(!normal.contains(&"validate_plugin"));
+
+        context.creator_mode = true;
+        let creator: Vec<&str> = code_enabled_specs(&context, &settings, 0, false)
+            .iter()
+            .map(|spec| spec.name)
+            .collect();
+        assert!(creator.contains(&"validate_plugin"));
+        assert!(creator.contains(&"install_plugin"));
+
+        let subagent: Vec<&str> = code_enabled_specs(&context, &settings, 1, false)
+            .iter()
+            .map(|spec| spec.name)
+            .collect();
+        assert!(!subagent.contains(&"validate_plugin"));
     }
 
     #[test]

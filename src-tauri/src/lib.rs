@@ -436,6 +436,7 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             commands::code::get_code_session_state,
             commands::code::set_permission_mode,
             commands::code::set_plan_mode,
+            commands::code::set_creator_mode,
             commands::code::respond_approval,
             commands::code::respond_question,
             commands::code::mcp_status,

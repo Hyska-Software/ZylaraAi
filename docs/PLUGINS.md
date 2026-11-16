@@ -291,6 +291,16 @@ Instalação por arquivo (`.zplugin`, picker ou drag & drop), URL inspecionada e
 deep link (`zylara://plugin/install?url=https%3A%2F%2F…` ou
 `zylara://plugin/https%3A%2F%2F…`) sempre passam por inspeção + consentimento.
 
+O agente também pode instalar um plugin pelo tool `install_plugin`:
+
+- Code: caminho `.zplugin` dentro do workspace ou URL HTTPS.
+- Chat: apenas URL HTTPS.
+- O pacote é validado, as permissões declaradas ficam registradas e o plugin é
+  gravado **desativado** (`activation_required`); nenhum código do plugin roda.
+- O tool nunca substitui um plugin já instalado. O usuário revisa as permissões
+  e ativa o plugin em Settings → Plugins; a ativação é o consentimento.
+- Fora do developer mode o pacote precisa ser assinado.
+
 ## 11. CLI e fixtures
 
 ```bash
@@ -313,7 +323,24 @@ node scripts/plugin/cli.mjs registry plugins/fixtures --base-url "" \
 `init` também gera um par Ed25519 de fixture. Nunca reutilize as chaves de
 fixture para um publisher real.
 
-## 12. Verificação
+## 12. Modo Plugin Creator (`/creator`)
+
+No layout Code, `/creator` ativa um modo persistente da sessão (evento
+`creator/mode`, independente do modo Plano). O prompt volátil ganha o workflow
+de criação de plugins e a tool read-only `validate_plugin` passa a ser exposta;
+`install_plugin` continua disponível no perfil Code.
+
+Fluxo esperado do agente: ler a skill `plugin-authoring` e o contrato, planejar
+com `todo_write`, implementar, validar com `validate_plugin` + CLI
+`dev`/`review`, testar, empacotar/assinar, instalar desativado e pedir que o
+usuário ative em Settings → Plugins. O agente nunca ativa o plugin nem concede
+permissões.
+
+`/creator off` (ou o chip no composer) desativa o modo. O modo não substitui o
+modo Plano: com ambos ativos, o agente primeiro planeja e só implementa após a
+aprovação.
+
+## 13. Verificação
 
 - `pnpm typecheck`
 - `pnpm test`

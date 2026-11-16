@@ -260,6 +260,8 @@ function readManifest(files) {
 function cmdInit(args) {
   const dir = resolve(args[0] ?? 'my-plugin');
   const id = args[1] ?? 'com.example.my-plugin';
+  const idParts = id.split('.');
+  const publisherId = idParts.length >= 3 ? idParts[1] : idParts[0];
   mkdirSync(join(dir, 'ui'), { recursive: true });
   mkdirSync(join(dir, 'backend'), { recursive: true });
   mkdirSync(join(dir, 'skills', 'example'), { recursive: true });
@@ -280,7 +282,7 @@ function cmdInit(args) {
         author: 'Example',
         apiVersion: 1,
         engines: { zylara: '>=0.10.0 <1.0.0' },
-        publisher: { id: id.split('.')[0], name: 'Example', keyId: 'example-2026' },
+        publisher: { id: publisherId, name: 'Example', keyId: 'example-2026' },
         permissions: ['ui.slot:chat.composer.toolbar', 'ui.view', 'ui.command', 'storage'],
         contributes: {
           ui: {
@@ -324,7 +326,7 @@ function cmdInit(args) {
     join(dir, 'skills', 'example', 'SKILL.md'),
     '---\nname: example\ndescription: Example skill shipped by my-plugin.\n---\n# Example skill\n\nUse this skill as a template.\n',
   );
-  writeFileSync(join(dir, 'README.md'), `# ${id}\n\nRun \`pnpm plugin:contract\` after changing the contract, then:\n\n\`zylara-plugin pack . --key META-INF/publisher.pem --publisher ${id.split('.')[0]}\`\n`);
+  writeFileSync(join(dir, 'README.md'), `# ${id}\n\nRun \`pnpm plugin:contract\` after changing the contract, then:\n\n\`zylara-plugin pack . --key META-INF/publisher.pem --publisher ${publisherId}\`\n`);
   console.log(`created ${dir}`);
   console.log('Pack it with: node scripts/plugin/cli.mjs pack . --key META-INF/publisher.pem');
 }
@@ -334,11 +336,11 @@ function cmdPack(args) {
   const flags = parseFlags(args.slice(1));
   const out = flags._[0] ?? join(dirname(dir), `${basename(dir)}.zplugin`);
   const keyPath = flags.key ? resolve(flags.key) : null;
-  const keyId = flags['key-id'] ?? 'dev-2026';
-  const publisherId = flags.publisher ?? 'dev';
   const files = normalizeFiles(collectFiles(dir));
   const manifest = readManifest(files);
   if (!manifest.id) fail('manifest.id is required');
+  const keyId = flags['key-id'] ?? manifest.publisher?.keyId ?? 'dev-2026';
+  const publisherId = flags.publisher ?? manifest.publisher?.id ?? 'dev';
   if (keyPath) {
     if (!existsSync(keyPath)) fail(`key not found: ${keyPath}`);
     const signature = signatureFor(files, keyPath, keyId, publisherId);
@@ -492,7 +494,7 @@ function cmdSign(args) {
   const signature = signatureFor(
     files,
     keyPath,
-    flags['key-id'] ?? 'dev-2026',
+    flags['key-id'] ?? manifest.publisher?.keyId ?? 'dev-2026',
     flags.publisher ?? manifest.publisher?.id ?? 'dev',
   );
   files.push([SIGNATURE_PATH, Buffer.from(`${JSON.stringify(signature, null, 2)}\n`)]);

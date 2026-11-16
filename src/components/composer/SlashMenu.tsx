@@ -21,6 +21,7 @@ const GROUP_ORDER: SlashCommandGroup[] = [
   'session',
   'plan',
   'goal',
+  'creator',
   'git',
   'context',
   'project',

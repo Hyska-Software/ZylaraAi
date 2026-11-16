@@ -21,6 +21,7 @@ pub mod fetch_url;
 pub mod genui;
 pub mod memory;
 pub mod pipeline;
+pub mod plugins;
 pub mod registry;
 pub mod skills;
 pub mod tasks;
@@ -218,6 +219,12 @@ pub fn definitions(options: &TurnOptions) -> Vec<ToolDefinition> {
     tools.push(artifact_library::read_definition());
     // Sempre disponível: o agente valida o JSON do bloco `ui` antes de emitir.
     tools.push(genui::definition());
+    // O agente pode preparar um plugin, mas nunca ativá-lo: a instalação deixa
+    // o plugin desativado e o usuário concede as permissões/ativa na UI.
+    // Subagentes não instalam plugins no host.
+    if options.delegation_depth == 0 {
+        tools.push(plugins::definition());
+    }
     if options.agent_memory {
         tools.push(memory::definition());
     }
@@ -313,6 +320,8 @@ pub async fn execute(rt: &ToolRuntime, call: &ToolCallRecord) -> ToolOutcome {
         "read_artifact" => artifact_library::run_read(rt, &arguments).await,
         // Validação local do bloco `ui`; não depende de flags do turno.
         "validate_ui" => genui::run(&arguments),
+        // Preparar um plugin (desativado) para o usuário ativar depois.
+        "install_plugin" => plugins::run_chat(rt, &arguments).await,
         // Durable agent memory (only for agent turns with memory enabled).
         "memory" => memory::run(rt, &arguments),
         name if agents::is_agent_tool(name) => {
@@ -472,7 +481,8 @@ mod tests {
                 "read_skill",
                 "list_artifacts",
                 "read_artifact",
-                "validate_ui"
+                "validate_ui",
+                "install_plugin"
             ]
         );
 
@@ -480,9 +490,10 @@ mod tests {
         options.create_files = false;
         options.run_code = false;
         let names: Vec<String> = definitions(&options).into_iter().map(|tool| tool.name).collect();
-        // `list_skills`, `read_skill`, `list_artifacts`, `read_artifact` e
-        // `validate_ui` são sempre expostas; apenas as duas primeiras e a
-        // validação de UI não entram no orçamento de ferramentas de dados.
+        // `list_skills`, `read_skill`, `list_artifacts`, `read_artifact`,
+        // `validate_ui` e `install_plugin` são sempre expostas; apenas as duas
+        // primeiras e a validação de UI não entram no orçamento de ferramentas
+        // de dados.
         assert_eq!(
             names,
             vec![
@@ -491,7 +502,8 @@ mod tests {
                 "read_skill",
                 "list_artifacts",
                 "read_artifact",
-                "validate_ui"
+                "validate_ui",
+                "install_plugin"
             ]
         );
     }
@@ -511,6 +523,16 @@ mod tests {
         assert!(definitions(&options)
             .iter()
             .any(|tool| tool.name == "memory"));
+    }
+
+    #[test]
+    fn subagents_do_not_receive_the_plugin_install_tool() {
+        let options = TurnOptions {
+            delegation_depth: 1,
+            ..Default::default()
+        };
+        let names: Vec<String> = definitions(&options).into_iter().map(|tool| tool.name).collect();
+        assert!(!names.iter().any(|name| name == "install_plugin"));
     }
 
     #[tokio::test]

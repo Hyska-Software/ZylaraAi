@@ -74,6 +74,7 @@
       "session": "Sesión",
       "plan": "Plan",
       "goal": "Objetivo",
+      "creator": "Creador de plugins",
       "git": "Git",
       "context": "Contexto",
       "project": "Proyecto",
@@ -92,6 +93,14 @@
       "goal": {
         "title": "Crear objetivo de la sesión",
         "description": "Activa el chip de objetivo; el siguiente mensaje describe la tarea y el agente crea el objetivo."
+      },
+      "creator": {
+        "title": "Modo Creador de plugins",
+        "description": "Da al agente el flujo de creación de plugins y las tools de validar/instalar; el usuario activa el plugin después."
+      },
+      "creatorOff": {
+        "title": "Salir del modo Creador de plugins",
+        "description": "Desactiva el modo Creador de plugins de la sesión activa."
       },
       "permissions": {
         "title": "Modo de permiso",
@@ -141,9 +150,14 @@
     "noActiveSession": "Ninguna sesión activa",
     "noActiveSessionPlanOnHint": "Abre una sesión de código para activar el modo Plan.",
     "noActiveSessionPlanOffHint": "Abre una sesión de código para desactivar el modo Plan.",
+    "noActiveSessionCreatorOnHint": "Abre una sesión de código para activar el modo Creador de plugins.",
+    "noActiveSessionCreatorOffHint": "Abre una sesión de código para desactivar el modo Creador de plugins.",
     "planAlreadyActive": "El modo Plan ya está activo",
+    "creatorAlreadyActive": "El modo Creador de plugins ya está activo",
     "planEnabled": "Modo Plan activado",
-    "planDisabled": "Modo Plan desactivado"
+    "planDisabled": "Modo Plan desactivado",
+    "creatorEnabled": "Modo Creador de plugins activado",
+    "creatorDisabled": "Modo Creador de plugins desactivado"
   },
   "permissions": {
     "readOnly": {
@@ -187,6 +201,11 @@
     "tooltip": "Modo Plan activo — haz clic para desactivar",
     "disable": "Desactivar modo Plan",
     "label": "Plan"
+  },
+  "creatorMode": {
+    "tooltip": "Modo Creador de plugins activo — haz clic para desactivar",
+    "disable": "Desactivar modo Creador de plugins",
+    "label": "Creador de plugins"
   },
   "goal": {
     "tooltipActive": "Objetivo activo — haz clic para desactivar",

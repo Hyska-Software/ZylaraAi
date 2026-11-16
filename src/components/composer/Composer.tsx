@@ -47,6 +47,7 @@ import {
 } from './attachmentFiles';
 import { CacheMeterChip } from './CacheMeterChip';
 import { CodeSessionControls } from './CodeSessionControls';
+import { CreatorModeChip } from './CreatorModeChip';
 import { filterSlashCommands, type SlashCommand, type SlashCommandView } from './commands';
 import { ComposerActivity } from './ComposerActivity';
 import { MentionChips } from './MentionChips';
@@ -160,8 +161,13 @@ export function Composer() {
       ? (state.byConversation[codeSessionConversation.id]?.planMode ?? false)
       : false,
   );
-  /** A linha de chips acima do textarea existe quando há `/goal` e/ou Plano. */
-  const showComposerChips = goalIntent || planModeActive;
+  const creatorModeActive = useCodeStore((state) =>
+    codeSessionConversation
+      ? (state.byConversation[codeSessionConversation.id]?.creatorMode ?? false)
+      : false,
+  );
+  /** A linha de chips acima do textarea existe quando há `/goal`, Plano ou Creator. */
+  const showComposerChips = goalIntent || planModeActive || creatorModeActive;
   const workspaceId = activeConversation?.workspaceId || activeWorkspaceId || null;
   /** `@` menções e `/` comandos existem no Code e em agentes com workspace. */
   const codeMenusEnabled = (isCodeLayout || isAgentLayout) && Boolean(workspaceId);
@@ -484,6 +490,41 @@ export function Composer() {
             });
           return;
         }
+        case 'creator-on': {
+          if (!conversationId) {
+            toast.info(t('toasts.noActiveSession'), {
+              description: t('toasts.noActiveSessionCreatorOnHint'),
+            });
+            return;
+          }
+          const current = useCodeStore.getState().byConversation[conversationId];
+          if (current?.creatorMode) {
+            toast.info(t('toasts.creatorAlreadyActive'));
+            return;
+          }
+          void useCodeStore
+            .getState()
+            .setCreatorMode(conversationId, true)
+            .then((ok) => {
+              if (ok) toast.success(t('toasts.creatorEnabled'));
+            });
+          return;
+        }
+        case 'creator-off': {
+          if (!conversationId) {
+            toast.info(t('toasts.noActiveSession'), {
+              description: t('toasts.noActiveSessionCreatorOffHint'),
+            });
+            return;
+          }
+          void useCodeStore
+            .getState()
+            .setCreatorMode(conversationId, false)
+            .then((ok) => {
+              if (ok) toast.success(t('toasts.creatorDisabled'));
+            });
+          return;
+        }
         default:
           return;
       }
@@ -752,6 +793,9 @@ export function Composer() {
                   ) : null}
                   {codeSessionConversation ? (
                     <PlanModeChip conversationId={codeSessionConversation.id} />
+                  ) : null}
+                  {codeSessionConversation ? (
+                    <CreatorModeChip conversationId={codeSessionConversation.id} />
                   ) : null}
                 </div>
               ) : null}

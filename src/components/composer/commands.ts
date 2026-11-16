@@ -24,6 +24,7 @@ export type SlashCommandGroup =
   | 'session'
   | 'plan'
   | 'goal'
+  | 'creator'
   | 'git'
   | 'context'
   | 'project'
@@ -34,6 +35,7 @@ export const SLASH_GROUP_LABEL_KEYS: Record<SlashCommandGroup, string> = {
   session: 'composer:slash.groups.session',
   plan: 'composer:slash.groups.plan',
   goal: 'composer:slash.groups.goal',
+  creator: 'composer:slash.groups.creator',
   git: 'composer:slash.groups.git',
   context: 'composer:slash.groups.context',
   project: 'composer:slash.groups.project',
@@ -48,7 +50,9 @@ export type SlashInvoke =
   | 'novo'
   | 'limpar'
   | 'plan-on'
-  | 'plan-off';
+  | 'plan-off'
+  | 'creator-on'
+  | 'creator-off';
 
 /**
  * Chip de intenção do `/goal`: o usuário escolhe o comando, o composer mostra
@@ -118,6 +122,24 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     descriptionKey: 'composer:slash.commands.goal.description',
     group: 'goal',
     action: 'intent',
+  },
+  {
+    id: 'creator',
+    command: '/creator',
+    titleKey: 'composer:slash.commands.creator.title',
+    descriptionKey: 'composer:slash.commands.creator.description',
+    group: 'creator',
+    action: 'invoke',
+    invoke: 'creator-on',
+  },
+  {
+    id: 'creator-off',
+    command: '/creator off',
+    titleKey: 'composer:slash.commands.creatorOff.title',
+    descriptionKey: 'composer:slash.commands.creatorOff.description',
+    group: 'creator',
+    action: 'invoke',
+    invoke: 'creator-off',
   },
   {
     id: 'permissoes',

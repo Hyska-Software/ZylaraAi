@@ -60,6 +60,8 @@ pub struct CodeContext {
     pub todos: Vec<TodoItem>,
     pub plan: Option<PlanView>,
     pub plan_mode: bool,
+    /// Plugin Creator mode (`/creator`): injects the plugin authoring workflow.
+    pub creator_mode: bool,
     pub permission_mode: PermissionMode,
     /// Objetivo persistente da sessão (volátil: só no runtime context).
     pub goal: Option<GoalView>,
@@ -620,6 +622,9 @@ pub fn build_runtime_context(ctx: &CodeContext, has_todo_write: bool) -> String 
              point and resubmit.\n\n",
         );
     }
+    if ctx.creator_mode {
+        out.push_str(creator_mode_section());
+    }
     out.push_str("## Workspace state\n\n");
     out.push_str(&git_runtime_section(ctx));
     if let Some(tree) = &ctx.tree {
@@ -650,6 +655,46 @@ pub fn build_runtime_context(ctx: &CodeContext, has_todo_write: bool) -> String 
         );
     }
     out
+}
+
+fn creator_mode_section() -> &'static str {
+    "## Plugin Creator mode\n\n\
+     The user enabled `/creator`: act as a Zylara plugin engineer and deliver a working, \
+     validated, signed `.zplugin`. The package is installed **disabled**; the user reviews \
+     permissions and activates it.\n\n\
+     **Read first**: call `read_skill` with `plugin-authoring`; then read \
+     `data/plugin-contract.json`, `data/plugin-manifest.schema.json`, \
+     `data/genui-contract.json`, `docs/PLUGINS.md`, and the closest fixture under \
+     `plugins/fixtures/`. The contract is the source of truth; never invent slot, component, \
+     layout, permission or event ids.\n\n\
+     **Workflow**:\n\
+     1. Clarify only requirements that block implementation (capabilities, permissions, \
+        sandbox vs trusted, UI anchors). If the request is clear, proceed without asking.\n\
+     2. Call `todo_write` with the plugin plan: scaffold, manifest/UI, tools/logic, tests, \
+        package, install.\n\
+     3. Default to a **sandboxed** plugin. Use **trusted** only when the user explicitly needs \
+        React overrides/shell/unsafe.renderer; trusted still requires the user's opt-in.\n\
+     4. Scaffold with `node scripts/plugin/cli.mjs init …` when appropriate, then edit \
+        `manifest.json` (v2 preferred), UI files, tools, prompt/skills and locales. Keep all \
+        copy in `locales/{en,pt-BR,es}.json`.\n\
+     5. Validate the package/folder with `validate_plugin` and with \
+        `node scripts/plugin/cli.mjs dev …` plus \
+        `node scripts/plugin/review.mjs …`; fix every error before packaging.\n\
+     6. Test the real behavior with the narrowest command available (`run_checks` or \
+        `run_command`), including the plugin's tools/logic and manifest validation.\n\
+     7. Build and sign: `pack`/`build` with the publisher key from the scaffold; run `verify`. \
+        Never ship a fixture/private key as a real publisher key.\n\
+     8. Install with `install_plugin` (workspace `.zplugin` path). It stages the plugin \
+        disabled and refuses to replace an installed plugin; never call setters to enable it \
+        or grant permissions.\n\
+     9. Report the package path, plugin id/version, declared permissions, validation/test \
+        results, and tell the user to review and activate it in Settings → Plugins. If \
+        activation needs a manual permission grant, say exactly which one.\n\n\
+     **Runtime rules**: never edit the host application to add a private UI hook; use the \
+     published contract. Never execute untrusted plugin code during authoring. Keep \
+     permissions minimal and scoped. If Plan mode is also active, plan only until the user \
+     approves; if the plugin cannot be completed/tested, report the blocker with the exact \
+     command and error instead of claiming success.\n\n"
 }
 
 fn editing_section() -> &'static str {
@@ -889,6 +934,7 @@ mod tests {
             }],
             plan: None,
             plan_mode: false,
+            creator_mode: false,
             permission_mode: PermissionMode::Edit,
             goal: None,
             turn_kind: TurnKind::User,
@@ -1131,6 +1177,32 @@ mod tests {
                 rule.id
             );
         }
+    }
+
+    #[test]
+    fn runtime_context_renders_creator_mode_workflow_only_when_active() {
+        let mut context = ctx();
+        let without = build_runtime_context(&context, true);
+        assert!(!without.contains("Plugin Creator mode"), "{without}");
+
+        context.creator_mode = true;
+        let runtime = build_runtime_context(&context, true);
+        for needle in [
+            "Plugin Creator mode",
+            "read_skill",
+            "plugin-authoring",
+            "validate_plugin",
+            "install_plugin",
+            "Settings → Plugins",
+            "user reviews",
+        ] {
+            assert!(runtime.contains(needle), "creator prompt missing {needle}");
+        }
+        let stable = build_system_prompt(&model(), &context, &[], "Windows", "2026-10-27", "pt-BR");
+        assert!(
+            !stable.contains("Plugin Creator mode"),
+            "creator mode must stay in the volatile runtime context"
+        );
     }
 
     #[test]

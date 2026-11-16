@@ -345,8 +345,12 @@ export function PluginDetailDialog({
                         <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0" />
                         <div>
                           <p className="font-semibold">{t('detail.inactiveReason')}</p>
-                          <p className="mt-0.5 font-mono text-[11px] text-warning/90">
-                            {plugin.disabledReason}
+                          <p className="mt-0.5 text-[11px] text-warning/90">
+                            {plugin.disabledReason === 'activation_required'
+                              ? t('installed.activationRequired')
+                              : plugin.disabledReason === 'permissions_incomplete'
+                                ? t('installed.permissionsIncomplete')
+                                : plugin.disabledReason}
                           </p>
                         </div>
                       </div>

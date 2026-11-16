@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "id": "com.example.my-plugin",
+  "name": "My plugin",
+  "version": "1.0.0",
+  "description": "A sandboxed Zylara plugin.",
+  "author": "Example",
+  "apiVersion": 1,
+  "engines": {
+    "zylara": ">=0.10.0 <1.0.0"
+  },
+  "publisher": {
+    "id": "com",
+    "name": "Example",
+    "keyId": "example-2026"
+  },
+  "permissions": [
+    "ui.slot:chat.composer.toolbar",
+    "ui.view",
+    "ui.command",
+    "storage"
+  ],
+  "contributes": {
+    "ui": {
+      "slots": [
+        {
+          "slot": "chat.composer.toolbar",
+          "entry": "ui/toolbar.html",
+          "title": "My plugin"
+        }
+      ],
+      "views": [
+        {
+          "id": "main",
+          "title": "My plugin",
+          "surface": "chat",
+          "location": "sidebar",
+          "entry": "ui/page.html"
+        }
+      ],
+      "commands": [
+        {
+          "id": "open",
+          "title": "Open my plugin",
+          "command": "my-plugin",
+          "action": {
+            "kind": "openView",
+            "target": "main"
+          }
+        }
+      ]
+    },
+    "locales": [
+      "locales"
+    ]
+  },
+  "runtime": {
+    "ui": "sandbox"
+  }
+}

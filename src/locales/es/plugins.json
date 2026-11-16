@@ -44,6 +44,8 @@
     "toolCount": "{{count}} herramientas",
     "rollbackAvailable": "volver a {{version}}",
     "inactive": "inactivo",
+    "activationRequired": "instalado por el agente — revísalo y actívalo",
+    "permissionsIncomplete": "permisos incompletos",
     "toggleAria": "Activar o desactivar {{name}}"
   },
   "empty": {
