@@ -112,6 +112,7 @@
       "description": "“{{title}}” will be permanently removed. This action cannot be undone."
     },
     "toasts": {
+      "dismiss": "Dismiss notification",
       "codeLinkAddError": "Could not add the session to Code",
       "codeLinkRemoveError": "Could not remove the session from Code",
       "codeLinkAdded": "Session added to Code",

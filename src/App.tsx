@@ -38,6 +38,7 @@ import type {
   TurnEventBusPayload,
 } from '@/lib/types';
 import { useUpdateCheck } from '@/components/layout/useUpdateCheck';
+import { useIsDark } from '@/components/genui/useIsDark';
 
 /** Ensures bootstrap runs once even under React StrictMode double-effects. */
 let bootstrapPromise: Promise<void> | null = null;
@@ -144,6 +145,9 @@ export default function App() {
   const initializing = useAppStore((state) => state.initializing);
   const error = useAppStore((state) => state.error);
   const theme = useUiStore((state) => state.theme);
+  // Sonner needs the resolved mode, not "system": the app may force light/dark
+  // regardless of the OS preference.
+  const dark = useIsDark();
   const layoutMode = useUiStore((state) => state.layoutMode);
   const codePanelOpen = useUiStore((state) => state.codePanelOpen);
   const agentPanelOpen = useUiStore((state) => state.agentPanelOpen);
@@ -630,16 +634,11 @@ export default function App() {
         <PluginSafeModeBanner />
       </ErrorBoundary>
       <Toaster
+        className="zylara-toaster"
         position="bottom-right"
-        theme="system"
+        theme={dark ? 'dark' : 'light'}
         closeButton
-        toastOptions={{
-          classNames: {
-            toast:
-              'rounded-xl bg-surface-raised text-foreground shadow-lg text-[13px]',
-            description: 'text-foreground-muted',
-          },
-        }}
+        toastOptions={{ closeButtonAriaLabel: t('common:shell.toasts.dismiss') }}
       />
     </TooltipProvider>
   );

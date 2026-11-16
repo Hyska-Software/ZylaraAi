@@ -1072,3 +1072,84 @@ body.zylara-sortable-dragging * {
   cursor: grabbing !important;
   user-select: none !important;
 }
+
+/* ------------------------------------------------------------------ */
+/* Notifications (sonner)                                              */
+/* ------------------------------------------------------------------ */
+/* Sonner injects its stylesheet at runtime without a cascade layer, so its
+   defaults win over Tailwind utilities (which live in `@layer utilities`).
+   Re-map the notification surface to the app tokens here; every selector is
+   scoped with `.zylara-toaster` to stay above Sonner's own specificity. */
+.zylara-toaster[data-sonner-toaster][data-sonner-theme] {
+  --normal-bg: var(--surface-raised);
+  --normal-bg-hover: var(--surface-hover);
+  --normal-border: var(--border);
+  --normal-border-hover: var(--border-strong);
+  --normal-text: var(--foreground);
+  --border-radius: var(--theme-radius-xl);
+  font-family: var(--font-sans);
+}
+
+.zylara-toaster [data-sonner-toast][data-styled='true'] {
+  border: 0;
+  box-shadow:
+    0 10px 15px -3px hsl(var(--shadow-color) / 0.14),
+    0 4px 6px -4px hsl(var(--shadow-color) / 0.14);
+}
+
+.zylara-toaster [data-sonner-toast][data-styled='true'] [data-description] {
+  color: var(--foreground-muted);
+}
+
+.zylara-toaster [data-sonner-toast][data-type='success'] [data-icon] {
+  color: var(--success);
+}
+
+.zylara-toaster [data-sonner-toast][data-type='error'] [data-icon] {
+  color: var(--danger);
+}
+
+.zylara-toaster [data-sonner-toast][data-type='warning'] [data-icon] {
+  color: var(--warning);
+}
+
+.zylara-toaster [data-sonner-toast][data-type='info'] [data-icon] {
+  color: var(--accent);
+}
+
+.zylara-toaster [data-sonner-toast][data-styled='true'][data-y-position] [data-close-button] {
+  border: 0;
+  background: var(--surface-raised);
+  color: var(--foreground-subtle);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.zylara-toaster
+  [data-sonner-toast][data-styled='true'][data-y-position]
+  [data-close-button]:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+}
+
+.zylara-toaster [data-sonner-toast][data-styled='true']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Sonner sets `outline: none` on its buttons, so the app focus ring has to be
+   reinstated here (the base-layer rule loses to Sonner's unlayered styles). */
+.zylara-toaster
+  [data-sonner-toast][data-styled='true'][data-y-position]
+  [data-close-button]:focus-visible,
+.zylara-toaster [data-sonner-toast][data-styled='true'] [data-button]:focus-visible {
+  box-shadow: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.zylara-toaster [data-sonner-toast][data-styled='true'] [data-button] {
+  border-radius: var(--theme-radius-sm);
+  font-weight: 500;
+}

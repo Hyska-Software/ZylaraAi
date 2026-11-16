@@ -112,6 +112,7 @@
       "description": "“{{title}}” será removida permanentemente. Esta ação não pode ser desfeita."
     },
     "toasts": {
+      "dismiss": "Dispensar notificação",
       "codeLinkAddError": "Não foi possível adicionar a sessão ao Code",
       "codeLinkRemoveError": "Não foi possível remover a sessão do Code",
       "codeLinkAdded": "Sessão adicionada ao Code",

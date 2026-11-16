@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-16T02:54:05.207Z",
+ "generatedAt": "2026-11-16T11:09:37.998Z",
  "sources": {
   "docs": [
    "https://opencode.ai/v2/docs/console/go/",
@@ -978,6 +978,52 @@
       "vision"
      ],
      "status": "stable"
+    },
+    {
+     "id": "hy4-flash-free",
+     "name": "Hy4 flash Free",
+     "family": "hy",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "high"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0
+     },
+     "releaseDate": "2026-11-16",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
+     "tags": [
+      "free",
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "free"
     },
     {
      "id": "hy4-preview",
@@ -2009,7 +2055,7 @@
        "type": "effort",
        "values": [
         "low",
-        "medium",
+        "high",
         "xhigh"
        ]
       },
@@ -2030,7 +2076,7 @@
       ]
      },
      "contextWindow": 1000000,
-     "maxOutput": 393216,
+     "maxOutput": 262144,
      "cost": {
       "input": 1.5,
       "output": 4.5,
@@ -5603,6 +5649,52 @@
       "vision"
      ],
      "status": "stable"
+    },
+    {
+     "id": "hy4-flash-free",
+     "name": "Hy4 flash Free",
+     "family": "hy",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "high"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0
+     },
+     "releaseDate": "2026-11-16",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
+     "tags": [
+      "free",
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "free"
     },
     {
      "id": "kimi-k2.5",

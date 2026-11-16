@@ -112,6 +112,7 @@
       "description": "“{{title}}” se eliminará de forma permanente. Esta acción no se puede deshacer."
     },
     "toasts": {
+      "dismiss": "Descartar notificación",
       "codeLinkAddError": "No se pudo añadir la sesión a Code",
       "codeLinkRemoveError": "No se pudo quitar la sesión de Code",
       "codeLinkAdded": "Sesión añadida a Code",
