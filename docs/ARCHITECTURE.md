@@ -929,10 +929,16 @@ mesclado (catálogo + modelos da conta).
   `code_events`, journal reversível e commit apenas pelo usuário. **Não é sandbox de SO**: no
   Windows não prometemos isolamento de processo/arquivo fora do workspace — a barreira é
   política + confinamento + aprovação (HARNESS.md §4/§13).
-- **CSP**: `tauri.conf.json` ainda está com `csp: null` (dívida pré-existente, registrada em
-  `docs/goals/code-harness/EVIDENCE.md`); a mitigação atual é não injetar conteúdo remoto no
-  webview (arquivos são renderizados como texto sanitizado e HTML/SVG sempre em iframe sandbox).
-  Endurecer a CSP é item de hardening separado, com validação manual no app empacotado.
+- **CSP**: `tauri.conf.json` define `csp` (produção) e `devCsp`. Além dos `default-src`
+  restritos, `style-src-elem` e `style-src-attr` são declarados **explicitamente** com
+  `'unsafe-inline'`: o Tauri injeta hashes `sha256` das tags `<style>`/`<script>` inline de
+  `index.html` em `style-src`, e pela spec de CSP a presença de qualquer hash/nonce anula
+  `'unsafe-inline'` **naquela diretiva** — o que bloquearia todo `<style>` criado em runtime
+  (xterm injeta o CSS de tema/fonte do renderer DOM, sonner injetava o seu) e todo
+  `style="…"` em HTML parseado (KaTeX/Mermaid). As diretivas dedicadas não recebem hashes, por
+  isso mantêm o comportamento pretendido de permitir estilos inline sem afrouxar `script-src`.
+  Nada de conteúdo remoto no webview: arquivos são renderizados como texto sanitizado e
+  HTML/SVG sempre em iframe sandbox. Validação da CSP é manual no app empacotado.
 - HTML/SVG de artefatos e blocos `html` rodam em iframe `sandbox="allow-scripts"` sem acesso ao IPC (sem `allow-same-origin`).
 - Links externos abrem no navegador padrão via plugin-opener, nunca no webview.
 - Markdown com HTML cru passa por sanitizador allowlist (`rehypeSafeHtml`): sem `script`/`style`/`iframe`/eventos/`style` inline, classes e `data-*` fora da allowlist, e URLs restritas a `http(s)`, `mailto:` e âncoras internas. React nunca injeta o markdown via `innerHTML`.
