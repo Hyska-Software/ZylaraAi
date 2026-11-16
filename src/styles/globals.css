@@ -2,6 +2,9 @@
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/jetbrains-mono';
 @import 'katex/dist/katex.min.css';
+/* Bundled so notifications keep their layout under the Tauri CSP: Sonner also
+   injects this file as a runtime `<style>`, which the webview can block. */
+@import 'sonner/dist/styles.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
