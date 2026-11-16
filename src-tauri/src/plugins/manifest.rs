@@ -1713,6 +1713,11 @@ mod tests {
             .as_array_mut()
             .unwrap()
             .push(serde_json::json!("unsafe.renderer"));
+        // A trusted runtime cannot host a sandbox GenUI component; switch the
+        // fixture to a trusted render so the permission change is the only
+        // difference under test.
+        value["contributes"]["ui"]["genui"]["components"][0]["render"] =
+            serde_json::json!({ "kind": "trusted", "component": "metricView" });
         parse(value).expect("trusted manifest");
     }
 

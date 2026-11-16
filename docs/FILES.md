@@ -712,6 +712,7 @@ Entrega da v1 concluída. Arquivos principais:
 | Execução de código | `src-tauri/src/tools/code_exec.rs` (`run_code` + `environment_status`) |
 | Skills runtime | `src-tauri/src/tools/skills.rs` (`catalog`/`read`/tools + materialização `include_dir!`) |
 | Skills embutidas | `src-tauri/skills/{office-docx,office-xlsx,office-pptx,pdf,imagens}/SKILL.md` + `scripts/make_*.py` (stdlib) |
+| Skills de plugins | `src-tauri/skills/{plugin-authoring,plugin-manifest,plugin-ui,plugin-genui,plugin-agent,plugin-trusted,plugin-package}/SKILL.md`; tabelas geradas por `scripts/build-plugin-skills.mjs` |
 | Previews backend | `src-tauri/src/documents/preview.rs` (`docx_html`, `xlsx_sheets`, `pptx_slides`) |
 | Comandos | `src-tauri/src/commands/artifacts.rs::get_artifact_preview`, `commands/settings.rs::{get_code_environment,open_skills_dir}`, `commands/skills.rs::{get_skills,set_skill_enabled,delete_skill}` (registrados em `lib.rs`) |
 | Contratos | `src-tauri/src/domain.rs`, `src/lib/types.ts`, `src/lib/api.ts`, `src/lib/store/*` |

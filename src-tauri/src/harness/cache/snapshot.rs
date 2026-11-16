@@ -143,6 +143,7 @@ pub fn config_hash(
             "runCode": options.run_code,
             "systemPromptOverride": options.system_prompt_override.as_deref().unwrap_or(""),
             "pluginFingerprint": options.plugin_fingerprint,
+            "pluginCreator": options.plugin_creator,
         },
         "settings": {
             "locale": settings.locale,

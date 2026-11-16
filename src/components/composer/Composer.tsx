@@ -162,8 +162,8 @@ export function Composer() {
       : false,
   );
   const creatorModeActive = useCodeStore((state) =>
-    codeSessionConversation
-      ? (state.byConversation[codeSessionConversation.id]?.creatorMode ?? false)
+    activeConversationId && !isAgentLayout
+      ? (state.byConversation[activeConversationId]?.creatorMode ?? false)
       : false,
   );
   /** A linha de chips acima do textarea existe quando há `/goal`, Plano ou Creator. */
@@ -176,7 +176,8 @@ export function Composer() {
   const providerBlocked = selectedProvider !== undefined && !providerReady;
   const pluginRevision = usePluginRegistry().revision;
   const pluginCommandCount = usePluginRegistry().commands.length;
-  const slashMenusEnabled = codeMenusEnabled || pluginCommandCount > 0;
+  const slashMenusEnabled =
+    codeMenusEnabled || pluginCommandCount > 0 || Boolean(activeConversationId);
   const hasDraft =
     value.trim().length > 0 || mentioned.length > 0 || pendingAttachments.length > 0;
   const canQueue = isStreaming && !providerBlocked && hasDraft;
@@ -186,10 +187,16 @@ export function Composer() {
   // The catalog resolves its copy, so the language is a dependency.
   const slashCommands = useMemo(() => {
     const all = filterSlashCommands(slashQuery);
-    // Chat only shows plugin commands (the built-in slash catalog is Code/agent
-    // specific); Code/agent show the full catalog.
-    return codeMenusEnabled ? all : all.filter((command) => command.group === 'plugins');
-  }, [slashQuery, i18n.language, pluginRevision, codeMenusEnabled]);
+    // Chat only exposes plugin commands + /creator. Agent has no creator mode;
+    // Code with a workspace keeps the full catalog.
+    if (codeMenusEnabled) {
+      return isAgentLayout ? all.filter((command) => command.group !== 'creator') : all;
+    }
+    return all.filter(
+      (command) =>
+        command.group === 'plugins' || (!isAgentLayout && command.group === 'creator'),
+    );
+  }, [slashQuery, i18n.language, pluginRevision, codeMenusEnabled, isAgentLayout]);
   const mentionQuery = menu?.kind === 'mention' ? menu.query : null;
   const optionCount =
     menu?.kind === 'mention' ? mentionResults.length : menu?.kind === 'slash' ? slashCommands.length : 0;
@@ -272,6 +279,14 @@ export function Composer() {
     setGoalIntent(false);
   }, [activeConversationId]);
 
+  /* Chat conversations do not pass through `chatStore.syncCodeSession`, so load
+     the per-conversation session snapshot once to restore /creator after reload. */
+  useEffect(() => {
+    if (layoutMode !== 'chat' || !activeConversationId) return;
+    if (useCodeStore.getState().byConversation[activeConversationId]) return;
+    void useCodeStore.getState().load(activeConversationId);
+  }, [activeConversationId, layoutMode]);
+
   /* Ctrl/Cmd+L foca o composer (padrão Paseo) — só no modo Code. Local ao
      componente: nenhum atalho global novo, o Chat mantém o comportamento. */
   useEffect(() => {
@@ -344,8 +359,9 @@ export function Composer() {
     (next: string, caret: number) => {
       const before = next.slice(0, caret);
       if (!codeMenusEnabled) {
-        // Chat still exposes plugin slash commands; mentions need a workspace.
-        const slashMatch = pluginCommandCount > 0 ? /(^|\s)\/([^\s]*)$/.exec(before) : null;
+        // Chat still exposes plugin slash commands and /creator; mentions need
+        // a workspace.
+        const slashMatch = activeConversationId ? /(^|\s)\/([^\s]*)$/.exec(before) : null;
         if (slashMatch) {
           const query = slashMatch[2] ?? '';
           setMenu({
@@ -386,7 +402,7 @@ export function Composer() {
       }
       setMenu(null);
     },
-    [codeMenusEnabled, pluginCommandCount],
+    [codeMenusEnabled, activeConversationId],
   );
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -794,8 +810,8 @@ export function Composer() {
                   {codeSessionConversation ? (
                     <PlanModeChip conversationId={codeSessionConversation.id} />
                   ) : null}
-                  {codeSessionConversation ? (
-                    <CreatorModeChip conversationId={codeSessionConversation.id} />
+                  {activeConversationId && !isAgentLayout ? (
+                    <CreatorModeChip conversationId={activeConversationId} />
                   ) : null}
                 </div>
               ) : null}
@@ -890,6 +906,7 @@ export function Composer() {
                 <SlashMenu
                   commands={slashCommands}
                   activeIndex={activeIndex}
+                  headerKey={codeMenusEnabled ? 'slash.header' : 'slash.headerChat'}
                   onSelect={selectSlash}
                   onHoverIndex={(index) => setMenu({ ...menu, active: index })}
                 />

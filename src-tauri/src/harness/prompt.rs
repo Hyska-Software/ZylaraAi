@@ -23,7 +23,7 @@ use crate::tools::skills::Skill;
 /// Part of the persisted `prompt_snapshots` identity (`snapshot_key`, F2a):
 /// bump it whenever the prompt text/sections change so a session never reuses a
 /// snapshot built by an older prompt.
-pub const PROMPT_VERSION: u32 = 3;
+pub const PROMPT_VERSION: u32 = 4;
 
 /// Session date (`YYYY-MM-DD`) frozen from the conversation creation time.
 ///
@@ -115,6 +115,9 @@ fn build_system_prompt_inner(
     prompt.push_str(&skills_section(skills, options));
     if let Some(section) = code_execution_section(options, settings) {
         prompt.push_str(&section);
+    }
+    if options.plugin_creator {
+        prompt.push_str(crate::harness::plugin_creator::section());
     }
     prompt.push_str(
         "# Citations and sources\n\
@@ -254,6 +257,14 @@ fn tools_section(options: &TurnOptions) -> String {
          - When creating a file, end with a short summary of the artifact; the complete content \
          stays in the artifact, do not repeat it in the chat.\n\n",
     );
+    if options.plugin_creator {
+        section.push_str(
+            "- `plugin_studio(action, plugin?, pluginId?, name?, slug?, target?, template?, path?, \
+             content?, encoding?)`: authors, validates, signs, packs and installs a Zylara plugin. \
+             Only available in Plugin Creator mode. Read `plugin-authoring` and the relevant \
+             bundled skills first; install is always disabled.\n",
+        );
+    }
     section
 }
 
@@ -990,6 +1001,43 @@ mod tests {
         assert!(prompt.contains("# Skills"));
         assert!(prompt.contains("No skills installed at the moment."));
         assert!(!prompt.contains("## Installed skills"));
+    }
+
+    #[test]
+    fn prompt_embeds_creator_skills_only_when_active() {
+        let normal = default_prompt();
+        assert!(!normal.contains("Plugin Creator mode"));
+        assert!(!normal.contains("plugin_studio"));
+
+        let creator = build_system_prompt(
+            &model(),
+            &TurnOptions {
+                plugin_creator: true,
+                ..Default::default()
+            },
+            &Settings::default(),
+            &sample_skills(),
+            SESSION_DATE,
+        );
+        for needle in [
+            "Plugin Creator mode",
+            "plugin-authoring",
+            "plugin-manifest",
+            "plugin_studio",
+            "Settings → Plugins",
+            "do not ask the user for an implementation guide",
+        ] {
+            assert!(creator.contains(needle), "creator prompt missing {needle}");
+        }
+        for forbidden in [
+            "data/plugin-contract.json",
+            "data/plugin-manifest.schema.json",
+            "docs/PLUGINS.md",
+            "plugins/fixtures",
+            "scripts/plugin/cli.mjs",
+        ] {
+            assert!(!creator.contains(forbidden), "creator prompt points at {forbidden}");
+        }
     }
 
     #[test]

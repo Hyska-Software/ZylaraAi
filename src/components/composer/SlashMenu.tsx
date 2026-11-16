@@ -15,6 +15,7 @@ export interface SlashMenuProps {
   activeIndex: number;
   onSelect: (command: SlashCommandView) => void;
   onHoverIndex: (index: number) => void;
+  headerKey?: 'slash.header' | 'slash.headerChat';
 }
 
 const GROUP_ORDER: SlashCommandGroup[] = [
@@ -33,7 +34,13 @@ const GROUP_ORDER: SlashCommandGroup[] = [
  * ordem do catálogo; `aria-activedescendant` no textarea aponta para o id da
  * opção ativa.
  */
-export function SlashMenu({ commands, activeIndex, onSelect, onHoverIndex }: SlashMenuProps) {
+export function SlashMenu({
+  commands,
+  activeIndex,
+  onSelect,
+  onHoverIndex,
+  headerKey = 'slash.header',
+}: SlashMenuProps) {
   const { t } = useTranslation('composer');
   const grouped = GROUP_ORDER.map((group) => ({
     group,
@@ -47,7 +54,7 @@ export function SlashMenu({ commands, activeIndex, onSelect, onHoverIndex }: Sla
       <div className="flex items-center gap-1.5 px-2 pb-1 pt-1.5">
         <Terminal aria-hidden className="size-3.5 shrink-0 text-foreground-subtle" strokeWidth={1.75} />
         <p className="min-w-0 flex-1 truncate text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
-          {t('slash.header')}
+          {t(headerKey)}
         </p>
         <span className="flex items-center gap-1 text-[10.5px] text-foreground-subtle">
           <CornerDownLeft aria-hidden className="size-3" strokeWidth={1.75} />

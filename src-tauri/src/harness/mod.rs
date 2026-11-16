@@ -33,6 +33,7 @@ pub mod cache;
 pub mod code;
 pub mod completion;
 pub mod compaction;
+pub mod plugin_creator;
 pub mod prompt;
 pub mod render;
 
@@ -1970,6 +1971,12 @@ pub async fn run_turn(
             conversation.id
         ));
     }
+    // Plugin Creator is a top-level session mode for Chat and Code. It is read
+    // from the append-only session store (never trusted from the renderer) and
+    // set before prompt/tool snapshots so the Chat cache key changes with it.
+    payload.options.plugin_creator = payload.options.delegation_depth == 0
+        && crate::harness::code::session::creator_mode_active(&deps.db, &conversation.id)
+            .unwrap_or(false);
     // Agent threads keep the workspace they were created with (like a Code
     // session). Changing the persona's default workspace later does not
     // invalidate old threads.
@@ -5491,6 +5498,8 @@ fn code_enabled_specs(
             .filter(|spec| has_workspace || !spec.requires_workspace)
             .filter(|spec| settings.shell_enabled || spec.name != "run_command")
             .filter(|spec| settings.web_search_enabled || spec.name != "web_search")
+            // Plugin Studio is only exposed in Plugin Creator mode.
+            .filter(|spec| spec.name != crate::tools::plugins_studio::NAME || ctx.creator_mode)
             // Subagents: read-only scouts or autonomous workers (write + shell).
             .filter(|spec| {
                 !subagent
@@ -7092,6 +7101,75 @@ mod agent_loop_tests {
             prompt::PROMPT_VERSION,
             &config,
         )
+    }
+
+    #[tokio::test]
+    async fn chat_creator_mode_adds_the_studio_prompt_and_tool() {
+        let temp = TempDb::new();
+        let creator_conversation = temp
+            .db
+            .create_conversation("Creator", "opencode-go", "deepseek-v4.1-flash")
+            .expect("creator conversation");
+        let normal_conversation = temp
+            .db
+            .create_conversation("Normal", "opencode-go", "deepseek-v4.1-flash")
+            .expect("normal conversation");
+        crate::harness::code::session::set_creator_mode(
+            &temp.db,
+            &creator_conversation.id,
+            true,
+        )
+        .expect("creator mode");
+        let requests: Arc<Mutex<Vec<CompletionRequest>>> = Arc::new(Mutex::new(Vec::new()));
+        let harness = deps(
+            temp.db.clone(),
+            capturing_streamer(requests.clone(), "Creator ready."),
+        );
+        let payload = |conversation: &Conversation| TurnPayload {
+            conversation_id: conversation.id.clone(),
+            content: "Create a plugin".into(),
+            attachment_ids: Vec::new(),
+            provider_id: conversation.provider_id.clone(),
+            model_id: conversation.model_id.clone(),
+            reasoning: None,
+            options: TurnOptions::default(),
+            profile: TurnProfile::Chat,
+            turn_kind: TurnKind::User,
+            goal_request: false,
+            turn_id: None,
+            resume_assistant_message_id: None,
+        };
+        let (creator_channel, _events) = channel();
+        run_turn(
+            harness.clone(),
+            payload(&creator_conversation),
+            Settings::default(),
+            creator_channel,
+            CancellationToken::new(),
+        )
+        .await
+        .expect("creator turn");
+        let (normal_channel, _events) = channel();
+        run_turn(
+            harness,
+            payload(&normal_conversation),
+            Settings::default(),
+            normal_channel,
+            CancellationToken::new(),
+        )
+        .await
+        .expect("normal turn");
+
+        let requests = requests.lock().expect("requests");
+        assert!(requests.len() >= 2);
+        let creator = &requests[0];
+        assert!(creator.system_prompt.contains("Plugin Creator mode"));
+        assert!(creator.system_prompt.contains("plugin-authoring"));
+        assert!(creator.tools.iter().any(|tool| tool.name == "plugin_studio"));
+        assert!(!creator.tools.iter().any(|tool| tool.name == "validate_plugin"));
+        let normal = &requests[1];
+        assert!(!normal.system_prompt.contains("Plugin Creator mode"));
+        assert!(!normal.tools.iter().any(|tool| tool.name == "plugin_studio"));
     }
 
     /// User turns have no step cap: 65 tool steps must not stop at the old
@@ -14770,7 +14848,7 @@ mod agent_loop_tests {
     }
 
     #[test]
-    fn creator_mode_adds_validate_plugin_only_for_top_level_turns() {
+    fn creator_mode_adds_studio_and_validate_only_for_top_level_turns() {
         let mut context = code::context::CodeTurnContext::default();
         context.root = Some(PathBuf::from("C:/workspace"));
         let settings = Settings::default();
@@ -14779,6 +14857,7 @@ mod agent_loop_tests {
             .map(|spec| spec.name)
             .collect();
         assert!(!normal.contains(&"validate_plugin"));
+        assert!(!normal.contains(&"plugin_studio"));
 
         context.creator_mode = true;
         let creator: Vec<&str> = code_enabled_specs(&context, &settings, 0, false)
@@ -14787,12 +14866,25 @@ mod agent_loop_tests {
             .collect();
         assert!(creator.contains(&"validate_plugin"));
         assert!(creator.contains(&"install_plugin"));
+        assert!(creator.contains(&"plugin_studio"));
 
         let subagent: Vec<&str> = code_enabled_specs(&context, &settings, 1, false)
             .iter()
             .map(|spec| spec.name)
             .collect();
         assert!(!subagent.contains(&"validate_plugin"));
+        assert!(!subagent.contains(&"plugin_studio"));
+
+        // The authoring studio works without a workspace; validate/install
+        // still require one for workspace paths.
+        let mut no_workspace = code::context::CodeTurnContext::default();
+        no_workspace.creator_mode = true;
+        let studio_only: Vec<&str> = code_enabled_specs(&no_workspace, &settings, 0, false)
+            .iter()
+            .map(|spec| spec.name)
+            .collect();
+        assert!(studio_only.contains(&"plugin_studio"));
+        assert!(!studio_only.contains(&"validate_plugin"));
     }
 
     #[test]

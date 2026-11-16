@@ -10,6 +10,7 @@
 //! - disabled/safe-mode plugins contribute nothing.
 
 mod assets;
+pub mod authoring;
 pub mod contract;
 pub mod contract_generated;
 pub mod manifest;
@@ -17,7 +18,7 @@ mod package;
 mod permissions;
 mod providers_support;
 mod rpc;
-mod signature;
+pub(crate) mod signature;
 mod store;
 mod store_db;
 
@@ -1317,6 +1318,20 @@ impl PluginManager {
             .warnings
             .retain(|warning| warning != "unsigned");
         inspection.warnings.push("dev".to_string());
+        Ok(inspection)
+    }
+
+    /// Inspects an authoring folder without requiring developer mode and
+    /// without executing plugin code. Signing material is excluded from the
+    /// digest by `authoring::collect_authoring_files`.
+    pub fn inspect_authoring_folder(&self, path: &Path) -> Result<PluginPackageInspection> {
+        let package = authoring::inspect_authoring_folder(path)?;
+        let mut inspection = inspection_from(&package);
+        inspection.signature_status = "unsigned".to_string();
+        inspection
+            .warnings
+            .retain(|warning| warning != "unsigned");
+        inspection.warnings.push("studio".to_string());
         Ok(inspection)
     }
 

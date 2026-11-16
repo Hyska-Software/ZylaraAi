@@ -22,6 +22,7 @@ pub mod genui;
 pub mod memory;
 pub mod pipeline;
 pub mod plugins;
+pub mod plugins_studio;
 pub mod registry;
 pub mod skills;
 pub mod tasks;
@@ -224,6 +225,9 @@ pub fn definitions(options: &TurnOptions) -> Vec<ToolDefinition> {
     // Subagentes não instalam plugins no host.
     if options.delegation_depth == 0 {
         tools.push(plugins::definition());
+        if options.plugin_creator {
+            tools.push(plugins_studio::definition());
+        }
     }
     if options.agent_memory {
         tools.push(memory::definition());
@@ -322,6 +326,11 @@ pub async fn execute(rt: &ToolRuntime, call: &ToolCallRecord) -> ToolOutcome {
         "validate_ui" => genui::run(&arguments),
         // Preparar um plugin (desativado) para o usuário ativar depois.
         "install_plugin" => plugins::run_chat(rt, &arguments).await,
+        // Plugin Studio is only callable in Plugin Creator mode.
+        "plugin_studio" if !rt.options.plugin_creator => ToolOutcome::error(
+            "TOOL_UNAVAILABLE: plugin_studio requires Plugin Creator mode",
+        ),
+        "plugin_studio" => plugins_studio::run_chat(rt, &arguments).await,
         // Durable agent memory (only for agent turns with memory enabled).
         "memory" => memory::run(rt, &arguments),
         name if agents::is_agent_tool(name) => {
@@ -523,6 +532,36 @@ mod tests {
         assert!(definitions(&options)
             .iter()
             .any(|tool| tool.name == "memory"));
+    }
+
+    #[test]
+    fn plugin_studio_is_only_visible_in_plugin_creator_mode() {
+        let normal = TurnOptions::default();
+        assert!(!definitions(&normal)
+            .iter()
+            .any(|tool| tool.name == "plugin_studio"));
+
+        let creator = TurnOptions {
+            plugin_creator: true,
+            ..Default::default()
+        };
+        let names: Vec<String> = definitions(&creator)
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect();
+        assert_eq!(
+            names.iter().filter(|name| name.as_str() == "plugin_studio").count(),
+            1
+        );
+
+        let subagent = TurnOptions {
+            plugin_creator: true,
+            delegation_depth: 1,
+            ..Default::default()
+        };
+        assert!(!definitions(&subagent)
+            .iter()
+            .any(|tool| tool.name == "plugin_studio"));
     }
 
     #[test]

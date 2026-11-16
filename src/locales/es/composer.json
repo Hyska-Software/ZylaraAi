@@ -68,6 +68,7 @@
   },
   "slash": {
     "header": "Comandos del espacio de trabajo",
+    "headerChat": "Comandos de plugins",
     "empty": "No se encontró ningún comando.",
     "listAria": "Comandos del modo Code",
     "groups": {
@@ -96,11 +97,11 @@
       },
       "creator": {
         "title": "Modo Creador de plugins",
-        "description": "Da al agente el flujo de creación de plugins y las tools de validar/instalar; el usuario activa el plugin después."
+        "description": "Usa plugin_studio para crear, validar, empaquetar e instalar un plugin en esta conversación (funciona sin workspace)."
       },
       "creatorOff": {
         "title": "Salir del modo Creador de plugins",
-        "description": "Desactiva el modo Creador de plugins de la sesión activa."
+        "description": "Desactiva el modo Creador de plugins de la conversación activa (chat o código)."
       },
       "permissions": {
         "title": "Modo de permiso",
@@ -150,8 +151,8 @@
     "noActiveSession": "Ninguna sesión activa",
     "noActiveSessionPlanOnHint": "Abre una sesión de código para activar el modo Plan.",
     "noActiveSessionPlanOffHint": "Abre una sesión de código para desactivar el modo Plan.",
-    "noActiveSessionCreatorOnHint": "Abre una sesión de código para activar el modo Creador de plugins.",
-    "noActiveSessionCreatorOffHint": "Abre una sesión de código para desactivar el modo Creador de plugins.",
+    "noActiveSessionCreatorOnHint": "Abre una conversación de chat o código para activar el modo Creador de plugins.",
+    "noActiveSessionCreatorOffHint": "Abre una conversación de chat o código para desactivar el modo Creador de plugins.",
     "planAlreadyActive": "El modo Plan ya está activo",
     "creatorAlreadyActive": "El modo Creador de plugins ya está activo",
     "planEnabled": "Modo Plan activado",

@@ -75,6 +75,7 @@ pub async fn run(ctx: &ToolCtx, exec: ToolExec, args: Value) -> ToolOutcome {
         ToolExec::ValidateUi => validate_ui(ctx, &args),
         ToolExec::InstallPlugin => crate::tools::plugins::run_code(ctx, &args).await,
         ToolExec::ValidatePlugin => crate::tools::plugins::run_validate(ctx, &args),
+        ToolExec::PluginStudio => crate::tools::plugins_studio::run_code(ctx, &args).await,
         ToolExec::WebSearch | ToolExec::FetchUrl | ToolExec::ListSkills | ToolExec::ReadSkill => {
             bridge_chat_tool(ctx, exec.name(), &args).await
         }

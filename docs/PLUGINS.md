@@ -325,16 +325,30 @@ fixture para um publisher real.
 
 ## 12. Modo Plugin Creator (`/creator`)
 
-No layout Code, `/creator` ativa um modo persistente da sessão (evento
-`creator/mode`, independente do modo Plano). O prompt volátil ganha o workflow
-de criação de plugins e a tool read-only `validate_plugin` passa a ser exposta;
-`install_plugin` continua disponível no perfil Code.
+`/creator` funciona em conversas do **Chat** (sem workspace) e do **Code** (em
+qualquer pasta). Ativa um modo persistente da conversa (evento `creator/mode`,
+independente do modo Plano), injeta o workflow de criação de plugins e expõe a
+tool `plugin_studio`; `validate_plugin` continua disponível no Code para pacotes
+e pastas do workspace, e `install_plugin` continua para URLs/paths do Code.
 
-Fluxo esperado do agente: ler a skill `plugin-authoring` e o contrato, planejar
-com `todo_write`, implementar, validar com `validate_plugin` + CLI
-`dev`/`review`, testar, empacotar/assinar, instalar desativado e pedir que o
-usuário ative em Settings → Plugins. O agente nunca ativa o plugin nem concede
-permissões.
+A fonte do plugin fica em `<app-data>/plugin-studio/<conversation>/<slug>` no
+Chat, ou em `<workspace>/plugins/<slug>` no Code com workspace confiável
+(`target=studio` usa app-data em qualquer layout). O `plugin_studio` faz
+`init` → `write` → `validate` → `pack` (assinatura Ed25519) → `install`
+(sempre desativado). A chave do studio e o `studio.json` nunca entram no
+`.zplugin`; `write`/`read`/`remove` rejeitam `META-INF/**`.
+
+O conhecimento é autocontido nas skills embarcadas `plugin-authoring`,
+`plugin-manifest`, `plugin-ui`, `plugin-genui`, `plugin-agent`,
+`plugin-trusted` e `plugin-package`; o agente não lê contrato/schema/docs/
+fixtures do repositório nem pede um guia ao usuário. As tabelas factuais são
+geradas por `scripts/build-plugin-skills.mjs` a partir do contrato e do schema,
+com `--check` no teste de paridade.
+
+O agente nunca ativa o plugin nem concede permissões: o pacote instalado pelo
+studio fica `activation_required`; o usuário revisa e ativa em Settings →
+Plugins. Trusted exige `allowTrusted`, `unsafe.renderer`, assinatura e
+consentimento.
 
 `/creator off` (ou o chip no composer) desativa o modo. O modo não substitui o
 modo Plano: com ambos ativos, o agente primeiro planeja e só implementa após a

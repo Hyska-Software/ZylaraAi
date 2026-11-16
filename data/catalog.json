@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-14T21:24:15.235Z",
+ "generatedAt": "2026-11-16T02:54:05.207Z",
  "sources": {
   "docs": [
    "https://opencode.ai/v2/docs/console/go/",
@@ -1986,6 +1986,61 @@
      "knowledge": null,
      "openWeights": false,
      "description": "2.4-trillion-parameter MoE flagship for coding, professional work, multimodal understanding, and long-horizon agentic workflows",
+     "tags": [
+      "open-weights",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "qwen4-max",
+     "name": "Qwen4 Max",
+     "family": "qwen",
+     "protocols": [
+      "anthropic"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      },
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "xhigh"
+       ]
+      },
+      {
+       "type": "budget_tokens",
+       "max": 262144
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1000000,
+     "maxOutput": 393216,
+     "cost": {
+      "input": 1.5,
+      "output": 4.5,
+      "cache_read": 0.075,
+      "cache_write": 1.875
+     },
+     "releaseDate": "2026-11-16",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Flagship multimodal model for coding, office productivity, frontend design, and complex agentic tasks",
      "tags": [
       "open-weights",
       "reasoning",

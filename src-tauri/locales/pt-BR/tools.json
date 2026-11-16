@@ -595,6 +595,7 @@
   "tools.plugins.install.unavailable": "o gerenciador de plugins não está disponível",
   "tools.plugins.install.urlOnly": "este perfil só instala URL HTTPS de pacote; use uma sessão Code para instalar um .zplugin local",
   "tools.plugins.install.workspaceRequired": "é necessário um workspace para instalar um pacote .zplugin local",
+  "tools.pluginStudio.installNext": "Peça ao usuário para revisar as permissões e ativar {plugin} em Configurações → Plugins.",
   "tools.plugins.validate.pathOnly": "validate_plugin só aceita caminho local; use install_plugin para URL HTTPS de pacote",
   "tools.plugins.validate.summary": "Validado {plugin} v{version}",
   "tools.plugins.validate.valid": "PLUGIN_VALID",

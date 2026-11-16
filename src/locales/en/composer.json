@@ -68,6 +68,7 @@
   },
   "slash": {
     "header": "Workspace commands",
+    "headerChat": "Plugin commands",
     "empty": "No command found.",
     "listAria": "Code mode commands",
     "groups": {
@@ -96,11 +97,11 @@
       },
       "creator": {
         "title": "Plugin Creator mode",
-        "description": "Gives the agent the plugin-authoring workflow and the validate/install plugin tools; the user activates the plugin afterwards."
+        "description": "Use plugin_studio to create, validate, pack and install a plugin in this conversation (works without a workspace)."
       },
       "creatorOff": {
         "title": "Leave Plugin Creator mode",
-        "description": "Disables Plugin Creator mode for the active session."
+        "description": "Disables Plugin Creator mode for the active chat or code conversation."
       },
       "permissions": {
         "title": "Permission mode",
@@ -150,8 +151,8 @@
     "noActiveSession": "No active session",
     "noActiveSessionPlanOnHint": "Open a code session to enable Plan mode.",
     "noActiveSessionPlanOffHint": "Open a code session to disable Plan mode.",
-    "noActiveSessionCreatorOnHint": "Open a code session to enable Plugin Creator mode.",
-    "noActiveSessionCreatorOffHint": "Open a code session to disable Plugin Creator mode.",
+    "noActiveSessionCreatorOnHint": "Open a chat or code conversation to enable Plugin Creator mode.",
+    "noActiveSessionCreatorOffHint": "Open a chat or code conversation to disable Plugin Creator mode.",
     "planAlreadyActive": "Plan mode is already active",
     "creatorAlreadyActive": "Plugin Creator mode is already active",
     "planEnabled": "Plan mode enabled",

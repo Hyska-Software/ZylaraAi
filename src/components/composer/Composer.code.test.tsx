@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   setPlanMode: vi.fn(),
   setCreatorMode: vi.fn(),
   setPermissionMode: vi.fn(),
+  getCodeSessionState: vi.fn(),
   createConversation: vi.fn(),
   listConversations: vi.fn(),
   listArtifacts: vi.fn(),
@@ -102,6 +103,15 @@ beforeEach(() => {
     approvals: [],
   });
   mocks.setCreatorMode.mockResolvedValue({
+    conversationId: 'c-1',
+    permissionMode: 'edit',
+    planMode: false,
+    creatorMode: false,
+    todos: [],
+    jobs: [],
+    approvals: [],
+  });
+  mocks.getCodeSessionState.mockResolvedValue({
     conversationId: 'c-1',
     permissionMode: 'edit',
     planMode: false,
@@ -505,15 +515,21 @@ describe('Composer — comandos /', () => {
     ).toBe('false');
   });
 
-  it('não abre slash no Chat', async () => {
+  it('abre somente os comandos de plugin no Chat', async () => {
     useUiStore.setState({ layoutMode: 'chat' });
+    useChatStore.setState({
+      conversations: [conversation({ mode: 'chat', workspaceId: null })],
+      activeId: 'c-1',
+    });
     render(<Composer />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Mensagem para o Zylara' }), {
       target: { value: '/' },
     });
 
-    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(await screen.findByRole('listbox')).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /\/plan/ })).toBeNull();
+    expect(screen.getAllByRole('option', { name: /\/creator/ }).length).toBeGreaterThan(0);
   });
 
   it('/creator ativa o modo Plugin Creator no codeStore', async () => {
@@ -535,6 +551,34 @@ describe('Composer — comandos /', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Desativar modo Criador de plugins' })).toBeTruthy(),
     );
+  });
+
+  it('/creator appears in Chat without a workspace and enables the mode', async () => {
+    useUiStore.setState({ layoutMode: 'chat', activeWorkspaceId: null });
+    useChatStore.setState({
+      conversations: [conversation({ mode: 'chat', workspaceId: null })],
+      activeId: 'c-1',
+    });
+    mocks.setCreatorMode.mockResolvedValue({
+      conversationId: 'c-1',
+      permissionMode: 'edit',
+      planMode: false,
+      creatorMode: true,
+      todos: [],
+      jobs: [],
+      approvals: [],
+    });
+    render(<Composer />);
+
+    const chatTextarea = screen.getByRole('textbox', { name: 'Mensagem para o Zylara' });
+    fireEvent.change(chatTextarea, { target: { value: '/' } });
+    const options = await screen.findAllByRole('option', { name: /\/creator/ });
+    fireEvent.click(options[0]);
+
+    await waitFor(() => expect(mocks.setCreatorMode).toHaveBeenCalledWith('c-1', true));
+    expect(
+      await screen.findByRole('button', { name: 'Desativar modo Criador de plugins' }),
+    ).toBeTruthy();
   });
 
   it('/creator off desativa o modo pelo store e remove o chip', async () => {

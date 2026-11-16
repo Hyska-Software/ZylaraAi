@@ -377,7 +377,7 @@ pub static CHAT_SPECS: [ToolSpec; 10] = [
 /* ------------------------------------------------------------------ */
 
 /// Ordem estável do catálogo Code (a ordem entra no prompt: não reordene).
-static CODE_SPECS: [&ToolSpec; 26] = [
+static CODE_SPECS: [&ToolSpec; 27] = [
     &code::fs_read::READ_FILE_SPEC,
     &code::fs_read::LIST_DIR_SPEC,
     &code::fs_read::SEARCH_FILES_SPEC,
@@ -404,6 +404,7 @@ static CODE_SPECS: [&ToolSpec; 26] = [
     &CODE_READ_SKILL_SPEC,
     &CODE_VALIDATE_UI_SPEC,
     &crate::tools::plugins::CODE_SPEC,
+    &crate::tools::plugins_studio::SPEC,
 ];
 
 /// Perfil Code reaproveita web/skills do Chat (`TOOLS.md` §2.7).
@@ -586,6 +587,7 @@ pub enum ToolExec {
     ValidateUi,
     InstallPlugin,
     ValidatePlugin,
+    PluginStudio,
 }
 
 impl ToolExec {
@@ -619,6 +621,7 @@ impl ToolExec {
             "validate_ui" => Self::ValidateUi,
             "install_plugin" => Self::InstallPlugin,
             "validate_plugin" => Self::ValidatePlugin,
+            "plugin_studio" => Self::PluginStudio,
             _ => return None,
         })
     }
@@ -652,6 +655,7 @@ impl ToolExec {
             Self::ValidateUi => "validate_ui",
             Self::InstallPlugin => "install_plugin",
             Self::ValidatePlugin => "validate_plugin",
+            Self::PluginStudio => "plugin_studio",
         }
     }
 
@@ -720,9 +724,10 @@ mod tests {
                 "read_skill",
                 "validate_ui",
                 "install_plugin",
+                "plugin_studio",
             ]
         );
-        assert_eq!(code_specs().len(), 26);
+        assert_eq!(code_specs().len(), 27);
     }
 
     #[test]
@@ -827,7 +832,7 @@ mod tests {
     #[test]
     fn code_definitions_expose_wire_fields_only() {
         let definitions = definitions_for(TurnProfile::Code);
-        assert_eq!(definitions.len(), 26);
+        assert_eq!(definitions.len(), 27);
         for definition in &definitions {
             assert!(!definition.description.is_empty(), "{}", definition.name);
             assert_eq!(definition.parameters["type"], "object", "{}", definition.name);
@@ -870,6 +875,10 @@ mod tests {
         assert_eq!(
             ToolExec::for_tool("validate_plugin").map(ToolExec::name),
             Some("validate_plugin")
+        );
+        assert_eq!(
+            ToolExec::for_tool("plugin_studio").map(ToolExec::name),
+            Some("plugin_studio")
         );
         // `ToolCtx` de teste continua construível com todos os campos novos.
         let ctx = test_ctx();

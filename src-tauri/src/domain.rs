@@ -857,6 +857,10 @@ pub struct TurnOptions {
     pub plugin_prompt: String,
     #[serde(skip)]
     pub plugin_fingerprint: String,
+    /// Plugin Creator mode for this turn (read from the session store, never
+    /// from the renderer). It gates the `plugin_studio` tool and prompt section.
+    #[serde(skip)]
+    pub plugin_creator: bool,
     /// Agent turn with durable memory enabled (`memory` tool available).
     #[serde(skip)]
     pub agent_memory: bool,
@@ -896,6 +900,7 @@ impl Default for TurnOptions {
             allowed_mcp_servers: None,
             plugin_prompt: String::new(),
             plugin_fingerprint: String::new(),
+            plugin_creator: false,
             agent_memory: false,
             agent_id: None,
             agent_delegation: false,
