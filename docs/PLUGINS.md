@@ -206,12 +206,21 @@ consegue substituí-la renderizando sua própria UI no lugar de `children`:
 | `chat.message.tool-group` | `chat.message.tool.group.frame` | idem (grupo dentro do `<ol>` de steps) |
 | `chat.message.tool-row` | `chat.message.tool` (keyed por tool) | o renderer por tool já é o slot keyed |
 | `code.tab.strip` | `code.tab.strip.frame` | o strip é `RecipeDiv` com refs de sortable/drag |
-| `code.workbench` | `code.session.header.frame` + `layout.center` | o workbench é o próprio `WorkspaceCenter` |
 | `agent.tab.strip` | `agent.tabs` | faixa inexistente (ver acima) |
 | `agent.channel.view` | `agent.channel.view.frame` | — |
 | `agent.channel.message` | `agent.channel.message.before/after/body.frame` | — |
 | `agent.channel.composer` | `agent.channel.composer.frame` | — |
-| `settings.page`, `settings.rail` | `settings.page.header`, `settings.rail.before/after` | as abas vivem dentro do contexto Radix `Tabs` |
+
+`code.workbench`, `settings.page` e `settings.rail` **saíram** dessa lista: agora
+têm `ComponentSlot` de verdade (`WorkspaceCenter` e `SettingsDialog`), com
+fallback de identidade que repassa a árvore do host como `children` (o rail
+recebe `pluginTabs`, a página recebe `tab`). O fixture trusted
+`plugins/fixtures/surfaces-demo` demonstra os três: envolve o workbench, substitui
+a página de configurações e injeta uma linha declarativa em `palette.actions`.
+
+O *dock takeover* também é renderizado: `App.tsx` calcula `takeoverDock` a partir
+dos painéis com `takeover` e o mostra no lugar do dock do host até o usuário
+dispensá-lo (`dismissPluginDockTakeover`).
 
 ## 3.1 Abas de conteúdo nas sidebars (`ui.sidebarTabs`)
 
@@ -248,6 +257,11 @@ declarativos usam `{ "kind": "toggleMode", "target": "<pluginId>:<modeId>" }`.
 O conjunto ativo entra no fingerprint de plugins, então alternar um modo invalida
 o snapshot de prompt (`break_reason=plugin_config_changed`).
 
+Cada modo do layout ativo também vira um slash command (`pluginModeCommands` em
+`src/components/composer/commands.ts`): `/<modeId>` ou, quando o nome já está
+tomado por um builtin/command, `/<plugin-slug>-<modeId>`. Executar alterna o modo
+da conversa aberta e emite `zylara:plugin-mode-changed`, que as chips escutam.
+
 ## 3.3 Templates de agentes (`contributes.agentTemplates`)
 
 Templates aparecem na galeria de criação do layout Agentes com selo do plugin.
@@ -256,6 +270,14 @@ Templates aparecem na galeria de criação do layout Agentes com selo do plugin.
 e `capabilities` — **deny-only**: só restringem os defaults, como os templates
 embutidos. Permissão `agent.templates`. Criar o agente continua sendo consentimento
 explícito no editor.
+
+Quando o agente nasce de um template de plugin, o renderer envia
+`template: { pluginId, templateId }` junto do `AgentInput`. O backend revalida
+(`validate_template`): o template precisa existir num plugin ativo, e o agente não
+pode reativar uma capability que o template desativou (`AGENT_TEMPLATE_INVALID`)
+nem usar `null` ("todos") onde o template reduziu a lista. A origem é gravada em
+`plugin_audit` (`capability = agent.template`, `decision = applied`); falha de
+auditoria só loga e nunca bloqueia a criação.
 
 ## 3.4 Provedores
 
@@ -267,6 +289,11 @@ Code e Agentes resolvem modelo/credencial pelo mesmo caminho; a UI marca a orige
 (`origin: custom|plugin`). Só `openai-chat` é suportado; `http://` apenas em
 localhost (Ollama/LM Studio/vLLM). Credenciais nunca são declarativas: headers
 `authorization`/`cookie`/`host` são recusados no manifesto.
+
+O botão "Testar conexão" usa `validate_provider` para provedores do catálogo e
+`test_custom_provider` (mesmo probe, restrito a ids `custom__…`) para os definidos
+pelo usuário. Um `icon` declarado no provedor é resolvido pelo `ProviderGlyph`
+antes do fallback de iniciais.
 
 Componentes que trusted pode substituir/wrapar:
 `layout.shell`, `layout.center`, `chat.welcome`, `settings.dialog`, `plugins.view`

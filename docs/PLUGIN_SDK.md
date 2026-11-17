@@ -100,4 +100,11 @@ rejeita ids/slots/permissões desconhecidos.
 
 `plugins/fixtures/modes-demo` é o exemplo executável: dois modos (`review` com
 `promptFile` + `writes: "blocked"`, `deep-dive` inline) e um template de agente
-`reviewer` com `permissionMode: "read_only"`.
+`reviewer` com `permissionMode: "read_only"`. Cada modo também aparece como slash
+command (`/<modeId>`, ou `/<plugin-slug>-<modeId>` em caso de colisão), e o
+template enviado ao backend leva `template: { pluginId, templateId }`, auditado
+como `agent.template`.
+
+`plugins/fixtures/surfaces-demo` cobre a camada de UI: envolve `code.workbench`,
+substitui `settings.page` e injeta uma linha em `palette.actions` — o roteiro de
+aceitação para "qualquer alteração de UI".
