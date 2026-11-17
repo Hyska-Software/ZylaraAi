@@ -23,7 +23,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { providerAuth, providerSupportsPlan, providers as catalogProviders } from '@/lib/catalog';
+import {
+  CURATED_PROVIDER_IDS,
+  providerAuth,
+  providerSupportsPlan,
+  providers as catalogProviders,
+} from '@/lib/catalog';
 import { openExternal } from '@/lib/genui/open-external';
 import { formatDate } from '@/lib/i18n/format';
 import { copyText } from '@/lib/utils';
@@ -96,20 +101,31 @@ const CHATGPT_USAGE_URL = 'https://chatgpt.com/settings/usage';
 const PLAN_NOTICE_KEY = 'zylara.openaiPlanNoticeShown';
 
 /**
- * Providers listed under "Popular providers", in display order. Contracts: this
- * is the curated set shipped today — anything else stays in "See more
- * providers" (so a new catalog provider needs no UI change).
+ * Providers listed under "Popular providers", in display order. Sourced from the
+ * catalog so the settings list and the model selector share one curated set;
+ * anything else stays in "See more providers" (so a new catalog provider needs
+ * no UI change).
  */
-const POPULAR_PROVIDER_IDS: readonly string[] = [
-  'opencode-go',
-  'opencode-zen',
-  'openai',
-  'anthropic',
-  'gemini',
-];
+const POPULAR_PROVIDER_IDS: readonly string[] = CURATED_PROVIDER_IDS;
 
 /** Provider highlighted with the "Recommended" badge (the app default). */
 const RECOMMENDED_PROVIDER_ID = 'opencode-go';
+
+/**
+ * Display order of the "See more providers" groups (catalog `category`).
+ * Providers without a known category land in the trailing group, so
+ * user-defined and plugin entries still show up.
+ */
+const PROVIDER_CATEGORY_ORDER = ['lab', 'aggregator', 'host', 'other'] as const;
+
+type ProviderCategory = (typeof PROVIDER_CATEGORY_ORDER)[number];
+
+function providerCategoryOf(provider: ProviderInfo): ProviderCategory {
+  const category = provider.category ?? '';
+  return (PROVIDER_CATEGORY_ORDER as readonly string[]).includes(category)
+    ? (category as ProviderCategory)
+    : 'other';
+}
 
 function readPlanNoticeShown(): boolean {
   try {
@@ -352,16 +368,21 @@ function ProviderConfigDialog({
   );
 }
 
-/** "See more providers" modal: remaining providers, or the coming-soon state. */
+/** "See more providers" modal: grouped, searchable list or the coming-soon state. */
 function MoreProvidersDialog({
   open,
   onOpenChange,
   empty,
+  query,
+  onQueryChange,
   children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** No other provider is bundled at all (shows the coming-soon copy). */
   empty: boolean;
+  query: string;
+  onQueryChange: (value: string) => void;
   children: ReactNode;
 }) {
   const { t } = useTranslation('settings');
@@ -380,7 +401,16 @@ function MoreProvidersDialog({
               </p>
             </div>
           ) : (
-            children
+            <div className="flex flex-col gap-3">
+              <Input
+                type="search"
+                value={query}
+                onChange={(event) => onQueryChange(event.target.value)}
+                placeholder={t('providers.more.searchPlaceholder')}
+                aria-label={t('providers.more.searchPlaceholder')}
+              />
+              {children}
+            </div>
           )}
         </div>
       </DialogContent>
@@ -448,6 +478,8 @@ export function ProvidersTab() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [openProviderId, setOpenProviderId] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Free-text filter of the "See more providers" dialog. */
+  const [moreQuery, setMoreQuery] = useState('');
   const finishingAttemptRef = useRef<string | null>(null);
   const copiedLinkTimerRef = useRef<number | null>(null);
   /** Attempts cancelled by the user: their rejection is not an error to show. */
@@ -473,23 +505,13 @@ export function ProvidersTab() {
     }
   };
 
-  /** Curated catalog copy: known provider ids use localized keys. */
-  const descriptionOf = (provider: ProviderInfo): string => {
-    switch (provider.id) {
-      case 'opencode-go':
-        return t('providers.description.opencode-go');
-      case 'opencode-zen':
-        return t('providers.description.opencode-zen');
-      case 'openai':
-        return t('providers.description.openai');
-      case 'anthropic':
-        return t('providers.description.anthropic');
-      case 'gemini':
-        return t('providers.description.gemini');
-      default:
-        return provider.description;
-    }
-  };
+  /**
+   * Localized copy of a catalog provider. The catalog `description` is the
+   * fallback for providers without shipped copy (user-defined, plugin and any
+   * future catalog entry), so a new provider needs no UI change to render.
+   */
+  const descriptionOf = (provider: ProviderInfo): string =>
+    t(`providers.description.${provider.id}`, { defaultValue: provider.description });
 
   /** Curated catalog notes: unknown providers keep the catalog data as-is. */
   const notesOf = (provider: ProviderInfo): string[] => {
@@ -518,6 +540,10 @@ export function ProvidersTab() {
           t('providers.notes.gemini.2'),
           t('providers.notes.gemini.3'),
         ];
+      case 'openrouter':
+        return [t('providers.notes.openrouter.0')];
+      case 'zai':
+        return [t('providers.notes.zai.0')];
       default:
         return provider.notes;
     }
@@ -535,6 +561,21 @@ export function ProvidersTab() {
   const otherProviders = providerList.filter(
     (provider) => !POPULAR_PROVIDER_IDS.includes(provider.id) && !managedIds.has(provider.id),
   );
+  const normalizedMoreQuery = moreQuery.trim().toLocaleLowerCase();
+  const filteredOtherProviders = normalizedMoreQuery
+    ? otherProviders.filter((provider) =>
+        [provider.name, provider.shortName, provider.id, descriptionOf(provider)].some((value) =>
+          value.toLocaleLowerCase().includes(normalizedMoreQuery),
+        ),
+      )
+    : otherProviders;
+  /** Non-empty groups of the dialog, in {@link PROVIDER_CATEGORY_ORDER}. */
+  const otherGroups = PROVIDER_CATEGORY_ORDER.map((category) => ({
+    category,
+    providers: filteredOtherProviders.filter(
+      (provider) => providerCategoryOf(provider) === category,
+    ),
+  })).filter((group) => group.providers.length > 0);
   const openProvider = openProviderId
     ? providerList.find((provider) => provider.id === openProviderId) ?? null
     : null;
@@ -1722,24 +1763,42 @@ export function ProvidersTab() {
 
       <MoreProvidersDialog
         open={moreOpen}
-        onOpenChange={setMoreOpen}
+        onOpenChange={(next) => {
+          setMoreOpen(next);
+          if (!next) setMoreQuery('');
+        }}
         empty={otherProviders.length === 0}
+        query={moreQuery}
+        onQueryChange={setMoreQuery}
       >
-        <ul className="divide-y divide-border rounded-xl bg-surface">
-          {otherProviders.map((provider) => (
-            <ProviderRow
-              key={provider.id}
-              provider={provider}
-              description={descriptionOf(provider)}
-              state={rowStateOf(provider)}
-              recommended={false}
-              onOpen={() => {
-                setMoreOpen(false);
-                setOpenProviderId(provider.id);
-              }}
-            />
-          ))}
-        </ul>
+        {otherGroups.length === 0 ? (
+          <p className="rounded-xl bg-surface px-4 py-8 text-center text-[13px] text-foreground-muted">
+            {t('providers.more.noResults', { query: moreQuery.trim() })}
+          </p>
+        ) : (
+          otherGroups.map((group) => (
+            <section key={group.category} aria-label={t(`providers.category.${group.category}`)}>
+              <h4 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-foreground-subtle">
+                {t(`providers.category.${group.category}`)}
+              </h4>
+              <ul className="divide-y divide-border rounded-xl bg-surface">
+                {group.providers.map((provider) => (
+                  <ProviderRow
+                    key={provider.id}
+                    provider={provider}
+                    description={descriptionOf(provider)}
+                    state={rowStateOf(provider)}
+                    recommended={false}
+                    onOpen={() => {
+                      setMoreOpen(false);
+                      setOpenProviderId(provider.id);
+                    }}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))
+        )}
       </MoreProvidersDialog>
 
       <PlanNoticeDialog

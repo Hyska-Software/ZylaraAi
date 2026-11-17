@@ -28,6 +28,7 @@ import {
   normalizeSearch,
   reasoningForModel,
   selectionKey,
+  selectorProviders,
   type ModelFilter,
   type ModelListEntry,
 } from '@/lib/modelMenu';
@@ -165,8 +166,14 @@ function ModelPickerDialogBody({ onClose }: ModelPickerDialogBodyProps) {
   const toggleFavorite = useAppStore((state) => state.toggleFavorite);
 
   const providerList = useMemo<ProviderInfo[]>(
-    () => (storeProviders.length ? storeProviders : catalogProviders()),
-    [storeProviders],
+    () =>
+      selectorProviders(
+        storeProviders.length ? storeProviders : catalogProviders(),
+        keys,
+        auth,
+        selection.providerId,
+      ),
+    [storeProviders, keys, auth, selection.providerId],
   );
 
   const searchRef = useRef<HTMLInputElement>(null);

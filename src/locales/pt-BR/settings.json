@@ -208,7 +208,9 @@
     "more": {
       "title": "Ver mais provedores",
       "description": "Novos provedores aparecem aqui assim que forem suportados.",
-      "empty": "Mais provedores em breve"
+      "empty": "Mais provedores em breve",
+      "searchPlaceholder": "Buscar provedores…",
+      "noResults": "Nenhum provedor corresponde a \"{{query}}\"."
     },
     "custom": {
       "yourProviders": "Seus provedores",
@@ -399,12 +401,39 @@
       "keyStillDetectedBody": "Ainda há uma chave detectada via {{source}}."
     },
     "privacyFooter": "O Zylara não envia suas credenciais para nenhum servidor próprio: as requisições vão direto para o provedor escolhido. Ao remover uma chave salva nas configurações, a detecção por ambiente/CLI volta a valer, se existir. Sair do ChatGPT revoga o token de atualização e mantém apenas o registro da conta para a próxima conexão.",
+    "category": {
+      "lab": "Laboratórios de modelos",
+      "aggregator": "Agregadores",
+      "host": "Provedores de inferência",
+      "other": "Outros provedores"
+    },
     "description": {
       "opencode-go": "Assinatura OpenCode com limites mensais — sem cobrança por token.",
       "opencode-zen": "Catálogo pay-as-you-go com modelos curados de vários provedores.",
       "openai": "Login com o plano ChatGPT ou uma API key da OpenAI.",
       "anthropic": "Acesso direto aos modelos Claude com uma API key da Anthropic.",
-      "gemini": "Modelos Gemini com uma API key do Google AI Studio."
+      "gemini": "Modelos Gemini com uma API key do Google AI Studio.",
+      "deepseek": "API própria da DeepSeek com modelos de raciocínio e chat e contexto longo.",
+      "xai": "Modelos Grok pela API da xAI.",
+      "mistral": "Modelos Mistral AI, incluindo a linha Devstral para código.",
+      "moonshot": "Modelos Kimi da plataforma Moonshot AI.",
+      "zai": "Modelos GLM pelo endpoint do plano de código da Z.AI.",
+      "minimax": "Modelos de chat e raciocínio MiniMax pela API compatível com OpenAI.",
+      "inception": "Modelos de difusão Mercury da Inception Labs.",
+      "stepfun": "Modelos Step da plataforma StepFun.",
+      "openrouter": "Uma API key para um catálogo agregado de vários provedores.",
+      "vercel-ai-gateway": "Gateway da Vercel que roteia uma API key entre vários provedores.",
+      "groq": "Inferência de baixa latência para modelos de pesos abertos.",
+      "together": "Modelos de pesos abertos hospedados com API compatível com OpenAI.",
+      "fireworks": "Modelos de pesos abertos e de código hospedados na Fireworks.",
+      "cerebras": "Inferência em wafer-scale para modelos de pesos abertos.",
+      "nvidia": "Modelos hospedados pela NVIDIA pela API NIM.",
+      "deepinfra": "Hospedagem por token para modelos de pesos abertos.",
+      "siliconflow": "Hospedagem de pesos abertos (DeepSeek, Qwen, GLM) com API compatível com OpenAI.",
+      "sambanova": "Inferência rápida para modelos de pesos abertos na SambaNova Cloud.",
+      "scaleway": "APIs generativas hospedadas na UE com endpoint compatível com OpenAI.",
+      "novita": "Hospedagem de modelos de pesos abertos com API compatível com OpenAI.",
+      "venice": "Inferência com foco em privacidade para modelos de pesos abertos."
     },
     "notes": {
       "opencode-go": {
@@ -431,6 +460,12 @@
         "1": "Crie ou revise a API key em https://aistudio.google.com/apikey.",
         "2": "A lista da conta é buscada em GET /v1beta/models e limitada a Gemini 4 Carbon, Gemini 4 Argon e Gemini 3.8 Flash.",
         "3": "Thinking low/medium/high com resumos; long decode acima de 65.536 tokens não é suportado."
+      },
+      "openrouter": {
+        "0": "O OpenRouter aplica uma taxa própria sobre o preço de cada modelo; os valores do catálogo são os preços dos modelos."
+      },
+      "zai": {
+        "0": "Usa o endpoint do plano de código da Z.AI; sem um plano ativo a API responde com erro de autorização."
       }
     }
   },

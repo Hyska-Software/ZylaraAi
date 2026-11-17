@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getModel, getProvider, providerAuth, providerSupportsPlan, providers } from '@/lib/catalog';
-import type { ModelInfo, ProviderInfo } from '@/lib/types';
+import type { ModelInfo, ProviderAuthStatus, ProviderInfo } from '@/lib/types';
 import {
   budgetPresets,
   buildModelGroups,
@@ -26,6 +26,7 @@ import {
   providerHasKey,
   reasoningForModel,
   selectionKey,
+  selectorProviders,
   thinkingHeadline,
   thinkingNote,
   thinkingOptions,
@@ -618,5 +619,45 @@ describe('provider key status', () => {
       'Chave do OpenCode CLI',
     );
     expect(keyStatusLabel(undefined)).toBe('Sem chave de API');
+  });
+});
+
+describe('selectorProviders', () => {
+  const ids = (list: ProviderInfo[]) => list.map((provider) => provider.id);
+  const signedIn = (providerId: string) =>
+    ({ providerId, state: 'signed-in' }) as unknown as ProviderAuthStatus;
+
+  it('offers the curated providers even without a credential', () => {
+    expect(ids(selectorProviders(allProviders, [], []))).toEqual([
+      'opencode-go',
+      'opencode-zen',
+      'openai',
+      'anthropic',
+      'gemini',
+    ]);
+  });
+
+  it('adds a provider once it has a stored key or a connected account', () => {
+    expect(
+      ids(selectorProviders(allProviders, [{ providerId: 'deepseek', hasKey: true, source: 'settings' }], [])),
+    ).toContain('deepseek');
+    expect(ids(selectorProviders(allProviders, [], [signedIn('xai')]))).toContain('xai');
+    // A disconnected account does not make the provider selectable.
+    expect(
+      ids(
+        selectorProviders(allProviders, [], [
+          { providerId: 'xai', state: 'signed-out' } as unknown as ProviderAuthStatus,
+        ]),
+      ),
+    ).not.toContain('xai');
+  });
+
+  it('keeps the current selection and user-defined providers, drops the rest', () => {
+    const custom = { ...allProviders[0], id: 'acme-gateway', origin: 'custom' } as ProviderInfo;
+    const list = selectorProviders([...allProviders, custom], [], [], 'deepseek');
+    expect(ids(list)).toContain('deepseek');
+    expect(ids(list)).toContain('acme-gateway');
+    expect(ids(list)).not.toContain('groq');
+    expect(ids(list)).not.toContain('openrouter');
   });
 });

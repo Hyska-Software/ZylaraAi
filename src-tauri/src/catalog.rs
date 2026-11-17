@@ -67,6 +67,11 @@ pub struct ProviderInfo {
     /// Package-relative asset or image URL used instead of the built-in glyph.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Group of the "See more providers" dialog (`lab`, `aggregator`, `host`).
+    /// Bundled API-key providers carry it; curated and user-defined entries
+    /// may omit it (the dialog then uses the default group).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
     /// `custom` for user-defined providers, `plugin` for contributed ones.
     /// Bundled catalog entries omit it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -581,6 +586,56 @@ mod tests {
             assert!(model.attachment, "{} sem imagem", model.id);
             assert!(!model.estimated);
         }
+    }
+
+    #[test]
+    fn embedded_catalog_has_the_api_key_providers() {
+        let catalog = embedded();
+        for id in ["deepseek", "groq", "openrouter", "zai", "vercel-ai-gateway"] {
+            let provider = catalog.provider(id).unwrap_or_else(|| panic!("provedor {id}"));
+            assert_eq!(provider.auth, ProviderAuth::ApiKey, "{id}");
+            assert!(provider.oauth.is_none(), "{id}");
+            assert!(provider.category.is_some(), "{id}");
+            assert_eq!(
+                provider.endpoints.get("openai-chat").map(String::as_str),
+                Some("/chat/completions"),
+                "{id}"
+            );
+            assert_eq!(
+                provider.endpoints.get("models").map(String::as_str),
+                Some("/models"),
+                "{id}"
+            );
+            assert!(!provider.models.is_empty(), "{id}");
+            assert!(
+                provider
+                    .models
+                    .iter()
+                    .all(|model| model.protocols == vec!["openai-chat".to_string()]),
+                "{id}: a API-key seed must stay on a single wire protocol"
+            );
+            assert!(
+                provider
+                    .models
+                    .iter()
+                    .any(|model| model.id == provider.default_model_id),
+                "{id}: the default model must exist in the seed"
+            );
+        }
+    }
+
+    #[test]
+    fn provider_category_is_optional() {
+        let raw = r#"{
+            "id": "acme",
+            "name": "Acme",
+            "shortName": "Acme",
+            "baseUrl": "https://api.acme.dev/v1",
+            "defaultModelId": "chat-model",
+            "models": []
+        }"#;
+        let provider: ProviderInfo = serde_json::from_str(raw).expect("provider sem categoria");
+        assert!(provider.category.is_none());
     }
 
     #[test]

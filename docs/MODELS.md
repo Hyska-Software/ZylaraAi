@@ -110,6 +110,68 @@ removeu o parâmetro). Raciocínio segue a tabela do protocolo `anthropic` abaix
 (`adaptive` + `output_config.effort` para modelos com esforço; `enabled` +
 `budget_tokens` ≥1024 para os que só têm orçamento).
 
+## Provedores adicionais (API key, "Ver mais provedores")
+
+Além dos provedores curados (Go, Zen, OpenAI, Anthropic, Gemini), o catálogo embute
+21 provedores de API key que falam o protocolo `openai-chat` com Bearer. Eles não
+aparecem em **Provedores populares**: ficam em **Configurações › Provedores ›
+Ver mais provedores**, agrupados pela `category` do catálogo (`lab`,
+`aggregator`, `host`) e filtráveis pela busca do modal. Nenhum deles exige código
+de transporte novo — todos reutilizam o adaptador `openai-chat`.
+
+| Provedor | Base URL | `env` | Grupo |
+| --- | --- | --- | --- |
+| DeepSeek | `https://api.deepseek.com` | `DEEPSEEK_API_KEY` | lab |
+| xAI (Grok) | `https://api.x.ai/v1` | `XAI_API_KEY` | lab |
+| Mistral | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` | lab |
+| Moonshot (Kimi) | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` | lab |
+| Z.AI (GLM) | `https://api.z.ai/api/coding/paas/v4` | `ZAI_API_KEY` | lab |
+| MiniMax | `https://api.minimax.io/v1` | `MINIMAX_API_KEY` | lab |
+| Inception (Mercury) | `https://api.inceptionlabs.ai/v1` | `INCEPTION_API_KEY` | lab |
+| StepFun | `https://api.stepfun.ai/v1` | `STEPFUN_API_KEY` | lab |
+| OpenRouter | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | aggregator |
+| Vercel AI Gateway | `https://ai-gateway.vercel.sh/v1` | `AI_GATEWAY_API_KEY` | aggregator |
+| Groq | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` | host |
+| Together AI | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` | host |
+| Fireworks AI | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` | host |
+| Cerebras | `https://api.cerebras.ai/v1` | `CEREBRAS_API_KEY` | host |
+| NVIDIA NIM | `https://integrate.api.nvidia.com/v1` | `NVIDIA_API_KEY` | host |
+| DeepInfra | `https://api.deepinfra.com/v1/openai` | `DEEPINFRA_API_KEY` | host |
+| SiliconFlow | `https://api.siliconflow.com/v1` | `SILICONFLOW_API_KEY` | host |
+| SambaNova | `https://api.sambanova.ai/v1` | `SAMBANOVA_API_KEY` | host |
+| Scaleway | `https://api.scaleway.ai/v1` | `SCW_SECRET_KEY` | host |
+| Novita AI | `https://api.novita.ai/openai/v1` | `NOVITA_API_KEY` | host |
+| Venice AI | `https://api.venice.ai/api/v1` | `VENICE_API_KEY` | host |
+
+Contrato de cada entrada (`data/catalog.json`):
+
+- `endpoints`: `openai-chat: "/chat/completions"` + `models: "/models"`. O segundo
+  é o que **Testar conexão** (`validate_provider`) e **Atualizar modelos**
+  (`refresh_catalog`) usam — provedor sem `models` é ignorado no refresh
+  (`commands/models.rs`).
+- `models`: semente gerada do bucket do models.dev (máx. 20 por provedor, só
+  saída de texto); `defaultModelId` é o modelo estável com preço mais recente.
+- `cache: null`: capacidades de prompt cache desconhecidas até rodar
+  `node scripts/probe-cache.mjs` (o request não envia diretivas não suportadas).
+- `category`: grupo do modal (`lab`/`aggregator`/`host`); provedores curados,
+  custom e de plugin não têm categoria e nunca entram nessa lista.
+
+Para adicionar outro provedor de API key:
+
+1. Acrescente a entrada em `scripts/provider-seeds.mjs` (`id`, `baseUrl`,
+   `consoleUrl`, `docsUrl`, `authEnv`, `mdProviderId`, `category`).
+2. `node scripts/build-catalog.mjs` (ou `--provider <id>` para regenerar só ele)
+   e confira a contagem de modelos impressa no fim.
+3. Adicione `providers.description.<id>` nos três locales
+   (`src/locales/{en,pt-BR,es}/settings.json`) e, se houver marca na LobeHub, o
+   glifo em `src/lib/providerIcons.ts` + `providerIconAssets.ts`.
+4. `pnpm test:scripts`, `pnpm test`, `cargo test --lib`.
+
+Fora deste conjunto ficam os provedores que exigem OAuth/assinatura
+(Copilot, Cursor, Kimi Code, Codex, Gemini CLI, Z.AI coding plan…), um transporte
+novo (Bedrock Converse, Vertex ADC, agentes hospedados) e os engines locais
+(Ollama, LM Studio, vLLM), que precisam de um caminho "sem credencial" na UI.
+
 ## Troca de modelo/provedor no meio da conversa (layout Code)
 
 Sessões do **layout Code** podem trocar de modelo e de provedor entre turnos

@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { toast } from 'sonner';
 import { TooltipProvider } from '@/components/ui';
 import { ModelPill } from '@/components/models/ModelPill';
-import { catalog } from '@/lib/catalog';
+import { catalog, isCuratedProvider } from '@/lib/catalog';
 import type { ChatMessage, Conversation } from '@/lib/types';
 import {
   MODEL_LOCKED_DESCRIPTION,
@@ -48,7 +48,10 @@ const ZEN_MODELS = catalog.providers.find((provider) => provider.id === ZEN)?.mo
 /** The compact pill hides models the gateway reports as unavailable. */
 const GO_AVAILABLE_COUNT = GO_MODELS.filter((model) => model.status !== 'unavailable').length;
 const ZEN_COUNT = ZEN_MODELS.filter((model) => model.status !== 'unavailable').length;
-const ALL_AVAILABLE_COUNT = catalog.providers.reduce(
+// Curated providers are always offered by the selector; the fixtures only
+// configure Go/Zen, so "all providers" is the curated set.
+const SELECTOR_PROVIDERS = catalog.providers.filter((provider) => isCuratedProvider(provider.id));
+const ALL_AVAILABLE_COUNT = SELECTOR_PROVIDERS.reduce(
   (total, provider) =>
     total + provider.models.filter((model) => model.status !== 'unavailable').length,
   0,

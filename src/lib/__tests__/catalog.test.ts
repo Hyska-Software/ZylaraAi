@@ -11,6 +11,7 @@ import {
   groupByFamily,
   modelBadges,
   providerLabel,
+  providerAuth,
   reasoningLabel,
   reasoningShortLabel,
   reasoningUi,
@@ -173,5 +174,59 @@ describe('defaultSelection', () => {
     const selection = defaultSelection(undefined);
     expect(selection.providerId).toBe('opencode-go');
     expect(selection.modelId.length).toBeGreaterThan(0);
+  });
+});
+
+describe('API-key providers (See more providers)', () => {
+  const ids = [
+    'deepseek',
+    'groq',
+    'openrouter',
+    'zai',
+    'together',
+    'scaleway',
+    'vercel-ai-gateway',
+  ];
+
+  it('ships the providers listed in the dialog with their category', () => {
+    for (const id of ids) {
+      const provider = getProvider(id);
+      expect(provider, id).toBeTruthy();
+      expect(provider!.category, id).toBeTruthy();
+      expect(provider!.authEnv, id).toMatch(/^[A-Z][A-Z0-9_]+$/);
+      expect(provider!.consoleUrl.startsWith('https://'), id).toBe(true);
+    }
+  });
+
+  it('routes chat and model listing through the OpenAI-compatible endpoints', () => {
+    for (const id of ids) {
+      const provider = getProvider(id)!;
+      expect(provider.endpoints['openai-chat'], id).toBe('/chat/completions');
+      expect(provider.endpoints.models, id).toBe('/models');
+      expect(providerAuth(provider), id).toBe('api-key');
+      expect(provider.models.length, id).toBeGreaterThan(0);
+      expect(
+        provider.models.every(
+          (model) => model.protocols.length === 1 && model.protocols[0] === 'openai-chat',
+        ),
+        id,
+      ).toBe(true);
+    }
+  });
+
+  it('pins a default model that exists in the seed', () => {
+    for (const id of ids) {
+      const provider = getProvider(id)!;
+      expect(provider.defaultModelId.length, id).toBeGreaterThan(0);
+      expect(getModel(id, provider.defaultModelId), id).toBeTruthy();
+    }
+  });
+
+  it('files each provider under its dialog group', () => {
+    expect(getProvider('deepseek')?.category).toBe('lab');
+    expect(getProvider('openrouter')?.category).toBe('aggregator');
+    expect(getProvider('groq')?.category).toBe('host');
+    // Curated providers carry no category: they never reach the dialog list.
+    expect(getProvider('opencode-go')?.category ?? null).toBeNull();
   });
 });

@@ -139,6 +139,8 @@ export interface ProviderInfo {
   cache?: CacheInfo | null;
   /** Package-relative asset or image URL used instead of the built-in glyph. */
   icon?: string | null;
+  /** Group of the "See more providers" dialog (`lab`, `aggregator`, `host`). */
+  category?: string | null;
   /** `custom` for user-defined providers, `plugin` for contributed ones. */
   origin?: 'custom' | 'plugin' | null;
   /** Human label for the origin (plugin name, "Custom provider"). */

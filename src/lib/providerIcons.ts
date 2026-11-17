@@ -13,7 +13,29 @@
  */
 
 /** Mono LobeHub marks bundled for the provider list (`?raw` SVGs). */
-export type ProviderIconKey = 'opencode' | 'openai' | 'anthropic' | 'gemini';
+export type ProviderIconKey =
+  | 'opencode'
+  | 'openai'
+  | 'anthropic'
+  | 'gemini'
+  | 'cerebras'
+  | 'deepseek'
+  | 'fireworks'
+  | 'groq'
+  | 'inception'
+  | 'minimax'
+  | 'mistral'
+  | 'moonshot'
+  | 'novita'
+  | 'nvidia'
+  | 'openrouter'
+  | 'siliconcloud'
+  | 'stepfun'
+  | 'together'
+  | 'venice'
+  | 'vercel'
+  | 'xai'
+  | 'zhipu';
 
 /** Human label of each bundled mark (tooltips, tests). */
 export const PROVIDER_ICON_LABELS: Readonly<Record<ProviderIconKey, string>> = {
@@ -21,6 +43,24 @@ export const PROVIDER_ICON_LABELS: Readonly<Record<ProviderIconKey, string>> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   gemini: 'Gemini',
+  cerebras: 'Cerebras',
+  deepseek: 'DeepSeek',
+  fireworks: 'Fireworks',
+  groq: 'Groq',
+  inception: 'Inception',
+  minimax: 'MiniMax',
+  mistral: 'Mistral',
+  moonshot: 'Moonshot AI',
+  novita: 'Novita AI',
+  nvidia: 'NVIDIA',
+  openrouter: 'OpenRouter',
+  siliconcloud: 'SiliconCloud',
+  stepfun: 'StepFun',
+  together: 'Together AI',
+  venice: 'Venice AI',
+  vercel: 'Vercel',
+  xai: 'xAI',
+  zhipu: 'Z.AI',
 };
 
 /** All bundled mark keys, in stable (declaration) order. */
@@ -40,6 +80,39 @@ const PROVIDER_TO_ICON: Readonly<Record<string, ProviderIconKey>> = {
   claude: 'anthropic',
   gemini: 'gemini',
   google: 'gemini',
+  cerebras: 'cerebras',
+  deepseek: 'deepseek',
+  fireworks: 'fireworks',
+  'fireworks-ai': 'fireworks',
+  groq: 'groq',
+  inception: 'inception',
+  'inception-labs': 'inception',
+  minimax: 'minimax',
+  mistral: 'mistral',
+  moonshot: 'moonshot',
+  moonshotai: 'moonshot',
+  kimi: 'moonshot',
+  novita: 'novita',
+  'novita-ai': 'novita',
+  nvidia: 'nvidia',
+  'nvidia-nim': 'nvidia',
+  openrouter: 'openrouter',
+  siliconflow: 'siliconcloud',
+  siliconcloud: 'siliconcloud',
+  stepfun: 'stepfun',
+  together: 'together',
+  togetherai: 'together',
+  venice: 'venice',
+  vercel: 'vercel',
+  'vercel-ai-gateway': 'vercel',
+  'ai-gateway': 'vercel',
+  xai: 'xai',
+  grok: 'xai',
+  zai: 'zhipu',
+  'z-ai': 'zhipu',
+  zhipu: 'zhipu',
+  zhipuai: 'zhipu',
+  glm: 'zhipu',
 };
 
 /** Normalizes a provider id for lookup: trim, lowercase, `_`/spaces → `-`. */

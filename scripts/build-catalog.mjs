@@ -12,6 +12,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import {
+  DEFAULT_MODEL_CAP,
+  endpointsFor,
+  EXTRA_PROVIDERS,
+  validateProviderSeeds,
+} from './provider-seeds.mjs';
+
 const ROOT = path.resolve(import.meta.dirname, '..');
 const RESEARCH = path.join(ROOT, '.research');
 
@@ -388,6 +395,101 @@ function buildProvider({ id, name, shortName, description, baseUrl, defaultModel
 }
 
 /* ------------------------------------------------------------------ */
+/* API-key providers (one wire protocol, models.dev seeds)             */
+/* ------------------------------------------------------------------ */
+
+// Model ids that are not text-chat endpoints of an OpenAI-compatible API:
+// embeddings, media generation, rerankers and hosted tools use other routes.
+const CHAT_EXCLUDED =
+  /(embed|rerank|moderation|tts|audio|whisper|transcri|speech|image|imagen|dall-e|sora|flux|stable-diffusion|realtime|computer[-_]use|search[-_]preview|guard)/i;
+
+/**
+ * models.dev rows of a seed worth bundling: text output, chat-capable, newest
+ * first and capped — the account list (`GET /models`) adds the rest at runtime.
+ */
+function chatModelEntries(spec) {
+  const bucket = modelsDev[spec.mdProviderId]?.models ?? {};
+  const entries = Object.entries(bucket).filter(([id, md]) => {
+    if (CHAT_EXCLUDED.test(id)) return false;
+    const output = md?.modalities?.output ?? ['text'];
+    return output.includes('text');
+  });
+  entries.sort(([aId, a], [bId, b]) => {
+    const aDate = a?.release_date ?? '';
+    const bDate = b?.release_date ?? '';
+    if (aDate !== bDate) return bDate.localeCompare(aDate);
+    return aId.localeCompare(bId);
+  });
+  return entries.slice(0, spec.modelCap ?? DEFAULT_MODEL_CAP);
+}
+
+/**
+ * models.dev reports `-1` on budget-only reasoners to mean "no minimum/maximum";
+ * the Rust catalog stores these as `u32`, so an impossible value is dropped and
+ * the UI falls back to its documented default.
+ */
+function sanitizeReasoningOptions(options) {
+  return (options ?? []).map((option) => {
+    if (option?.type !== 'budget_tokens') return option;
+    const next = { ...option };
+    if (typeof next.min !== 'number' || next.min < 0) delete next.min;
+    if (typeof next.max !== 'number' || next.max < 0) delete next.max;
+    return next;
+  });
+}
+
+/**
+ * Builds a provider entry from a seed (`scripts/provider-seeds.mjs`): every model
+ * speaks the seed's single wire protocol, the default model is the newest priced
+ * stable row, and the endpoints pair the chat path with the `/models` probe used
+ * by "Test connection" and the account refresh.
+ */
+function buildApiKeyProvider(spec) {
+  const entries = chatModelEntries(spec);
+  const models = entries.map(([id, md]) => {
+    const model = buildModel(id, { md });
+    return {
+      ...model,
+      reasoningOptions: sanitizeReasoningOptions(model.reasoningOptions),
+      protocols: [spec.protocol],
+    };
+  });
+  if (!models.length) {
+    console.warn(`[catalog] ${spec.id}: nenhum modelo em models.dev (${spec.mdProviderId})`);
+  }
+
+  const ids = new Set(models.map((model) => model.id));
+  const preferred = models.find((model) => model.cost && model.status === 'stable');
+  const defaultModelId =
+    spec.defaultModel && ids.has(spec.defaultModel)
+      ? spec.defaultModel
+      : (preferred?.id ?? models[0]?.id ?? '');
+
+  models.sort((a, b) => {
+    if (a.family !== b.family) return a.family.localeCompare(b.family);
+    return a.name.localeCompare(b.name);
+  });
+
+  return {
+    id: spec.id,
+    name: spec.name,
+    shortName: spec.shortName,
+    description: spec.description,
+    baseUrl: spec.baseUrl,
+    consoleUrl: spec.consoleUrl,
+    endpoints: endpointsFor(spec),
+    authEnv: spec.authEnv,
+    defaultModelId,
+    models,
+    category: spec.category,
+    notes: [],
+    // Prompt-cache behavior is unknown until probed (`scripts/probe-cache.mjs`);
+    // `null` keeps the request free of unsupported cache directives.
+    cache: null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* OpenAI (ChatGPT plan usage — Sign in with ChatGPT)                  */
 /* ------------------------------------------------------------------ */
 
@@ -650,6 +752,8 @@ const catalog = {
     ],
     models: 'https://models.dev/api.json',
     probe: 'scripts/probe-models.mjs',
+    // Provenance of the API-key providers: their public API docs.
+    providers: Object.fromEntries(EXTRA_PROVIDERS.map((spec) => [spec.id, spec.docsUrl])),
   },
   providers: [
     buildProvider({
@@ -684,8 +788,15 @@ const catalog = {
     buildOpenAiProvider(),
     buildAnthropicProvider(),
     buildGeminiProvider(),
+    // API-key providers surfaced under "See more providers" (Settings → Providers).
+    ...EXTRA_PROVIDERS.map(buildApiKeyProvider),
   ],
 };
+
+const seedErrors = validateProviderSeeds();
+if (seedErrors.length) {
+  throw new Error(`provider-seeds inválidos:\n  ${seedErrors.join('\n  ')}`);
+}
 
 fs.mkdirSync(outDir, { recursive: true });
 
@@ -696,6 +807,12 @@ const SURGICAL_PROVIDERS = {
   openai: { build: buildOpenAiProvider, docs: OPENAI_DOCS },
   anthropic: { build: buildAnthropicProvider, docs: ANTHROPIC_DOCS },
   gemini: { build: buildGeminiProvider, docs: GEMINI_DOCS },
+  ...Object.fromEntries(
+    EXTRA_PROVIDERS.map((spec) => [
+      spec.id,
+      { build: () => buildApiKeyProvider(spec), docs: [spec.docsUrl] },
+    ]),
+  ),
 };
 
 const providerFlagIndex = process.argv.indexOf('--provider');
@@ -739,6 +856,15 @@ if (unchanged) {
   fs.writeFileSync(tmp, JSON.stringify(output, null, 1));
   fs.renameSync(tmp, outFile);
   console.log(`wrote ${outFile} (${(fs.statSync(outFile).size / 1024).toFixed(1)} KiB)`);
+}
+
+// The catalog is bundled twice (renderer import + `include_str!` in Rust), so
+// keep an eye on its size: cap the per-provider seeds instead of shipping more.
+const catalogKiB = fs.statSync(outFile).size / 1024;
+if (catalogKiB > 512) {
+  console.warn(
+    `[catalog] aviso: ${catalogKiB.toFixed(1)} KiB (acima de 512 KiB) — reduza o modelCap dos seeds.`,
+  );
 }
 
 for (const p of output.providers) {

@@ -332,6 +332,7 @@ fn row_to_provider(row: &CustomProviderRow) -> Option<ProviderInfo> {
         notes: vec!["User-defined provider.".to_string()],
         cache: None,
         icon: row.icon.clone(),
+        category: None,
         origin: Some("custom".to_string()),
         origin_label: Some("Custom provider".to_string()),
     })

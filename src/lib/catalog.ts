@@ -23,6 +23,25 @@ export function providers(): ProviderInfo[] {
   return catalog.providers;
 }
 
+/**
+ * Providers curated as "Popular providers" in Settings. They are always offered
+ * by the model selector (even before a credential exists, so the missing-key
+ * call to action stays reachable); every other provider appears there only once
+ * it has a stored credential or a connected account.
+ */
+export const CURATED_PROVIDER_IDS: readonly string[] = [
+  'opencode-go',
+  'opencode-zen',
+  'openai',
+  'anthropic',
+  'gemini',
+];
+
+/** True when the provider belongs to the curated "popular" set. */
+export function isCuratedProvider(providerId: string): boolean {
+  return CURATED_PROVIDER_IDS.includes(providerId);
+}
+
 export function getProvider(providerId: string): ProviderInfo | undefined {
   return findProviderIn(catalog.providers, providerId);
 }

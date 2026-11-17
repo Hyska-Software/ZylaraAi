@@ -14,7 +14,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { TooltipProvider } from '@/components/ui';
 import { ModelPickerDialog } from '@/components/models/ModelPickerDialog';
-import { catalog } from '@/lib/catalog';
+import { catalog, isCuratedProvider } from '@/lib/catalog';
 import { modelMatchesQuery } from '@/lib/modelMenu';
 import type { ModelInfo, ProviderInfo } from '@/lib/types';
 import { useAppStore, useUiStore } from '@/lib/store';
@@ -25,12 +25,15 @@ const CURRENT_PROVIDER = 'opencode-go';
 const CURRENT_MODEL = 'deepseek-v4.1-flash';
 const FAVORITES = ['glm-5.3-flash', 'deepseek-v4.1-flash', 'claude-haiku-5-5', 'gpt-6-luna'];
 
-const GO_MODELS = catalog.providers.find((provider) => provider.id === CURRENT_PROVIDER)?.models ?? [];
-const ZEN_MODELS = catalog.providers.find((provider) => provider.id === 'opencode-zen')?.models ?? [];
+// Curated providers are always offered; the fixtures only configure Go/Zen, so
+// the selector catalogue is exactly this set.
+const SELECTOR_PROVIDERS = catalog.providers.filter((provider) => isCuratedProvider(provider.id));
+const GO_MODELS = SELECTOR_PROVIDERS.find((provider) => provider.id === CURRENT_PROVIDER)?.models ?? [];
+const ZEN_MODELS = SELECTOR_PROVIDERS.find((provider) => provider.id === 'opencode-zen')?.models ?? [];
 const GO_COUNT = GO_MODELS.length;
 const ZEN_COUNT = ZEN_MODELS.length;
 /** Every model whose provider/name/id/etc. contains the single letter "o". */
-const TOTAL_MATCHING_O = catalog.providers.reduce(
+const TOTAL_MATCHING_O = SELECTOR_PROVIDERS.reduce(
   (total, provider) =>
     total + provider.models.filter((model) => modelMatchesQuery(model, provider, 'o')).length,
   0,

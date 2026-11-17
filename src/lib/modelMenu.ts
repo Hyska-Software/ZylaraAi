@@ -14,6 +14,7 @@ import {
   effortLabel,
   formatContextWindow,
   formatPrice,
+  isCuratedProvider,
   modelBadges,
   reasoningUi,
 } from './catalog';
@@ -22,6 +23,7 @@ import { compareText } from './i18n/format';
 import type {
   ModelInfo,
   ModelSelection,
+  ProviderAuthStatus,
   ProviderInfo,
   ProviderKeyStatus,
   ReasoningSelection,
@@ -49,8 +51,48 @@ export function parseModelKey(key: string): { providerId: string; modelId: strin
 }
 
 export function selectionKey(selection: ModelSelection | null | undefined): string | null {
-  if (!selection?.providerId || !selection.modelId) return null;
-  return modelKey(selection.providerId, selection.modelId);
+  const providerId = selection?.providerId;
+  const modelId = selection?.modelId;
+  return providerId && modelId ? modelKey(providerId, modelId) : null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Selector providers                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Providers the model selector offers.
+ *
+ * The bundled catalog ships ~26 providers, but one without a credential cannot
+ * answer a turn, so listing all of them would flood the pill label and the
+ * provider tabs. The selector lists the curated "popular" set (keeping the
+ * missing-key call to action reachable), every provider with a stored credential
+ * or a connected account, user-defined/plugin providers, and the provider of the
+ * current selection (an account-only provider never disappears).
+ */
+export function selectorProviders(
+  providers: readonly ProviderInfo[],
+  keyStatuses: readonly ProviderKeyStatus[],
+  authStatuses: readonly ProviderAuthStatus[],
+  currentProviderId?: string | null,
+): ProviderInfo[] {
+  const usable = new Set<string>();
+  for (const status of keyStatuses) {
+    if (status.hasKey) usable.add(status.providerId);
+  }
+  for (const status of authStatuses) {
+    if (status.state === 'signed-in' || status.state === 'plan-disabled') {
+      usable.add(status.providerId);
+    }
+  }
+  return providers.filter(
+    (provider) =>
+      isCuratedProvider(provider.id) ||
+      usable.has(provider.id) ||
+      provider.origin === 'custom' ||
+      provider.origin === 'plugin' ||
+      provider.id === currentProviderId,
+  );
 }
 
 /* ------------------------------------------------------------------ */

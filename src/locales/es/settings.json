@@ -208,7 +208,9 @@
     "more": {
       "title": "Ver más proveedores",
       "description": "Los nuevos proveedores aparecen aquí en cuanto estén disponibles.",
-      "empty": "Más proveedores muy pronto"
+      "empty": "Más proveedores muy pronto",
+      "searchPlaceholder": "Buscar proveedores…",
+      "noResults": "Ningún proveedor coincide con \"{{query}}\"."
     },
     "custom": {
       "yourProviders": "Tus proveedores",
@@ -399,12 +401,39 @@
       "keyStillDetectedBody": "Todavía hay una clave detectada mediante {{source}}."
     },
     "privacyFooter": "Zylara no envía tus credenciales a ningún servidor propio: las solicitudes van directamente al proveedor elegido. Al eliminar una clave guardada en la configuración, la detección por entorno/CLI vuelve a aplicarse si existe. Salir de ChatGPT revoca el token de actualización y conserva solo el registro de la cuenta para la próxima conexión.",
+    "category": {
+      "lab": "Laboratorios de modelos",
+      "aggregator": "Agregadores",
+      "host": "Proveedores de inferencia",
+      "other": "Otros proveedores"
+    },
     "description": {
       "opencode-go": "Suscripción de OpenCode con límites mensuales, sin cobro por token.",
       "opencode-zen": "Catálogo pay-as-you-go con modelos seleccionados de varios proveedores.",
       "openai": "Inicio de sesión con el plan ChatGPT o una clave de API de OpenAI.",
       "anthropic": "Acceso directo a los modelos Claude con una clave de API de Anthropic.",
-      "gemini": "Modelos Gemini con una clave de API de Google AI Studio."
+      "gemini": "Modelos Gemini con una clave de API de Google AI Studio.",
+      "deepseek": "API propia de DeepSeek con modelos de razonamiento y chat y contexto largo.",
+      "xai": "Modelos Grok desde la API de xAI.",
+      "mistral": "Modelos de Mistral AI, incluida la línea Devstral para código.",
+      "moonshot": "Modelos Kimi de la plataforma Moonshot AI.",
+      "zai": "Modelos GLM desde el endpoint del plan de código de Z.AI.",
+      "minimax": "Modelos de chat y razonamiento de MiniMax mediante la API compatible con OpenAI.",
+      "inception": "Modelos de difusión Mercury de Inception Labs.",
+      "stepfun": "Modelos Step de la plataforma StepFun.",
+      "openrouter": "Una clave de API para un catálogo agregado de varios proveedores.",
+      "vercel-ai-gateway": "Gateway de Vercel que enruta una clave de API entre varios proveedores.",
+      "groq": "Inferencia de baja latencia para modelos de pesos abiertos.",
+      "together": "Modelos de pesos abiertos alojados con API compatible con OpenAI.",
+      "fireworks": "Modelos de pesos abiertos y de código alojados en Fireworks.",
+      "cerebras": "Inferencia wafer-scale para modelos de pesos abiertos.",
+      "nvidia": "Modelos alojados por NVIDIA mediante la API NIM.",
+      "deepinfra": "Alojamiento por token para modelos de pesos abiertos.",
+      "siliconflow": "Alojamiento de pesos abiertos (DeepSeek, Qwen, GLM) con API compatible con OpenAI.",
+      "sambanova": "Inferencia rápida para modelos de pesos abiertos en SambaNova Cloud.",
+      "scaleway": "APIs generativas alojadas en la UE con endpoint compatible con OpenAI.",
+      "novita": "Alojamiento de modelos de pesos abiertos con API compatible con OpenAI.",
+      "venice": "Inferencia centrada en la privacidad para modelos de pesos abiertos."
     },
     "notes": {
       "opencode-go": {
@@ -431,6 +460,12 @@
         "1": "Crea o revisa la clave de API en https://aistudio.google.com/apikey.",
         "2": "La lista de la cuenta se consulta en GET /v1beta/models y se limita a Gemini 4 Carbon, Gemini 4 Argon y Gemini 3.8 Flash.",
         "3": "Thinking low/medium/high con resúmenes; long decode por encima de 65.536 tokens no está soportado."
+      },
+      "openrouter": {
+        "0": "OpenRouter aplica una tarifa propia sobre el precio de cada modelo; los valores del catálogo son los precios de los modelos."
+      },
+      "zai": {
+        "0": "Usa el endpoint del plan de código de Z.AI; sin un plan activo la API responde con un error de autorización."
       }
     }
   },

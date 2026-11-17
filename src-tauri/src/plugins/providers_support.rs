@@ -164,6 +164,7 @@ fn to_provider(plugin: &super::LoadedPlugin, contribution: &super::ProviderContr
         )],
         cache: None,
         icon: contribution.icon.clone(),
+        category: None,
         origin: Some("plugin".to_string()),
         origin_label: Some(plugin.manifest.name.clone()),
     }

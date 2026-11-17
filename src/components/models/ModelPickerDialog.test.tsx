@@ -4,7 +4,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { TooltipProvider } from '@/components/ui';
 import { ModelPickerDialog } from '@/components/models/ModelPickerDialog';
-import { providers } from '@/lib/catalog';
+import { isCuratedProvider, providers } from '@/lib/catalog';
 import { modelSupportsVision } from '@/lib/modelMenu';
 import type { ChatMessage, Conversation } from '@/lib/types';
 import {
@@ -41,7 +41,9 @@ const CURRENT_PROVIDER = 'opencode-go';
 const CURRENT_MODEL = 'deepseek-v4.1-flash';
 const FAVORITES = ['glm-5.3-flash', 'deepseek-v4.1-flash', 'claude-haiku-5-5', 'gpt-6-luna'];
 
-const CATALOG_PROVIDERS = providers();
+// The selector lists curated providers plus the ones with a credential; the
+// fixtures only configure Go/Zen, so the curated set is the expected catalogue.
+const CATALOG_PROVIDERS = providers().filter((provider) => isCuratedProvider(provider.id));
 const GO_MODELS = CATALOG_PROVIDERS.find((provider) => provider.id === CURRENT_PROVIDER)?.models ?? [];
 const ZEN_MODELS = CATALOG_PROVIDERS.find((provider) => provider.id === 'opencode-zen')?.models ?? [];
 const GO_COUNT = GO_MODELS.length;

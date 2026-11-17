@@ -6139,6 +6139,7 @@ mod tests {
             notes: Vec::new(),
             cache: None,
             icon: None,
+            category: None,
             origin: None,
             origin_label: None,
         }
@@ -6488,6 +6489,7 @@ mod agent_loop_tests {
             notes: Vec::new(),
             cache: None,
             icon: None,
+            category: None,
             origin: None,
             origin_label: None,
         };
@@ -6595,6 +6597,7 @@ mod agent_loop_tests {
             notes: Vec::new(),
             cache: None,
             icon: None,
+            category: None,
             origin: None,
             origin_label: None,
         }
@@ -6745,6 +6748,7 @@ mod agent_loop_tests {
             notes: Vec::new(),
             cache: None,
             icon: None,
+            category: None,
             origin: None,
             origin_label: None,
         }
@@ -13261,6 +13265,7 @@ mod agent_loop_tests {
             notes: Vec::new(),
             cache: provider_cache,
             icon: None,
+            category: None,
             origin: None,
             origin_label: None,
         };

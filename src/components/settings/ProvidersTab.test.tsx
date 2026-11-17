@@ -546,7 +546,16 @@ describe('ProvidersTab — lista de provedores', () => {
 });
 
 describe('ProvidersTab — Ver mais provedores', () => {
-  it('mostra o estado vazio enquanto não há outros provedores', async () => {
+  /** Only the curated providers remain, so the dialog shows the empty state. */
+  function curatedOnly() {
+    const curated = new Set(['opencode-go', 'opencode-zen', 'openai', 'anthropic', 'gemini']);
+    useAppStore.setState({
+      providers: catalog.providers.filter((provider) => curated.has(provider.id)),
+    });
+  }
+
+  it('mostra o estado vazio quando só os provedores populares existem', async () => {
+    curatedOnly();
     await renderTab();
     const user = userEvent.setup();
 
@@ -558,17 +567,74 @@ describe('ProvidersTab — Ver mais provedores', () => {
       within(dialog).getByText(/Novos provedores aparecem aqui assim que forem suportados/),
     ).toBeTruthy();
     expect(within(dialog).queryByRole('listitem')).toBeNull();
+    expect(within(dialog).queryByRole('searchbox')).toBeNull();
   });
 
-  it('lista provedores futuros, com fallback de iniciais, e abre o modal de configuração', async () => {
+  it('agrupa os provedores de API key pela categoria do catálogo e filtra pela busca', async () => {
+    await renderTab();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Ver mais provedores' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ver mais provedores' });
+
+    // Groups come from the catalog `category`, in display order.
+    expect(within(dialog).getByRole('heading', { name: 'Laboratórios de modelos' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Agregadores' })).toBeTruthy();
+    expect(
+      within(dialog).getByRole('heading', { name: 'Provedores de inferência' }),
+    ).toBeTruthy();
+
+    // Curated providers stay in the popular list only.
+    expect(within(dialog).queryByText('OpenCode Go')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Conectar DeepSeek' })).toBeTruthy();
+    // Bundled brand mark for a newly supported provider (`<title>` inside the SVG
+    // and the glyph tooltip both carry the vendor name).
+    expect(within(dialog).getAllByTitle('DeepSeek').length).toBeGreaterThan(0);
+
+    const search = within(dialog).getByRole('searchbox', { name: 'Buscar provedores…' });
+    await user.type(search, 'groq');
+
+    await waitFor(() =>
+      expect(within(dialog).queryByRole('button', { name: 'Conectar DeepSeek' })).toBeNull(),
+    );
+    expect(within(dialog).getByRole('button', { name: 'Conectar Groq' })).toBeTruthy();
+
+    await user.clear(search);
+    await user.type(search, 'zzz');
+    expect(await within(dialog).findByText(/Nenhum provedor corresponde/)).toBeTruthy();
+  });
+
+  it('conecta um provedor novo direto do diálogo', async () => {
+    await renderTab();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Ver mais provedores' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ver mais provedores' });
+    await user.type(
+      within(dialog).getByRole('searchbox', { name: 'Buscar provedores…' }),
+      'deepseek',
+    );
+    await user.click(await within(dialog).findByRole('button', { name: 'Conectar DeepSeek' }));
+
+    const config = await screen.findByRole('dialog', { name: 'Conectar DeepSeek' });
+    await user.type(within(config).getByLabelText('API key de DeepSeek'), 'sk-ds-123');
+    await user.click(within(config).getByRole('button', { name: 'Continuar' }));
+
+    await waitFor(() =>
+      expect(mocks.setProviderKey).toHaveBeenCalledWith('deepseek', 'sk-ds-123'),
+    );
+  });
+
+  it('provedor sem marca usa as iniciais e, sem categoria, cai em "Outros provedores"', async () => {
     const future: ProviderInfo = {
       ...catalog.providers[1],
-      id: 'openrouter',
-      name: 'OpenRouter',
-      shortName: 'OpenRouter',
+      id: 'acme-gateway',
+      name: 'Acme Gateway',
+      shortName: 'Acme',
       description: 'Modelos agregados de vários provedores.',
-      consoleUrl: 'https://openrouter.ai/keys',
-      authEnv: 'OPENROUTER_API_KEY',
+      consoleUrl: 'https://acme.dev/keys',
+      authEnv: 'ACME_API_KEY',
+      category: null,
       notes: [],
       models: [],
     };
@@ -576,26 +642,29 @@ describe('ProvidersTab — Ver mais provedores', () => {
     await renderTab();
     const user = userEvent.setup();
 
-    // Curated providers stay in the popular list only.
-    expect(screen.queryByRole('button', { name: 'Conectar OpenRouter' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Conectar Acme Gateway' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Ver mais provedores' }));
     const dialog = await screen.findByRole('dialog', { name: 'Ver mais provedores' });
-    expect(within(dialog).queryByText('Mais provedores em breve')).toBeNull();
-
-    const row = within(dialog).getByRole('listitem');
-    expect(within(row).getByText('OpenRouter')).toBeTruthy();
-    // No bundled brand mark: falls back to the provider initials.
-    expect(within(row).getByText('OP')).toBeTruthy();
-
-    await user.click(within(row).getByRole('button', { name: 'Conectar OpenRouter' }));
-
-    const config = await screen.findByRole('dialog', { name: 'Conectar OpenRouter' });
     await user.type(
-      within(config).getByLabelText('API key de OpenRouter'),
-      'sk-or-123',
+      within(dialog).getByRole('searchbox', { name: 'Buscar provedores…' }),
+      'acme',
     );
+
+    const row = await within(dialog).findByRole('listitem');
+    expect(within(dialog).getByRole('heading', { name: 'Outros provedores' })).toBeTruthy();
+    expect(within(row).getByText('Acme Gateway')).toBeTruthy();
+    // No bundled brand mark: falls back to the provider name initials.
+    expect(within(row).getByText('AG')).toBeTruthy();
+
+    await user.click(within(row).getByRole('button', { name: 'Conectar Acme Gateway' }));
+
+    const config = await screen.findByRole('dialog', { name: 'Conectar Acme Gateway' });
+    await user.type(within(config).getByLabelText('API key de Acme Gateway'), 'sk-acme-1');
     await user.click(within(config).getByRole('button', { name: 'Continuar' }));
-    await waitFor(() => expect(mocks.setProviderKey).toHaveBeenCalledWith('openrouter', 'sk-or-123'));
+
+    await waitFor(() =>
+      expect(mocks.setProviderKey).toHaveBeenCalledWith('acme-gateway', 'sk-acme-1'),
+    );
   });
 });

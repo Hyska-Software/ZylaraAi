@@ -23,6 +23,7 @@ import {
   parseModelKey,
   reasoningForModel,
   selectionKey,
+  selectorProviders,
   thinkingHeadline,
   thinkingSelectionFor,
   type ModelListEntry,
@@ -250,9 +251,16 @@ export function ModelPill({
   const hideDetailsTimerRef = useRef<number | null>(null);
   const detailsFrameRef = useRef<number | null>(null);
 
-  const providerList = storeProviders.length ? storeProviders : catalogProviders();
   const pid = providerId ?? selection.providerId;
   const mid = modelId ?? selection.modelId;
+  // The selector lists the curated + connected providers; the merged list also
+  // resolves account-only models for the current pair.
+  const providerList = selectorProviders(
+    storeProviders.length ? storeProviders : catalogProviders(),
+    keys,
+    auth,
+    pid,
+  );
   // The merged list resolves account-only models too (not just the static catalog).
   const model = findModelIn(providerList, pid, mid);
 
