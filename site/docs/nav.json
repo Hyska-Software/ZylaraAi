@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "basePath": "/docs",
+  "sections": [
+    {
+      "title": "Start here",
+      "items": [
+        {
+          "title": "Overview",
+          "slug": "",
+          "description": "What Zylara is, what you can do with it, and where to start."
+        },
+        {
+          "title": "What is Zylara",
+          "slug": "introduction",
+          "description": "A local-first AI desktop app with three layouts: Chat, Code and Agents."
+        },
+        {
+          "title": "Installation",
+          "slug": "installation",
+          "description": "Install on Windows, macOS or Linux, run it for the first time, and uninstall safely."
+        },
+        {
+          "title": "First steps",
+          "slug": "first-steps",
+          "description": "Connect a provider, choose a model, send a message and get your first file."
+        }
+      ]
+    },
+    {
+      "title": "Chat",
+      "items": [
+        {
+          "title": "Interface",
+          "slug": "interface",
+          "description": "Title bar, sidebar, composer, panels and the command palette."
+        },
+        {
+          "title": "Conversations",
+          "slug": "conversations",
+          "description": "History, search, pinning, exporting, editing messages and queuing replies."
+        },
+        {
+          "title": "Models and providers",
+          "slug": "models-and-providers",
+          "description": "Connect providers, pick models, control thinking, and read usage and cost."
+        },
+        {
+          "title": "Attachments",
+          "slug": "attachments",
+          "description": "Send documents, spreadsheets, slides, images and code as context."
+        },
+        {
+          "title": "Artifacts",
+          "slug": "artifacts",
+          "description": "Files the agent creates, how they preview, and how to save them."
+        },
+        {
+          "title": "Library",
+          "slug": "library",
+          "description": "Every file from every conversation in one searchable place."
+        },
+        {
+          "title": "Web search and sources",
+          "slug": "web-search",
+          "description": "Let the agent search the web, read pages and cite sources."
+        },
+        {
+          "title": "Generative UI",
+          "slug": "generative-ui",
+          "description": "Declarative cards, tables, charts and interactive blocks in the transcript."
+        },
+        {
+          "title": "Markdown and math",
+          "slug": "markdown-and-math",
+          "description": "Tables, math, diagrams, code blocks and sandboxed previews."
+        }
+      ]
+    },
+    {
+      "title": "Tools",
+      "items": [
+        {
+          "title": "Code execution",
+          "slug": "code-execution",
+          "description": "Let the agent run Python or Node to produce real files, with limits."
+        },
+        {
+          "title": "Skills",
+          "slug": "skills",
+          "description": "Instructions and scripts that teach the agent how to build each format."
+        },
+        {
+          "title": "Customization",
+          "slug": "customization",
+          "description": "Theme, text size, language, layouts, installed themes and plugin UI."
+        }
+      ]
+    },
+    {
+      "title": "Code",
+      "items": [
+        {
+          "title": "Workspaces and sessions",
+          "slug": "code-workspaces",
+          "description": "Open a folder, trust it, and run coding sessions on your own files."
+        },
+        {
+          "title": "Workbench",
+          "slug": "code-workbench",
+          "description": "Files, changes, diffs, commits, branches and the terminal."
+        },
+        {
+          "title": "Permissions and approvals",
+          "slug": "permissions-and-approvals",
+          "description": "Read, Review, Edit and Autonomous modes, approvals and the Docker sandbox."
+        },
+        {
+          "title": "Goals and tasks",
+          "slug": "goals-and-tasks",
+          "description": "Plan mode, task lists, long-running goals, context and background jobs."
+        }
+      ]
+    },
+    {
+      "title": "Agents",
+      "items": [
+        {
+          "title": "Agents",
+          "slug": "agents",
+          "description": "Create personas with their own model, instructions, memory and permissions."
+        },
+        {
+          "title": "Routines and queues",
+          "slug": "routines-and-queues",
+          "description": "Queue messages while the agent works and schedule recurring instructions."
+        },
+        {
+          "title": "Channels and teams",
+          "slug": "channels-and-teams",
+          "description": "Let several agents answer in one channel and track usage per agent."
+        },
+        {
+          "title": "Computer use",
+          "slug": "computer-use",
+          "description": "Give an agent a private desktop in Docker, with per-action approval."
+        }
+      ]
+    },
+    {
+      "title": "Reference",
+      "items": [
+        {
+          "title": "Plugins",
+          "slug": "plugins",
+          "description": "Install, review permissions, update and remove third-party extensions."
+        },
+        {
+          "title": "Settings reference",
+          "slug": "settings-reference",
+          "description": "Every settings tab, control, default and range."
+        },
+        {
+          "title": "Keyboard shortcuts",
+          "slug": "keyboard-shortcuts",
+          "description": "All global, composer, palette and list shortcuts."
+        },
+        {
+          "title": "Data and privacy",
+          "slug": "data-and-privacy",
+          "description": "Where your data lives, what leaves the machine, and how to back up or erase it."
+        },
+        {
+          "title": "Troubleshooting",
+          "slug": "troubleshooting",
+          "description": "Fix common problems with providers, streaming, code execution, Docker and updates."
+        }
+      ]
+    }
+  ]
+}
