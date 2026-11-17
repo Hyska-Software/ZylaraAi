@@ -1,4 +1,11 @@
-/** A plugin-owned tab inside the right dock. */
+/**
+ * Body of a plugin tab inside the right dock.
+ *
+ * The dock chrome belongs to the host: CodePanel/AgentPanel and the chat dock
+ * shell render the strip and the header, so this component only mounts the tab
+ * content (trusted component or sandboxed `entry` iframe). Rendering another
+ * page header here used to push a "back" affordance below the real tab strip.
+ */
 import { useEffect } from 'react';
 
 import { useChatStore } from '@/lib/store/chatStore';
@@ -9,17 +16,14 @@ import { PluginFrame } from '@/lib/plugins/frame';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { PluginBoundary } from './PluginBoundary';
-import { PluginPageHeader } from '../PluginHosts';
 
 export function PluginDockTabHost({
   layout,
   tabKey,
-  onClose,
   className,
 }: {
   layout: LayoutMode;
   tabKey: string;
-  onClose?: () => void;
   className?: string;
 }) {
   const ui = usePluginUi();
@@ -35,11 +39,6 @@ export function PluginDockTabHost({
     state.closePluginDockTab(layout);
     if (tab?.takeover) state.dismissPluginDockTakeover(layout);
   }, [unavailable, layout, tab?.takeover]);
-  const close = onClose ?? (() => {
-    const state = useUiStore.getState();
-    state.closePluginDockTab(layout);
-    if (tab?.takeover) state.dismissPluginDockTakeover(layout);
-  });
   if (!tab || unavailable) return null;
   const title = pluginLabel(tab.plugin, tab.titleKey, tab.title);
   const TabComponent = tab.component;
@@ -50,8 +49,11 @@ export function PluginDockTabHost({
     conversationId,
   };
   return (
-    <div className={className ?? 'flex h-full min-h-0 flex-col bg-surface-raised'}>
-      <PluginPageHeader title={title} subtitle={tab.plugin.name} pluginId={tab.pluginId} onClose={close} />
+    <div
+      className={className ?? 'flex h-full min-h-0 flex-col bg-surface-raised'}
+      data-plugin-dock-tab={tab.key}
+      aria-label={title}
+    >
       <div className="min-h-0 flex-1">
         {TabComponent ? (
           <PluginBoundary plugin={tab.plugin}>

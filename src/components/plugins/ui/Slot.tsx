@@ -37,6 +37,12 @@ export interface SlotProps {
   fallback?: ReactNode;
   children?: ReactNode;
   onlyPluginId?: string;
+  /**
+   * Extra per-occurrence routing: a host region that already renders a surface
+   * (for example the dock tab strip) can drop contributions that would only
+   * duplicate it.
+   */
+  filter?: (entry: SlotContribution) => boolean;
 }
 
 function SlotEntry({
@@ -133,6 +139,7 @@ export function Slot({
   fallback = null,
   children,
   onlyPluginId,
+  filter,
 }: SlotProps) {
   const spec = pluginSlotSpec(name);
   const currentLayout = useUiStore((state) => state.layoutMode);
@@ -142,7 +149,7 @@ export function Slot({
 
   const contributions = useMemo(() => {
     if (!prefs.enabled || !spec) return [];
-    return selectSlotContributions(ui.slots, {
+    const selected = selectSlotContributions(ui.slots, {
       slot: name,
       layout: resolvedLayout,
       entryKey,
@@ -150,7 +157,8 @@ export function Slot({
       disabled: prefs.disabled,
       owner,
     }).filter((entry) => pluginHasPermission(entry.plugin, `ui.slot:${entry.slot}`));
-  }, [prefs.disabled, prefs.enabled, name, resolvedLayout, entryKey, onlyPluginId, owner, spec, ui.slots]);
+    return filter ? selected.filter(filter) : selected;
+  }, [prefs.disabled, prefs.enabled, name, resolvedLayout, entryKey, onlyPluginId, owner, spec, ui.slots, filter]);
 
   if (!spec) {
     if (!warned.has(name)) {

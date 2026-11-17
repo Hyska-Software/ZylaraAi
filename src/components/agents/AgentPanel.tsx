@@ -19,8 +19,8 @@ import { AgentActivityDialog } from './AgentActivityDialog';
 import { PanelResizer } from '@/components/layout/PanelResizer';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
-import { pluginIcon } from '@/lib/plugins/icons';
-import { pluginLabel } from '@/lib/plugins/registry';
+import { PluginDockTabStrip } from '@/components/plugins/ui/PluginDockTabStrip';
+import { dockTabsForLayout, isRedundantDockTabAction } from '@/lib/plugins/ui/dock';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { IconButton, Tooltip } from '@/components/ui';
@@ -68,17 +68,10 @@ export function AgentPanel() {
   const tab = useUiStore((state) => state.agentPanelTab);
   const setTab = useUiStore((state) => state.setAgentPanelTab);
   const pluginDock = useUiStore((state) => state.pluginDockTab.agent);
-  const openPluginDockTab = useUiStore((state) => state.openPluginDockTab);
   const ui = usePluginUi();
   const disabledPluginUi = usePluginUiPrefs((state) => state.disabled);
   const pluginTabs = useMemo(
-    () =>
-      ui.panelTabs.filter(
-        (entry) =>
-          entry.layouts.includes('agent') &&
-          !entry.takeover &&
-          !disabledPluginUi.includes(entry.key),
-      ),
+    () => dockTabsForLayout(ui.panelTabs, 'agent', disabledPluginUi),
     [disabledPluginUi, ui.panelTabs],
   );
   const setOpen = useUiStore((state) => state.setAgentPanelOpen);
@@ -299,35 +292,12 @@ export function AgentPanel() {
             );
           })}
         </div>
-        {pluginTabs.map((entry) => {
-          const Icon = pluginIcon(entry.icon);
-          const selected = pluginDock === entry.key;
-          const label = pluginLabel(entry.plugin, entry.titleKey, entry.title);
-          return (
-            <button
-              key={entry.key}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-label={label}
-              title={label}
-              onClick={() => openPluginDockTab(entry.key, 'agent')}
-              className={cn(
-                'flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium',
-                'transition-colors duration-150',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-                selected
-                  ? 'bg-surface-active text-foreground'
-                  : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
-                compactTabs && 'px-2',
-              )}
-            >
-              <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
-              {compactTabs ? null : label}
-            </button>
-          );
-        })}
-        <Slot name="agent.panel.tabs" owner={{ layout: 'agent' }} />
+        <PluginDockTabStrip layout="agent" compact={compactTabs} />
+        <Slot
+          name="agent.panel.tabs"
+          owner={{ layout: 'agent' }}
+          filter={(entry) => !isRedundantDockTabAction(entry, pluginTabs)}
+        />
         <Slot name="agent.panel.header" owner={{ layout: 'agent' }} />
         {agent ? (
           <Tooltip content={t('panel.editAgent')} side="bottom">

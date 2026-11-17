@@ -59,6 +59,8 @@ import {
   useUiStore,
 } from '@/lib/store';
 import { EMPTY_PREFS, usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
+import { setPluginUiState } from '@/lib/plugins/ui/registry';
+import type { PanelTabSpec, SlotContribution } from '@/lib/plugins/ui/types';
 import type { Conversation, Workspace, WorkspaceGitStatus } from '@/lib/types';
 import { __resetWorkspacesForTests } from './useWorkspaces';
 import { CodePanel } from './CodePanel';
@@ -894,5 +896,119 @@ describe('CodePanel — ordem das abas', () => {
     expect(screen.getByRole('tab', { name: 'Arquivos' }).getAttribute('aria-selected')).toBe(
       'true',
     );
+  });
+});
+
+describe('CodePanel — aba de plugin no dock', () => {
+  const plugin = {
+    id: 'com.acme.insights',
+    name: 'Session Insights',
+    version: '1.0.0',
+    manifest: { contributes: { ui: {} } },
+    permissions: [
+      { id: 'ui.panel', granted: true },
+      { id: 'ui.slot:code.panel.tabs', granted: true },
+    ],
+    trusted: true,
+    active: true,
+    enabled: true,
+  } as never;
+
+  function emptyUi(): Parameters<typeof setPluginUiState>[0] {
+    return {
+      slots: [],
+      replacements: [],
+      wraps: [],
+      pages: [],
+      panelTabs: [],
+      nav: [],
+      settingsTabs: [],
+      artifactViewers: [],
+      variants: [],
+      presets: [],
+      css: [],
+      genui: [],
+    };
+  }
+
+  function panelTab(overrides: Partial<PanelTabSpec> = {}): PanelTabSpec {
+    return {
+      key: 'com.acme.insights:panel:insights',
+      plugin,
+      pluginId: 'com.acme.insights',
+      source: 'trusted',
+      order: 100,
+      priority: 100,
+      layouts: ['code'],
+      tabId: 'insights',
+      title: 'Insights',
+      titleKey: null,
+      icon: 'Puzzle',
+      entry: null,
+      component: () => <div>insights-body</div>,
+      takeover: false,
+      ...overrides,
+    };
+  }
+
+  function stripSlot(): SlotContribution {
+    return {
+      key: 'com.acme.insights:slot:tabs',
+      plugin,
+      pluginId: 'com.acme.insights',
+      source: 'manifest',
+      order: 100,
+      priority: 100,
+      layouts: ['code'],
+      slot: 'code.panel.tabs',
+      entryId: 'tabs',
+      kind: 'list',
+      keyMatch: null,
+      component: null,
+      entry: null,
+      action: { kind: 'openPanelTab', target: 'insights' },
+      title: 'Insights',
+      titleKey: null,
+      icon: 'Puzzle',
+      when: null,
+    };
+  }
+
+  beforeEach(() => {
+    setPluginUiState(emptyUi());
+  });
+
+  it('mostra o painel do plugin como aba do dock, sem cabeçalho de página', () => {
+    setPluginUiState({ ...emptyUi(), panelTabs: [panelTab()] });
+    useUiStore.setState({ pluginDockTab: { chat: null, code: panelTab().key, agent: null } });
+
+    render(<CodePanel />);
+
+    const strip = screen.getByRole('tablist', { name: 'Conteúdo do painel' });
+    // Host tabs stay reachable next to the plugin tab.
+    expect(within(strip).getByRole('tab', { name: 'Alterações' })).toBeTruthy();
+    expect(within(strip).getByRole('tab', { name: 'Insights' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(within(strip).getAllByRole('tab')).toHaveLength(4);
+    // Body renders inside the dock, without a duplicated page header.
+    expect(screen.getByText('insights-body')).toBeTruthy();
+    const body = screen.getByRole('tabpanel');
+    expect(within(body).queryByRole('button', { name: 'Voltar' })).toBeNull();
+  });
+
+  it('renderiza uma única aba por painel, mesmo com declaração duplicada e atalho no slot', () => {
+    setPluginUiState({
+      ...emptyUi(),
+      panelTabs: [panelTab(), panelTab({ order: 20 })],
+      slots: [stripSlot()],
+    });
+
+    render(<CodePanel />);
+
+    const strip = screen.getByRole('tablist', { name: 'Conteúdo do painel' });
+    expect(within(strip).getAllByRole('tab', { name: 'Insights' })).toHaveLength(1);
+    // The redundant slot button (same plugin, same panel) is not rendered either.
+    expect(screen.getAllByLabelText('Insights')).toHaveLength(1);
   });
 });

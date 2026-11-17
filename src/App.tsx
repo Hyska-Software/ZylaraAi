@@ -5,7 +5,6 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { listen } from '@tauri-apps/api/event';
 import { AppShell } from '@/components/layout/AppShell';
 import { WorkspaceCenter } from '@/components/layout/WorkspaceCenter';
-import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
 import { Slot } from '@/components/plugins/ui/Slot';
@@ -21,6 +20,9 @@ import { TrayPromptDialog } from '@/components/settings/TrayPromptDialog';
 import { ModelPickerDialog } from '@/components/models/ModelPickerDialog';
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel';
 import { SourcesPanel } from '@/components/chat/SourcesPanel';
+import { PluginDockPanel } from '@/components/plugins/ui/PluginDockPanel';
+import { dockTabsForLayout } from '@/lib/plugins/ui/dock';
+import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { CommandPalette } from '@/components/palette/CommandPalette';
 import { TooltipProvider } from '@/components/ui';
 import { useAgentStore, useAppStore, useChatStore, useThemeStore, useUiStore } from '@/lib/store';
@@ -162,12 +164,28 @@ export default function App() {
   const pluginDockTab = useUiStore((state) => state.pluginDockTab);
   const pluginDockClosed = useUiStore((state) => state.pluginDockClosed);
   const pluginUi = usePluginUi();
-  const activeDockKey = pluginDockTab[layoutMode];
-  const takeoverDock = pluginDockClosed[layoutMode]
-    ? undefined
-    : pluginUi.panelTabs.find(
-        (entry) => entry.takeover && entry.layouts.includes(layoutMode),
-      );
+  const pluginDockUiEnabled = usePluginUiPrefs((state) => state.enabled);
+  const disabledDockTabs = usePluginUiPrefs((state) => state.disabled);
+  /* Resolved once so a stale/disabled dock key falls back to the host dock
+     instead of leaving an empty right panel. */
+  const activeDockTab = useMemo(() => {
+    const key = pluginDockTab[layoutMode];
+    if (!key || !pluginDockUiEnabled) return null;
+    return (
+      dockTabsForLayout(pluginUi.panelTabs, layoutMode, disabledDockTabs).find(
+        (entry) => entry.key === key,
+      ) ?? null
+    );
+  }, [disabledDockTabs, layoutMode, pluginDockTab, pluginDockUiEnabled, pluginUi.panelTabs]);
+  const takeoverDock =
+    pluginDockClosed[layoutMode] || !pluginDockUiEnabled
+      ? undefined
+      : pluginUi.panelTabs.find(
+          (entry) =>
+            entry.takeover &&
+            entry.layouts.includes(layoutMode) &&
+            !disabledDockTabs.includes(entry.key),
+        );
   const activeConversation = useChatStore((state) => {
     const id = state.activeId;
     return id ? state.conversations.find((conversation) => conversation.id === id) : undefined;
@@ -589,27 +607,32 @@ export default function App() {
                 : layoutMode === 'agent'
                   ? translate('shell.labels.agents')
                   : translate('shell.labels.conversations'),
-            rightPanel: activeDockKey ? (
-              <PluginDockTabHost layout={layoutMode} tabKey={activeDockKey} />
-            ) : takeoverDock ? (
-              <PluginDockTabHost layout={layoutMode} tabKey={takeoverDock.key} />
+            rightPanel: takeoverDock ? (
+              <PluginDockPanel layout={layoutMode} tabKey={takeoverDock.key} takeover />
             ) : layoutMode === 'code' ? (
+              /* CodePanel owns its strip and renders the plugin dock tab there. */
               <ComponentSlot
                 name="code.panel"
                 fallback={CodePanel as unknown as PluginComponent}
               />
             ) : agentPanelVisible ? (
               agentWorkspacePanel ? (
-                <ComponentSlot
-                  name="code.panel"
-                  fallback={CodePanel as unknown as PluginComponent}
-                />
+                activeDockTab ? (
+                  <PluginDockPanel layout={layoutMode} tabKey={activeDockTab.key} />
+                ) : (
+                  <ComponentSlot
+                    name="code.panel"
+                    fallback={CodePanel as unknown as PluginComponent}
+                  />
+                )
               ) : (
                 <ComponentSlot
                   name="agent.panel"
                   fallback={AgentPanel as unknown as PluginComponent}
                 />
               )
+            ) : activeDockTab ? (
+              <PluginDockPanel layout={layoutMode} tabKey={activeDockTab.key} />
             ) : (
               <>
                 <ComponentSlot
@@ -620,8 +643,8 @@ export default function App() {
               </>
             ),
             rightPanelOpen:
-              (Boolean(activeDockKey) ||
-                Boolean(takeoverDock) ||
+              (Boolean(takeoverDock) ||
+                Boolean(activeDockTab) ||
                 layoutMode === 'code' ||
                 (agentPanelVisible &&
                   (agentWorkspacePanel ? codePanelOpen : agentPanelOpen))) &&

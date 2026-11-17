@@ -222,6 +222,27 @@ O *dock takeover* também é renderizado: `App.tsx` calcula `takeoverDock` a par
 dos painéis com `takeover` e o mostra no lugar do dock do host até o usuário
 dispensá-lo (`dismissPluginDockTakeover`).
 
+### Painéis no dock direito (`ui.panel`)
+
+O painel é uma **aba do dock**, não uma página: o host mantém a faixa de abas e
+renderiza só o corpo (`PluginDockTabHost`), sem cabeçalho de página nem botão
+"voltar" repetido.
+
+- **Code e Agentes**: a aba entra na faixa do `CodePanel`/`AgentPanel`, ao lado de
+  Arquivos/Alterações/Terminal e das abas do agente; voltar para uma aba do host
+  limpa `pluginDockTab` daquele layout.
+- **Chat**: o dock não tem faixa própria, então `PluginDockPanel` embrulha o
+  painel com o mesmo casco dos painéis de Artefatos/Fontes (largura persistida,
+  divisor, `bg-surface-raised`; sobreposto abaixo de 1120px) e monta uma faixa com
+  a aba **Artefatos** (volta ao dock do host) seguida das abas de plugin.
+- **Takeover** (`tab: false`): substitui o dock inteiro dentro do mesmo casco, com
+  o cabeçalho de página e o "voltar" que dispensa o takeover.
+- **Um painel por `(pluginId, tabId)`**: `dockTabsForLayout`
+  (`src/lib/plugins/ui/dock.ts`) deduplica declarações repetidas (manifesto +
+  `registerPanelTab`) e prefere a versão *trusted*. Atalhos declarativos em
+  `code.panel.tabs`/`agent.panel.tabs` que só reabrem uma aba já presente na faixa
+  são descartados (`isRedundantDockTabAction`), evitando duas abas iguais.
+
 ## 3.1 Abas de conteúdo nas sidebars (`ui.sidebarTabs`)
 
 `contributes.ui.sidebarTabs[]` adiciona abas de conteúdo **dentro** da sidebar de
