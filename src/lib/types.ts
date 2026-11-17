@@ -505,6 +505,9 @@ export interface ContextBreakdown {
   messages: number;
 }
 
+/** Lane que gerou a compactação de contexto (`local` = resumo local). */
+export type CompactionMethod = 'local' | 'openai-responses' | 'anthropic';
+
 /** Medidor de contexto do turno/sessão. */
 export interface ContextStats {
   used: number;
@@ -1994,7 +1997,15 @@ export type TurnEvent =
   | { type: 'plan_updated'; plan: PlanView }
   | { type: 'goal_updated'; goal: GoalView }
   | { type: 'context_stats'; stats: ContextStats }
-  | { type: 'compacted'; messages: number; tokensFreed: number }
+  | {
+      type: 'compacted';
+      messages: number;
+      tokensFreed: number;
+      method?: CompactionMethod;
+      fallbackFrom?: string;
+    }
+  | { type: 'compaction_started'; reason: 'threshold' | 'overflow' }
+  | { type: 'compaction_failed'; reason: string; message: string }
   | { type: 'job_updated'; job: JobView }
   | { type: 'profile_changed'; profile: TurnProfile; permissionMode: PermissionMode; planMode: boolean }
   | { type: 'question_requested'; request: AskUserRequest }

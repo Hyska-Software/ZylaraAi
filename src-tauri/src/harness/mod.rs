@@ -42,6 +42,8 @@ pub mod render;
 const MAX_PARALLEL_TOOLS: usize = 4;
 /// Upper bound of tool call indexes accepted from a provider stream.
 const MAX_STREAMED_TOOL_CALLS: usize = 64;
+/// One forced compaction retry after a provider context-overflow rejection.
+const MAX_OVERFLOW_RECOVERIES: u32 = 1;
 /// Auto generated conversation titles are short.
 const TITLE_MAX_CHARS: usize = 48;
 /// Per-attachment and per-message limits when injecting extracted text.
@@ -551,6 +553,9 @@ impl TurnFailure {
                 )),
                 Some("insufficient_credit") => {
                     Some(crate::i18n::t("harness.hints.insufficientCredit"))
+                }
+                Some("context_overflow") => {
+                    Some(crate::i18n::t("harness.hints.contextOverflow"))
                 }
                 _ => None,
             }
@@ -1758,7 +1763,7 @@ fn history_tool_call_count(history: &[HistoryMessage]) -> u32 {
 }
 
 /// Caracteres das definições wire das tools (nome + descrição + JSON Schema).
-fn tool_definition_chars(definitions: &[crate::providers::ToolDefinition]) -> usize {
+pub(crate) fn tool_definition_chars(definitions: &[crate::providers::ToolDefinition]) -> usize {
     definitions
         .iter()
         .map(|tool| {
@@ -2257,30 +2262,35 @@ pub async fn run_turn(
             }
         }
     }
-    // Perfil Code e Chat: aplica o último resumo de compactação persistido antes
+    // Perfil Code e Chat: aplica o último head de compactação persistido antes
     // de montar o histórico (o transcript real continua no banco; o modelo vê o
-    // resumo no lugar das mensagens cobertas — HARNESS.md §10.3 / PLAN F2c).
+    // resumo/payload no lugar das mensagens cobertas — HARNESS.md §10.3).
     let stored_summary = match profile {
-        TurnProfile::Code | TurnProfile::Chat => {
-            compaction::apply_stored_summary(&deps.db, &conversation.id, &messages)
-        }
+        TurnProfile::Code | TurnProfile::Chat => compaction::apply_stored_summary(
+            &deps.db,
+            &conversation.id,
+            &messages,
+            &provider.id,
+            &model.id,
+            provider.request_profile(credential.auth_mode()),
+        ),
     };
     let has_stored_summary = stored_summary.is_some();
     let history_budget_chars = history_budget(&model);
     let (mut history, mut history_anchors) = match stored_summary {
-        Some((summary, cut)) => {
+        Some(stored) => {
             let (tail, tail_anchors) = build_history(
                 &deps,
-                &messages[cut.min(messages.len())..],
+                &messages[stored.cut.min(messages.len())..],
                 &assistant_message.id,
                 &provider.id,
                 &settings,
                 &model,
                 supports_images,
                 &stored_surface_items,
-                cut.saturating_add(1),
+                stored.cut.saturating_add(1),
             );
-            let mut compacted = vec![compaction::summary_message(&summary)];
+            let mut compacted = vec![stored.head];
             compacted.extend(tail);
             let mut anchors = vec![0];
             anchors.extend(tail_anchors);
@@ -2983,6 +2993,20 @@ pub async fn run_turn(
         );
         emit_context_stats(&deps.db, &on_event, &conversation.id, &tool_turn_id, stats);
     }
+    // Native compaction lane for this turn's route (None = local summarizer).
+    // Computed from the credential profile: the ChatGPT-plan route stays local.
+    let native_lane = compaction::native::native_lane(
+        &provider,
+        &model,
+        &protocols,
+        provider.request_profile(credential.auth_mode()),
+    );
+    // Last provider-calibrated context usage; floors the estimated pressure.
+    let mut pressure_floor: Option<u32> = None;
+    // One forced compaction retry per turn when the provider rejects the request.
+    let mut overflow_recoveries = 0u32;
+    // Suppress duplicate CompactionFailed events across the steps of one turn.
+    let mut compaction_failure_emitted = false;
 
     /* ---------------------------------------------------------------- */
     /* 5. Agent loop                                                     */
@@ -3089,100 +3113,10 @@ pub async fn run_turn(
         stop_continuations,
     );
 
-    // F2c: compactação cache-safe do **Chat** antes do loop (uma tentativa por
-    // turno — nada de loop infinito). Reusa system prompt + tools + histórico
-    // como prefixo, com o mesmo plano de cache do request normal. Se falhar, o
-    // turno segue com o histórico atual e o watermark do Chat continua como
-    // fallback de emergência na próxima reconstrução.
-    let mut chat_compacted = false;
-    if profile == TurnProfile::Chat && settings.auto_compact {
-        let mut summary_template = CompletionRequest {
-            config: provider_config(&provider, &model, &credential, &wire_session_id),
-            protocols: protocols.clone(),
-            history: history.clone(),
-            system_prompt: system_prompt.clone(),
-            tools: tool_definitions.clone(),
-            reasoning: reasoning.clone(),
-            max_output_tokens,
-            temperature: None,
-            cancel: cancel.clone(),
-            cache_plan: None,
-            timeouts: StreamTimeouts::from_settings(&settings),
-        };
-        summary_template.cache_plan = cache_plan_for(
-            &provider,
-            &model,
-            &protocols,
-            &summary_template,
-            &settings.cache,
-        );
-        let compacted = compaction::maybe_compact(
-            &deps,
-            &conversation.id,
-            &tool_turn_id,
-            &summary_template,
-            &mut history,
-            &mut history_anchors,
-            &messages,
-            model.context_window,
-            model.max_output.clamp(1_024, 32_768),
-            &on_event,
-            &cancel,
-        )
-        .await;
-        if let Some(outcome) = compacted {
-            chat_compacted = true;
-            // Epoch novo explícito: a próxima amostra reporta Compaction.
-            cache_tracker.trigger_epoch_break(CacheBreakReason::Compaction);
-            // O resumo passou a cobrir o head: o watermark não é mais
-            // necessário e é zerado (fallback só vale para turnos sem resumo).
-            chat_cut_seq = None;
-            persist_chat_watermark(
-                &deps.db,
-                &conversation.id,
-                persisted_cache_state.as_ref(),
-                None,
-            );
-            let _ = outcome;
-        }
-    }
-    // F2b (fallback de emergência): só corta por saltos se a compactação não
-    // rodou/fracassou — o resumo cache-safe tem prioridade e cobre o head.
-    if profile == TurnProfile::Chat && !has_stored_summary && !chat_compacted {
-        let mut guard = 0usize;
-        while history_request_chars(&history) > history_budget_chars {
-            guard += 1;
-            if guard > messages.len() {
-                break;
-            }
-            let Some(new_seq) =
-                advance_chat_watermark(&messages, chat_cut_seq.unwrap_or(1), history_budget_chars)
-            else {
-                break;
-            };
-            chat_cut_seq = Some(new_seq);
-            let visible_from = (new_seq.saturating_sub(1) as usize).min(messages.len());
-            let (rebuilt, rebuilt_anchors) = build_history(
-                &deps,
-                &messages[visible_from..],
-                &assistant_message.id,
-                &provider.id,
-                &settings,
-                &model,
-                supports_images,
-                &[],
-                visible_from.saturating_add(1),
-            );
-            history = rebuilt;
-            history_anchors = rebuilt_anchors;
-            persist_chat_watermark(
-                &deps.db,
-                &conversation.id,
-                persisted_cache_state.as_ref(),
-                Some(new_seq),
-            );
-        }
-    }
+    // Whether the Chat history already has a compaction head. The watermark
+    // fallback runs inside the loop only when the primary compaction could not
+    // cover the head (it must never preempt compaction).
+    let mut chat_history_compacted = has_stored_summary;
 
     // Turno retomado: devolve ao modelo a cauda que ele já tinha produzido
     // (um assistant por passo, seguido dos resultados das tools). É o mesmo
@@ -3211,9 +3145,9 @@ pub async fn run_turn(
             cancelled = true;
             break;
         }
-        // Contexto do perfil Code: compacta o histórico antigo quando a janela
-        // aperta (resumo por chamada auxiliar; falha não derruba o turno).
-        if profile == TurnProfile::Code && settings.auto_compact {
+        // Contexto (Chat e Code): compacta antes de cada request quando a
+        // pressão atinge 85% da janela. Falha não derruba o turno.
+        if settings.auto_compact {
             let mut summary_template = CompletionRequest {
                 config: provider_config(&provider, &model, &credential, &wire_session_id),
                 protocols: protocols.clone(),
@@ -3236,16 +3170,24 @@ pub async fn run_turn(
                 &summary_template,
                 &settings.cache,
             );
+            if let Some((name, value)) = compaction::anthropic_beta_header(&history) {
+                crate::providers::add_header(&mut summary_template.config, name, value);
+            }
             let compacted = compaction::maybe_compact(
                 &deps,
                 &conversation.id,
                 &tool_turn_id,
                 &summary_template,
+                native_lane,
                 &mut history,
                 &mut history_anchors,
                 &messages,
-                model.context_window,
-                model.max_output.clamp(1_024, 32_768),
+                compaction::CompactionTrigger {
+                    window: model.context_window,
+                    used_floor: pressure_floor,
+                    reason: compaction::CompactionReason::Threshold,
+                },
+                &mut compaction_failure_emitted,
                 &on_event,
                 &cancel,
             )
@@ -3254,9 +3196,57 @@ pub async fn run_turn(
                 // `covered` é o `to_seq` do resumo (mensagens cobertas, não
                 // índice do histórico neutro — D15 corrigido).
                 compacted_messages = outcome.covered_messages;
+                chat_history_compacted = true;
+                pressure_floor = None;
                 // Epoch novo explícito: a próxima amostra reporta Compaction e
                 // não tenta reusar P/Δ do prefixo reescrito (F3b).
                 cache_tracker.trigger_epoch_break(CacheBreakReason::Compaction);
+                if profile == TurnProfile::Chat {
+                    chat_cut_seq = None;
+                    persist_chat_watermark(
+                        &deps.db,
+                        &conversation.id,
+                        persisted_cache_state.as_ref(),
+                        None,
+                    );
+                }
+            }
+        }
+        // F2b (emergency fallback): only when the primary compaction did not
+        // cover the head and the char budget is still exceeded.
+        if profile == TurnProfile::Chat && !chat_history_compacted {
+            let mut guard = 0usize;
+            while history_request_chars(&history) > history_budget_chars {
+                guard += 1;
+                if guard > messages.len() {
+                    break;
+                }
+                let Some(new_seq) =
+                    advance_chat_watermark(&messages, chat_cut_seq.unwrap_or(1), history_budget_chars)
+                else {
+                    break;
+                };
+                chat_cut_seq = Some(new_seq);
+                let visible_from = (new_seq.saturating_sub(1) as usize).min(messages.len());
+                let (rebuilt, rebuilt_anchors) = build_history(
+                    &deps,
+                    &messages[visible_from..],
+                    &assistant_message.id,
+                    &provider.id,
+                    &settings,
+                    &model,
+                    supports_images,
+                    &[],
+                    visible_from.saturating_add(1),
+                );
+                history = rebuilt;
+                history_anchors = rebuilt_anchors;
+                persist_chat_watermark(
+                    &deps.db,
+                    &conversation.id,
+                    persisted_cache_state.as_ref(),
+                    Some(new_seq),
+                );
             }
         }
         step_number += 1;
@@ -3322,25 +3312,25 @@ pub async fn run_turn(
         let step_system_prompt = system_prompt.clone();
 
         // Estimativa do request prestes a rodar: a UI recebe o medidor em tempo
-        // real a cada passo. Guardamos o valor para calibrar com o
-        // `usage.input_tokens` quando o provedor responder.
-        let mut step_context_stats: Option<crate::domain::ContextStats> = None;
+        // real a cada passo e a calibração usa o `usage.input_tokens` real.
+        // O Chat também estima (para pressão/calibração), mas não emite o card.
+        let step_context_stats = Some(context_stats_estimate(
+            &history,
+            &step_system_prompt,
+            &tool_definitions,
+            &model,
+            compacted_messages,
+        ));
         if profile == TurnProfile::Code {
-            let stats = context_stats_estimate(
-                &history,
-                &step_system_prompt,
-                &tool_definitions,
-                &model,
-                compacted_messages,
-            );
-            emit_context_stats(
-                &deps.db,
-                &on_event,
-                &conversation.id,
-                &tool_turn_id,
-                stats.clone(),
-            );
-            step_context_stats = Some(stats);
+            if let Some(stats) = step_context_stats.clone() {
+                emit_context_stats(
+                    &deps.db,
+                    &on_event,
+                    &conversation.id,
+                    &tool_turn_id,
+                    stats,
+                );
+            }
         }
 
         let retry_policy = providers::retry::RetryPolicy::from_settings(&settings);
@@ -3358,8 +3348,12 @@ pub async fn run_turn(
             &provider,
             &mut credential,
             |credential| {
+                let mut config = provider_config(&provider, &model, credential, &wire_session_id);
+                if let Some((name, value)) = compaction::anthropic_beta_header(&history) {
+                    crate::providers::add_header(&mut config, name, value);
+                }
                 let mut request = CompletionRequest {
-                    config: provider_config(&provider, &model, credential, &wire_session_id),
+                    config,
                     protocols: protocols.clone(),
                     history: history.clone(),
                     system_prompt: step_system_prompt.clone(),
@@ -3391,6 +3385,89 @@ pub async fn run_turn(
             &retry_policy,
         )
         .await;
+
+        // Overflow recovery: the provider rejected the request as too long. Compact
+        // once with the local ladder (the native endpoint would reject the same
+        // oversized input) and retry the same step. A second overflow is terminal.
+        if settings.auto_compact && overflow_recoveries < MAX_OVERFLOW_RECOVERIES {
+            let should_recover = match &step_run.outcome {
+                AttemptOutcome::Failed { attempt, error } => {
+                    attempt_is_empty(attempt)
+                        && error
+                            .downcast_ref::<ProviderError>()
+                            .is_some_and(ProviderError::is_context_overflow)
+                }
+                _ => false,
+            };
+            if should_recover {
+                let mut summary_template = CompletionRequest {
+                    config: provider_config(&provider, &model, &credential, &wire_session_id),
+                    protocols: protocols.clone(),
+                    history: history.clone(),
+                    system_prompt: system_prompt.clone(),
+                    tools: tool_definitions.clone(),
+                    reasoning: reasoning.clone(),
+                    max_output_tokens,
+                    temperature: None,
+                    cancel: cancel.clone(),
+                    cache_plan: None,
+                    timeouts: StreamTimeouts::from_settings(&settings),
+                };
+                summary_template.cache_plan = cache_plan_for(
+                    &provider,
+                    &model,
+                    &protocols,
+                    &summary_template,
+                    &settings.cache,
+                );
+                if let Some((name, value)) = compaction::anthropic_beta_header(&history) {
+                    crate::providers::add_header(&mut summary_template.config, name, value);
+                }
+                let compacted = compaction::maybe_compact(
+                    &deps,
+                    &conversation.id,
+                    &tool_turn_id,
+                    &summary_template,
+                    None,
+                    &mut history,
+                    &mut history_anchors,
+                    &messages,
+                    compaction::CompactionTrigger {
+                        window: model.context_window,
+                        used_floor: pressure_floor,
+                        reason: compaction::CompactionReason::Overflow,
+                    },
+                    &mut compaction_failure_emitted,
+                    &on_event,
+                    &cancel,
+                )
+                .await;
+                if compacted.is_some() {
+                    overflow_recoveries += 1;
+                    compacted_messages = compacted
+                        .as_ref()
+                        .map(|outcome| outcome.covered_messages)
+                        .unwrap_or(compacted_messages);
+                    chat_history_compacted = true;
+                    pressure_floor = None;
+                    cache_tracker.trigger_epoch_break(CacheBreakReason::Compaction);
+                    if profile == TurnProfile::Chat {
+                        chat_cut_seq = None;
+                        persist_chat_watermark(
+                            &deps.db,
+                            &conversation.id,
+                            persisted_cache_state.as_ref(),
+                            None,
+                        );
+                    }
+                    // Re-run the same step number; the failed attempt did not
+                    // advance the resume checkpoint.
+                    step_number = step_number.saturating_sub(1);
+                    continue;
+                }
+            }
+        }
+
         let outcome = step_run.outcome;
         let step_attempts = step_run.attempts;
         let step_retry_after = step_run.retry_after;
@@ -3500,17 +3577,21 @@ pub async fn run_turn(
         // Tempo real: o uso real do request recém-executado corrige a estimativa
         // (`HARNESS.md` §10.1). O histórico aqui ainda é o do request — a
         // resposta do modelo e os resultados das tools entram depois.
-        if let (Some(input_tokens), Some(estimate)) = (step_input_tokens, step_context_stats.take())
+        if let (Some(input_tokens), Some(estimate)) =
+            (step_input_tokens, step_context_stats.clone())
         {
             if input_tokens > 0 {
                 let calibrated = code::session::calibrate_context(&estimate, input_tokens);
-                emit_context_stats(
-                    &deps.db,
-                    &on_event,
-                    &conversation.id,
-                    &tool_turn_id,
-                    calibrated,
-                );
+                pressure_floor = Some(calibrated.used);
+                if profile == TurnProfile::Code {
+                    emit_context_stats(
+                        &deps.db,
+                        &on_event,
+                        &conversation.id,
+                        &tool_turn_id,
+                        calibrated,
+                    );
+                }
             }
         }
         // Custo em tempo real: o `usage` acumulado do turno (passos + subagentes
@@ -3833,8 +3914,12 @@ pub async fn run_turn(
             &provider,
             &mut credential,
             |credential| {
+                let mut config = provider_config(&provider, &model, credential, &wire_session_id);
+                if let Some((name, value)) = compaction::anthropic_beta_header(&forced_history) {
+                    crate::providers::add_header(&mut config, name, value);
+                }
                 let mut forced_request = CompletionRequest {
-                    config: provider_config(&provider, &model, credential, &wire_session_id),
+                    config,
                     protocols: protocols.clone(),
                     history: forced_history.clone(),
                     system_prompt: forced_system_prompt.clone(),
@@ -13824,10 +13909,85 @@ mod agent_loop_tests {
         );
     }
 
+    /// A provider context-overflow rejection triggers one forced local compaction
+    /// and retries the same step; the retried request opens with the summary.
+    #[tokio::test]
+    async fn overflow_recovery_compacts_once_and_retries_the_same_step() {
+        let temp = TempDb::new();
+        let conversation = temp
+            .db
+            .create_conversation("Nova conversa", "opencode-go", "deepseek-v4.1-flash")
+            .expect("conversation");
+        seed_chat_history(&temp, &conversation, 4, 60_000);
+        let captured: Arc<Mutex<Vec<CompletionRequest>>> = Arc::new(Mutex::new(Vec::new()));
+        let calls = Arc::new(Mutex::new(0u32));
+        let streamer: ProviderStreamer = {
+            let captured = captured.clone();
+            let calls = calls.clone();
+            Arc::new(move |request, sink| {
+                captured.lock().expect("captured").push(request.clone());
+                let mut count = calls.lock().expect("calls");
+                *count += 1;
+                let call = *count;
+                let summary_call = request
+                    .history
+                    .last()
+                    .is_some_and(|message| {
+                        message
+                            .text
+                            .starts_with("Summarize the transcript of this same conversation")
+                    });
+                Box::pin(async move {
+                    if call == 1 {
+                        return Err(anyhow::Error::new(ProviderError::from_http(
+                            400,
+                            r#"{"error":{"code":"context_length_exceeded","message":"input exceeds the context window"}}"#,
+                        )));
+                    }
+                    if summary_call {
+                        text_stream(&sink, "## Main request\nResumo de recuperação.");
+                    } else {
+                        text_stream(&sink, "Recuperado.");
+                    }
+                    Ok(())
+                })
+            })
+        };
+        let (emitter, events) = channel();
+        let result = run_turn(
+            deps(temp.db.clone(), streamer),
+            payload(&conversation, 2),
+            Settings::default(),
+            emitter,
+            CancellationToken::new(),
+        )
+        .await
+        .expect("turno recuperado");
+        assert_eq!(result.assistant_message.content, "Recuperado.");
+        let captured = captured.lock().expect("captured").clone();
+        assert_eq!(captured.len(), 3, "overflow + resumo + retry do mesmo passo");
+        assert!(captured[1]
+            .history
+            .last()
+            .is_some_and(|message| message
+                .text
+                .starts_with("Summarize the transcript of this same conversation")));
+        assert!(
+            captured[2].history[0]
+                .text
+                .contains("[Summary of the previous conversation"),
+            "o retry usa o histórico compactado"
+        );
+        let events = events.lock().expect("events").clone();
+        assert!(events
+            .iter()
+            .any(|event| event.contains("compaction_started") && event.contains("overflow")));
+        assert!(events.iter().any(|event| event.contains("compacted")));
+    }
+
     /* ---------------------------------------------------------------- */
     /* F6: poda de tool results no trecho mantido                       */
     /* ---------------------------------------------------------------- */
-
     fn completed_assistant(
         conversation_id: &str,
         text: &str,
@@ -13853,7 +14013,7 @@ mod agent_loop_tests {
     fn seed_chat_tool_history(
         temp: &TempDb,
         conversation: &Conversation,
-    ) -> (String, String, String) {
+    ) -> (String, String) {
         let mut seq = 1_700_000_000_000i64;
         let mut insert = |mut message: ChatMessage| {
             message.created_at = seq;
@@ -13872,19 +14032,18 @@ mod agent_loop_tests {
             vec![done_call("call-covered", &covered_big)],
         ));
         insert(ChatMessage::user(&conversation.id, "u3 ".repeat(30_000)));
-        let short_id = insert(completed_assistant(
-            &conversation.id,
-            "ok3",
-            vec![done_call("call-short", "curto")],
-        ));
-        insert(ChatMessage::user(&conversation.id, "u4 ".repeat(30_000)));
+        insert(completed_assistant(&conversation.id, "ok3", Vec::new()));
+        insert(ChatMessage::user(&conversation.id, "u4 ".repeat(6_000)));
         let kept_big = "SAIDA-GRANDE-".repeat(2_000);
         let big_id = insert(completed_assistant(
             &conversation.id,
             "ok4",
-            vec![done_call("call-big", &kept_big)],
+            vec![
+                done_call("call-short", "curto"),
+                done_call("call-big", &kept_big),
+            ],
         ));
-        (big_id, short_id, covered_big)
+        (big_id, covered_big)
     }
 
     /// F6 (a): a compactação pode os tool results grandes do trecho mantido com
@@ -13898,7 +14057,7 @@ mod agent_loop_tests {
             .db
             .create_conversation("Nova conversa", "opencode-go", "deepseek-v4.1-flash")
             .expect("conversation");
-        let (big_id, short_id, covered_big) = seed_chat_tool_history(&temp, &conversation);
+        let (big_id, covered_big) = seed_chat_tool_history(&temp, &conversation);
         let captured: Arc<Mutex<Vec<(CompletionRequest, UsageInfo)>>> =
             Arc::new(Mutex::new(Vec::new()));
         let previous: Arc<Mutex<Option<PrefixDigest>>> = Arc::new(Mutex::new(None));
@@ -13968,10 +14127,7 @@ mod agent_loop_tests {
             .as_str()
             .is_some_and(|value| value == pruned_text));
         assert!(
-            temp.db
-                .get_render_decision(&short_id, compaction::RENDER_KIND_TOOL_RESULT)
-                .expect("ler decisão curta")
-                .is_none(),
+            decision_payload.get("call-short").is_none(),
             "tool result curto não gera decisão"
         );
         let created_at = decision.created_at;
@@ -14194,19 +14350,14 @@ mod agent_loop_tests {
         let summary_requests: Arc<Mutex<Vec<CompletionRequest>>> = Arc::new(Mutex::new(Vec::new()));
         let helper_deps = deps(
             temp.db.clone(),
-            capturing_streamer(summary_requests.clone(), "Resumo manual do Code."),
+            capturing_streamer(summary_requests.clone(), "## Main request\nResumo manual do Code."),
         );
         let outcome =
             compaction::summarize_manual_for_conversation(&helper_deps, &conversation, &settings)
                 .await
                 .expect("helper do /compact manual")
                 .expect("histórico suficiente para resumir");
-        assert!(outcome.summary.starts_with("Resumo manual do Code."));
-        assert_eq!(
-            outcome.system_prompt_hash,
-            cache::snapshot::stable_hash(&normal_request.system_prompt),
-            "hash do snapshot congelado do Code"
-        );
+        assert!(outcome.summary.contains("Resumo manual do Code."));
         // `covered` (to_seq) alinhado aos anchors: a primeira mensagem mantida é
         // a `messages[covered]`, uma user.
         let messages = temp.db.list_messages(&conversation.id).expect("mensagens");

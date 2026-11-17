@@ -1196,18 +1196,25 @@ pub async fn compact_session(
     .map_err(|error| format!("falha ao compactar: {error:#}"))?
     .ok_or_else(|| crate::i18n::t("code.errors.nothingToCompact"))?;
 
-    // `to_seq` = `outcome.covered` (ordinal estável de mensagens); a coluna
-    // `tokens` guarda a estimativa de tokens liberados (informativa).
-    state
-        .db
-        .insert_session_summary(
-            &conversation_id,
-            1,
-            i64::from(outcome.covered),
-            &outcome.summary,
-            Some(outcome.tokens_freed),
-        )
-        .map_err(map_err)?;
+    // `to_seq` = `outcome.covered` (ordinal estável de mensagens); o hash cobre
+    // as mensagens resumidas para invalidar o resumo em edição/revert.
+    let covered = usize::try_from(outcome.covered).unwrap_or(usize::MAX);
+    let covered_hash = crate::harness::compaction::covered_hash(&messages, covered);
+    crate::harness::compaction::persist_compaction(
+        &state.db,
+        crate::harness::compaction::CompactionRecord {
+            conversation_id: &conversation_id,
+            covered: outcome.covered,
+            summary: &outcome.summary,
+            tokens_before: Some(outcome.tokens_before),
+            method: outcome.method,
+            provider_id: Some(&conversation.provider_id),
+            model_id: Some(&conversation.model_id),
+            native_payload: outcome.native_payload.as_ref(),
+            covered_hash: &covered_hash,
+        },
+    )
+    .map_err(map_err)?;
     // Projeção canônica da UI (D25): `context/compacted`, nunca `context/stats`.
     record_manual_compaction(
         &state.db,
@@ -1969,8 +1976,10 @@ mod tests {
             !source.contains(concat!("complete", "_text(")),
             "o manual não deve voltar ao caminho de texto do batch (não cache-safe)"
         );
-        // `to_seq`/projeção seguem vindo do outcome do helper.
-        assert!(source.contains(concat!("i64::from(outcome", ".covered)")));
+        // `to_seq`/projeção seguem vindo do outcome do helper, persistidos pelo
+        // helper único de compactação.
+        assert!(source.contains(concat!("persist", "_compaction(")));
+        assert!(source.contains(concat!("outcome", ".covered")));
         assert!(source.contains(concat!("outcome", ".tokens_freed")));
     }
 
@@ -2014,8 +2023,19 @@ mod tests {
         assert_eq!(session::compacted_messages(&db, &conversation_id), 9);
 
         // Resumo da compactação manual: `to_seq` = mensagens cobertas.
-        db.insert_session_summary(&conversation_id, 1, 9, "resumo manual", None)
-            .expect("resumo");
+        db.insert_session_summary(crate::db::NewSessionSummary {
+            conversation_id: &conversation_id,
+            from_seq: 1,
+            to_seq: 9,
+            content: "resumo manual",
+            tokens: None,
+            kind: crate::harness::compaction::SUMMARY_KIND_LOCAL,
+            provider_id: None,
+            model_id: None,
+            payload: None,
+            covered_hash: None,
+        })
+        .expect("resumo");
         let latest = db
             .latest_session_summary(&conversation_id)
             .expect("ler resumo")

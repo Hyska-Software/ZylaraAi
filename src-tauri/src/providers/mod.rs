@@ -516,6 +516,21 @@ impl StructuredError {
     }
 }
 
+/// Lowercased body fragments that mean "the input did not fit the context
+/// window". Only 400/422 responses are classified: a 413 is a byte-size
+/// rejection (images, payload), not a token-window overflow.
+pub const CONTEXT_OVERFLOW_PATTERNS: &[&str] = &[
+    "context_length_exceeded",
+    "context length",
+    "context window",
+    "prompt is too long",
+    "input is too long",
+    "input token count",
+    "too many tokens",
+    "maximum context",
+    "reduce the length",
+];
+
 /// Raw provider code for a 401 that explicitly rejects the account identity.
 const CODE_INVALID_USER: &str = "subscription_sharing_invalid_user";
 /// Raw provider code for "this account cannot use ChatGPT-plan usage".
@@ -540,6 +555,10 @@ pub enum ProviderError {
     },
     #[error("bad request: {0}")]
     BadRequest(String),
+    /// The request exceeded the model context window (400/422 with a
+    /// window-overflow body). Recoverable only by compacting the history.
+    #[error("context window exceeded: {0}")]
+    ContextOverflow(StructuredError),
     #[error("insufficient credit: {0}")]
     InsufficientCredit(String),
     #[error("network error: {0}")]
@@ -618,6 +637,17 @@ impl ProviderError {
             return Self::UnsupportedProtocol(body.to_string());
         }
         let structured = StructuredError::from_body(body);
+        // Context-window overflow arrives as a 400/422 with a body describing
+        // the input length; it needs compaction, not a generic bad-request
+        // terminal failure. Checked before the status match so the specific
+        // classification wins over `BadRequest`/`Other`.
+        if matches!(status, 400 | 422)
+            && CONTEXT_OVERFLOW_PATTERNS
+                .iter()
+                .any(|pattern| lower.contains(*pattern))
+        {
+            return Self::ContextOverflow(structured);
+        }
         let code = structured.code.as_deref();
         let excerpt = error_excerpt(body);
         match status {
@@ -715,6 +745,7 @@ impl ProviderError {
             Self::UnsupportedCapability(_) => Some("unsupported_capability"),
             Self::RouteNotSupported(_) => Some("route_not_supported"),
             Self::BadRequest(_) => Some("bad_request"),
+            Self::ContextOverflow(_) => Some("context_overflow"),
             Self::InsufficientCredit(_) => Some("insufficient_credit"),
             Self::Network(_) => Some("network"),
             Self::Timeout { .. } | Self::StreamStalled(_) => Some("timeout"),
@@ -757,6 +788,7 @@ impl ProviderError {
             | Self::Transient { .. } => RetryClass::Transient,
             Self::UnsupportedProtocol(_)
             | Self::BadRequest(_)
+            | Self::ContextOverflow(_)
             | Self::InsufficientCredit(_)
             | Self::Other(_)
             | Self::Cancelled
@@ -797,6 +829,12 @@ impl ProviderError {
     /// uso" CTA instead (the limit may be the plan's or this app's).
     pub fn is_plan_limit(&self) -> bool {
         matches!(self, Self::PlanLimit(_))
+    }
+
+    /// The input exceeded the model context window: the only recovery is to
+    /// compact the history and retry the same step.
+    pub fn is_context_overflow(&self) -> bool {
+        matches!(self, Self::ContextOverflow(_))
     }
 
     pub fn is_unsupported_protocol(&self) -> bool {
@@ -970,6 +1008,90 @@ pub(crate) async fn send_stream(
         ));
     }
     Ok(Some(response))
+}
+
+/// Append one header to `config.extra_headers`, merging by case-insensitive
+/// name with a comma (the convention for multi-value headers such as
+/// `anthropic-beta`).
+pub(crate) fn add_header(config: &mut ProviderConfig, name: &str, value: &str) {
+    if let Some(existing) = config
+        .extra_headers
+        .iter_mut()
+        .find(|(current, _)| current.eq_ignore_ascii_case(name))
+    {
+        if existing.1.trim().is_empty() {
+            existing.1 = value.to_string();
+        } else if !existing.1.split(',').any(|entry| entry.trim() == value) {
+            existing.1.push(',');
+            existing.1.push_str(value);
+        }
+        return;
+    }
+    config
+        .extra_headers
+        .push((name.to_string(), value.to_string()));
+}
+
+/// POST a JSON body and return the decoded JSON response (non-streaming).
+///
+/// Used by the native-compaction endpoints, which answer with a single JSON
+/// object instead of an SSE stream.
+pub(crate) async fn post_json(
+    http: &reqwest::Client,
+    config: &ProviderConfig,
+    url: &str,
+    body: &Value,
+    timeout: Duration,
+    cancel: &CancellationToken,
+) -> ProviderResult<Value> {
+    use reqwest::header::CONTENT_TYPE;
+
+    if cancel.is_cancelled() {
+        return Err(ProviderError::Cancelled);
+    }
+    let mut builder = http.post(url).header(CONTENT_TYPE, "application/json");
+    for (name, value) in config.headers() {
+        builder = builder.header(name.as_str(), value.as_str());
+    }
+    let response = tokio::select! {
+        _ = cancel.cancelled() => return Err(ProviderError::Cancelled),
+        result = tokio::time::timeout(timeout, builder.json(body).send()) => match result {
+            Err(_) => {
+                return Err(ProviderError::Timeout {
+                    phase: TimeoutPhase::Headers,
+                    detail: format!(
+                        "sem resposta de {} em {} s",
+                        config.provider_name,
+                        timeout.as_secs()
+                    ),
+                });
+            }
+            Ok(Err(error)) => return Err(classify_transport_error(error)),
+            Ok(Ok(response)) => response,
+        },
+    };
+    let status = response.status();
+    let retry_after = retry::retry_after_from_headers(response.headers());
+    let text = tokio::select! {
+        _ = cancel.cancelled() => return Err(ProviderError::Cancelled),
+        text = tokio::time::timeout(Duration::from_secs(15), response.text()) => match text {
+            Ok(text) => text.unwrap_or_default(),
+            Err(_) => String::new(),
+        },
+    };
+    if !status.is_success() {
+        return Err(ProviderError::from_http_with_retry_after(
+            status.as_u16(),
+            &text,
+            retry_after,
+        ));
+    }
+    serde_json::from_str::<Value>(&text).map_err(|error| {
+        ProviderError::Other(format!(
+            "resposta não-JSON de {}: {error}",
+            config.provider_name
+        ))
+    })
 }
 
 /// Classify a transport failure: timeouts are retryable timeouts, everything
@@ -2758,6 +2880,55 @@ mod tests {
         assert!(matches!(error, ProviderError::BadRequest(_)));
         assert_eq!(error.code(), Some("bad_request"));
         assert!(!error.is_transient());
+    }
+
+    #[test]
+    fn context_overflow_is_classified_for_openai_anthropic_and_google_bodies() {
+        // OpenAI Responses / Chat both use `context_length_exceeded`.
+        let error = ProviderError::from_http(
+            400,
+            r#"{"error":{"code":"context_length_exceeded","message":"Your input exceeds the context window of this model."}}"#,
+        );
+        assert!(matches!(error, ProviderError::ContextOverflow(_)), "{error:?}");
+        assert!(error.is_context_overflow());
+        assert_eq!(error.code(), Some("context_overflow"));
+        assert_eq!(error.retry_class(), RetryClass::Permanent);
+        assert!(!error.is_transient());
+        assert!(!error.is_auth_failure());
+        assert!(!error.is_plan_limit());
+        assert!(error.to_string().contains("context window"));
+
+        // Anthropic: "prompt is too long: N tokens > M maximum".
+        let error = ProviderError::from_http(
+            422,
+            r#"{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 250000 tokens > 200000 maximum"}}"#,
+        );
+        assert!(error.is_context_overflow(), "{error:?}");
+        assert_eq!(error.code(), Some("context_overflow"));
+
+        // Google: "The input token count (N) exceeds the maximum number of tokens".
+        let error = ProviderError::from_http(
+            400,
+            r#"{"error":{"code":400,"message":"The input token count (1048577) exceeds the maximum number of tokens allowed (1048576).","status":"INVALID_ARGUMENT"}}"#,
+        );
+        assert!(error.is_context_overflow(), "{error:?}");
+
+        // A 413 is a payload-size rejection, never a token-window overflow.
+        let error = ProviderError::from_http(413, r#"{"message":"payload too large"}"#);
+        assert!(!error.is_context_overflow(), "{error:?}");
+        assert!(matches!(error, ProviderError::Other(_)));
+    }
+
+    #[test]
+    fn generic_400_stays_bad_request() {
+        let error = ProviderError::from_http(
+            400,
+            r#"{"error":{"code":"invalid_request_error","message":"missing field: model"}}"#,
+        );
+        assert!(matches!(error, ProviderError::BadRequest(_)), "{error:?}");
+        assert!(!error.is_context_overflow());
+        assert_eq!(error.code(), Some("bad_request"));
+        assert_eq!(error.retry_class(), RetryClass::Permanent);
     }
 
     #[test]

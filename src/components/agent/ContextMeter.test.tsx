@@ -249,6 +249,48 @@ describe('ContextMeter — faixas e compactação', () => {
     const dialog = await openPopover();
     expect(within(dialog).queryByRole('status')).toBeNull();
   });
+
+  it('mostra a nota de compactação nativa quando a lane é do provedor', async () => {
+    render(<ContextMeter stats={makeStats({ compacted: 42 })} compactionMethod="anthropic" />);
+    const dialog = await openPopover();
+    expect(within(dialog).getByRole('status').textContent).toBe(
+      'Contexto compactado pelo provedor · 42 mensagens resumidas',
+    );
+  });
+
+  it('compactação local mantém a nota existente', async () => {
+    render(<ContextMeter stats={makeStats({ compacted: 42 })} compactionMethod="local" />);
+    const dialog = await openPopover();
+    expect(within(dialog).getByRole('status').textContent).toBe(
+      'Contexto compactado · 42 mensagens resumidas',
+    );
+  });
+
+  it('compactação em andamento tem precedência na nota e marca aria-busy', async () => {
+    render(
+      <ContextMeter
+        stats={makeStats({ compacted: 42 })}
+        compacting
+        compactionMethod="local"
+      />,
+    );
+    expect(trigger().getAttribute('aria-busy')).toBe('true');
+    const dialog = await openPopover();
+    expect(within(dialog).getByRole('status').textContent).toBe('Compactando contexto…');
+  });
+
+  it('mostra o aviso de falha da compactação com role=status', async () => {
+    render(
+      <ContextMeter
+        stats={makeStats({ compacted: 0 })}
+        compactionWarning="Falha ao compactar o contexto: boom"
+      />,
+    );
+    const dialog = await openPopover();
+    const status = within(dialog).getByRole('status');
+    expect(status.textContent).toBe('Falha ao compactar o contexto: boom');
+    expect(status.className).toContain('text-warning');
+  });
 });
 
 describe('ContextMeter — fallback e tempo real', () => {

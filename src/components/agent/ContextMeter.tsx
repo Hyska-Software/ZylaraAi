@@ -5,7 +5,7 @@ import { DollarSign } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import type { SessionCostView } from '@/lib/sessionCost';
 import type { CacheConversationUi } from '@/lib/store/cacheStore';
-import type { ContextBreakdown, ContextStats } from '@/lib/types';
+import type { CompactionMethod, ContextBreakdown, ContextStats } from '@/lib/types';
 import { cn, formatCost, formatTokens } from '@/lib/utils';
 import {
   CacheChipSegment,
@@ -30,6 +30,12 @@ export interface ContextMeterProps {
   cost?: SessionCostView | null;
   /** Mensagens resumidas na última compactação (quando o host souber). */
   compacted?: number | null;
+  /** Compactação em andamento (o chip fica `aria-busy` e a nota muda). */
+  compacting?: boolean;
+  /** Lane da última compactação (`local` vs nativa do provedor). */
+  compactionMethod?: CompactionMethod;
+  /** Falha da última tentativa de compactação (linha de aviso). */
+  compactionWarning?: string | null;
   className?: string;
 }
 
@@ -126,7 +132,16 @@ function ContextRing({ percent, tier }: { percent: number; tier: Tier }) {
  * The optional `cost` prop adds the session spending segment (USD, official
  * catalog prices, subagents included) and its input/output/cache breakdown.
  */
-export function ContextMeter({ stats, cache, cost, compacted, className }: ContextMeterProps) {
+export function ContextMeter({
+  stats,
+  cache,
+  cost,
+  compacted,
+  compacting,
+  compactionMethod,
+  compactionWarning,
+  className,
+}: ContextMeterProps) {
   const { t } = useTranslation('agents');
   const descriptionId = useId();
   const hasCache = cache !== undefined;
@@ -134,7 +149,16 @@ export function ContextMeter({ stats, cache, cost, compacted, className }: Conte
   const tier = tierFor(percent);
   const tierLabel = t(tier.labelKey as never);
   const compactedCount = compacted ?? stats.compacted ?? 0;
-  const note = compactedCount > 0 ? t('context.compacted', { count: compactedCount }) : null;
+  const nativeCompaction =
+    compactionMethod === 'openai-responses' || compactionMethod === 'anthropic';
+  // Precedência: compactando > compactação nativa > nota local existente.
+  const note = compacting
+    ? t('context.compacting')
+    : compactedCount > 0
+      ? nativeCompaction
+        ? t('context.compactedNative', { count: compactedCount })
+        : t('context.compacted', { count: compactedCount })
+      : null;
   const costLabel = cost ? (cost.priced ? formatCost(cost.totalUsd) : '—') : null;
   const costRows = cost
     ? [
@@ -200,6 +224,7 @@ export function ContextMeter({ stats, cache, cost, compacted, className }: Conte
         <button
           type="button"
           aria-label={t('context.usedAria', { percent })}
+          aria-busy={compacting ? true : undefined}
           aria-describedby={description ? descriptionId : undefined}
           className={cn(
             'flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-full px-2 text-[11px] font-medium tabular-nums',
@@ -364,6 +389,11 @@ export function ContextMeter({ stats, cache, cost, compacted, className }: Conte
             {note ? (
               <p role="status" className="text-foreground-muted">
                 {note}
+              </p>
+            ) : null}
+            {compactionWarning ? (
+              <p role="status" className="text-warning">
+                {compactionWarning}
               </p>
             ) : null}
           </div>

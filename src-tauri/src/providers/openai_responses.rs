@@ -114,19 +114,7 @@ fn build_body(request: &CompletionRequest) -> Value {
         body["instructions"] = json!(system);
     }
     if !request.tools.is_empty() {
-        let tools: Vec<Value> = request
-            .tools
-            .iter()
-            .map(|tool| {
-                json!({
-                    "type": "function",
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.parameters,
-                })
-            })
-            .collect();
-        body["tools"] = json!(tools);
+        body["tools"] = json!(tools_value(request));
     }
     // Reasoning models reject a custom temperature; only send it when the
     // caller is not explicitly steering reasoning. The plan route rejects it
@@ -151,6 +139,74 @@ fn build_body(request: &CompletionRequest) -> Value {
         apply_chatgpt_plan_whitelist(&mut body);
     }
     body
+}
+
+/// Wire shape of the request tools (`{type, name, description, parameters}`).
+/// Shared by the streaming body and the native-compaction body so both send
+/// exactly the same tool definitions.
+fn tools_value(request: &CompletionRequest) -> Vec<Value> {
+    request
+        .tools
+        .iter()
+        .map(|tool| {
+            json!({
+                "type": "function",
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters,
+            })
+        })
+        .collect()
+}
+
+/// Body of `POST /responses/compact`.
+///
+/// Stateless w.r.t. the streaming endpoint: `stream`, `store`,
+/// `max_output_tokens`, `previous_response_id` and `truncation` are never sent —
+/// the endpoint only accepts the conversation prefix (`input`) plus the shape
+/// controls (`instructions`, `tools`, `prompt_cache_key`, reasoning).
+pub(crate) fn compact_body(request: &CompletionRequest) -> Value {
+    let mut body = json!({
+        "model": request.config.model.id,
+        "input": build_input(request),
+    });
+    let system = system_text(request);
+    if !system.is_empty() {
+        body["instructions"] = json!(system);
+    }
+    if !request.tools.is_empty() {
+        body["tools"] = json!(tools_value(request));
+    }
+    if let Some(key) = request
+        .cache_plan
+        .as_ref()
+        .and_then(|plan| plan.prompt_cache_key.as_ref())
+    {
+        body["prompt_cache_key"] = json!(key);
+    }
+    reasoning::apply(
+        WireProtocol::OpenaiResponses,
+        &request.config.model,
+        &request.reasoning,
+        &mut body,
+    );
+    body
+}
+
+/// Validate and normalize the `/responses/compact` answer.
+///
+/// The endpoint returns `{"object":"response.compaction","output":[...]}` where
+/// `output` carries the opaque (encrypted) compaction item to replay verbatim.
+pub(crate) fn parse_compact_response(value: &Value) -> anyhow::Result<Value> {
+    if value.get("object").and_then(Value::as_str) != Some("response.compaction") {
+        anyhow::bail!("resposta de compactação sem object=response.compaction: {value}");
+    }
+    let output = value
+        .get("output")
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("resposta de compactação sem output: {value}"))?;
+    Ok(json!({"object": "response.compaction", "output": output}))
 }
 
 /// Reduce an already built body to the plan-route whitelist and re-assert the
@@ -798,6 +854,70 @@ mod tests {
         }
     }
 
+    /// `/responses/compact` receives the conversation prefix plus the shape
+    /// controls, never the streaming-only fields.
+    #[test]
+    fn openai_compact_body_omits_stream_and_carries_input_instructions_tools() {
+        let mut request = test_request(RequestProfile::Standard, ReasoningRequest::Auto);
+        request.cache_plan = Some(cache::CachePlan {
+            mode: cache::CacheMode::Auto,
+            breakpoints: Vec::new(),
+            prompt_cache_key: Some("k".repeat(64)),
+            retention: None,
+            ttl: None,
+        });
+        let body = compact_body(&request);
+
+        assert_eq!(body["model"], json!("gpt-6.1-sol"));
+        assert_eq!(body["input"], json!(build_input(&request)));
+        assert_eq!(
+            body["instructions"],
+            json!("You are Zylara.\n\nsystem from history")
+        );
+        assert_eq!(body["tools"][0]["type"], json!("function"));
+        assert_eq!(body["tools"][0]["name"], json!("echo"));
+        assert_eq!(body["prompt_cache_key"], json!("k".repeat(64)));
+
+        for forbidden in [
+            "stream",
+            "store",
+            "max_output_tokens",
+            "previous_response_id",
+            "truncation",
+        ] {
+            assert!(
+                body.get(forbidden).is_none(),
+                "{forbidden} não pode ir no corpo de compactação: {body}"
+            );
+        }
+    }
+
+    #[test]
+    fn openai_compact_response_requires_response_compaction_object() {
+        let item = json!({
+            "type": "compaction",
+            "id": "cmp_1",
+            "encrypted_content": "opaque",
+        });
+        let parsed = parse_compact_response(&json!({
+            "object": "response.compaction",
+            "output": [item],
+        }))
+        .expect("resposta de compactação válida");
+        assert_eq!(parsed["object"], json!("response.compaction"));
+        assert_eq!(parsed["output"], json!([item]));
+
+        // Wrong object / missing or empty output are contract violations.
+        assert!(
+            parse_compact_response(&json!({"object": "response", "output": [item]})).is_err()
+        );
+        assert!(parse_compact_response(
+            &json!({"object": "response.compaction", "output": []})
+        )
+        .is_err());
+        assert!(parse_compact_response(&json!({"object": "response.compaction"})).is_err());
+    }
+
     #[test]
     fn chatgpt_plan_profile_only_sends_whitelisted_fields() {
         let request = plan_request();
@@ -1097,5 +1217,44 @@ mod tests {
         assert!(!serialized.contains("SEGREDO"), "{serialized}");
         assert!(!serialized.contains("sk-secret"), "{serialized}");
         assert!(!serialized.contains("authorization"), "{serialized}");
+    }
+
+    /// Live smoke of the standalone compaction endpoint. Skipped without a key.
+    #[tokio::test]
+    #[ignore = "live: requires OPENAI_API_KEY"]
+    async fn live_openai_responses_compact_returns_a_compaction_item() {
+        let Ok(key) = std::env::var("OPENAI_API_KEY") else {
+            return;
+        };
+        let response = reqwest::Client::new()
+            .post("https://api.openai.com/v1/responses/compact")
+            .bearer_auth(key)
+            .json(&json!({
+                "model": "gpt-6-luna",
+                "instructions": "You are a coding assistant.",
+                "input": [
+                    {"role": "user", "content": "We are building a small CLI."},
+                    {"role": "assistant", "content": "Use a single command with subcommands."},
+                    {"role": "user", "content": "Now add a config file."}
+                ]
+            }))
+            .send()
+            .await
+            .expect("compact request");
+        assert!(
+            response.status().is_success(),
+            "compact status: {}",
+            response.status()
+        );
+        let value: Value = response.json().await.expect("compact json");
+        let parsed = parse_compact_response(&value).expect("compacted response");
+        assert!(parsed["output"].as_array().is_some_and(|items| {
+            items.iter().any(|item| {
+                item["type"] == "compaction"
+                    && item["encrypted_content"]
+                        .as_str()
+                        .is_some_and(|value| !value.is_empty())
+            })
+        }));
     }
 }

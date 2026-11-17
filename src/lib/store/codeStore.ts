@@ -10,6 +10,7 @@ import type {
   AskUserRequest,
   ChangesSummary,
   CodeSessionState,
+  CompactionMethod,
   ContextStats,
   CreateGoalInput,
   FileChange,
@@ -54,6 +55,12 @@ export interface CodeSessionUi {
   dismissedGoalRevision: number | null;
   todos: TodoItem[];
   context: ContextStats | null;
+  /** Compactação de contexto em andamento (eventos `compaction_*`). */
+  compacting: boolean;
+  /** Lane da última compactação bem-sucedida (UI-only). */
+  lastCompactionMethod?: CompactionMethod;
+  /** Mensagem da última falha de compactação (limpa no próximo turno). */
+  compactionWarning: string | null;
   changes: ChangesSummary | null;
   /** Alterações do turno mais recente (subconjunto de `changes`). */
   lastTurnChanges: ChangesSummary | null;
@@ -86,6 +93,8 @@ export function emptyCodeSession(conversationId: string): CodeSessionUi {
     dismissedGoalRevision: null,
     todos: [],
     context: null,
+    compacting: false,
+    compactionWarning: null,
     changes: null,
     lastTurnChanges: null,
     jobs: [],
@@ -243,9 +252,16 @@ export function applyCodeEvent(state: CodeSessionUi, event: TurnEvent): CodeSess
       return { ...state, todos: event.todos };
     case 'context_stats':
       return { ...state, context: event.stats };
+    case 'compaction_started':
+      return { ...state, compacting: true, compactionWarning: null };
+    case 'compaction_failed':
+      return { ...state, compacting: false, compactionWarning: event.message };
     case 'compacted':
       return {
         ...state,
+        compacting: false,
+        compactionWarning: null,
+        lastCompactionMethod: event.method ?? 'local',
         context: state.context
           ? {
               ...state.context,
@@ -263,6 +279,8 @@ export function applyCodeEvent(state: CodeSessionUi, event: TurnEvent): CodeSess
          while this turn's edits are still arriving. */
       return {
         ...state,
+        compacting: false,
+        compactionWarning: null,
         lastTurnChanges: {
           turnId: event.turnId,
           files: [],
@@ -307,6 +325,8 @@ export function isCodeEvent(event: TurnEvent): boolean {
     case 'goal_updated':
     case 'todos_updated':
     case 'context_stats':
+    case 'compaction_started':
+    case 'compaction_failed':
     case 'compacted':
     case 'workspace_changes':
     case 'file_changed':
@@ -340,6 +360,9 @@ export function fromSnapshot(
     dismissedGoalRevision: sameGoal ? (previous?.dismissedGoalRevision ?? null) : null,
     todos: snapshot.todos ?? [],
     context: snapshot.context ?? null,
+    compacting: previous?.compacting ?? false,
+    lastCompactionMethod: previous?.lastCompactionMethod,
+    compactionWarning: previous?.compactionWarning ?? null,
     changes: snapshot.changes ?? null,
     lastTurnChanges: snapshot.lastTurnChanges ?? null,
     jobs: snapshot.jobs ?? [],

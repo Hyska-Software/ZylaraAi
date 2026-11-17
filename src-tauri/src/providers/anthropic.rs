@@ -63,8 +63,9 @@ pub(crate) async fn stream(
 /* Request                                                             */
 /* ------------------------------------------------------------------ */
 
-fn build_body(request: &CompletionRequest) -> Value {
-    let model = &request.config.model;
+/// Messages / system / tool definitions shared by every body this adapter
+/// builds (streaming and native compaction).
+fn request_parts(request: &CompletionRequest) -> (Vec<Value>, String, Vec<Value>) {
     let mut messages: Vec<Value> = Vec::new();
     for message in &request.history {
         match message.role {
@@ -83,29 +84,39 @@ fn build_body(request: &CompletionRequest) -> Value {
             HistoryRole::Tool => push_tool_result(&mut messages, message),
         }
     }
+    let system = system_text(request);
+    let tools: Vec<Value> = request
+        .tools
+        .iter()
+        .map(|tool| {
+            json!({
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.parameters,
+            })
+        })
+        .collect();
+    (messages, system, tools)
+}
 
+/// Assemble a Messages body. `stream` and `max_tokens` are the only fields
+/// that differ between the streaming endpoint and the on-demand compaction
+/// endpoint, so both share this builder.
+fn base_body(request: &CompletionRequest, stream: bool, max_tokens: u32) -> Value {
+    let model = &request.config.model;
+    let (messages, system, tools) = request_parts(request);
     let mut body = json!({
         "model": model.id,
-        "stream": true,
-        "max_tokens": max_output_tokens(request),
+        "max_tokens": max_tokens,
         "messages": messages,
     });
-    let system = system_text(request);
+    if stream {
+        body["stream"] = json!(true);
+    }
     if !system.is_empty() {
         body["system"] = json!(system);
     }
-    if !request.tools.is_empty() {
-        let tools: Vec<Value> = request
-            .tools
-            .iter()
-            .map(|tool| {
-                json!({
-                    "name": tool.name,
-                    "description": tool.description,
-                    "input_schema": tool.parameters,
-                })
-            })
-            .collect();
+    if !tools.is_empty() {
         body["tools"] = json!(tools);
     }
     reasoning::apply(
@@ -130,6 +141,69 @@ fn build_body(request: &CompletionRequest) -> Value {
         }
     }
     body
+}
+
+fn build_body(request: &CompletionRequest) -> Value {
+    base_body(request, true, max_output_tokens(request))
+}
+
+/// Body of the on-demand compaction request (`POST /v1/messages` with
+/// `compaction: {"type": "summarize"}` and the `compact-2026-09-04` beta).
+///
+/// Same conversation prefix, system and tools as the streaming body; no
+/// `stream`, and no output shaping (`output_config`) — the beta only accepts
+/// the request shape plus the compaction directive.
+pub(crate) fn compaction_body(request: &CompletionRequest) -> Value {
+    let max_tokens = max_output_tokens(request).clamp(4_096, 8_192);
+    let mut body = base_body(request, false, max_tokens);
+    body["compaction"] = json!({"type": "summarize"});
+    if let Some(object) = body.as_object_mut() {
+        // Effort shaping is meaningless for a summarization call and the beta
+        // rejects output shaping; keep only thinking.
+        let _ = object.remove("output_config");
+    }
+    body
+}
+
+/// Validate the on-demand compaction answer.
+///
+/// Shape: `stop_reason == "compaction"` and exactly one `content[]` block of
+/// `type == "compaction"`, carrying the readable `content` and its `signature`.
+/// Returns the assistant replay state and the readable summary text.
+pub(crate) fn parse_compaction_response(value: &Value) -> anyhow::Result<(Value, String)> {
+    if value.get("stop_reason").and_then(Value::as_str) != Some("compaction") {
+        anyhow::bail!("resposta de compactação com stop_reason inesperado: {value}");
+    }
+    let block = value
+        .get("content")
+        .and_then(Value::as_array)
+        .and_then(|blocks| {
+            let mut matches = blocks
+                .iter()
+                .filter(|block| block.get("type").and_then(Value::as_str) == Some("compaction"));
+            match (matches.next(), matches.next()) {
+                (Some(block), None) => Some(block),
+                _ => None,
+            }
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!("resposta de compactação exige exatamente um bloco compaction: {value}")
+        })?;
+    let text = block
+        .get("content")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let signature = block
+        .get("signature")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if text.trim().is_empty() || signature.trim().is_empty() {
+        anyhow::bail!("bloco de compactação sem content/signature: {value}");
+    }
+    Ok((
+        json!({"role": "assistant", "content": [block]}),
+        text.to_string(),
+    ))
 }
 
 fn user_blocks(message: &HistoryMessage) -> Vec<Value> {
@@ -724,6 +798,83 @@ mod tests {
         );
     }
 
+    /// On-demand compaction reuses the conversation prefix, system and tools
+    /// but drops `stream` and the output shaping.
+    #[test]
+    fn anthropic_compaction_body_adds_summarize_and_keeps_system_tools() {
+        let request = direct_request(ReasoningRequest::Effort("high".to_string()));
+        let body = compaction_body(&request);
+
+        assert_eq!(body["compaction"], json!({"type": "summarize"}));
+        assert_eq!(body["system"], json!("Você é o Zylara."));
+        assert_eq!(body["tools"][0]["name"], json!("echo"));
+        assert_eq!(body["messages"], build_body(&request)["messages"]);
+        assert!(
+            body.get("stream").is_none(),
+            "compactação não é streaming: {body}"
+        );
+        for forbidden in [
+            "context_management",
+            "stop_sequences",
+            "tool_choice",
+            "output_config",
+        ] {
+            assert!(
+                body.get(forbidden).is_none(),
+                "{forbidden} não pode ir no corpo de compactação: {body}"
+            );
+        }
+        let max_tokens = body["max_tokens"].as_u64().unwrap_or(0);
+        assert!(
+            (4_096..=8_192).contains(&max_tokens),
+            "max_tokens fora da faixa de compactação: {body}"
+        );
+        // The requested effort still enables adaptive thinking.
+        assert_eq!(body["thinking"], json!({"type": "adaptive"}));
+    }
+
+    #[test]
+    fn anthropic_compaction_response_requires_signature() {
+        let block = json!({
+            "type": "compaction",
+            "content": "Resumo da conversa.",
+            "signature": "sig-123",
+        });
+        let (state, text) = parse_compaction_response(&json!({
+            "stop_reason": "compaction",
+            "content": [block.clone()],
+        }))
+        .expect("resposta de compactação válida");
+        assert_eq!(text, "Resumo da conversa.");
+        assert_eq!(
+            state,
+            json!({"role": "assistant", "content": [block.clone()]})
+        );
+
+        // Any other stop reason is not a compaction answer.
+        assert!(parse_compaction_response(&json!({
+            "stop_reason": "end_turn",
+            "content": [block.clone()],
+        }))
+        .is_err());
+        // Missing/empty signature or content is a contract violation.
+        assert!(parse_compaction_response(&json!({
+            "stop_reason": "compaction",
+            "content": [{"type": "compaction", "content": "texto", "signature": ""}],
+        }))
+        .is_err());
+        assert!(parse_compaction_response(&json!({
+            "stop_reason": "compaction",
+            "content": [{"type": "compaction", "content": "  ", "signature": "sig"}],
+        }))
+        .is_err());
+        assert!(parse_compaction_response(&json!({
+            "stop_reason": "compaction",
+            "content": [{"type": "text", "text": "sem bloco"}],
+        }))
+        .is_err());
+    }
+
     #[test]
     fn budget_maps_to_enabled_thinking_and_raises_max_tokens() {
         // The default model only exposes `effort`; a budget needs a model that
@@ -938,5 +1089,43 @@ mod tests {
         assert!(!serialized.contains("SEGREDO"), "{serialized}");
         assert!(!serialized.contains("sk-secret"), "{serialized}");
         assert!(!serialized.contains("authorization"), "{serialized}");
+    }
+
+    /// Live smoke of on-demand compaction. Skipped without a key.
+    #[tokio::test]
+    #[ignore = "live: requires ANTHROPIC_API_KEY"]
+    async fn live_anthropic_compaction_returns_a_signed_block() {
+        let Ok(key) = std::env::var("ANTHROPIC_API_KEY") else {
+            return;
+        };
+        let response = reqwest::Client::new()
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", key)
+            .header("anthropic-version", "2026-10-21")
+            .header("anthropic-beta", "compact-2026-09-04")
+            .json(&json!({
+                "model": "claude-haiku-5-5",
+                "max_tokens": 4096,
+                "messages": [
+                    {"role": "user", "content": "We are building a small CLI."},
+                    {"role": "assistant", "content": "Use a single command with subcommands."},
+                    {"role": "user", "content": "Now add a config file."}
+                ],
+                "compaction": {"type": "summarize"}
+            }))
+            .send()
+            .await
+            .expect("compaction request");
+        assert!(
+            response.status().is_success(),
+            "compaction status: {}",
+            response.status()
+        );
+        let value: Value = response.json().await.expect("compaction json");
+        let (payload, text) = parse_compaction_response(&value).expect("signed block");
+        assert!(!text.trim().is_empty());
+        assert!(payload["content"][0]["signature"]
+            .as_str()
+            .is_some_and(|value| !value.is_empty()));
     }
 }

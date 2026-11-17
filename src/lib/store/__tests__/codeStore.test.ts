@@ -189,9 +189,17 @@ describe('codeStore reducer', () => {
     state = applyCodeEvent(state, { type: 'context_stats', stats: context(50_000) });
     expect(state.context?.used).toBe(50_000);
     // `compacted` é o total de mensagens resumidas (não o nº de compactações).
-    state = applyCodeEvent(state, { type: 'compacted', messages: 20, tokensFreed: 30_000 });
+    state = applyCodeEvent(state, {
+      type: 'compacted',
+      messages: 20,
+      tokensFreed: 30_000,
+      method: 'anthropic',
+    });
     expect(state.context?.compacted).toBe(20);
     expect(state.context?.used).toBe(20_000);
+    expect(state.compacting).toBe(false);
+    expect(state.compactionWarning).toBeNull();
+    expect(state.lastCompactionMethod).toBe('anthropic');
     // O stats seguinte é a fonte canônica do total.
     state = applyCodeEvent(state, {
       type: 'context_stats',
@@ -203,6 +211,41 @@ describe('codeStore reducer', () => {
     state = applyCodeEvent(state, { type: 'job_updated', job: job('done') });
     expect(state.jobs).toHaveLength(1);
     expect(state.jobs[0].status).toBe('done');
+  });
+
+  it('tracks compaction lifecycle events', () => {
+    let state = emptyCodeSession('conv-1');
+    expect(isCodeEvent({ type: 'compaction_started', reason: 'threshold' })).toBe(true);
+    expect(
+      isCodeEvent({ type: 'compaction_failed', reason: 'threshold', message: 'boom' }),
+    ).toBe(true);
+
+    state = applyCodeEvent(state, { type: 'compaction_started', reason: 'threshold' });
+    expect(state.compacting).toBe(true);
+    expect(state.compactionWarning).toBeNull();
+    expect(state.lastCompactionMethod).toBeUndefined();
+
+    state = applyCodeEvent(state, { type: 'compacted', messages: 3, tokensFreed: 1_000 });
+    expect(state.compacting).toBe(false);
+    expect(state.lastCompactionMethod).toBe('local');
+
+    state = applyCodeEvent(state, { type: 'compaction_started', reason: 'overflow' });
+    state = applyCodeEvent(state, {
+      type: 'compaction_failed',
+      reason: 'overflow',
+      message: 'summary failed',
+    });
+    expect(state.compacting).toBe(false);
+    expect(state.compactionWarning).toBe('summary failed');
+    // Um novo turno limpa o aviso transitório.
+    state = applyCodeEvent(state, {
+      type: 'turn_started',
+      turnId: 't1',
+      userMessageId: 'u1',
+      assistantMessageId: 'a1',
+    });
+    expect(state.compacting).toBe(false);
+    expect(state.compactionWarning).toBeNull();
   });
 
   it('mirrors profile changes and ignores chat events', () => {
@@ -268,7 +311,13 @@ describe('codeStore reducer', () => {
       jobs: [],
       approvals: [],
     };
-    const previous = { ...emptyCodeSession('conv-1'), approvals: [approval()] };
+    const previous = {
+      ...emptyCodeSession('conv-1'),
+      approvals: [approval()],
+      compacting: true,
+      lastCompactionMethod: 'local' as const,
+      compactionWarning: 'falhou',
+    };
     const next = fromSnapshot(snapshot, previous);
     expect(next.permissionMode).toBe('read_only');
     expect(next.loading).toBe(false);
@@ -277,6 +326,10 @@ describe('codeStore reducer', () => {
     expect(next.lastTurnChanges?.files[0].path).toBe('src/a.ts');
     // resoluções de UI sobrevivem ao snapshot
     expect(next.resolutions).toBe(previous.resolutions);
+    // estado transitório de compactação também (UI-only)
+    expect(next.compacting).toBe(true);
+    expect(next.lastCompactionMethod).toBe('local');
+    expect(next.compactionWarning).toBe('falhou');
   });
 });
 

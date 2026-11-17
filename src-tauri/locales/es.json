@@ -329,6 +329,7 @@
   "harness.hints.routeNotSupported": "La ruta usada no es compatible con esta cuenta; usa el endpoint del catálogo.",
   "harness.hints.unsupportedCapability": "La API del plan ChatGPT (preview) rechazó `{param}`; ajusta la solicitud.",
   "harness.hints.unsupportedCapabilityGeneric": "La API del plan ChatGPT (preview) rechazó un campo/herramienta; ajusta la solicitud.",
+  "harness.hints.contextOverflow": "La conversación superó la ventana del modelo incluso después de compactar. Inicia una nueva conversación o reduce el contexto.",
   "inbox.errors.channelNotDirect": "el canal no es una conversación directa",
   "inbox.errors.directMissing": "el canal directo no existe",
   "inbox.errors.recipientArchived": "destinatario archivado",

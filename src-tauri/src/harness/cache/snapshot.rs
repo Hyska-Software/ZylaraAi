@@ -42,6 +42,22 @@ pub fn stable_hash(text: &str) -> String {
     sha256_hex(text.as_bytes())
 }
 
+/// SHA-256 hex of a sequence of borrowed strings, hashed incrementally so callers
+/// never concatenate large histories into one buffer. Field separators are the
+/// caller's responsibility.
+pub fn stable_hash_iter<'a, I: IntoIterator<Item = &'a str>>(parts: I) -> String {
+    let mut hasher = Sha256::new();
+    for part in parts {
+        hasher.update(part.as_bytes());
+    }
+    let mut out = String::with_capacity(64);
+    for byte in hasher.finalize() {
+        use std::fmt::Write as _;
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
 /// Canonical tool catalog: fixed order (sorted by wire name) regardless of the
 /// registry iteration order.
 pub fn canonical_tools(tools: &[ToolDefinition]) -> Vec<ToolDefinition> {

@@ -151,10 +151,20 @@ pub enum TurnEvent {
     ContextStats {
         stats: crate::domain::ContextStats,
     },
-    /// O contexto foi compactado (resumo aplicado à janela do modelo).
+    /// Compactação do contexto iniciou (`threshold` = limiar atingido,
+    /// `overflow` = recuperação de estouro da janela).
+    CompactionStarted { reason: String },
+    /// A compactação do contexto falhou (o turno segue com o histórico bruto).
+    CompactionFailed { reason: String, message: String },
+    /// O contexto foi compactado (resumo/payload aplicado à janela do modelo).
     Compacted {
         messages: u32,
         tokens_freed: u32,
+        /// `local` | `openai-responses` | `anthropic`
+        method: String,
+        /// Lane nativa que falhou antes do fallback local.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fallback_from: Option<String>,
     },
     /// Um job de processo em background mudou de estado.
     JobUpdated {
@@ -259,6 +269,60 @@ mod tests {
         .expect("serialize finished");
         assert_eq!(finished["type"], "tool_call_finished");
         assert_eq!(finished["finishedAt"], 2_500);
+    }
+
+    #[test]
+    fn compaction_events_serialize_with_camel_case_and_optional_fallback() {
+        let started = serde_json::to_value(TurnEvent::CompactionStarted {
+            reason: "overflow".to_string(),
+        })
+        .expect("serialize compaction started");
+        assert_eq!(
+            started,
+            serde_json::json!({ "type": "compaction_started", "reason": "overflow" })
+        );
+
+        let failed = serde_json::to_value(TurnEvent::CompactionFailed {
+            reason: "threshold".to_string(),
+            message: "boom".to_string(),
+        })
+        .expect("serialize compaction failed");
+        assert_eq!(
+            failed,
+            serde_json::json!({
+                "type": "compaction_failed",
+                "reason": "threshold",
+                "message": "boom",
+            })
+        );
+
+        let compacted = serde_json::to_value(TurnEvent::Compacted {
+            messages: 12,
+            tokens_freed: 3_400,
+            method: "anthropic".to_string(),
+            fallback_from: Some("openai-responses".to_string()),
+        })
+        .expect("serialize compacted");
+        assert_eq!(
+            compacted,
+            serde_json::json!({
+                "type": "compacted",
+                "messages": 12,
+                "tokensFreed": 3_400,
+                "method": "anthropic",
+                "fallbackFrom": "openai-responses",
+            })
+        );
+
+        // A compactação sem fallback omite a chave (payload enxuto).
+        let local = serde_json::to_value(TurnEvent::Compacted {
+            messages: 2,
+            tokens_freed: 10,
+            method: "local".to_string(),
+            fallback_from: None,
+        })
+        .expect("serialize local compacted");
+        assert_eq!(local.get("fallbackFrom"), None);
     }
 }
 

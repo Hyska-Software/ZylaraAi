@@ -309,6 +309,15 @@ export function CodeContextMeterChip({
   showCache?: boolean;
 }) {
   const stats = useCodeStore((state) => state.byConversation[conversationId]?.context);
+  const compacting = useCodeStore(
+    (state) => state.byConversation[conversationId]?.compacting ?? false,
+  );
+  const compactionMethod = useCodeStore(
+    (state) => state.byConversation[conversationId]?.lastCompactionMethod,
+  );
+  const compactionWarning = useCodeStore(
+    (state) => state.byConversation[conversationId]?.compactionWarning ?? null,
+  );
   const cache = useCacheStore((state) => state.byConversation[conversationId] ?? null);
   const showCacheIndicator = useAppStore(
     (state) => state.settings.cache?.showIndicator !== false,
@@ -340,7 +349,14 @@ export function CodeContextMeterChip({
 
   return (
     <div className="hidden sm:block">
-      <ContextMeter stats={stats} cache={cacheVisible ? cache : undefined} cost={cost} />
+      <ContextMeter
+        stats={stats}
+        cache={cacheVisible ? cache : undefined}
+        cost={cost}
+        compacting={compacting}
+        compactionMethod={compactionMethod}
+        compactionWarning={compactionWarning}
+      />
     </div>
   );
 }

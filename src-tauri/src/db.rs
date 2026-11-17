@@ -953,6 +953,30 @@ pub struct SessionSummary {
     pub content: String,
     pub tokens: Option<u32>,
     pub created_at: i64,
+    /// `local` for a textual summary, or the native lane name
+    /// (`openai-responses`, `anthropic`) when the provider produced it.
+    pub kind: String,
+    pub provider_id: Option<String>,
+    pub model_id: Option<String>,
+    /// Opaque native compaction payload, replayed only on the same route.
+    pub payload: Option<String>,
+    /// Hash of the covered messages; `None` on legacy rows means "accept".
+    pub covered_hash: Option<String>,
+}
+
+/// Dados para criar um resumo de compactação; o `Db` gera `id` e `created_at`.
+#[derive(Debug, Clone)]
+pub struct NewSessionSummary<'a> {
+    pub conversation_id: &'a str,
+    pub from_seq: i64,
+    pub to_seq: i64,
+    pub content: &'a str,
+    pub tokens: Option<u32>,
+    pub kind: &'a str,
+    pub provider_id: Option<&'a str>,
+    pub model_id: Option<&'a str>,
+    pub payload: Option<&'a str>,
+    pub covered_hash: Option<&'a str>,
 }
 
 /// Dados para criar uma regra de aprovação; o `Db` gera `id` e `created_at`.
@@ -1208,6 +1232,41 @@ fn table_columns(conn: &Connection, table: &str) -> Result<Vec<(String, bool)>> 
         .with_context(|| format!("falha ao listar colunas de {table}"))?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
         .with_context(|| format!("falha ao ler colunas de {table}"))
+}
+
+/// Migração aditiva e idempotente de `session_summaries`: separa resumo local
+/// de payload nativo e grava a rota (provider/modelo) que o produziu.
+fn migrate_session_summaries_schema(conn: &Connection) -> Result<()> {
+    ensure_column(
+        conn,
+        "session_summaries",
+        "kind",
+        "ALTER TABLE session_summaries ADD COLUMN kind TEXT NOT NULL DEFAULT 'local'",
+    )?;
+    ensure_column(
+        conn,
+        "session_summaries",
+        "provider_id",
+        "ALTER TABLE session_summaries ADD COLUMN provider_id TEXT",
+    )?;
+    ensure_column(
+        conn,
+        "session_summaries",
+        "model_id",
+        "ALTER TABLE session_summaries ADD COLUMN model_id TEXT",
+    )?;
+    ensure_column(
+        conn,
+        "session_summaries",
+        "payload",
+        "ALTER TABLE session_summaries ADD COLUMN payload TEXT",
+    )?;
+    ensure_column(
+        conn,
+        "session_summaries",
+        "covered_hash",
+        "ALTER TABLE session_summaries ADD COLUMN covered_hash TEXT",
+    )
 }
 
 /// Shared channels: `attachments` (JSON) added after the first release; old
@@ -2275,8 +2334,18 @@ fn session_summary_from_row(row: &Row<'_>) -> rusqlite::Result<SessionSummary> {
         content: row.get(4)?,
         tokens: u32_from_db(row.get(5)?),
         created_at: row.get(6)?,
+        kind: row.get(7)?,
+        provider_id: row.get(8)?,
+        model_id: row.get(9)?,
+        payload: row.get(10)?,
+        covered_hash: row.get(11)?,
     })
 }
+
+/// Colunas de `session_summaries` lidas por [`session_summary_from_row`] (a
+/// ordem precisa bater com o mapper).
+const SESSION_SUMMARY_COLUMNS: &str = "id, conversation_id, from_seq, to_seq, content, tokens, \
+     created_at, kind, provider_id, model_id, payload, covered_hash";
 
 /// Colunas de `cache_samples` lidas por [`cache_sample_from_row`] (a ordem
 /// precisa bater com o mapper).
@@ -2906,6 +2975,8 @@ impl Db {
         migrate_usage_log_schema(conn)?;
         // Watermark do histórico do Chat: coluna aditiva em `cache_state` (F2b).
         migrate_cache_state_schema(conn)?;
+        // Compactação: resumos locais e payloads nativos com a rota que os gerou.
+        migrate_session_summaries_schema(conn)?;
         // Mensagens `streaming` de um processo morto: preserva o parcial e
         // fecha como canceladas (best-effort: falha não impede o boot).
         if let Err(error) = Self::recover_interrupted_messages(conn) {
@@ -6946,32 +7017,36 @@ impl Db {
     /// Registra um resumo de compactação para a faixa `[from_seq, to_seq]`.
     pub fn insert_session_summary(
         &self,
-        conversation_id: &str,
-        from_seq: i64,
-        to_seq: i64,
-        content: &str,
-        tokens: Option<u32>,
+        summary: NewSessionSummary<'_>,
     ) -> anyhow::Result<SessionSummary> {
-        if from_seq < 1 || to_seq < from_seq {
+        if summary.from_seq < 1 || summary.to_seq < summary.from_seq {
             return Err(anyhow::anyhow!(
-                "faixa de compactação inválida: {from_seq}..{to_seq}"
+                "faixa de compactação inválida: {}..{}",
+                summary.from_seq,
+                summary.to_seq
             ));
         }
         let summary = SessionSummary {
             id: uuid::Uuid::new_v4().to_string(),
-            conversation_id: conversation_id.to_string(),
-            from_seq,
-            to_seq,
-            content: content.to_string(),
-            tokens,
+            conversation_id: summary.conversation_id.to_string(),
+            from_seq: summary.from_seq,
+            to_seq: summary.to_seq,
+            content: summary.content.to_string(),
+            tokens: summary.tokens,
             created_at: now_ms(),
+            kind: summary.kind.to_string(),
+            provider_id: summary.provider_id.map(str::to_string),
+            model_id: summary.model_id.map(str::to_string),
+            payload: summary.payload.map(str::to_string),
+            covered_hash: summary.covered_hash.map(str::to_string),
         };
         {
             let conn = self.conn.lock();
             conn.execute(
                 "INSERT INTO session_summaries \
-                 (id, conversation_id, from_seq, to_seq, content, tokens, created_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                 (id, conversation_id, from_seq, to_seq, content, tokens, created_at, kind, \
+                  provider_id, model_id, payload, covered_hash) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 params![
                     &summary.id,
                     &summary.conversation_id,
@@ -6980,6 +7055,11 @@ impl Db {
                     &summary.content,
                     summary.tokens.map(i64::from),
                     summary.created_at,
+                    &summary.kind,
+                    &summary.provider_id,
+                    &summary.model_id,
+                    &summary.payload,
+                    &summary.covered_hash,
                 ],
             )
             .context("falha ao gravar o resumo da sessão")?;
@@ -6987,16 +7067,22 @@ impl Db {
         Ok(summary)
     }
 
+    /// Resumos de uma conversa, do que cobre a faixa mais recente para o mais
+    /// antigo. `limit` é limitado a `1..=50`.
     pub fn list_session_summaries(
         &self,
         conversation_id: &str,
+        limit: u32,
     ) -> anyhow::Result<Vec<SessionSummary>> {
+        let limit = limit.clamp(1, 50);
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare(
-            "SELECT id, conversation_id, from_seq, to_seq, content, tokens, created_at \
-             FROM session_summaries WHERE conversation_id = ?1 ORDER BY from_seq ASC, created_at ASC",
-        )?;
-        let rows = stmt.query_map([conversation_id], |row| session_summary_from_row(row))?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {SESSION_SUMMARY_COLUMNS} FROM session_summaries \
+             WHERE conversation_id = ?1 ORDER BY to_seq DESC, created_at DESC LIMIT ?2"
+        ))?;
+        let rows = stmt.query_map(params![conversation_id, limit], |row| {
+            session_summary_from_row(row)
+        })?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .context("falha ao listar os resumos da sessão")
     }
@@ -7008,9 +7094,10 @@ impl Db {
     ) -> anyhow::Result<Option<SessionSummary>> {
         let conn = self.conn.lock();
         conn.query_row(
-            "SELECT id, conversation_id, from_seq, to_seq, content, tokens, created_at \
-             FROM session_summaries WHERE conversation_id = ?1 \
-             ORDER BY to_seq DESC, created_at DESC LIMIT 1",
+            &format!(
+                "SELECT {SESSION_SUMMARY_COLUMNS} FROM session_summaries \
+                 WHERE conversation_id = ?1 ORDER BY to_seq DESC, created_at DESC LIMIT 1"
+            ),
             [conversation_id],
             |row| session_summary_from_row(row),
         )
@@ -11435,23 +11522,45 @@ mod tests {
             .is_err());
     }
 
+    fn new_summary<'a>(
+        conversation_id: &'a str,
+        from_seq: i64,
+        to_seq: i64,
+        content: &'a str,
+        tokens: Option<u32>,
+    ) -> NewSessionSummary<'a> {
+        NewSessionSummary {
+            conversation_id,
+            from_seq,
+            to_seq,
+            content,
+            tokens,
+            kind: "local",
+            provider_id: None,
+            model_id: None,
+            payload: None,
+            covered_hash: None,
+        }
+    }
+
     #[test]
     fn session_summaries_roundtrip_and_latest() {
         let db = test_db();
         let first = db
-            .insert_session_summary("conv-1", 1, 10, "Resumo inicial", Some(500))
+            .insert_session_summary(new_summary("conv-1", 1, 10, "Resumo inicial", Some(500)))
             .expect("resumo 1");
         assert_eq!(first.from_seq, 1);
         assert_eq!(first.tokens, Some(500));
         assert_eq!(first.content, "Resumo inicial");
-        db.insert_session_summary("conv-1", 11, 20, "Resumo seguinte", None)
+        assert_eq!(first.kind, "local");
+        db.insert_session_summary(new_summary("conv-1", 11, 20, "Resumo seguinte", None))
             .expect("resumo 2");
-        db.insert_session_summary("conv-2", 1, 5, "Outra sessão", Some(1))
+        db.insert_session_summary(new_summary("conv-2", 1, 5, "Outra sessão", Some(1)))
             .expect("outra sessão");
 
-        let listed = db.list_session_summaries("conv-1").expect("listar");
+        let listed = db.list_session_summaries("conv-1", 10).expect("listar");
         assert_eq!(listed.len(), 2);
-        assert_eq!(listed[0].from_seq, 1);
+        assert_eq!(listed[0].to_seq, 20);
         let latest = db
             .latest_session_summary("conv-1")
             .expect("último")
@@ -11464,11 +11573,145 @@ mod tests {
             .is_none());
 
         assert!(db
-            .insert_session_summary("conv-1", 0, 5, "x", None)
+            .insert_session_summary(new_summary("conv-1", 0, 5, "x", None))
             .is_err());
         assert!(db
-            .insert_session_summary("conv-1", 10, 5, "x", None)
+            .insert_session_summary(new_summary("conv-1", 10, 5, "x", None))
             .is_err());
+    }
+
+    #[test]
+    fn session_summary_roundtrip_preserves_native_fields() {
+        let db = test_db();
+        let payload = r#"{"object":"response.compaction","output":[]}"#;
+        let inserted = db
+            .insert_session_summary(NewSessionSummary {
+                conversation_id: "conv-native",
+                from_seq: 1,
+                to_seq: 42,
+                content: "",
+                tokens: Some(12_345),
+                kind: "openai-responses",
+                provider_id: Some("openai"),
+                model_id: Some("gpt-5"),
+                payload: Some(payload),
+                covered_hash: Some("abc123"),
+            })
+            .expect("resumo nativo");
+        assert_eq!(inserted.kind, "openai-responses");
+        assert_eq!(inserted.provider_id.as_deref(), Some("openai"));
+        assert_eq!(inserted.model_id.as_deref(), Some("gpt-5"));
+        assert_eq!(inserted.payload.as_deref(), Some(payload));
+        assert_eq!(inserted.covered_hash.as_deref(), Some("abc123"));
+
+        let stored = db
+            .latest_session_summary("conv-native")
+            .expect("ler")
+            .expect("presente");
+        assert_eq!(stored.kind, "openai-responses");
+        assert_eq!(stored.provider_id.as_deref(), Some("openai"));
+        assert_eq!(stored.model_id.as_deref(), Some("gpt-5"));
+        assert_eq!(stored.payload.as_deref(), Some(payload));
+        assert_eq!(stored.covered_hash.as_deref(), Some("abc123"));
+
+        // A summary without native fields keeps them absent.
+        let local = db
+            .insert_session_summary(new_summary("conv-native", 43, 50, "resumo", None))
+            .expect("resumo local");
+        assert_eq!(local.kind, "local");
+        assert_eq!(local.provider_id, None);
+        assert_eq!(local.payload, None);
+        assert_eq!(local.covered_hash, None);
+    }
+
+    #[test]
+    fn list_session_summaries_orders_by_covered_range_desc() {
+        let db = test_db();
+        for (from, to) in [(1, 10), (11, 25), (26, 40)] {
+            db.insert_session_summary(new_summary("conv-order", from, to, "resumo", None))
+                .expect("resumo");
+        }
+        for (from, to) in [(1, 5), (6, 8)] {
+            db.insert_session_summary(new_summary("conv-other", from, to, "outra", None))
+                .expect("outra");
+        }
+
+        let listed = db.list_session_summaries("conv-order", 10).expect("listar");
+        let seqs: Vec<i64> = listed.iter().map(|summary| summary.to_seq).collect();
+        assert_eq!(seqs, vec![40, 25, 10]);
+
+        // `limit` applies after the ordering and clamps low values to 1.
+        let limited = db.list_session_summaries("conv-order", 2).expect("limitar");
+        assert_eq!(limited.len(), 2);
+        assert_eq!(limited[0].to_seq, 40);
+        assert_eq!(limited[1].to_seq, 25);
+        assert_eq!(
+            db.list_session_summaries("conv-order", 0)
+                .expect("limite zero")
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn session_summaries_migration_is_idempotent_and_keeps_legacy_rows() {
+        let temp = TempDir::new("zylara-db-session-summaries-migrate");
+        let path = temp.path.join("zylara.db");
+        {
+            let conn = Connection::open(&path).expect("abrir banco legado");
+            conn.execute_batch(
+                "CREATE TABLE session_summaries (
+                   id              TEXT PRIMARY KEY,
+                   conversation_id TEXT NOT NULL,
+                   from_seq        INTEGER NOT NULL,
+                   to_seq          INTEGER NOT NULL,
+                   content         TEXT NOT NULL,
+                   tokens          INTEGER,
+                   created_at      INTEGER NOT NULL
+                 );
+                 INSERT INTO session_summaries
+                   (id, conversation_id, from_seq, to_seq, content, tokens, created_at)
+                 VALUES ('legacy-1', 'conv-legacy', 1, 7, 'resumo antigo', 900, 1);",
+            )
+            .expect("criar schema legado");
+        }
+
+        // Opening twice must not fail: every `ensure_column` is a no-op the
+        // second time.
+        let db = Db::open(&path).expect("primeira abertura");
+        let legacy = db
+            .latest_session_summary("conv-legacy")
+            .expect("ler")
+            .expect("linha legada preservada");
+        assert_eq!(legacy.content, "resumo antigo");
+        // Legacy rows get the column default; the hash stays NULL (accepted).
+        assert_eq!(legacy.kind, "local");
+        assert_eq!(legacy.provider_id, None);
+        assert_eq!(legacy.covered_hash, None);
+        drop(db);
+
+        let db = Db::open(&path).expect("segunda abertura idempotente");
+        assert!(db
+            .list_session_summaries("conv-legacy", 10)
+            .expect("listar")
+            .iter()
+            .any(|summary| summary.to_seq == 7));
+        drop(db);
+
+        let conn = Connection::open(&path).expect("inspecionar banco migrado");
+        let columns = table_columns(&conn, "session_summaries").expect("colunas");
+        for column in [
+            "kind",
+            "provider_id",
+            "model_id",
+            "payload",
+            "covered_hash",
+        ] {
+            assert!(
+                columns.iter().any(|(name, _)| name == column),
+                "coluna {column} ausente após a migração"
+            );
+        }
     }
 
     #[test]
@@ -11664,7 +11907,7 @@ mod tests {
             FileChangeKind::Created,
         ))
         .expect("journal");
-        db.insert_session_summary(&conversation.id, 1, 5, "resumo", None)
+        db.insert_session_summary(new_summary(&conversation.id, 1, 5, "resumo", None))
             .expect("resumo");
         db.create_approval_rule(&NewApprovalRule {
             scope: ApprovalScope::Session,
@@ -11710,7 +11953,7 @@ mod tests {
             .expect("journal")
             .is_empty());
         assert!(db
-            .list_session_summaries(&conversation.id)
+            .list_session_summaries(&conversation.id, 10)
             .expect("resumos")
             .is_empty());
         let rules = db.list_approval_rules().expect("regras restantes");
@@ -11945,7 +12188,7 @@ mod tests {
             FileChangeKind::Modified,
         ))
         .expect("journal");
-        db.insert_session_summary(&conversation.id, 1, 5, "resumo", None)
+        db.insert_session_summary(new_summary(&conversation.id, 1, 5, "resumo", None))
             .expect("resumo");
         db.create_approval_rule(&code_harness_rule(ApprovalScope::Global, None, "shell"))
             .expect("regra global");
@@ -11962,7 +12205,7 @@ mod tests {
             .expect("journal")
             .is_empty());
         assert!(db
-            .list_session_summaries(&conversation.id)
+            .list_session_summaries(&conversation.id, 10)
             .expect("resumos")
             .is_empty());
         assert!(db.list_approval_rules().expect("regras").is_empty());
