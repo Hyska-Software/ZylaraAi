@@ -56,6 +56,11 @@ Generated limits:
 | `rpcBytes` | 1048576 |
 | `toolResultChars` | 120000 |
 | `toolTimeoutSecs` | 60 |
+| `modesPerPlugin` | 8 |
+| `modePromptChars` | 8000 |
+| `agentTemplatesPerPlugin` | 8 |
+| `templateInstructionsChars` | 8000 |
+| `customProviders` | 64 |
 
 ### UI limits
 
@@ -65,6 +70,7 @@ Generated limits:
 | `navEntriesPerPlugin` | 16 |
 | `pagesPerPlugin` | 16 |
 | `panelTabsPerPlugin` | 16 |
+| `sidebarTabsPerPlugin` | 16 |
 | `variantsPerPlugin` | 32 |
 | `presetsPerPlugin` | 8 |
 | `cssCharsPerPlugin` | 200000 |

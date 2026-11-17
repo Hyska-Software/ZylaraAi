@@ -865,7 +865,7 @@ fn store_view_merges_two_signed_registries_and_ignores_one_failure() {
             false,
         ))
         .expect("merged registry");
-    assert_eq!(view.plugins.len(), 3);
+    assert_eq!(view.plugins.len(), 4);
     assert!(view.registry_name.contains(" + "));
     let installed = runtime
         .block_on(manager.install_from_registry(

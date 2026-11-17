@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { CircleAlert, RefreshCw } from 'lucide-react';
 
 import { IconButton, Spinner, Tooltip } from '@/components/ui';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import type { CodeDiffTab } from '@/lib/store';
@@ -71,6 +72,7 @@ export function CodeDiffView({ target, className }: CodeDiffViewProps) {
             <RefreshCw aria-hidden className="size-3.5" />
           </IconButton>
         </Tooltip>
+        <Slot name="code.diff.toolbar" owner={{ layout: 'code' }} />
       </div>
       {error ? (
         <div

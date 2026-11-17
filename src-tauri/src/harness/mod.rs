@@ -34,6 +34,7 @@ pub mod code;
 pub mod completion;
 pub mod compaction;
 pub mod plugin_creator;
+pub mod plugin_modes;
 pub mod prompt;
 pub mod render;
 
@@ -2344,8 +2345,20 @@ pub async fn run_turn(
     if options.delegation_depth == 0 {
         if let Some(manager) = crate::plugins::global_manager() {
             let context = manager.prompt_context();
-            options.plugin_prompt = context.text;
-            options.plugin_fingerprint = context.fingerprint;
+            // Plugin modes are resolved from the session store for both profiles;
+            // the active set is part of the prompt and of the config hash.
+            let modes =
+                crate::harness::plugin_modes::active(&deps.db, &conversation.id, profile);
+            let mode_prompt = crate::harness::plugin_modes::render(&modes);
+            options.plugin_mode_tools_add = crate::harness::plugin_modes::tools_added(&modes);
+            options.plugin_mode_tools_remove = crate::harness::plugin_modes::tools_removed(&modes);
+            options.plugin_mode_writes_blocked = crate::harness::plugin_modes::writes_blocked(&modes);
+            options.plugin_prompt = format!("{}{}", context.text, mode_prompt);
+            options.plugin_fingerprint = format!(
+                "{}:{}",
+                context.fingerprint,
+                crate::harness::plugin_modes::fingerprint(&modes)
+            );
             let current = manager.config_fingerprint();
             if let Ok(Some(previous)) = deps.db.plugin_cache_fingerprint(&conversation.id) {
                 plugin_cache_changed = previous != current;
@@ -2394,6 +2407,12 @@ pub async fn run_turn(
         ),
         TurnProfile::Chat => None,
     };
+    if let Some(context) = code_context.as_mut() {
+        // Plugin modes adjust the Code catalog for this turn.
+        context.mode_tools_add = options.plugin_mode_tools_add.clone();
+        context.mode_tools_remove = options.plugin_mode_tools_remove.clone();
+        context.mode_writes_blocked = options.plugin_mode_writes_blocked;
+    }
     if agent.is_some() && conversation.workspace_id.is_none() {
         let root = match conversation.task_id.as_deref() {
             Some(task_id) => agent_workspace::prepare_for_task(&data_dir, task_id)?,
@@ -5512,7 +5531,28 @@ fn code_enabled_specs(
                         code::subagent::readonly_tools().contains(&spec.name)
                     }
             })
+            // Plugin modes can hide tools and block mutating ones.
+            .filter(|spec| !ctx.mode_tools_remove.iter().any(|name| name == spec.name))
+            .filter(|spec| !ctx.mode_writes_blocked || !spec.mutating)
             .collect();
+    // A plugin mode can re-expose a catalog tool that a flag disabled.
+    if !ctx.mode_tools_add.is_empty() {
+        for spec in crate::tools::registry::code_spec_refs() {
+            if !ctx.mode_tools_add.iter().any(|name| name == spec.name) {
+                continue;
+            }
+            if specs.iter().any(|known| known.name == spec.name) {
+                continue;
+            }
+            if !has_workspace && spec.requires_workspace {
+                continue;
+            }
+            if ctx.mode_writes_blocked && spec.mutating {
+                continue;
+            }
+            specs.push(spec);
+        }
+    }
     // Plugin Creator is a top-level session mode: subagents never validate or
     // install plugins on the host.
     if ctx.creator_mode && !subagent && has_workspace {
@@ -6011,6 +6051,9 @@ mod tests {
             models: Vec::new(),
             notes: Vec::new(),
             cache: None,
+            icon: None,
+            origin: None,
+            origin_label: None,
         }
     }
 
@@ -6357,6 +6400,9 @@ mod agent_loop_tests {
             models: vec![model],
             notes: Vec::new(),
             cache: None,
+            icon: None,
+            origin: None,
+            origin_label: None,
         };
         CatalogFile {
             version: 1,
@@ -6461,6 +6507,9 @@ mod agent_loop_tests {
             models: vec![openai_model("gpt-6.1-sol")],
             notes: Vec::new(),
             cache: None,
+            icon: None,
+            origin: None,
+            origin_label: None,
         }
     }
 
@@ -6608,6 +6657,9 @@ mod agent_loop_tests {
             models: vec![anthropic_model("claude-sonnet-5-5")],
             notes: Vec::new(),
             cache: None,
+            icon: None,
+            origin: None,
+            origin_label: None,
         }
     }
 
@@ -13119,6 +13171,9 @@ mod agent_loop_tests {
             models: vec![model],
             notes: Vec::new(),
             cache: provider_cache,
+            icon: None,
+            origin: None,
+            origin_label: None,
         };
         CatalogFile {
             version: 1,

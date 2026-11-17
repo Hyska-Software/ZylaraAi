@@ -281,15 +281,14 @@ function TraceEntryRows({
         }
 
         return (
-          <li
-            key={`tools-${index}`}
-            className="flex min-w-0 items-start gap-2.5 rounded-lg px-1.5 py-1"
-          >
-            <span className="mt-0.5 flex size-3.5 shrink-0 items-center justify-center">
-              <ToolMarker group={entry.group} />
-            </span>
-            <ToolActivity group={entry.group} />
-          </li>
+          <Slot key={`tools-${index}`} name="chat.message.tool.group.frame" owner={{ group: entry.group }}>
+            <li className="flex min-w-0 items-start gap-2.5 rounded-lg px-1.5 py-1">
+              <span className="mt-0.5 flex size-3.5 shrink-0 items-center justify-center">
+                <ToolMarker group={entry.group} />
+              </span>
+              <ToolActivity group={entry.group} />
+            </li>
+          </Slot>
         );
       })}
     </ol>

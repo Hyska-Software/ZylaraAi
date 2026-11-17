@@ -15,7 +15,7 @@ function allowed(pluginId: string, event: string): boolean {
   const plugin = getPluginRegistryState().plugins.find((entry) => entry.id === pluginId);
   if (!plugin) return false;
   const scope = event.split('/')[0] === 'message' || event.split('/')[0] === 'turn' ||
-    event.split('/')[0] === 'conversation'
+    event.split('/')[0] === 'conversation' || event.split('/')[0] === 'mode'
     ? 'chat'
     : 'ui';
   if (!pluginHasPermission(plugin, `events:${scope}`) && !pluginHasPermission(plugin, 'events:*')) {

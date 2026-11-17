@@ -8,6 +8,7 @@
 
 pub mod anthropic;
 pub mod cache;
+pub mod custom;
 pub mod google;
 pub mod openai_chat;
 pub mod openai_responses;

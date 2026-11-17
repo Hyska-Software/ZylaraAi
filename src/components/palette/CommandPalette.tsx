@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { CacheDiagnosticsDialog } from '@/components/agent/CacheDiagnosticsDialog';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { CACHE_DIAGNOSTICS_EVENT } from '@/components/agent/cacheDiagnosticsRequest';
 import {
   Dialog,
@@ -526,6 +527,7 @@ export function CommandPalette() {
                   )}
                 </div>
               ))}
+              <Slot name="palette.actions" owner={{ query: parsed.query }} />
             </div>
             {sections.length === 0 ? (
               conversationSearch.loading ? (
@@ -537,6 +539,7 @@ export function CommandPalette() {
           </div>
   
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border px-3 py-2 text-[11px] text-foreground-subtle">
+            <Slot name="palette.footer" />
             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="flex items-center gap-1">
                 <Kbd>↑</Kbd>

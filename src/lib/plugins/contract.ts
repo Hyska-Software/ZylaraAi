@@ -64,6 +64,11 @@ export interface PluginLimits {
   rpcBytes: number;
   toolResultChars: number;
   toolTimeoutSecs: number;
+  modesPerPlugin: number;
+  modePromptChars: number;
+  agentTemplatesPerPlugin: number;
+  templateInstructionsChars: number;
+  customProviders: number;
 }
 
 export interface PluginUiLimits {
@@ -71,6 +76,7 @@ export interface PluginUiLimits {
   navEntriesPerPlugin: number;
   pagesPerPlugin: number;
   panelTabsPerPlugin: number;
+  sidebarTabsPerPlugin: number;
   variantsPerPlugin: number;
   presetsPerPlugin: number;
   cssCharsPerPlugin: number;
@@ -95,6 +101,7 @@ export interface PluginContract {
   components: PluginComponentSpec[];
   reservedSlots: string[];
   reservedComponents: string[];
+  reservedPermissions: string[];
   events: PluginEventSpec[];
   permissions: PluginPermissionSpec[];
 }
@@ -109,6 +116,7 @@ export const PLUGIN_SLOTS = PLUGIN_CONTRACT.slots;
 export const PLUGIN_COMPONENTS = PLUGIN_CONTRACT.components;
 export const PLUGIN_RESERVED_SLOTS = PLUGIN_CONTRACT.reservedSlots;
 export const PLUGIN_RESERVED_COMPONENTS = PLUGIN_CONTRACT.reservedComponents;
+export const PLUGIN_RESERVED_PERMISSIONS = PLUGIN_CONTRACT.reservedPermissions ?? [];
 export const PLUGIN_EVENTS = PLUGIN_CONTRACT.events;
 export const PLUGIN_PERMISSIONS = PLUGIN_CONTRACT.permissions;
 

@@ -538,6 +538,7 @@ export function CodePanel() {
         aria-labelledby={`code-panel-tab-${tab}`}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
+        <Slot name="code.panel.body.frame" owner={{ layout: 'code' }}>
         {activePluginDock ? (
           <PluginDockTabHost layout="code" tabKey={activePluginDock} />
         ) : tab === 'changes' ? (
@@ -654,6 +655,7 @@ export function CodePanel() {
             className="min-h-0 flex-1"
           />
         )}
+        </Slot>
       </div>
 
       <PanelResizer

@@ -60,11 +60,19 @@ Reserved slots are not mounted by this host version; a manifest that targets one
 | Slot | Kind | Scope | Layouts | Modes | Props | Description |
 | --- | --- | --- | --- | --- | --- | --- |
 | `titlebar.actions` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Actions in the window title bar. |
+| `app.titlebar.brand` | single | root | chat, code, agent | trusted | — | Brand block in the title bar. |
+| `app.overlay` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Floating layer above the shell. |
 | `chat.sidebar.header` | list | layout | chat | declarative, sandbox, trusted | — | Header of the chat sidebar. |
 | `chat.sidebar.footer` | list | layout | chat | declarative, sandbox, trusted | — | Footer of the chat sidebar. |
 | `sidebar.nav.before` | list | layout | chat, code, agent | declarative, sandbox, trusted | — | Content before the navigation items. |
 | `sidebar.nav.after` | list | layout | chat, code, agent | declarative, sandbox, trusted | — | Content after the navigation items. |
+| `sidebar.conversation.row.frame` | hoc | layout | chat, code | trusted | conversation, active | Wraps each conversation row. |
+| `code.sidebar.header` | list | layout | code | declarative, sandbox, trusted | — | Header of the code sidebar. |
+| `code.sidebar.footer` | list | layout | code | declarative, sandbox, trusted | — | Footer of the code sidebar. |
+| `agent.sidebar.header` | list | layout | agent | declarative, sandbox, trusted | — | Header of the agents sidebar. |
 | `agent.sidebar.footer` | list | layout | agent | declarative, sandbox, trusted | — | Footer of the agents sidebar. |
+| `agent.thread.row.frame` | hoc | layout | agent | trusted | conversation, active | Wraps each agent thread row. |
+| `agent.channel.row.frame` | hoc | layout | agent | trusted | channel, active | Wraps each agent channel row. |
 | `chat.header.actions` | list | conversation | chat, code | declarative, sandbox, trusted | — | Actions in the chat header. |
 | `chat.header.leading` | list | conversation | chat, code | declarative, sandbox, trusted | — | Content before the chat header title. |
 | `chat.header.trailing` | list | conversation | chat, code | declarative, sandbox, trusted | — | Content after the chat header actions. |
@@ -78,6 +86,7 @@ Reserved slots are not mounted by this host version; a manifest that targets one
 | `chat.message.body.frame` | hoc | message | chat, code | trusted | — | Wraps the message body. |
 | `chat.reasoning.body.frame` | hoc | message | chat, code | trusted | — | Wraps the reasoning body. |
 | `chat.message.tool` | keyed | message | chat, code | trusted | tool | Per-tool renderer keyed by tool name. |
+| `chat.message.tool.group.frame` | hoc | message | chat, code | trusted | — | Wraps each tool group. |
 | `chat.message.usage` | single | message | chat, code | trusted | — | Token/usage footer of a message. |
 | `chat.message.usage.actions` | list | message | chat, code | declarative, sandbox, trusted | — | Actions next to the usage footer. |
 | `chat.message.attachments.frame` | hoc | message | chat, code | trusted | attachments | Wraps message attachment chips. |
@@ -87,21 +96,49 @@ Reserved slots are not mounted by this host version; a manifest that targets one
 | `chat.markdown.fence` | keyed | message | chat, code | trusted | language, code | Fence renderer keyed by language. |
 | `chat.turn.error.frame` | hoc | conversation | chat, code | trusted | — | Wraps the turn error banner. |
 | `chat.queue.frame` | hoc | conversation | chat, code | trusted | — | Wraps the queued message bar. |
+| `chat.scroll.jump` | single | conversation | chat, code | trusted | — | Jump-to-latest control. |
 | `chat.composer.frame` | hoc | composer | chat, code | trusted | — | Wraps the composer card. |
+| `chat.composer.input.frame` | hoc | composer | chat, code | trusted | — | Wraps the composer input. |
 | `chat.composer.toolbar` | list | composer | chat, code | declarative, sandbox, trusted | draft | Composer toolbar items. |
 | `chat.composer.actions` | list | composer | chat, code | declarative, sandbox, trusted | streaming, canSend | Actions next to send/stop. |
 | `chat.composer.attachments` | list | composer | chat, code | declarative, sandbox, trusted | — | Content above the composer input. |
+| `chat.composer.notice` | list | composer | chat, code | declarative, sandbox, trusted | — | Notice row above the composer. |
 | `chat.composer.slash` | list | composer | chat, code | declarative, sandbox, trusted | query | Extra slash-command rows. |
 | `chat.welcome.actions` | list | layout | chat, code | declarative, sandbox, trusted | — | Actions on the welcome screen. |
 | `chat.welcome.suggestions` | list | layout | chat, code | declarative, sandbox, trusted | — | Suggestion chips on the welcome screen. |
 | `code.header.actions` | list | conversation | code | declarative, sandbox, trusted | workspaceId | Actions in the code session header. |
+| `code.session.header.frame` | hoc | layout | code | trusted | — | Wraps the code session header. |
+| `code.tabs.before` | list | layout | code | declarative, sandbox, trusted | — | Content before the code tab strip. |
+| `code.tabs.after` | list | layout | code | declarative, sandbox, trusted | — | Content after the code tab strip. |
+| `code.tab.strip.frame` | hoc | layout | code | trusted | — | Wraps the code tab strip. |
 | `code.panel.header` | list | layout | code | declarative, sandbox, trusted | — | Header of the code right panel. |
 | `code.panel.tabs` | list | layout | code | declarative, sandbox, trusted | — | Extra tabs in the code right panel. |
+| `code.panel.body.frame` | hoc | layout | code | trusted | — | Wraps the code right panel body. |
+| `code.terminal.toolbar` | list | layout | code | declarative, sandbox, trusted | — | Actions in the terminal toolbar. |
+| `code.diff.toolbar` | list | layout | code | declarative, sandbox, trusted | — | Actions in the diff toolbar. |
+| `code.welcome.actions` | list | layout | code | declarative, sandbox, trusted | — | Actions on the code welcome screen. |
+| `agent.header.actions` | list | layout | agent | declarative, sandbox, trusted | — | Actions in the agent thread header. |
 | `agent.panel.tabs` | list | layout | agent | declarative, sandbox, trusted | — | Extra tabs in the agent right panel. |
+| `agent.panel.header` | list | layout | agent | declarative, sandbox, trusted | — | Header of the agent right panel. |
 | `right.panel.header` | list | layout | chat, code, agent | declarative, sandbox, trusted | — | Header of the right dock. |
+| `right.panel.body.frame` | hoc | layout | chat, code, agent | trusted | — | Wraps the active right dock panel. |
 | `settings.plugins.header` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Header of the plugins settings tab. |
+| `settings.rail.before` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Content before the settings rail items. |
+| `settings.rail.after` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Content after the settings rail items. |
+| `settings.page.header` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Header of the active settings page. |
+| `palette.actions` | list | root | chat, code, agent | declarative, trusted | query | Extra rows in the command palette. |
+| `palette.footer` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Footer of the command palette. |
 | `plugins.detail.actions` | list | root | chat, code, agent | declarative, sandbox, trusted | pluginId | Actions in the plugin detail dialog. |
+| `plugins.view.header` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Header of the plugins page. |
 | `artifact.preview.toolbar` | list | root | chat, code, agent | declarative, sandbox, trusted | artifactId, artifactKind, mimeType | Toolbar of the artifact preview. |
+| `artifact.card.actions` | list | root | chat, code, agent | declarative, sandbox, trusted | artifactId, artifactKind | Actions on an artifact card. |
+| `agent.thread.view.frame` | hoc | layout | agent | trusted | agentId, conversationId | Wraps the agent thread view. |
+| `agent.channel.view.frame` | hoc | layout | agent | trusted | channelId | Wraps the agent channel view. |
+| `agent.channel.message.before` | chain | message | agent | declarative, sandbox, trusted | agentId, channelId, message | Chain before each channel message. |
+| `agent.channel.message.after` | chain | message | agent | declarative, sandbox, trusted | agentId, channelId, message | Chain after each channel message. |
+| `agent.channel.message.body.frame` | hoc | message | agent | trusted | agentId, channelId, message | Wraps the channel message body. |
+| `agent.channel.composer.frame` | hoc | composer | agent | trusted | agentId, channelId | Wraps the channel composer. |
+| `agent.channel.composer.actions` | list | composer | agent | declarative, sandbox, trusted | agentId, channelId | Actions next to the channel composer. |
 
 ### Components
 
@@ -113,7 +150,7 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `layout.titlebar` | available | chat, code, agent | — | — | — |
 | `layout.sidebar` | available | chat, code, agent | — | layout, onClose | — |
 | `layout.center` | available | chat, code, agent | — | — | — |
-| `layout.right-panel` | reserved | chat, code, agent | default, flush, card | layout | default, flush, card |
+| `layout.right-panel` | available | chat, code, agent | default, flush, card | layout | default, flush, card |
 | `chat.view` | available | chat, code | — | conversationId, layout, welcome | — |
 | `chat.header` | available | chat, code | default, minimal, floating | conversationId | default, minimal, floating |
 | `chat.welcome` | available | chat, code | default, hero, compact | — | default, hero, compact |
@@ -128,33 +165,33 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `chat.message.reasoning` | available | chat, code | — | message | — |
 | `chat.message.tool-group` | reserved | chat, code | — | message | — |
 | `chat.message.tool-row` | reserved | chat, code | — | tool | — |
-| `chat.turn.error` | reserved | chat, code | — | code, hint, planProvider, usageUrl | — |
-| `chat.queue.bar` | reserved | chat, code | — | conversationId | — |
+| `chat.turn.error` | available | chat, code | — | code, hint, planProvider, usageUrl | — |
+| `chat.queue.bar` | available | chat, code | — | conversationId | — |
 | `chat.composer` | available | chat, code | card, flat, outline, dock | — | card, flat, outline, dock |
 | `chat.composer.input` | reserved | chat, code | — | — | — |
 | `sidebar.nav.item` | available | chat, code, agent | default, pill, underline | icon, label, active, badge, onSelect | default, pill, underline |
-| `sidebar.conversation.row` | reserved | chat, code | default, compact, card | conversation, active | default, compact, card |
+| `sidebar.conversation.row` | available | chat, code | default, compact, card | conversation, active | default, compact, card |
 | `code.workbench` | reserved | code | — | — | — |
-| `code.session.header` | reserved | code | — | — | — |
+| `code.session.header` | available | code | — | — | — |
 | `code.tab.strip` | reserved | code | default, segmented, underline | — | default, segmented, underline |
-| `code.panel` | reserved | code | — | — | — |
-| `code.welcome` | reserved | code | — | — | — |
-| `agent.workspace` | reserved | agent | — | — | — |
-| `agent.sidebar` | reserved | agent | — | — | — |
+| `code.panel` | available | code | — | — | — |
+| `code.welcome` | available | code | — | — | — |
+| `agent.workspace` | available | agent | — | — | — |
+| `agent.sidebar` | available | agent | — | — | — |
 | `agent.tab.strip` | reserved | agent | default, segmented, underline | — | default, segmented, underline |
-| `agent.thread.view` | reserved | agent | — | agentId, conversationId | — |
+| `agent.thread.view` | available | agent | — | agentId, conversationId | — |
 | `agent.channel.view` | reserved | agent | — | channelId | — |
 | `agent.channel.message` | reserved | agent | — | message, channelId | — |
 | `agent.channel.composer` | reserved | agent | — | channelId | — |
-| `agent.panel` | reserved | agent | — | — | — |
+| `agent.panel` | available | agent | — | — | — |
 | `settings.dialog` | available | chat, code, agent | default, wide, compact | — | default, wide, compact |
 | `settings.page` | reserved | chat, code, agent | — | tab | — |
 | `settings.rail` | reserved | chat, code, agent | — | — | — |
 | `plugins.view` | available | chat, code, agent | — | — | — |
-| `plugins.detail` | reserved | chat, code, agent | — | pluginId | — |
-| `artifact.panel` | reserved | chat, code, agent | — | — | — |
-| `artifact.preview` | reserved | chat, code, agent | — | artifactId | — |
-| `palette.dialog` | reserved | chat, code, agent | — | — | — |
+| `plugins.detail` | available | chat, code, agent | — | pluginId | — |
+| `artifact.panel` | available | chat, code, agent | — | — | — |
+| `artifact.preview` | available | chat, code, agent | — | artifactId | — |
+| `palette.dialog` | available | chat, code, agent | — | — | — |
 
 ### Style recipe enums
 
@@ -183,6 +220,7 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `ui.settings` | no | no | low | Register a settings tab. |
 | `ui.command` | no | no | low | Register command palette and slash commands. |
 | `ui.artifact` | no | no | low | Register a viewer for artifact MIME types. |
+| `ui.sidebar` | no | no | low | Register content tabs inside a layout sidebar. |
 | `ui.variant` | no | no | low | Contribute declarative style variants for host components. |
 | `ui.preset` | no | no | medium | Contribute declarative design presets. |
 | `ui.genui` | no | no | medium | Expose UI components to generative UI blocks. |
@@ -196,19 +234,19 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `agent.tools` | no | no | high | Expose tools to the agent. |
 | `agent.prompt` | no | no | high | Inject instructions into the agent system prompt. |
 | `agent.skills` | no | no | high | Ship skills and scripts used by the agent. |
+| `agent.modes` | no | no | high | Define harness modes that inject instructions and adjust the tool catalog. |
+| `agent.templates` | no | no | high | Ship agent templates for the creation gallery. |
 | `chat.read` | no | no | high | Read conversations selected by the user. |
 | `chat.write` | no | no | high | Insert text into the composer draft. |
 | `fs.read` | yes | no | high | Read files granted by a glob scope. |
 | `fs.write` | yes | no | high | Write files granted by a glob scope. |
 | `net` | yes | no | high | Perform HTTP requests to allowlisted hosts. |
-| `process.spawn` | no | yes | critical | Run a native sidecar process. Trusted plugins only. |
 | `secrets.use` | no | no | medium | Use a namespaced secret through mediated HTTP without reading it. |
 | `secrets.read` | no | yes | critical | Read a namespaced secret. Trusted plugins only. |
 | `storage` | no | no | low | Use plugin-scoped key/value storage. |
 | `events` | yes | no | medium | Subscribe to normalized host events. |
 | `clipboard.read` | no | no | high | Read the system clipboard. |
 | `notifications` | no | no | low | Show desktop and in-app notifications. |
-| `dialog` | no | no | medium | Open native file dialogs. |
 | `opener` | no | no | medium | Open external links and folders. |
 | `providers` | no | no | high | Contribute an OpenAI-compatible model provider. |
 | `unsafe.renderer` | no | yes | critical | Run JavaScript in the main webview. Trusted plugins only. |
@@ -226,6 +264,7 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `message/appended` | conversationId, messageId, role | A message was appended. |
 | `turn/started` | conversationId, turnId | A turn started. |
 | `turn/finished` | conversationId, turnId, status | A turn finished. |
+| `mode/changed` | conversationId, mode, active | A harness mode (built-in or plugin) was toggled. |
 
 ### Limits
 
@@ -244,6 +283,11 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `rpcBytes` | 1048576 |
 | `toolResultChars` | 120000 |
 | `toolTimeoutSecs` | 60 |
+| `modesPerPlugin` | 8 |
+| `modePromptChars` | 8000 |
+| `agentTemplatesPerPlugin` | 8 |
+| `templateInstructionsChars` | 8000 |
+| `customProviders` | 64 |
 
 ### UI limits
 
@@ -253,6 +297,7 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `navEntriesPerPlugin` | 16 |
 | `pagesPerPlugin` | 16 |
 | `panelTabsPerPlugin` | 16 |
+| `sidebarTabsPerPlugin` | 16 |
 | `variantsPerPlugin` | 32 |
 | `presetsPerPlugin` | 8 |
 | `cssCharsPerPlugin` | 200000 |
@@ -370,7 +415,7 @@ Components marked `reserved` still support variants/presets but cannot be replac
       "maxItems": 64,
       "items": {
         "type": "string",
-        "pattern": "^(unsafe\\.renderer|ui\\.slot:[a-z0-9.]+|ui\\.override:[a-z0-9.-]+|ui\\.view|ui\\.nav|ui\\.panel|ui\\.command|ui\\.settings|ui\\.theme|ui\\.variant|ui\\.preset|ui\\.genui|ui\\.artifact|ui\\.shell|ui\\.css\\.global|commands|hotkeys|chat\\.read|chat\\.write|opener|agents\\.read|agents\\.write|agent\\.tools|agent\\.prompt|agent\\.skills|providers|storage|settings|secrets\\.use|secrets\\.read|clipboard\\.read|notify|notifications|dialog|events|fs\\.read:.+|fs\\.write:.+|net:.+|process\\.spawn)$"
+        "pattern": "^(unsafe\\.renderer|ui\\.slot:[a-z0-9.]+|ui\\.override:[a-z0-9.-]+|ui\\.view|ui\\.nav|ui\\.panel|ui\\.sidebar|ui\\.command|ui\\.settings|ui\\.theme|ui\\.variant|ui\\.preset|ui\\.genui|ui\\.artifact|ui\\.shell|ui\\.css\\.global|commands|hotkeys|chat\\.read|chat\\.write|opener|agents\\.read|agents\\.write|agent\\.tools|agent\\.prompt|agent\\.skills|agent\\.modes|agent\\.templates|providers|storage|settings|secrets\\.use|secrets\\.read|clipboard\\.read|notify|notifications|dialog|events|fs\\.read:.+|fs\\.write:.+|net:.+)$"
       }
     },
     "runtime": {
@@ -428,6 +473,12 @@ Components marked `reserved` still support variants/presets but cannot be replac
               "type": "array",
               "items": {
                 "$ref": "#/$defs/nav"
+              }
+            },
+            "sidebarTabs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/sidebarTab"
               }
             },
             "panels": {
@@ -520,6 +571,18 @@ Components marked `reserved` still support variants/presets but cannot be replac
           "items": {
             "$ref": "#/$defs/artifactViewer"
           }
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mode"
+          }
+        },
+        "agentTemplates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/agentTemplate"
+          }
         }
       },
       "additionalProperties": false
@@ -543,6 +606,7 @@ Components marked `reserved` still support variants/presets but cannot be replac
             "openSettings",
             "setVariant",
             "setPreset",
+            "toggleMode",
             "insertDraft",
             "openExternal",
             "execute"
@@ -1278,6 +1342,26 @@ Components marked `reserved` still support variants/presets but cannot be replac
           "type": "string",
           "format": "uri"
         },
+        "icon": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "authHeader": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "authPrefix": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "headers": {
+          "type": "object",
+          "maxProperties": 16,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
         "endpoints": {
           "type": "object",
           "additionalProperties": {
@@ -1325,6 +1409,205 @@ Components marked `reserved` still support variants/presets but cannot be replac
             },
             "additionalProperties": false
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mode": {
+      "type": "object",
+      "required": [
+        "id",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "titleKey": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "descriptionKey": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "icon": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "chat",
+              "code"
+            ]
+          }
+        },
+        "prompt": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "promptFile": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "tools": {
+          "type": "object",
+          "properties": {
+            "add": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "maxLength": 80
+              }
+            },
+            "remove": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "maxLength": 80
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "writes": {
+          "enum": [
+            "allowed",
+            "blocked"
+          ]
+        },
+        "defaultOn": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "agentTemplate": {
+      "type": "object",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "nameKey": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "descriptionKey": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "role": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "icon": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "instructions": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "instructionsFile": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "starters": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "capabilities": {
+          "type": "object"
+        },
+        "permissionMode": {
+          "type": "string",
+          "maxLength": 32
+        }
+      },
+      "additionalProperties": false
+    },
+    "sidebarTab": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "sidebars"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "titleKey": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "icon": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "sidebars": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "chat",
+              "code",
+              "agent"
+            ]
+          }
+        },
+        "entry": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "component": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "badge": {
+          "type": "string",
+          "maxLength": 24
         }
       },
       "additionalProperties": false

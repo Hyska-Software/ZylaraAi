@@ -41,6 +41,7 @@ import type {
   PanelTabSpec,
   PresetSpec,
   SettingsTabSpec,
+  SidebarTabSpec,
   SlotContribution as UiSlotContribution,
   VariantSpec,
 } from './ui/types';
@@ -226,6 +227,7 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
   const uiPages: PageSpec[] = [];
   const uiPanelTabs: PanelTabSpec[] = [];
   const uiNav: NavEntry[] = [];
+  const uiSidebarTabs: SidebarTabSpec[] = [];
   const uiSettingsTabs: SettingsTabSpec[] = [];
   const uiArtifactViewers: ArtifactViewerSpec[] = [];
   const uiVariants: VariantSpec[] = [];
@@ -306,6 +308,26 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
           layouts: nav.layouts?.length ? nav.layouts : ALL_LAYOUTS,
           order: nav.order ?? 200,
           badge: nav.badge ?? null,
+        });
+      });
+    }
+    if (hasPermission(plugin, 'ui.sidebar')) {
+      (plugin.manifest.contributes.ui.sidebarTabs ?? []).forEach((tab) => {
+        const component =
+          registration?.components.get(tab.id) ?? null;
+        uiSidebarTabs.push({
+          key: `${plugin.id}:sidebar:${tab.id}`,
+          pluginId: plugin.id,
+          plugin,
+          id: tab.id,
+          title: tab.title,
+          titleKey: tab.titleKey ?? null,
+          icon: tab.icon ?? 'PanelRight',
+          sidebars: tab.sidebars?.length ? tab.sidebars : ALL_LAYOUTS,
+          entry: tab.entry ?? null,
+          component,
+          order: tab.order ?? 300,
+          badge: tab.badge ?? null,
         });
       });
     }
@@ -644,6 +666,13 @@ function build(snapshot: PluginSnapshot): PluginRegistryState {
     presets: uiPresets,
     css: uiCss,
     genui: uiGenui,
+    modes: snapshot.modes ?? [],
+    sidebarTabs: uiSidebarTabs.sort(
+      (left, right) =>
+        left.order - right.order ||
+        left.pluginId.localeCompare(right.pluginId) ||
+        left.id.localeCompare(right.id),
+    ),
   });
   return {
     snapshot,

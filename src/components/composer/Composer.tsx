@@ -58,6 +58,7 @@ import {
 } from './MentionMenu';
 import { addMention, composeMessage, withoutMention, type MentionedFile } from './mentions';
 import { PlanModeChip } from './PlanModeChip';
+import { PluginModeChips } from './PluginModeChips';
 import { SLASH_LISTBOX_ID, SlashMenu, slashOptionId } from './SlashMenu';
 import { ToolsToggle } from './ToolsToggle';
 
@@ -813,6 +814,12 @@ export function Composer() {
                   {activeConversationId && !isAgentLayout ? (
                     <CreatorModeChip conversationId={activeConversationId} />
                   ) : null}
+                  {activeConversationId && !isAgentLayout ? (
+                    <PluginModeChips
+                      conversationId={activeConversationId}
+                      profile={codeSessionConversation ? 'code' : 'chat'}
+                    />
+                  ) : null}
                 </div>
               ) : null}
 
@@ -844,33 +851,52 @@ export function Composer() {
                   canSend,
                 }}
               />
-
-              <textarea
-                ref={textareaRef}
-                value={value}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                rows={1}
-                placeholder={placeholder}
-                aria-label={
-                  isAgentLayout
-                    ? t('aria.agent', { name: agentName })
-                    : isCodeLayout
-                      ? t('aria.code')
-                      : t('aria.chat')
-                }
-                aria-describedby={providerBlocked ? 'composer-credential-notice' : undefined}
-                aria-expanded={menu ? true : undefined}
-                aria-controls={menuControls}
-                aria-activedescendant={activeDescendant}
-                aria-autocomplete={slashMenusEnabled ? 'list' : undefined}
-                className={cn(
-                  'block max-h-[220px] w-full resize-none bg-transparent px-1.5 py-0.5',
-                  'text-[15px] leading-relaxed text-foreground placeholder:text-foreground-subtle',
-                  'focus:outline-none',
-                )}
+              <Slot
+                name="chat.composer.notice"
+                owner={{
+                  conversationId: activeConversationId,
+                  draft: value,
+                  streaming: isStreaming,
+                  canSend,
+                }}
               />
+
+              <Slot
+                name="chat.composer.input.frame"
+                owner={{
+                  conversationId: activeConversationId,
+                  draft: value,
+                  streaming: isStreaming,
+                  canSend,
+                }}
+              >
+                <textarea
+                  ref={textareaRef}
+                  value={value}
+                  onChange={handleChange}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  rows={1}
+                  placeholder={placeholder}
+                  aria-label={
+                    isAgentLayout
+                      ? t('aria.agent', { name: agentName })
+                      : isCodeLayout
+                        ? t('aria.code')
+                        : t('aria.chat')
+                  }
+                  aria-describedby={providerBlocked ? 'composer-credential-notice' : undefined}
+                  aria-expanded={menu ? true : undefined}
+                  aria-controls={menuControls}
+                  aria-activedescendant={activeDescendant}
+                  aria-autocomplete={slashMenusEnabled ? 'list' : undefined}
+                  className={cn(
+                    'block max-h-[220px] w-full resize-none bg-transparent px-1.5 py-0.5',
+                    'text-[15px] leading-relaxed text-foreground placeholder:text-foreground-subtle',
+                    'focus:outline-none',
+                  )}
+                />
+              </Slot>
             </div>
           </PopoverAnchor>
 

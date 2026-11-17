@@ -8,6 +8,7 @@ import { WorkspaceCenter } from '@/components/layout/WorkspaceCenter';
 import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { LayoutSidebar } from '@/components/layout/LayoutSidebar';
 import { PluginUiRuntime } from '@/components/plugins/PluginUiRuntime';
 import { PluginRuntime } from '@/lib/plugins/runtime';
@@ -593,16 +594,28 @@ export default function App() {
             ) : takeoverDock ? (
               <PluginDockTabHost layout={layoutMode} tabKey={takeoverDock.key} />
             ) : layoutMode === 'code' ? (
-              <CodePanel />
+              <ComponentSlot
+                name="code.panel"
+                fallback={CodePanel as unknown as PluginComponent}
+              />
             ) : agentPanelVisible ? (
               agentWorkspacePanel ? (
-                <CodePanel />
+                <ComponentSlot
+                  name="code.panel"
+                  fallback={CodePanel as unknown as PluginComponent}
+                />
               ) : (
-                <AgentPanel />
+                <ComponentSlot
+                  name="agent.panel"
+                  fallback={AgentPanel as unknown as PluginComponent}
+                />
               )
             ) : (
               <>
-                <ArtifactPanel />
+                <ComponentSlot
+                  name="artifact.panel"
+                  fallback={ArtifactPanel as unknown as PluginComponent}
+                />
                 <SourcesPanel />
               </>
             ),
@@ -623,13 +636,17 @@ export default function App() {
         />
         <PluginRuntime />
         <PluginUiRuntime />
+        <Slot name="app.overlay" />
         <TrayPromptDialog />
         <ComponentSlot
           name="settings.dialog"
           fallback={SettingsDialog as unknown as PluginComponent}
         />
         <ModelPickerDialog />
-        <CommandPalette />
+        <ComponentSlot
+          name="palette.dialog"
+          fallback={CommandPalette as unknown as PluginComponent}
+        />
         <ComputerControlBanner
           hideConversationId={agentThreadHeaderVisible ? activeConversation?.id ?? null : null}
         />

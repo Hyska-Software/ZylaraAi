@@ -44,8 +44,34 @@ com o glob. Leitura 10 MiB, escrita 2 MiB, listagem 500 entradas.
 
 `secrets.json` guarda `plugin:<id>:<chave>`. O renderer nunca recebe o valor;
 `secrets.has/names` só expõem existência/nomes. `secrets.use` injeta o segredo
-em um header de `net.request`; `secrets.read` é trusted-only e existe apenas no
-contrato de permissões (a UI não o usa por padrão).
+em um header de `net.request`; `secrets.read` é trusted-only, devolve o valor
+apenas para plugins trusted com a permissão concedida e passa pela auditoria
+normal (`plugin_audit`, digest dos params — nunca o valor).
+
+## Permissões reservadas
+
+`reservedPermissions` lista capacidades publicadas no contrato que este host
+**não** implementa (`process.spawn`, `dialog`). Um manifesto que as declare é
+recusado com `PLUGIN_PERMISSION_RESERVED`, em vez de receber uma permissão sem
+API. O renderer também só aplica contribuições cuja permissão está concedida
+(`pluginHasPermission`), então revogar uma permissão desliga a superfície.
+
+## Superfícies novas
+
+- `ui.sidebar` (abas de conteúdo na sidebar) e `ui.genui` (componentes de UI
+  generativa) são low/medium: nunca executam código no host sem sandbox ou lane
+  trusted.
+- `agent.modes` pode injetar instruções e alterar o catálogo de tools do turno;
+  um modo com `writes: "blocked"` esconde tools mutadoras no catálogo **e** no
+  prompt. O estado do modo vive no backend (`code_events`), nunca no payload do
+  renderer.
+- `agent.templates` só pode **restringir** capabilities (deny-only); criar o
+  agente continua sendo um ato explícito no editor.
+- `providers` não aceita credenciais declarativas: headers `authorization`,
+  `cookie` e `host` são recusados no manifesto; a chave entra pelo formulário
+  normal e fica em `secrets.json`.
+- `chat.write` é mediado por `chat.draft` (o backend emite o texto e o host o
+  aplica no composer); o plugin nunca escreve no DOM.
 
 ## Safe mode e crash loop
 

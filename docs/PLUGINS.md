@@ -87,6 +87,14 @@ symlink, ADS, nomes reservados do Windows, colisão case-insensitive, ZIP bomb
         "action": { "kind": "openView", "target": "notes" }
       }],
       "settingsTabs": [{ "id": "config", "title": "Notes", "entry": "ui/settings.html" }],
+      "sidebarTabs": [{
+        "id": "notes-tab",
+        "title": "Notes",
+        "icon": "Library",
+        "sidebars": ["chat", "code"],
+        "entry": "ui/notes-tab.html",
+        "order": 10
+      }],
       "themes": [{
         "id": "paper",
         "name": "Paper",
@@ -118,7 +126,30 @@ symlink, ADS, nomes reservados do Windows, colisão case-insensitive, ZIP bomb
       "id": "gateway",
       "name": "Acme Gateway",
       "baseUrl": "https://api.acme.example/v1",
+      "icon": "ui/acme.svg",
+      "authHeader": "authorization",
+      "authPrefix": "Bearer ",
+      "headers": { "x-acme-tenant": "public" },
       "models": [{ "id": "acme-chat-1", "name": "Acme Chat 1" }]
+    }],
+    "modes": [{
+      "id": "review",
+      "title": "Review",
+      "icon": "ListChecks",
+      "description": "Review every change before answering",
+      "profiles": ["chat", "code"],
+      "promptFile": "modes/review.md",
+      "tools": { "add": ["web_search"], "remove": ["install_plugin"] },
+      "writes": "blocked"
+    }],
+    "agentTemplates": [{
+      "id": "reviewer",
+      "name": "Reviewer",
+      "role": "Code reviewer",
+      "instructionsFile": "templates/reviewer.md",
+      "starters": ["Review this pull request"],
+      "capabilities": { "code_execution": false },
+      "permissionMode": "read_only"
     }]
   },
   "runtime": {
@@ -139,11 +170,109 @@ Slots disponíveis (catálogo em `data/plugin-contract.json`):
 `chat.header.actions`, `chat.composer.toolbar`, `chat.welcome.actions`,
 `chat.message.actions`, `code.header.actions`, `code.panel.header`,
 `agent.sidebar.footer`, `right.panel.header`, `settings.plugins.header`,
-`plugins.detail.actions`, `artifact.preview.toolbar`.
+`plugins.detail.actions`, `artifact.preview.toolbar`, além de
+`sidebar.nav.before`/`sidebar.nav.after` nos três layouts.
+
+### Como habilitar uma superfície reservada
+
+`reservedSlots` e `reservedComponents` listam as superfícies declaradas que este
+host **ainda não** monta; `scripts/check-plugin-surfaces.mjs` falha se um id
+"live" não estiver montado ou se um id reservado estiver montado. Habilitar uma
+superfície é sempre o mesmo par de passos, no mesmo commit:
+
+1. montar `<Slot name="<id>" …/>`, `<PluginSlot slot="<id>" …/>` ou
+   `<ComponentSlot name="<id>">…</ComponentSlot>` no componente do host;
+2. remover o id de `reservedSlots`/`reservedComponents` em
+   `data/plugin-contract.json` e rodar `pnpm plugin:contract`.
+
+`reservedPermissions` funciona do mesmo jeito para permissões sem API
+(`process.spawn`, `dialog`): o manifesto é recusado com
+`PLUGIN_PERMISSION_RESERVED`.
+
+Alguns ids seguem reservados de propósito porque o host ainda **não tem** a
+superfície correspondente (não é só falta de mount): `agent.tabs` e
+`right.panel.tabs` descrevem faixas de abas genéricas que hoje não existem no
+centro de Agentes nem no dock direito — cada painel tem seu próprio strip
+(`code.panel.tabs`, `agent.panel.tabs`). Habilitá-los exige desenhar a faixa,
+não apenas montar um slot.
+
+Os componentes abaixo continuam em `reservedComponents` por decisão explícita —
+a região já é **wrappável** pelo slot hoc equivalente, então um plugin trusted
+consegue substituí-la renderizando sua própria UI no lugar de `children`:
+
+| Componente | Superfície equivalente | Por que não tem ComponentSlot |
+|---|---|---|
+| `chat.composer.input` | `chat.composer.input.frame` | o textarea depende de ref, IME e `aria-activedescendant` do combobox |
+| `chat.message.tool-group` | `chat.message.tool.group.frame` | idem (grupo dentro do `<ol>` de steps) |
+| `chat.message.tool-row` | `chat.message.tool` (keyed por tool) | o renderer por tool já é o slot keyed |
+| `code.tab.strip` | `code.tab.strip.frame` | o strip é `RecipeDiv` com refs de sortable/drag |
+| `code.workbench` | `code.session.header.frame` + `layout.center` | o workbench é o próprio `WorkspaceCenter` |
+| `agent.tab.strip` | `agent.tabs` | faixa inexistente (ver acima) |
+| `agent.channel.view` | `agent.channel.view.frame` | — |
+| `agent.channel.message` | `agent.channel.message.before/after/body.frame` | — |
+| `agent.channel.composer` | `agent.channel.composer.frame` | — |
+| `settings.page`, `settings.rail` | `settings.page.header`, `settings.rail.before/after` | as abas vivem dentro do contexto Radix `Tabs` |
+
+## 3.1 Abas de conteúdo nas sidebars (`ui.sidebarTabs`)
+
+`contributes.ui.sidebarTabs[]` adiciona abas de conteúdo **dentro** da sidebar de
+qualquer layout (`sidebars: ["chat"|"code"|"agent"]`), sem tomar o centro:
+
+- `entry` (sandboxed, iframe) ou `component` (trusted, exportado pelo `main.js`);
+- `order` (padrão 300) e `badge` (até 24 caracteres);
+- permissão `ui.sidebar`; limite `uiLimits.sidebarTabsPerPlugin`.
+
+A aba ativa é estado de UI por layout (`uiStore.pluginSidebarTab`); o corpo é
+renderizado por `PluginSidebarTabHost`, que aplica o `PluginBoundary` e respeita
+o "desativar plugin UI" (prefs).
+
+## 3.2 Modos do harness (`contributes.modes`)
+
+Um modo é um interruptor persistente por conversa que injeta instruções no bloco
+de plugins do system prompt e pode ajustar o catálogo de tools:
+
+| Campo | Efeito |
+|---|---|
+| `profiles` | `chat` e/ou `code` (vazio = ambos) |
+| `prompt` / `promptFile` | texto injetado (um dos dois, ≤ `limits.modePromptChars`) |
+| `tools.add` | reexpõe tools do catálogo (`web_search`, `create_file`, …) |
+| `tools.remove` | esconde tools pelo nome (`install_plugin`, …) |
+| `writes: "blocked"` | esconde tools mutadoras; reforçado por prompt |
+| `defaultOn` | ativo por padrão até o usuário desligar |
+
+Permissão `agent.modes`. O estado vive em `code_events` (`plugin/modes`,
+append-only, último vence), é lido no backend a cada turno
+(`harness::plugin_modes`) e nunca vem do renderer. As chips do composer
+(`PluginModeChips`) e o comando `set_plugin_mode` são a interface; comandos
+declarativos usam `{ "kind": "toggleMode", "target": "<pluginId>:<modeId>" }`.
+O conjunto ativo entra no fingerprint de plugins, então alternar um modo invalida
+o snapshot de prompt (`break_reason=plugin_config_changed`).
+
+## 3.3 Templates de agentes (`contributes.agentTemplates`)
+
+Templates aparecem na galeria de criação do layout Agentes com selo do plugin.
+`instructions`/`instructionsFile` (≤ `limits.templateInstructionsChars`),
+`starters`, `role`, `icon`, `permissionMode` (`read_only|edit|autonomous|review`)
+e `capabilities` — **deny-only**: só restringem os defaults, como os templates
+embutidos. Permissão `agent.templates`. Criar o agente continua sendo consentimento
+explícito no editor.
+
+## 3.4 Provedores
+
+Além de `contributes.providers` (plugins), o usuário pode criar provedores em
+Configurações → Provedores → "Adicionar provedor" (id `custom__<slug>`), com
+baseUrl, auth header/prefix, headers estáticos e lista manual de modelos. Os dois
+caminhos entram no mesmo catálogo (`AppState::catalog_with_plugins`), então Chat,
+Code e Agentes resolvem modelo/credencial pelo mesmo caminho; a UI marca a origem
+(`origin: custom|plugin`). Só `openai-chat` é suportado; `http://` apenas em
+localhost (Ollama/LM Studio/vLLM). Credenciais nunca são declarativas: headers
+`authorization`/`cookie`/`host` são recusados no manifesto.
 
 Componentes que trusted pode substituir/wrapar:
-`layout.shell`, `layout.center`, `chat.welcome`, `settings.dialog`, `plugins.view`.
-Views/painéis e slots cobrem o restante da UI sem expor IDs internos.
+`layout.shell`, `layout.center`, `chat.welcome`, `settings.dialog`, `plugins.view`
+e os demais ids listados em `components` no contrato.
+Views/painéis, abas de sidebar e slots cobrem o restante da UI sem expor IDs
+internos.
 
 Contribuições declarativas em slots podem ser um botão (`action` + `title`) ou
 um iframe (`entry`). Views e painéis aparecem na sidebar/painel direito; abas de
@@ -225,9 +354,13 @@ demonstra um provedor OpenAI-compatible declarativo.
 Catálogo e risco em `data/plugin-contract.json`. Escopos:
 
 - `ui.slot:<slot>`, `ui.override:<componente>`
+- `ui.view`, `ui.nav`, `ui.sidebar`, `ui.panel`, `ui.settings`, `ui.command`,
+  `ui.artifact`, `ui.variant`, `ui.preset`, `ui.genui`, `ui.shell`,
+  `ui.css.global`, `ui.theme`
+- `agent.tools`, `agent.prompt`, `agent.skills`, `agent.modes`, `agent.templates`
+- `providers`, `chat.read`, `chat.write`, `commands`, `hotkeys`, `events:<scope>`
 - `net:<host>` (HTTPS, allowlist, redirects revalidados, loopback/privado bloqueado)
 - `fs.read:<glob>`, `fs.write:<glob>` (caminho absoluto canonicalizado)
-- `events:<scope>`
 
 O broker Rust expõe: `storage.*`, `settings.*`, `secrets.has/names`,
 `net.request` (com injeção de segredo), `chat.read`, `chat.list`, `log`,
@@ -365,12 +498,14 @@ aprovação.
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm i18n:check`
+- `pnpm plugin:contract` + `node scripts/check-plugin-surfaces.mjs`
 - `cd src-tauri && cargo check`
 - `cd src-tauri && cargo test --lib plugins::`
-- Smoke manual: instalar `.zplugin`, abrir view/painel, conceder/revogar
-  permissão, ver tool no Chat/Code, habilitar plugin e conferir
-  `plugin_config_changed`, safe mode, update/rollback.
+- Smoke manual: instalar `.zplugin`, abrir view/painel/aba de sidebar, conceder/revogar
+  permissão, ver tool no Chat/Code, alternar um modo de plugin, criar agente por
+  template de plugin, habilitar plugin e conferir `plugin_config_changed`, safe
+  mode, update/rollback.
 
 Fora do v1 (issue): dylibs Rust, sandbox de SO/sidecar para pacotes públicos,
-WASM, OAuth broker, componentes GenUI declarados por plugin, pagamentos,
-telemetria e dependências plugin→plugin.
+WASM, OAuth broker, pagamentos, telemetria e dependências plugin→plugin.
+`process.spawn` fica em `reservedPermissions` até existir um sandbox de processo.

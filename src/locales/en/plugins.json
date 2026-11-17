@@ -230,6 +230,7 @@
     "viewMissing": "Plugin page `{{id}}` is not registered.",
     "panelMissing": "Plugin panel `{{id}}` is not registered.",
     "permissionDenied": "Permission `{{permission}}` was not granted.",
+    "noConversation": "Open a conversation first.",
     "openLinkFailed": "Could not open the link",
     "trustedPermission": "This plugin is missing the `unsafe.renderer` permission.",
     "trustedLoadFailed": "Trusted plugin {{name}} could not start",

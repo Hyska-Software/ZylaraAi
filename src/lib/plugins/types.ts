@@ -26,6 +26,7 @@ export type PluginAction =
   | { kind: 'openSettings'; target?: string | null }
   | { kind: 'setVariant'; component: string; target: string }
   | { kind: 'setPreset'; target: string; layout?: PluginLayoutId | null }
+  | { kind: 'toggleMode'; target: string }
   | { kind: 'insertDraft'; text: string }
   | { kind: 'openExternal'; url: string }
   | { kind: 'execute'; method: string; params?: unknown };
@@ -198,6 +199,19 @@ export interface ProviderContribution {
   models: ProviderModelContribution[];
 }
 
+/** A content tab rendered inside a layout sidebar (`contributes.ui.sidebarTabs`). */
+export interface SidebarTabContribution {
+  id: string;
+  title: string;
+  titleKey?: string | null;
+  icon?: string | null;
+  sidebars: PluginLayoutId[];
+  entry?: string | null;
+  component?: string | null;
+  order?: number | null;
+  badge?: string | null;
+}
+
 export interface ArtifactViewerContribution {
   id: string;
   title: string;
@@ -212,6 +226,8 @@ export interface UiContributions {
   slots: SlotContribution[];
   views: ViewContribution[];
   nav: NavContribution[];
+  /** Content tabs rendered inside a layout sidebar. */
+  sidebarTabs?: SidebarTabContribution[];
   panels: PanelContribution[];
   commands: CommandContribution[];
   settingsTabs: SettingsTabContribution[];
@@ -328,6 +344,51 @@ export interface PluginSnapshot {
   allowTrusted: boolean;
   devMode: boolean;
   configFingerprint: string;
+  /** Harness modes contributed by active plugins. */
+  modes?: PluginModeView[];
+  /** Agent templates contributed by active plugins. */
+  agentTemplates?: PluginTemplateView[];
+}
+
+/** A harness mode contributed by an active plugin (`contributes.modes`). */
+export interface PluginModeView {
+  /** `<pluginId>:<modeId>`. */
+  key: string;
+  pluginId: string;
+  pluginName: string;
+  id: string;
+  title: string;
+  description: string;
+  icon?: string | null;
+  profiles: string[];
+  toolsAdd: string[];
+  toolsRemove: string[];
+  writesBlocked: boolean;
+  defaultOn: boolean;
+}
+
+/** An agent template contributed by an active plugin. */
+export interface PluginTemplateView {
+  key: string;
+  pluginId: string;
+  pluginName: string;
+  id: string;
+  name: string;
+  nameKey?: string | null;
+  description: string;
+  descriptionKey?: string | null;
+  role: string;
+  icon?: string | null;
+  instructions: string;
+  starters: string[];
+  capabilities: Record<string, unknown>;
+  permissionMode?: string | null;
+}
+
+/** Explicit plugin-mode state of a conversation. */
+export interface PluginModesView {
+  on: string[];
+  off: string[];
 }
 
 export interface PluginPackageInspection {

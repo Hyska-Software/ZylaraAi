@@ -22,6 +22,7 @@ const EMPTY: PluginUiState = {
   presets: [],
   css: [],
   genui: [],
+  modes: [],
   revision: 0,
 };
 

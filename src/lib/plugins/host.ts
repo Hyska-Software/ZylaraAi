@@ -5,6 +5,7 @@
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
+import { useChatStore } from '@/lib/store';
 import { useUiStore } from '@/lib/store/uiStore';
 import { pluginUiState } from './ui/registry';
 import { usePluginUiPrefs } from './ui/prefs';
@@ -142,6 +143,34 @@ export async function runPluginAction(
           (entry.presetId === action.target || entry.key === action.target),
       );
       if (preset) usePluginUiPrefs.getState().setPreset(layout, preset.key);
+      return;
+    }
+    case 'toggleMode': {
+      if (!pluginHasPermission(plugin, 'agent.modes')) {
+        toast.error(t('plugins:errors.permissionDenied', { permission: 'agent.modes' }));
+        return;
+      }
+      const conversationId = useChatStore.getState().activeId;
+      if (!conversationId) {
+        toast.error(t('plugins:errors.noConversation'));
+        return;
+      }
+      try {
+        const state = await api.pluginModesState(conversationId);
+        const mode = (pluginUiState().modes ?? []).find(
+          (entry) => entry.key === action.target && entry.pluginId === plugin.id,
+        );
+        if (!mode) return;
+        const active = state.on.includes(mode.key) || (mode.defaultOn && !state.off.includes(mode.key));
+        await api.setPluginMode(conversationId, mode.key, !active);
+        window.dispatchEvent(
+          new CustomEvent('zylara:plugin-mode-changed', {
+            detail: { conversationId, mode: mode.key, active: !active },
+          }),
+        );
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : String(error));
+      }
       return;
     }
     case 'insertDraft': {

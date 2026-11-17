@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -41,6 +42,7 @@ import { useReduceMotion } from '@/components/layout/hooks';
 import { IconButton, Spinner } from '@/components/ui';
 import { api } from '@/lib/api';
 import { agentAvatarForEmoji, DEFAULT_AGENT_AVATAR } from '@/lib/agentAvatar';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { localeLowerCase } from '@/lib/i18n/format';
 import { useAgentStore, useAppStore, useUiStore } from '@/lib/store';
 import type {
@@ -464,6 +466,7 @@ export function AgentChannelView({
   const canPost = draft.trim().length > 0 || attachments.length > 0;
 
   return (
+    <Slot name="agent.channel.view.frame" owner={{ channelId: channel.id }}>
     <div className="relative flex h-full min-h-0 flex-col">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 px-3">
         <IconButton label={t('channel.back')} size="sm" variant="ghost" onClick={onBack}>
@@ -571,18 +574,23 @@ export function AgentChannelView({
 
                 if (message.role === 'system') {
                   return (
-                    <div key={message.id} className={cn('flex justify-center', spacing)}>
-                      <p className="rounded-full bg-surface-hover px-3 py-1 text-[11px] text-foreground-muted">
-                        {message.content}
-                      </p>
-                    </div>
+                    <Fragment key={message.id}>
+                      <Slot name="agent.channel.message.before" owner={{ channelId: channel.id, message }} />
+                      <div className={cn('flex justify-center', spacing)}>
+                        <p className="rounded-full bg-surface-hover px-3 py-1 text-[11px] text-foreground-muted">
+                          {message.content}
+                        </p>
+                      </div>
+                      <Slot name="agent.channel.message.after" owner={{ channelId: channel.id, message }} />
+                    </Fragment>
                   );
                 }
 
                 if (message.role === 'user') {
                   return (
+                    <Fragment key={message.id}>
+                      <Slot name="agent.channel.message.before" owner={{ channelId: channel.id, message }} />
                     <div
-                      key={message.id}
                       className={cn('group/message flex flex-col items-end', spacing)}
                     >
                       {message.attachments.length > 0 ? (
@@ -593,9 +601,14 @@ export function AgentChannelView({
                         />
                       ) : null}
                       {message.content ? (
-                        <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-3xl bg-user-bubble px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
-                          {message.content}
-                        </div>
+                        <Slot
+                          name="agent.channel.message.body.frame"
+                          owner={{ channelId: channel.id, message }}
+                        >
+                          <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-3xl bg-user-bubble px-4 py-2.5 text-[15px] leading-relaxed text-foreground">
+                            {message.content}
+                          </div>
+                        </Slot>
                       ) : null}
                       {message.content ? (
                         <div className="mt-1 flex items-center gap-0.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100">
@@ -603,12 +616,15 @@ export function AgentChannelView({
                         </div>
                       ) : null}
                     </div>
+                    <Slot name="agent.channel.message.after" owner={{ channelId: channel.id, message }} />
+                    </Fragment>
                   );
                 }
 
                 return (
+                  <Fragment key={message.id}>
+                    <Slot name="agent.channel.message.before" owner={{ channelId: channel.id, message }} />
                   <div
-                    key={message.id}
                     className={cn('group/message flex items-start gap-3', spacing)}
                   >
                     <AgentAvatar
@@ -620,12 +636,19 @@ export function AgentChannelView({
                       <p className="mb-0.5 text-[11px] font-medium text-foreground-subtle">
                         {author.name}
                       </p>
-                      <Markdown content={message.content} />
+                      <Slot
+                        name="agent.channel.message.body.frame"
+                        owner={{ channelId: channel.id, message }}
+                      >
+                        <Markdown content={message.content} />
+                      </Slot>
                       <div className="mt-1 flex items-center gap-0.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100">
                         <MessageCopyButton content={message.content} label={t('channel.copyReply')} />
                       </div>
                     </div>
                   </div>
+                    <Slot name="agent.channel.message.after" owner={{ channelId: channel.id, message }} />
+                  </Fragment>
                 );
               })}
               {sending ? (
@@ -718,6 +741,10 @@ export function AgentChannelView({
             </p>
           ) : (
             <>
+              <Slot
+                name="agent.channel.composer.frame"
+                owner={{ channelId: channel.id }}
+              >
               <div
                 className="relative rounded-3xl bg-surface-raised shadow-sm transition-colors duration-150"
               >
@@ -852,6 +879,10 @@ export function AgentChannelView({
                   >
                     <Plus className="size-4" />
                   </IconButton>
+                  <Slot
+                    name="agent.channel.composer.actions"
+                    owner={{ channelId: channel.id, active: true }}
+                  />
                   <div className="ml-auto flex items-center gap-1.5">
                     {sending ? (
                       <button
@@ -883,6 +914,7 @@ export function AgentChannelView({
                   </div>
                 </div>
               </div>
+              </Slot>
               <p className="mt-1.5 text-center text-[11px] leading-relaxed text-foreground-subtle">
                 {t('channel.disclaimer')}
               </p>
@@ -916,5 +948,6 @@ export function AgentChannelView({
         title={t('channel.tasksTitle', { name: channel.name })}
       />
     </div>
+    </Slot>
   );
 }

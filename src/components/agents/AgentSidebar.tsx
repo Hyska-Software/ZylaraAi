@@ -69,6 +69,10 @@ import {
 } from '@/components/ui';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
+import {
+  PluginSidebarTabHost,
+  PluginSidebarTabStrip,
+} from '@/components/plugins/ui/PluginSidebarTabHost';
 import { pluginIcon } from '@/lib/plugins/icons';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
@@ -482,18 +486,23 @@ function AgentRow({
               {(threadSortable) => (
                 <div ref={threadSortable.containerRef} className="space-y-0.5">
                   {shown.map((thread) => (
-                    <ThreadRow
+                    <Slot
                       key={thread.id}
-                      conversation={thread}
-                      active={activeThreadId === thread.id}
-                      sortable={threadSortable}
-                      onSelect={() => onOpenThread(thread.id)}
-                      onTogglePin={() => onToggleThreadPin(thread)}
-                      onStartRename={() => onStartThreadRename(thread)}
-                      onExport={() => onExportThread(thread)}
-                      onDelete={() => onDeleteThread(thread)}
-                      onStop={() => onStopThread(thread)}
-                    />
+                      name="agent.thread.row.frame"
+                      owner={{ conversation: thread, active: activeThreadId === thread.id }}
+                    >
+                      <ThreadRow
+                        conversation={thread}
+                        active={activeThreadId === thread.id}
+                        sortable={threadSortable}
+                        onSelect={() => onOpenThread(thread.id)}
+                        onTogglePin={() => onToggleThreadPin(thread)}
+                        onStartRename={() => onStartThreadRename(thread)}
+                        onExport={() => onExportThread(thread)}
+                        onDelete={() => onDeleteThread(thread)}
+                        onStop={() => onStopThread(thread)}
+                      />
+                    </Slot>
                   ))}
                 </div>
               )}
@@ -1038,6 +1047,8 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
         </Button>
       </div>
 
+      <Slot name="agent.sidebar.header" owner={{ layout: 'agent' }} />
+
       <div className="relative mt-3 px-3">
         <Search className="pointer-events-none absolute left-5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle" />
         <Input
@@ -1116,22 +1127,27 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
               {(sortable) => (
                 <div ref={sortable.containerRef} className="space-y-0.5">
                   {visibleChannels.map((channel) => (
-                    <ChannelRow
+                    <Slot
                       key={channel.id}
-                      channel={channel}
-                      members={channel.memberIds
-                        .map((id) => agentsById[id])
-                        .filter((member): member is Agent => Boolean(member))}
-                      active={activeChannelId === channel.id}
-                      label={channelLabel(channel)}
-                      pending={inboxCounts[channel.id] ?? 0}
-                      sortable={sortable}
-                      onSelect={() => selectChannel(channel)}
-                      onEdit={() => {
-                        setEditingChannel(channel);
-                        setChannelDialogOpen(true);
-                      }}
-                    />
+                      name="agent.channel.row.frame"
+                      owner={{ channel, active: activeChannelId === channel.id }}
+                    >
+                      <ChannelRow
+                        channel={channel}
+                        members={channel.memberIds
+                          .map((id) => agentsById[id])
+                          .filter((member): member is Agent => Boolean(member))}
+                        active={activeChannelId === channel.id}
+                        label={channelLabel(channel)}
+                        pending={inboxCounts[channel.id] ?? 0}
+                        sortable={sortable}
+                        onSelect={() => selectChannel(channel)}
+                        onEdit={() => {
+                          setEditingChannel(channel);
+                          setChannelDialogOpen(true);
+                        }}
+                      />
+                    </Slot>
                   ))}
                 </div>
               )}
@@ -1325,6 +1341,8 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
           );
         })}
         <Slot name="sidebar.nav.after" owner={{ layout: 'agent' }} />
+        <PluginSidebarTabStrip layout="agent" />
+        <PluginSidebarTabHost layout="agent" />
         <button
           type="button"
           onClick={() => openSettings()}

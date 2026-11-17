@@ -1,6 +1,7 @@
 import { t } from './i18n';
-import type { AgentAvatar, AgentCapabilities } from './types';
+import type { AgentAvatar, AgentCapabilities, PermissionMode } from './types';
 import { DEFAULT_AGENT_CAPABILITIES } from './agentDefaults';
+import type { PluginTemplateView } from './plugins/types';
 
 /** A curated starting point for the Agentes layout. Templates are local,
  * versioned with the app and never grant capabilities beyond the factory
@@ -16,6 +17,22 @@ export interface AgentTemplate {
   starterKeys: string[];
   capabilities?: Partial<AgentCapabilities>;
   memoryEnabled?: boolean;
+  /** Default permission mode for agents created from this template. */
+  permissionMode?: PermissionMode;
+  /** Texts of a plugin-contributed template (already resolved). */
+  literal?: PluginTemplateTexts;
+}
+
+/** Pre-resolved texts of a plugin template. */
+export interface PluginTemplateTexts {
+  name: string;
+  role: string;
+  description: string;
+  department: string;
+  instructions: string;
+  starters: string[];
+  pluginName: string;
+  pluginId: string;
 }
 
 export interface LocalizedAgentTemplate {
@@ -29,6 +46,9 @@ export interface LocalizedAgentTemplate {
   starters: string[];
   capabilities?: Partial<AgentCapabilities>;
   memoryEnabled?: boolean;
+  permissionMode?: PermissionMode;
+  /** Origin of a plugin-contributed template. */
+  plugin?: { id: string; name: string } | null;
 }
 
 export const AGENT_TEMPLATES: AgentTemplate[] = [
@@ -118,6 +138,43 @@ export function templateCapabilities(template: AgentTemplate): AgentCapabilities
   return { ...DEFAULT_AGENT_CAPABILITIES, ...template.capabilities };
 }
 
+/** Plugin templates as gallery entries. Capabilities can only narrow the
+ * defaults, exactly like the bundled templates. */
+export function pluginAgentTemplates(
+  templates: readonly PluginTemplateView[],
+): AgentTemplate[] {
+  return templates.map((template) => ({
+    id: template.key,
+    nameKey: '',
+    roleKey: '',
+    descriptionKey: '',
+    avatar: {
+      kind: 'mascot',
+      shape: 'mascot',
+      body: 'mascot',
+      expression: 'neutral',
+      color: 'purple',
+      face: 'white',
+    },
+    departmentKey: '',
+    instructionsKey: '',
+    starterKeys: [],
+    capabilities: template.capabilities as Partial<AgentCapabilities>,
+    memoryEnabled: false,
+    permissionMode: (template.permissionMode ?? undefined) as PermissionMode | undefined,
+    literal: {
+      name: template.name,
+      role: template.role || template.pluginName,
+      description: template.description,
+      department: template.pluginName,
+      instructions: template.instructions,
+      starters: template.starters,
+      pluginName: template.pluginName,
+      pluginId: template.pluginId,
+    },
+  }));
+}
+
 /**
  * Resolves a template in the active language. The switch keeps keys literal so
  * the catalog parity gate can see every string the templates use.
@@ -128,7 +185,22 @@ export function localizedAgentTemplate(template: AgentTemplate): LocalizedAgentT
     avatar: template.avatar,
     capabilities: template.capabilities,
     memoryEnabled: template.memoryEnabled,
+    permissionMode: template.permissionMode,
+    plugin: template.literal
+      ? { id: template.literal.pluginId, name: template.literal.pluginName }
+      : null,
   };
+  if (template.literal) {
+    return {
+      ...base,
+      name: template.literal.name,
+      role: template.literal.role,
+      description: template.literal.description,
+      department: template.literal.department,
+      instructions: template.literal.instructions,
+      starters: template.literal.starters,
+    };
+  }
   switch (template.id) {
     case 'assistant':
       return {

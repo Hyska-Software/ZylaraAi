@@ -59,6 +59,7 @@ import type {
   DockerDaemonStatus,
   DockerImageInfo,
   DockerStatus,
+  CustomProviderInput,
   FileChange,
   GitHubAccount,
   GitHubComment,
@@ -128,6 +129,7 @@ import type {
   PluginPackageInspection,
   PluginRecord,
   PluginSnapshot,
+  PluginModesView,
   PluginStoreView,
   PluginToolCallEvent,
   PluginToolCallRow,
@@ -202,6 +204,10 @@ export const api = {
     invoke<string[]>('list_remote_models', { providerId }),
   refreshProviderModels: (providerId: string) =>
     invoke<CatalogView>('refresh_provider_models', { providerId }),
+  saveCustomProvider: (input: CustomProviderInput) =>
+    invoke<CatalogView>('save_custom_provider', { input }),
+  deleteCustomProvider: (providerId: string) =>
+    invoke<CatalogView>('delete_custom_provider', { providerId }),
 
   /* -------- OpenAI ChatGPT plan auth (two-phase login) -------- */
   openaiLoginStart: (providerId: string, forceConsent = false) =>
@@ -863,6 +869,10 @@ export const api = {
 
   /* -------- plugins -------- */
   listPlugins: () => invoke<PluginSnapshot>('list_plugins'),
+  pluginModesState: (conversationId: string) =>
+    invoke<PluginModesView>('plugin_modes_state', { conversationId }),
+  setPluginMode: (conversationId: string, mode: string, active: boolean) =>
+    invoke<PluginModesView>('set_plugin_mode', { conversationId, mode, active }),
   inspectPluginPackage: (path: string) =>
     invoke<PluginPackageInspection>('inspect_plugin_package', { path }),
   inspectPluginFolder: (path: string) =>

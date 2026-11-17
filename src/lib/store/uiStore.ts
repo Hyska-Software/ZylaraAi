@@ -384,6 +384,8 @@ interface UiState {
   pluginPages: Record<LayoutMode, PluginPageTarget | null>;
   /** Plugin dock tab active in each layout (null = the host dock tab). */
   pluginDockTab: Record<LayoutMode, string | null>;
+  /** Plugin sidebar content tab open in each layout (null = none). */
+  pluginSidebarTab: Record<LayoutMode, string | null>;
   /** A takeover panel was explicitly dismissed in this layout. */
   pluginDockClosed: Record<LayoutMode, boolean>;
   activeArtifactId: string | null;
@@ -510,6 +512,8 @@ interface UiState {
   closePluginDockTab: (layout?: LayoutMode) => void;
   /** Dismisses a takeover panel for one layout (default: the active layout). */
   dismissPluginDockTakeover: (layout?: LayoutMode) => void;
+  /** Opens/closes a plugin content tab inside a layout sidebar. */
+  setPluginSidebarTab: (layout: LayoutMode, key: string | null) => void;
   /** Opens the panel on the artifact preview (or the list when there is none). */
   openArtifactPanel: (artifactId?: string | null) => void;
   /** Opens the panel on the generated-artifact list. */
@@ -625,6 +629,7 @@ export const useUiStore = create<UiState>()(
       sidePanelMode: 'overlay',
       activeView: 'chat',
       pluginPages: { chat: null, code: null, agent: null },
+      pluginSidebarTab: { chat: null, code: null, agent: null },
       pluginDockTab: { chat: null, code: null, agent: null },
       pluginDockClosed: { chat: false, code: false, agent: false },
       activeArtifactId: null,
@@ -1018,6 +1023,10 @@ export const useUiStore = create<UiState>()(
             pluginDockTab: { ...state.pluginDockTab, [targetLayout]: null },
           };
         }),
+      setPluginSidebarTab: (layout, key) =>
+        set((state) => ({
+          pluginSidebarTab: { ...state.pluginSidebarTab, [layout]: key },
+        })),
       dismissPluginDockTakeover: (layout) =>
         set((state) => {
           const targetLayout = layout ?? state.layoutMode;

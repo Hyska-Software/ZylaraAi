@@ -7,6 +7,7 @@ import { useUiStore } from '@/lib/store';
 import { cn, modKey } from '@/lib/utils';
 import { BrandMark } from '@/components/chat/BrandMark';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { LayoutModeSwitch } from './LayoutModeSwitch';
 import { PlanUsageChip } from './PlanUsageChip';
 import { UpdateChip } from './UpdateChip';
@@ -130,12 +131,17 @@ export function TitleBar() {
           </IconButton>
         </Tooltip>
 
-        <div data-tauri-drag-region className="flex min-w-0 items-center gap-2 pl-1 pr-1">
-          <BrandMark size={22} />
-          <span className="truncate text-[14px] font-semibold tracking-tight text-foreground">
-            Zylara
-          </span>
-        </div>
+        <Slot
+          name="app.titlebar.brand"
+          fallback={
+            <div data-tauri-drag-region className="flex min-w-0 items-center gap-2 pl-1 pr-1">
+              <BrandMark size={22} />
+              <span className="truncate text-[14px] font-semibold tracking-tight text-foreground">
+                Zylara
+              </span>
+            </div>
+          }
+        />
 
         <div data-tauri-drag-region className="h-full min-w-0 flex-1" />
       </div>

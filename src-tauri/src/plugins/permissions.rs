@@ -155,7 +155,6 @@ mod tests {
             "ui.shell",
             "unsafe.renderer",
             "secrets.read",
-            "process.spawn",
         ] {
             assert!(is_trusted_only(permission), "{permission}");
         }

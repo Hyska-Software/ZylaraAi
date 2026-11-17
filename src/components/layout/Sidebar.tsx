@@ -24,6 +24,12 @@ import { navEntries, openNavTarget } from '@/lib/plugins/ui/nav';
 import { SidebarNavItem } from './SidebarNavItem';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
+import { ComponentSlot } from '@/components/plugins/ui/Slot';
+import type { PluginComponent } from '@/lib/plugins/ui/types';
+import {
+  PluginSidebarTabHost,
+  PluginSidebarTabStrip,
+} from '@/components/plugins/ui/PluginSidebarTabHost';
 import { useAppStore, useChatStore, useUiStore } from '@/lib/store';
 import type { Conversation } from '@/lib/types';
 import { cn, groupConversations, modKey } from '@/lib/utils';
@@ -372,6 +378,8 @@ export function Sidebar({ className, onClose }: SidebarProps) {
         );
       })}
       <Slot name="sidebar.nav.after" owner={{ layout: 'chat' }} />
+      <PluginSidebarTabStrip layout="chat" />
+      <PluginSidebarTabHost layout="chat" />
 
       <button
         type="button"
@@ -416,23 +424,32 @@ export function Sidebar({ className, onClose }: SidebarProps) {
                 {(sortable) => (
                   <div ref={sortable.containerRef} className="flex flex-col gap-0.5">
                     {group.conversations.map((conversation) => (
-                      <ConversationRow
+                      <Slot
                         key={conversation.id}
-                        conversation={conversation}
-                        active={conversation.id === activeId}
-                        renaming={renamingId === conversation.id}
-                        renameValue={renameValue}
-                        sortable={sortable}
-                        onSelect={() => handleSelect(conversation.id)}
-                        onStartRename={() => handleStartRename(conversation)}
-                        onRenameValueChange={setRenameValue}
-                        onCommitRename={handleCommitRename}
-                        onCancelRename={handleCancelRename}
-                        onTogglePin={() => handleTogglePin(conversation)}
-                        onToggleCodeLink={() => void handleToggleCodeLink(conversation)}
-                        onExport={() => void handleExport(conversation)}
-                        onDelete={() => setDeleteTarget(conversation)}
-                      />
+                        name="sidebar.conversation.row.frame"
+                        owner={{ conversation, active: conversation.id === activeId }}
+                      >
+                        <ComponentSlot
+                          name="sidebar.conversation.row"
+                          fallback={ConversationRow as unknown as PluginComponent}
+                          props={{
+                            conversation,
+                            active: conversation.id === activeId,
+                            renaming: renamingId === conversation.id,
+                            renameValue,
+                            sortable,
+                            onSelect: () => handleSelect(conversation.id),
+                            onStartRename: () => handleStartRename(conversation),
+                            onRenameValueChange: setRenameValue,
+                            onCommitRename: handleCommitRename,
+                            onCancelRename: handleCancelRename,
+                            onTogglePin: () => handleTogglePin(conversation),
+                            onToggleCodeLink: () => void handleToggleCodeLink(conversation),
+                            onExport: () => void handleExport(conversation),
+                            onDelete: () => setDeleteTarget(conversation),
+                          }}
+                        />
+                      </Slot>
                     ))}
                   </div>
                 )}

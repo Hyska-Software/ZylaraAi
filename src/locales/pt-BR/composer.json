@@ -203,6 +203,10 @@
     "disable": "Desativar modo Plano",
     "label": "Plano"
   },
+  "pluginMode": {
+    "tooltip": "Modo contribuído pelo plugin {{name}}",
+    "toggle": "Alternar o modo {{name}}"
+  },
   "creatorMode": {
     "tooltip": "Modo Criador de plugins ativo — clique para desativar",
     "disable": "Desativar modo Criador de plugins",

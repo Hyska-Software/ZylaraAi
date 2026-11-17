@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { i18n } from '@/lib/i18n';
 import { useUiStore } from '@/lib/store/uiStore';
+import { useChatStore } from '@/lib/store/chatStore';
 import { runPluginCommand } from './host';
 import { getPluginRegistryState, pluginHasPermission, trustedPluginRegistration } from './registry';
 import { usePluginStore } from './store';
@@ -236,6 +237,28 @@ export function PluginRuntime() {
         description: event.payload.body || undefined,
         duration: 6_000,
       });
+    })
+      .then((unlisten) => (disposed ? unlisten() : disposers.push(unlisten)))
+      .catch(() => {});
+    // `chat.draft` RPC: the backend cannot touch the composer directly, so it
+    // emits the text and the host routes it through the same window event the
+    // declarative `insertDraft` action uses.
+    void listen<{
+      pluginId: string;
+      conversationId?: string | null;
+      text: string;
+      mode?: 'append' | 'replace' | 'prepend';
+    }>('zylara:plugin-composer-draft', (event) => {
+      if (disposed) return;
+      const { text, mode, conversationId, pluginId } = event.payload;
+      if (!text) return;
+      const activeId = useChatStore.getState().activeId;
+      if (conversationId && activeId && conversationId !== activeId) return;
+      window.dispatchEvent(
+        new CustomEvent('zylara:insert-draft', {
+          detail: { text, mode: mode ?? 'append', pluginId },
+        }),
+      );
     })
       .then((unlisten) => (disposed ? unlisten() : disposers.push(unlisten)))
       .catch(() => {});

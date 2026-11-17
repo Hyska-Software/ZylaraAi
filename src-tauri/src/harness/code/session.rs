@@ -20,6 +20,9 @@ pub const KIND_APPROVAL_DECIDED: &str = "approval/decided";
 pub const KIND_PERMISSION_MODE: &str = "permission/mode";
 pub const KIND_PLAN_MODE: &str = "plan/mode";
 pub const KIND_CREATOR_MODE: &str = "creator/mode";
+/// Plugin-contributed harness modes (`{"on":[key],"off":[key]}`); the whole set
+/// is rewritten on every toggle so the last event is authoritative.
+pub const KIND_PLUGIN_MODES: &str = "plugin/modes";
 pub const KIND_PLAN_SUBMITTED: &str = "plan/submitted";
 pub const KIND_PLAN_FEEDBACK: &str = "plan/feedback";
 pub const KIND_PLAN_APPROVED: &str = "plan/approved";
@@ -136,6 +139,61 @@ pub fn creator_mode_active(db: &Db, conversation_id: &str) -> anyhow::Result<boo
     Ok(latest::<ModePayload>(db, conversation_id, KIND_CREATOR_MODE)?
         .map(|payload| payload.active)
         .unwrap_or(false))
+}
+
+/// Explicit mode state of a conversation: keys turned on and keys turned off.
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+pub struct PluginModeState {
+    #[serde(default)]
+    pub on: Vec<String>,
+    #[serde(default)]
+    pub off: Vec<String>,
+}
+
+impl PluginModeState {
+    /// A mode is active when it was turned on, or when it is `default_on` and was
+    /// never turned off.
+    pub fn is_active(&self, key: &str, default_on: bool) -> bool {
+        if self.on.iter().any(|entry| entry == key) {
+            return true;
+        }
+        default_on && !self.off.iter().any(|entry| entry == key)
+    }
+}
+
+/// Reads the plugin mode state of a conversation.
+pub fn plugin_mode_state(db: &Db, conversation_id: &str) -> anyhow::Result<PluginModeState> {
+    Ok(
+        latest::<PluginModeState>(db, conversation_id, KIND_PLUGIN_MODES)?
+            .unwrap_or_default(),
+    )
+}
+
+/// Turns a plugin mode on or off (append-only; the last event wins).
+pub fn set_plugin_mode(
+    db: &Db,
+    conversation_id: &str,
+    key: &str,
+    active: bool,
+) -> anyhow::Result<PluginModeState> {
+    let mut state = plugin_mode_state(db, conversation_id)?;
+    state.on.retain(|entry| entry != key);
+    state.off.retain(|entry| entry != key);
+    if active {
+        state.on.push(key.to_string());
+        state.on.sort();
+    } else {
+        state.off.push(key.to_string());
+        state.off.sort();
+    }
+    append(
+        db,
+        conversation_id,
+        None,
+        KIND_PLUGIN_MODES,
+        &serde_json::to_value(&state)?,
+    )?;
+    Ok(state)
 }
 
 /// Liga/desliga o modo Plugin Creator (append-only; último evento vence).

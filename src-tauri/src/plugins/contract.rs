@@ -32,6 +32,8 @@ pub struct PluginContract {
     pub reserved_slots: Vec<String>,
     #[serde(default)]
     pub reserved_components: Vec<String>,
+    #[serde(default)]
+    pub reserved_permissions: Vec<String>,
     pub events: Vec<EventSpec>,
     pub permissions: Vec<PermissionSpec>,
 }
@@ -104,6 +106,11 @@ pub struct PluginLimits {
     pub rpc_bytes: u64,
     pub tool_result_chars: usize,
     pub tool_timeout_secs: u64,
+    pub modes_per_plugin: usize,
+    pub mode_prompt_chars: usize,
+    pub agent_templates_per_plugin: usize,
+    pub template_instructions_chars: usize,
+    pub custom_providers: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -113,6 +120,7 @@ pub struct PluginUiLimits {
     pub nav_entries_per_plugin: usize,
     pub pages_per_plugin: usize,
     pub panel_tabs_per_plugin: usize,
+    pub sidebar_tabs_per_plugin: usize,
     pub variants_per_plugin: usize,
     pub presets_per_plugin: usize,
     pub css_chars_per_plugin: usize,
@@ -264,7 +272,7 @@ fn validate(contract: &PluginContract) {
             permission.id
         );
     }
-    for id in ["ui.override", "ui.shell", "unsafe.renderer", "process.spawn", "secrets.read"] {
+    for id in ["ui.override", "ui.shell", "unsafe.renderer", "secrets.read"] {
         assert!(
             contract
                 .permissions
@@ -272,6 +280,15 @@ fn validate(contract: &PluginContract) {
                 .find(|permission| permission.id == id)
                 .is_some_and(|permission| permission.trusted_only),
             "permission {id} must be trustedOnly"
+        );
+    }
+    for id in &contract.reserved_permissions {
+        assert!(
+            !contract
+                .permissions
+                .iter()
+                .any(|permission| &permission.id == id),
+            "reserved permission {id} is also declared"
         );
     }
     assert!(
@@ -363,6 +380,15 @@ pub fn permission_base(permission: &str) -> &str {
 
 pub fn permission_known(permission: &str) -> bool {
     permission_spec(permission_base(permission)).is_some()
+}
+
+/// Permissions published by the contract but not implemented by this host.
+/// A manifest that declares one is rejected with a precise error.
+pub fn permission_reserved(permission: &str) -> bool {
+    CONTRACT
+        .reserved_permissions
+        .iter()
+        .any(|entry| entry == permission_base(permission))
 }
 
 pub fn permission_risk(permission: &str) -> &'static str {

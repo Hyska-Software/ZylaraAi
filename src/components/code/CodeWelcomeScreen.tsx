@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { useReduceMotion } from '@/components/layout/hooks';
 import { useUiStore } from '@/lib/store';
 import type { Workspace } from '@/lib/types';
@@ -296,6 +297,10 @@ export function CodeWelcomeScreen() {
           ) : null}
         </>
       )}
+      <Slot
+        name="code.welcome.actions"
+        owner={{ workspaceId: activeWorkspace?.id ?? null }}
+      />
     </div>
   );
 }

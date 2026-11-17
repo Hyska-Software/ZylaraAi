@@ -79,6 +79,25 @@ para a lane trusted; código sandboxed nunca recebe esses objetos.
 ## Tipos
 
 `packages/plugin-sdk/src/contract.generated.ts` contém `PLUGIN_API_VERSION`,
-`SLOT_IDS`, `COMPONENT_IDS`, `PERMISSION_IDS` e `PLUGIN_LIMITS`. Mantenha o
-manifesto sincronizado com o contrato; o backend rejeita ids/slots/permissões
-desconhecidos.
+`SLOT_IDS`, `COMPONENT_IDS`, `PERMISSION_IDS`, `RESERVED_PERMISSION_IDS` e
+`PLUGIN_LIMITS`. Mantenha o manifesto sincronizado com o contrato; o backend
+rejeita ids/slots/permissões desconhecidos.
+
+`packages/plugin-sdk/src/index.ts` tipa as contribuições:
+
+| Tipo | `contributes` | Notas |
+|---|---|---|
+| `ModeContribution` | `modes` | `prompt`/`promptFile`, `profiles`, `tools.add/remove`, `writes`, `defaultOn`; permissão `agent.modes` |
+| `AgentTemplateContribution` | `agentTemplates` | capabilities deny-only, `permissionMode`; permissão `agent.templates` |
+| `SidebarTabContribution` | `ui.sidebarTabs` | `sidebars`, `entry`/`component`, `order`, `badge`; permissão `ui.sidebar` |
+| `ProviderContribution` | `providers` | `icon`, `authHeader`, `authPrefix`, `headers` (sem credenciais); permissão `providers` |
+
+`PluginPermission` é derivado de `PERMISSION_IDS` e aceita os escopos
+(`ui.slot:*`, `ui.override:*`, `events:*`, `net:*`, `fs.read:*`, `fs.write:*`).
+`ReservedPermission` lista o que o host publica mas **não** implementa
+(`process.spawn`, `dialog`) — declarar uma dessas falha com
+`PLUGIN_PERMISSION_RESERVED`.
+
+`plugins/fixtures/modes-demo` é o exemplo executável: dois modos (`review` com
+`promptFile` + `writes: "blocked"`, `deep-dive` inline) e um template de agente
+`reviewer` com `permissionMode: "read_only"`.

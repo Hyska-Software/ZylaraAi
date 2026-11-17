@@ -245,74 +245,22 @@ export const COMPONENT_IDS = [
 export type PluginComponentId = (typeof COMPONENT_IDS)[number];
 
 export const RESERVED_SLOT_IDS = [
-    "app.titlebar.brand",
-    "app.overlay",
-    "sidebar.conversation.row.frame",
-    "code.sidebar.header",
-    "code.sidebar.footer",
-    "agent.sidebar.header",
-    "agent.thread.row.frame",
-    "agent.channel.row.frame",
-    "chat.message.tool.group.frame",
-    "chat.scroll.jump",
-    "chat.composer.input.frame",
-    "chat.composer.notice",
-    "code.session.header.frame",
-    "code.tabs.before",
-    "code.tabs.after",
-    "code.tab.strip.frame",
-    "code.panel.body.frame",
-    "code.terminal.toolbar",
-    "code.diff.toolbar",
-    "code.welcome.actions",
-    "agent.header.actions",
     "agent.tabs",
-    "agent.panel.header",
     "right.panel.tabs",
-    "right.panel.body.frame",
-    "settings.rail.before",
-    "settings.rail.after",
-    "settings.page.header",
-    "palette.actions",
-    "palette.footer",
-    "plugins.view.header",
-    "artifact.card.actions",
-    "agent.thread.view.frame",
-    "agent.channel.view.frame",
-    "agent.channel.message.before",
-    "agent.channel.message.after",
-    "agent.channel.message.body.frame",
-    "agent.channel.composer.frame",
-    "agent.channel.composer.actions",
 ] as const;
 
 export const RESERVED_COMPONENT_IDS = [
-    "layout.right-panel",
     "chat.message.tool-group",
     "chat.message.tool-row",
-    "chat.turn.error",
-    "chat.queue.bar",
     "chat.composer.input",
-    "sidebar.conversation.row",
     "code.workbench",
-    "code.session.header",
     "code.tab.strip",
-    "code.panel",
-    "code.welcome",
-    "agent.workspace",
-    "agent.sidebar",
     "agent.tab.strip",
-    "agent.thread.view",
     "agent.channel.view",
     "agent.channel.message",
     "agent.channel.composer",
-    "agent.panel",
     "settings.page",
     "settings.rail",
-    "plugins.detail",
-    "artifact.panel",
-    "artifact.preview",
-    "palette.dialog",
 ] as const;
 
 export const PERMISSION_IDS = [
@@ -323,6 +271,7 @@ export const PERMISSION_IDS = [
     "ui.settings",
     "ui.command",
     "ui.artifact",
+    "ui.sidebar",
     "ui.variant",
     "ui.preset",
     "ui.genui",
@@ -336,24 +285,29 @@ export const PERMISSION_IDS = [
     "agent.tools",
     "agent.prompt",
     "agent.skills",
+    "agent.modes",
+    "agent.templates",
     "chat.read",
     "chat.write",
     "fs.read",
     "fs.write",
     "net",
-    "process.spawn",
     "secrets.use",
     "secrets.read",
     "storage",
     "events",
     "clipboard.read",
     "notifications",
-    "dialog",
     "opener",
     "providers",
     "unsafe.renderer",
 ] as const;
 export type PluginPermissionId = (typeof PERMISSION_IDS)[number];
+
+export const RESERVED_PERMISSION_IDS = [
+    "process.spawn",
+    "dialog",
+] as const;
 
 export const EVENT_NAMES = [
     "layout/changed",
@@ -365,6 +319,7 @@ export const EVENT_NAMES = [
     "message/appended",
     "turn/started",
     "turn/finished",
+    "mode/changed",
 ] as const;
 export type PluginEventName = (typeof EVENT_NAMES)[number];
 
@@ -381,7 +336,12 @@ export const PLUGIN_LIMITS = {
   "networkBytes": 10485760,
   "rpcBytes": 1048576,
   "toolResultChars": 120000,
-  "toolTimeoutSecs": 60
+  "toolTimeoutSecs": 60,
+  "modesPerPlugin": 8,
+  "modePromptChars": 8000,
+  "agentTemplatesPerPlugin": 8,
+  "templateInstructionsChars": 8000,
+  "customProviders": 64
 } as const;
 
 export const PLUGIN_UI_LIMITS = {
@@ -389,6 +349,7 @@ export const PLUGIN_UI_LIMITS = {
   "navEntriesPerPlugin": 16,
   "pagesPerPlugin": 16,
   "panelTabsPerPlugin": 16,
+  "sidebarTabsPerPlugin": 16,
   "variantsPerPlugin": 32,
   "presetsPerPlugin": 8,
   "cssCharsPerPlugin": 200000,

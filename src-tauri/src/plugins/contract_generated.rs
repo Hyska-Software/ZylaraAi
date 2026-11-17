@@ -328,74 +328,22 @@ pub static COMPONENT_IDS: &[&str] = &[
 ];
 
 pub static RESERVED_SLOT_IDS: &[&str] = &[
-    "app.titlebar.brand",
-    "app.overlay",
-    "sidebar.conversation.row.frame",
-    "code.sidebar.header",
-    "code.sidebar.footer",
-    "agent.sidebar.header",
-    "agent.thread.row.frame",
-    "agent.channel.row.frame",
-    "chat.message.tool.group.frame",
-    "chat.scroll.jump",
-    "chat.composer.input.frame",
-    "chat.composer.notice",
-    "code.session.header.frame",
-    "code.tabs.before",
-    "code.tabs.after",
-    "code.tab.strip.frame",
-    "code.panel.body.frame",
-    "code.terminal.toolbar",
-    "code.diff.toolbar",
-    "code.welcome.actions",
-    "agent.header.actions",
     "agent.tabs",
-    "agent.panel.header",
     "right.panel.tabs",
-    "right.panel.body.frame",
-    "settings.rail.before",
-    "settings.rail.after",
-    "settings.page.header",
-    "palette.actions",
-    "palette.footer",
-    "plugins.view.header",
-    "artifact.card.actions",
-    "agent.thread.view.frame",
-    "agent.channel.view.frame",
-    "agent.channel.message.before",
-    "agent.channel.message.after",
-    "agent.channel.message.body.frame",
-    "agent.channel.composer.frame",
-    "agent.channel.composer.actions",
 ];
 
 pub static RESERVED_COMPONENT_IDS: &[&str] = &[
-    "layout.right-panel",
     "chat.message.tool-group",
     "chat.message.tool-row",
-    "chat.turn.error",
-    "chat.queue.bar",
     "chat.composer.input",
-    "sidebar.conversation.row",
     "code.workbench",
-    "code.session.header",
     "code.tab.strip",
-    "code.panel",
-    "code.welcome",
-    "agent.workspace",
-    "agent.sidebar",
     "agent.tab.strip",
-    "agent.thread.view",
     "agent.channel.view",
     "agent.channel.message",
     "agent.channel.composer",
-    "agent.panel",
     "settings.page",
     "settings.rail",
-    "plugins.detail",
-    "artifact.panel",
-    "artifact.preview",
-    "palette.dialog",
 ];
 
 pub static PERMISSION_IDS: &[&str] = &[
@@ -406,6 +354,7 @@ pub static PERMISSION_IDS: &[&str] = &[
     "ui.settings",
     "ui.command",
     "ui.artifact",
+    "ui.sidebar",
     "ui.variant",
     "ui.preset",
     "ui.genui",
@@ -419,28 +368,32 @@ pub static PERMISSION_IDS: &[&str] = &[
     "agent.tools",
     "agent.prompt",
     "agent.skills",
+    "agent.modes",
+    "agent.templates",
     "chat.read",
     "chat.write",
     "fs.read",
     "fs.write",
     "net",
-    "process.spawn",
     "secrets.use",
     "secrets.read",
     "storage",
     "events",
     "clipboard.read",
     "notifications",
-    "dialog",
     "opener",
     "providers",
     "unsafe.renderer",
 ];
 
+pub static RESERVED_PERMISSION_IDS: &[&str] = &[
+    "process.spawn",
+    "dialog",
+];
+
 pub static TRUSTED_ONLY_PERMISSIONS: &[&str] = &[
     "ui.override",
     "ui.shell",
-    "process.spawn",
     "secrets.read",
     "unsafe.renderer",
 ];
@@ -455,6 +408,7 @@ pub static EVENT_NAMES: &[&str] = &[
     "message/appended",
     "turn/started",
     "turn/finished",
+    "mode/changed",
 ];
 
 pub static THEME_REQUIRED_TOKENS: &[&str] = &[
@@ -530,11 +484,17 @@ pub const LIMIT_NETWORK_BYTES: u64 = 10485760;
 pub const LIMIT_RPC_BYTES: u64 = 1048576;
 pub const LIMIT_TOOL_RESULT_CHARS: usize = 120000;
 pub const LIMIT_TOOL_TIMEOUT_SECS: u64 = 60;
+pub const LIMIT_MODES_PER_PLUGIN: usize = 8;
+pub const LIMIT_MODE_PROMPT_CHARS: usize = 8000;
+pub const LIMIT_AGENT_TEMPLATES_PER_PLUGIN: usize = 8;
+pub const LIMIT_TEMPLATE_INSTRUCTIONS_CHARS: usize = 8000;
+pub const LIMIT_CUSTOM_PROVIDERS: usize = 64;
 
 pub const UI_LIMIT_SLOT_ENTRIES: u64 = 64;
 pub const UI_LIMIT_NAV_ENTRIES: u64 = 16;
 pub const UI_LIMIT_PAGES: u64 = 16;
 pub const UI_LIMIT_PANEL_TABS: u64 = 16;
+pub const UI_LIMIT_SIDEBAR_TABS: u64 = 16;
 pub const UI_LIMIT_VARIANTS: u64 = 32;
 pub const UI_LIMIT_PRESETS: u64 = 8;
 pub const UI_LIMIT_CSS_CHARS: u64 = 200000;

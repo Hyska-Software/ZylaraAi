@@ -76,43 +76,130 @@ declare global {
   }
 }
 
+/**
+ * Scoped grants and the base ids published by the contract. `PERMISSION_IDS`
+ * comes from `data/plugin-contract.json`, so a contract change reaches the SDK
+ * through `pnpm plugin:contract`.
+ */
 export type PluginPermission =
-  | 'ui.view'
-  | 'ui.nav'
-  | 'ui.panel'
-  | 'ui.command'
-  | 'ui.artifact'
-  | 'ui.settings'
-  | 'ui.theme'
-  | 'ui.variant'
-  | 'ui.preset'
-  | 'ui.genui'
-  | 'ui.shell'
-  | 'ui.css.global'
-  | 'commands'
-  | 'hotkeys'
-  | 'settings'
-  | 'agent.tools'
-  | 'agent.prompt'
-  | 'agent.skills'
-  | 'chat.read'
-  | 'chat.write'
-  | 'storage'
-  | 'events'
-  | 'notifications'
-  | 'clipboard.read'
-  | 'dialog'
-  | 'opener'
-  | 'providers'
-  | 'process.spawn'
-  | 'secrets.use'
-  | 'secrets.read'
-  | 'unsafe.renderer'
+  | (typeof PERMISSION_IDS)[number]
   | `ui.slot:${string}`
   | `ui.override:${string}`
+  | `events:${string}`
   | `net:${string}`
   | `fs.read:${string}`
   | `fs.write:${string}`;
+
+/** Published in the contract but not implemented by this host: a manifest that
+ * declares one is rejected with `PLUGIN_PERMISSION_RESERVED`. */
+export type ReservedPermission = (typeof RESERVED_PERMISSION_IDS)[number];
+
+export interface PluginModeTools {
+  /** Catalog tools the mode re-exposes (`web_search`, `create_file`, …). */
+  add?: string[];
+  /** Tools hidden while the mode is on. */
+  remove?: string[];
+}
+
+/** A harness mode: persistent per-conversation switch that injects instructions
+ * and can adjust the tool catalog (`contributes.modes`). */
+export interface ModeContribution {
+  id: string;
+  title: string;
+  titleKey?: string;
+  description?: string;
+  descriptionKey?: string;
+  icon?: string;
+  /** `chat` and/or `code`; omitted means both. */
+  profiles?: Array<'chat' | 'code'>;
+  prompt?: string;
+  promptFile?: string;
+  tools?: PluginModeTools;
+  /** `blocked` hides mutating tools while the mode is active. */
+  writes?: 'allowed' | 'blocked';
+  defaultOn?: boolean;
+}
+
+/** An agent template shown in the Agentes gallery (`contributes.agentTemplates`).
+ * Capabilities are deny-only: a template can restrict, never grant. */
+export interface AgentTemplateContribution {
+  id: string;
+  name: string;
+  nameKey?: string;
+  description?: string;
+  descriptionKey?: string;
+  role?: string;
+  icon?: string;
+  instructions?: string;
+  instructionsFile?: string;
+  starters?: string[];
+  capabilities?: Record<string, string[] | boolean>;
+  permissionMode?: 'read_only' | 'edit' | 'autonomous' | 'review';
+}
+
+/** A content tab inside a layout sidebar (`contributes.ui.sidebarTabs`). */
+export interface SidebarTabContribution {
+  id: string;
+  title: string;
+  titleKey?: string;
+  icon?: string;
+  sidebars: Array<'chat' | 'code' | 'agent'>;
+  entry?: string;
+  component?: string;
+  order?: number;
+  badge?: string;
+}
+
+/** A declarative OpenAI-compatible provider (`contributes.providers`). */
+export interface ProviderContribution {
+  id: string;
+  name: string;
+  shortName?: string;
+  description?: string;
+  baseUrl: string;
+  consoleUrl?: string;
+  icon?: string;
+  authHeader?: string;
+  authPrefix?: string;
+  /** Static headers; `authorization`, `cookie` and `host` are rejected. */
+  headers?: Record<string, string>;
+  endpoints?: Record<string, string>;
+  models: Array<{
+    id: string;
+    name: string;
+    protocols?: Array<'openai-chat'>;
+    contextWindow?: number;
+    maxOutput?: number;
+    reasoning?: boolean;
+    attachment?: boolean;
+  }>;
+}
+
+/** Typed view of the manifest contributions documented in docs/PLUGINS.md. */
+export interface PluginContributions {
+  ui?: {
+    slots?: Array<Record<string, unknown>>;
+    views?: Array<Record<string, unknown>>;
+    nav?: Array<Record<string, unknown>>;
+    sidebarTabs?: SidebarTabContribution[];
+    panels?: Array<Record<string, unknown>>;
+    commands?: Array<Record<string, unknown>>;
+    settingsTabs?: Array<Record<string, unknown>>;
+    themes?: Array<Record<string, unknown>>;
+    variants?: Array<Record<string, unknown>>;
+    presets?: Array<Record<string, unknown>>;
+    css?: Array<Record<string, unknown>>;
+    genui?: Record<string, unknown>;
+  };
+  tools?: Array<Record<string, unknown>> | string;
+  promptSections?: Array<{ id?: string; title?: string; file: string }>;
+  skills?: string[];
+  locales?: string[];
+  providers?: ProviderContribution[];
+  artifactViewers?: Array<Record<string, unknown>>;
+  modes?: ModeContribution[];
+  agentTemplates?: AgentTemplateContribution[];
+}
 
 export interface Manifest {
   schemaVersion: 1 | 2;
@@ -124,7 +211,7 @@ export interface Manifest {
   author?: string;
   publisher: { id: string; name: string; keyId?: string };
   permissions: PluginPermission[];
-  contributes?: Record<string, unknown>;
+  contributes?: PluginContributions;
   runtime: {
     ui: 'none' | 'declarative' | 'sandbox' | 'trusted';
     entry?: string | null;

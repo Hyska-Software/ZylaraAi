@@ -861,6 +861,14 @@ pub struct TurnOptions {
     /// from the renderer). It gates the `plugin_studio` tool and prompt section.
     #[serde(skip)]
     pub plugin_creator: bool,
+    /// Tool catalog delta requested by active plugin modes (internal).
+    #[serde(skip)]
+    pub plugin_mode_tools_add: Vec<String>,
+    #[serde(skip)]
+    pub plugin_mode_tools_remove: Vec<String>,
+    /// An active mode with `writes: "blocked"` hides mutating tools.
+    #[serde(skip)]
+    pub plugin_mode_writes_blocked: bool,
     /// Agent turn with durable memory enabled (`memory` tool available).
     #[serde(skip)]
     pub agent_memory: bool,
@@ -901,6 +909,9 @@ impl Default for TurnOptions {
             plugin_prompt: String::new(),
             plugin_fingerprint: String::new(),
             plugin_creator: false,
+            plugin_mode_tools_add: Vec::new(),
+            plugin_mode_tools_remove: Vec::new(),
+            plugin_mode_writes_blocked: false,
             agent_memory: false,
             agent_id: None,
             agent_delegation: false,

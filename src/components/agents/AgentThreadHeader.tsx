@@ -9,6 +9,7 @@ import { AgentConversationWorkspace } from './AgentConversationWorkspace';
 import { TASK_TERMINAL_STATUSES, taskStatusMeta } from './agentTaskStatus';
 import { modelLabel } from './agentUtils';
 import { CodeContextMeterChip } from '@/components/code/CodeAgentWidgets';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { Button, IconButton } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAppStore, useChatStore, useUiStore } from '@/lib/store';
@@ -110,6 +111,10 @@ export function AgentThreadHeader({
         </p>
       </div>
       <AgentComputerControl conversationId={conversation.id} />
+      <Slot
+        name="agent.header.actions"
+        owner={{ agentId: agent.id, conversationId: conversation.id }}
+      />
       <AgentConversationWorkspace conversation={conversation} busy={turnActive} onChanged={(updated) => {
         useChatStore.setState((state) => ({
           conversations: state.conversations.map((item) => item.id === updated.id ? updated : item),

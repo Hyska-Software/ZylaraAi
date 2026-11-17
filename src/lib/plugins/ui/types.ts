@@ -10,6 +10,7 @@ import type { ComponentType } from 'react';
 import type {
   PluginAction,
   PluginLayoutId,
+  PluginModeView,
   PluginRecord,
 } from '../types';
 
@@ -265,6 +266,22 @@ export interface SettingsTabSpec extends UiContributionBase {
   component: PluginComponent | null;
 }
 
+/** A content tab contributed to a layout sidebar (`contributes.ui.sidebarTabs`). */
+export interface SidebarTabSpec {
+  key: string;
+  pluginId: string;
+  plugin: PluginRecord;
+  id: string;
+  title: string;
+  titleKey: string | null;
+  icon: string | null;
+  sidebars: LayoutId[];
+  entry: string | null;
+  component: PluginComponent | null;
+  order: number;
+  badge: string | null;
+}
+
 export interface PluginUiState {
   slots: SlotContribution[];
   replacements: ComponentReplacement[];
@@ -278,5 +295,9 @@ export interface PluginUiState {
   presets: PresetSpec[];
   css: CssEntry[];
   genui: GenuiComponentSpec[];
+  /** Harness modes contributed by active plugins. */
+  modes?: PluginModeView[];
+  /** Content tabs contributed to a layout sidebar. */
+  sidebarTabs?: SidebarTabSpec[];
   revision: number;
 }

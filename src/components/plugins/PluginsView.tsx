@@ -43,6 +43,9 @@ import { pluginContributesUi, usePluginRegistry } from '@/lib/plugins/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { commandSlashName } from '@/lib/plugins/host';
 import { builtinSlashCommandNames } from '@/components/composer/commands';
+import { Slot } from '@/components/plugins/ui/Slot';
+import { ComponentSlot } from '@/components/plugins/ui/Slot';
+import type { PluginComponent } from '@/lib/plugins/registry';
 import type {
   PluginPackageInspection,
   PluginRecord,
@@ -502,6 +505,7 @@ export function PluginsView() {
               <Settings aria-hidden className="size-3.5" />
             </Button>
           </div>
+          <Slot name="plugins.view.header" />
         </div>
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
@@ -875,7 +879,11 @@ export function PluginsView() {
         </button>
       </div>
 
-      <PluginDetailDialog pluginId={detailId} onClose={() => setDetailId(null)} />
+      <ComponentSlot
+        name="plugins.detail"
+        fallback={PluginDetailDialog as unknown as PluginComponent}
+        props={{ pluginId: detailId, onClose: () => setDetailId(null) }}
+      />
 
       <PluginConsentDialog
         open={consent !== null}

@@ -137,6 +137,37 @@ export interface ProviderInfo {
   notes: string[];
   /** Capacidades de cache do provedor/rota (default por protocolo/família). */
   cache?: CacheInfo | null;
+  /** Package-relative asset or image URL used instead of the built-in glyph. */
+  icon?: string | null;
+  /** `custom` for user-defined providers, `plugin` for contributed ones. */
+  origin?: 'custom' | 'plugin' | null;
+  /** Human label for the origin (plugin name, "Custom provider"). */
+  originLabel?: string | null;
+}
+
+/** Payload of `save_custom_provider` (Settings → Providers → Add provider). */
+export interface CustomProviderInput {
+  id: string;
+  name: string;
+  shortName?: string;
+  description?: string;
+  baseUrl: string;
+  consoleUrl?: string;
+  endpoints?: Record<string, string>;
+  headers?: Record<string, string>;
+  authHeader?: string;
+  authPrefix?: string;
+  icon?: string;
+  models: CustomProviderModelInput[];
+}
+
+export interface CustomProviderModelInput {
+  id: string;
+  name: string;
+  contextWindow?: number;
+  maxOutput?: number;
+  reasoning?: boolean;
+  attachment?: boolean;
 }
 
 export interface CatalogFile {

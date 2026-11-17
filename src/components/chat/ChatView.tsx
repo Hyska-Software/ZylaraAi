@@ -231,17 +231,25 @@ export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
               junto de plano/tarefas; não há mais faixa acima do composer. */}
           {activeId ? (
             <Slot name="chat.queue.frame" owner={owner}>
-              <MessageQueueBar conversationId={activeId} />
+              <ComponentSlot
+                name="chat.queue.bar"
+                fallback={MessageQueueBar as unknown as PluginComponent}
+                props={{ conversationId: activeId }}
+              />
             </Slot>
           ) : null}
           {showTurnError ? (
             <Slot name="chat.turn.error.frame" owner={owner}>
-              <TurnErrorBanner
-                code={errorCode}
-                hint={errorHint}
-                planProvider={planProvider}
-                usageUrl={planUsageUrl(selectedProvider)}
-                onOpenProviders={() => openSettings('providers')}
+              <ComponentSlot
+                name="chat.turn.error"
+                fallback={TurnErrorBanner as unknown as PluginComponent}
+                props={{
+                  code: errorCode,
+                  hint: errorHint,
+                  planProvider,
+                  usageUrl: planUsageUrl(selectedProvider),
+                  onOpenProviders: () => openSettings('providers'),
+                }}
               />
             </Slot>
           ) : null}
@@ -251,19 +259,24 @@ export function ChatView({ welcome }: { welcome?: ReactNode } = {}) {
 
       {showJump ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-32 z-20 flex justify-center">
-          <button
-            type="button"
-            onClick={() => scrollToBottom(reduceMotion ? 'auto' : 'smooth')}
-            aria-label={t('chatView.jumpToLatest')}
-            className={cn(
-              'pointer-events-auto flex size-9 items-center justify-center rounded-full ',
-              'bg-surface-raised text-foreground-muted shadow-md',
-              'transition-colors duration-150 hover:bg-surface-hover hover:text-foreground',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-            )}
-          >
-            <ArrowDown className="size-4" />
-          </button>
+          <Slot
+            name="chat.scroll.jump"
+            fallback={
+              <button
+                type="button"
+                onClick={() => scrollToBottom(reduceMotion ? 'auto' : 'smooth')}
+                aria-label={t('chatView.jumpToLatest')}
+                className={cn(
+                  'pointer-events-auto flex size-9 items-center justify-center rounded-full ',
+                  'bg-surface-raised text-foreground-muted shadow-md',
+                  'transition-colors duration-150 hover:bg-surface-hover hover:text-foreground',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                )}
+              >
+                <ArrowDown className="size-4" />
+              </button>
+            }
+          />
         </div>
       ) : null}
     </div>

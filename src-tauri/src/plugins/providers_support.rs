@@ -139,10 +139,16 @@ fn to_provider(plugin: &super::LoadedPlugin, contribution: &super::ProviderContr
         base_url: contribution.base_url.trim_end_matches('/').to_string(),
         console_url: contribution.console_url.clone(),
         endpoints: endpoints.into_iter().collect(),
-        headers: std::collections::HashMap::new(),
+        headers: contribution.headers.clone().into_iter().collect(),
         auth_env: String::new(),
-        auth_header: "authorization".to_string(),
-        auth_prefix: "Bearer ".to_string(),
+        auth_header: contribution
+            .auth_header
+            .clone()
+            .unwrap_or_else(|| "authorization".to_string()),
+        auth_prefix: contribution
+            .auth_prefix
+            .clone()
+            .unwrap_or_else(|| "Bearer ".to_string()),
         default_model_id: contribution
             .models
             .first()
@@ -157,6 +163,9 @@ fn to_provider(plugin: &super::LoadedPlugin, contribution: &super::ProviderContr
             plugin.stored.id
         )],
         cache: None,
+        icon: contribution.icon.clone(),
+        origin: Some("plugin".to_string()),
+        origin_label: Some(plugin.manifest.name.clone()),
     }
 }
 

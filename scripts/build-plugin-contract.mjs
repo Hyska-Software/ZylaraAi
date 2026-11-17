@@ -158,9 +158,18 @@ for (const permission of contract.permissions ?? []) {
   if (typeof permission.scoped !== 'boolean') fail(`permission ${permission.id} must declare scoped`);
   if (typeof permission.trustedOnly !== 'boolean') fail(`permission ${permission.id} must declare trustedOnly`);
 }
-for (const id of ['ui.override', 'ui.shell', 'unsafe.renderer', 'process.spawn', 'secrets.read']) {
+for (const id of ['ui.override', 'ui.shell', 'unsafe.renderer', 'secrets.read']) {
   const permission = contract.permissions.find((entry) => entry.id === id);
   if (!permission?.trustedOnly) fail(`permission ${id} must be trustedOnly`);
+}
+const reservedPermissions = contract.reservedPermissions ?? [];
+if (!Array.isArray(reservedPermissions)) fail('reservedPermissions must be an array');
+if (new Set(reservedPermissions).size !== reservedPermissions.length) fail('reservedPermissions has duplicates');
+for (const id of reservedPermissions) {
+  if (typeof id !== 'string' || !/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/.test(id)) {
+    fail(`invalid reserved permission: ${id}`);
+  }
+  if (permissionIds.has(id)) fail(`reserved permission is also declared: ${id}`);
 }
 const cssPermission = contract.permissions.find((entry) => entry.id === 'ui.css.global');
 if (!cssPermission || cssPermission.trustedOnly) fail('ui.css.global must be available to every lane');
@@ -188,6 +197,11 @@ for (const key of [
   'rpcBytes',
   'toolResultChars',
   'toolTimeoutSecs',
+  'modesPerPlugin',
+  'modePromptChars',
+  'agentTemplatesPerPlugin',
+  'templateInstructionsChars',
+  'customProviders',
 ]) {
   if (!Number.isInteger(limits[key]) || limits[key] <= 0) fail(`limit ${key} must be a positive integer`);
 }
@@ -197,6 +211,7 @@ for (const key of [
   'navEntriesPerPlugin',
   'pagesPerPlugin',
   'panelTabsPerPlugin',
+  'sidebarTabsPerPlugin',
   'variantsPerPlugin',
   'presetsPerPlugin',
   'cssCharsPerPlugin',
@@ -261,6 +276,10 @@ pub static PERMISSION_IDS: &[&str] = &[
 ${stringArray(contract.permissions.map((permission) => permission.id))}
 ];
 
+pub static RESERVED_PERMISSION_IDS: &[&str] = &[
+${stringArray(reservedPermissions)}
+];
+
 pub static TRUSTED_ONLY_PERMISSIONS: &[&str] = &[
 ${stringArray(contract.permissions.filter((permission) => permission.trustedOnly).map((permission) => permission.id))}
 ];
@@ -294,11 +313,17 @@ pub const LIMIT_NETWORK_BYTES: u64 = ${limits.networkBytes};
 pub const LIMIT_RPC_BYTES: u64 = ${limits.rpcBytes};
 pub const LIMIT_TOOL_RESULT_CHARS: usize = ${limits.toolResultChars};
 pub const LIMIT_TOOL_TIMEOUT_SECS: u64 = ${limits.toolTimeoutSecs};
+pub const LIMIT_MODES_PER_PLUGIN: usize = ${limits.modesPerPlugin};
+pub const LIMIT_MODE_PROMPT_CHARS: usize = ${limits.modePromptChars};
+pub const LIMIT_AGENT_TEMPLATES_PER_PLUGIN: usize = ${limits.agentTemplatesPerPlugin};
+pub const LIMIT_TEMPLATE_INSTRUCTIONS_CHARS: usize = ${limits.templateInstructionsChars};
+pub const LIMIT_CUSTOM_PROVIDERS: usize = ${limits.customProviders};
 
 ${numberConst('UI_LIMIT_SLOT_ENTRIES', uiLimits.slotEntriesPerPlugin)}
 ${numberConst('UI_LIMIT_NAV_ENTRIES', uiLimits.navEntriesPerPlugin)}
 ${numberConst('UI_LIMIT_PAGES', uiLimits.pagesPerPlugin)}
 ${numberConst('UI_LIMIT_PANEL_TABS', uiLimits.panelTabsPerPlugin)}
+${numberConst('UI_LIMIT_SIDEBAR_TABS', uiLimits.sidebarTabsPerPlugin)}
 ${numberConst('UI_LIMIT_VARIANTS', uiLimits.variantsPerPlugin)}
 ${numberConst('UI_LIMIT_PRESETS', uiLimits.presetsPerPlugin)}
 ${numberConst('UI_LIMIT_CSS_CHARS', uiLimits.cssCharsPerPlugin)}
@@ -350,6 +375,10 @@ export const PERMISSION_IDS = [
 ${stringArray(contract.permissions.map((permission) => permission.id))}
 ] as const;
 export type PluginPermissionId = (typeof PERMISSION_IDS)[number];
+
+export const RESERVED_PERMISSION_IDS = [
+${stringArray(reservedPermissions)}
+] as const;
 
 export const EVENT_NAMES = [
 ${stringArray(contract.events.map((event) => event.name))}

@@ -16,6 +16,9 @@ import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { Slot } from '@/components/plugins/ui/Slot';
+import { ComponentSlot } from '@/components/plugins/ui/Slot';
+import type { PluginComponent } from '@/lib/plugins/registry';
 import { t as translate } from '@/lib/i18n';
 import { formatDateTime } from '@/lib/i18n/format';
 import type { ArtifactContent } from '@/lib/types';
@@ -228,6 +231,7 @@ export function ArtifactPanel() {
             ),
       )}
     >
+      <Slot name="right.panel.body.frame" owner={{ open: open }}>
       {mode === 'preview' && artifact && meta ? (
         <>
           <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
@@ -386,7 +390,11 @@ export function ArtifactPanel() {
                 </Button>
               </div>
             ) : content ? (
-              <ArtifactPreview content={content} />
+              <ComponentSlot
+                name="artifact.preview"
+                fallback={ArtifactPreview as unknown as PluginComponent}
+                props={{ content, artifactId: artifact.id }}
+              />
             ) : null}
           </div>
 
@@ -452,6 +460,7 @@ export function ArtifactPanel() {
           </footer>
         </>
       )}
+      </Slot>
 
       {/* Out of flow, over the left edge: never covers the list or the scrollbar.
           The containing block comes from the panel itself (`absolute` in overlay

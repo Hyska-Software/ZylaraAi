@@ -1175,7 +1175,8 @@
     "title": "Plantillas de agentes",
     "description": "Empieza con un rol probado y ajusta identidad, instrucciones y modelo en el editor.",
     "use": "Usar plantilla",
-    "roleWithDepartment": "{{role}} · {{department}}"
+    "roleWithDepartment": "{{role}} · {{department}}",
+    "fromPlugin": "Del plugin {{name}}"
   },
   "builder": {
     "title": "Crear agente con IA",

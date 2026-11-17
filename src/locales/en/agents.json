@@ -1175,7 +1175,8 @@
     "title": "Agent templates",
     "description": "Start from a proven role and adjust identity, instructions and model in the editor.",
     "use": "Use template",
-    "roleWithDepartment": "{{role}} · {{department}}"
+    "roleWithDepartment": "{{role}} · {{department}}",
+    "fromPlugin": "From {{name}}"
   },
   "builder": {
     "title": "Create agent with AI",

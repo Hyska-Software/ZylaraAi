@@ -14,10 +14,12 @@ import {
   KeyRound,
   LogIn,
   LogOut,
+  Pencil,
   Plus,
   Settings2,
   ShieldCheck,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -26,6 +28,8 @@ import { openExternal } from '@/lib/genui/open-external';
 import { formatDate } from '@/lib/i18n/format';
 import { copyText } from '@/lib/utils';
 import type {
+  CustomProviderInput,
+  CustomProviderModelInput,
   LoginChallenge,
   ProviderAuthStatus,
   ProviderInfo,
@@ -45,8 +49,10 @@ import {
   Input,
   Label,
   Spinner,
+  IconButton,
 } from '@/components/ui';
 import { ProviderGlyph } from './ProviderGlyph';
+import { CustomProviderDialog } from './CustomProviderDialog';
 import { SettingRow, SettingsBlock, SettingsSection } from './shared';
 
 type TestState =
@@ -251,12 +257,18 @@ function ProviderRow({
   description,
   state,
   recommended,
+  originLabel,
+  extra,
   onOpen,
 }: {
   provider: ProviderInfo;
   description: string;
   state: ProviderRowState;
   recommended: boolean;
+  /** Origin badge for user-defined and plugin-contributed providers. */
+  originLabel?: string | null;
+  /** Extra row actions (edit/remove for user-defined providers). */
+  extra?: ReactNode;
   onOpen: () => void;
 }) {
   const { t } = useTranslation('settings');
@@ -278,11 +290,13 @@ function ProviderRow({
             {provider.name}
           </p>
           {recommended ? <Badge size="sm">{t('providers.list.recommended')}</Badge> : null}
+          {originLabel ? <Badge size="sm">{originLabel}</Badge> : null}
         </div>
         <p className="mt-0.5 text-xs leading-relaxed text-foreground-muted">{description}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2 self-center">
         {state.status}
+        {extra}
         <Button
           size="sm"
           variant="secondary"
@@ -394,6 +408,11 @@ export function ProvidersTab() {
   const [resilience, setResilience] = useState<ResilienceValues>(() =>
     resilienceFrom(settings),
   );
+  /** User-defined provider dialog (create when `editingCustom` is null). */
+  const [providerDialogOpen, setProviderDialogOpen] = useState(false);
+  const [editingCustom, setEditingCustom] = useState<ProviderInfo | null>(null);
+  /** Provider awaiting the remove confirmation. */
+  const [pendingDelete, setPendingDelete] = useState<ProviderInfo | null>(null);
 
   useEffect(
     () => setResilience(resilienceFrom(settings)),
@@ -507,8 +526,13 @@ export function ProvidersTab() {
   const popularProviders: ProviderInfo[] = POPULAR_PROVIDER_IDS.map((id) =>
     providerList.find((provider) => provider.id === id),
   ).filter((provider): provider is ProviderInfo => Boolean(provider));
+  /** User-defined and plugin-contributed providers, managed in their own block. */
+  const managedProviders = providerList.filter(
+    (provider) => provider.origin === 'custom' || provider.origin === 'plugin',
+  );
+  const managedIds = new Set(managedProviders.map((provider) => provider.id));
   const otherProviders = providerList.filter(
-    (provider) => !POPULAR_PROVIDER_IDS.includes(provider.id),
+    (provider) => !POPULAR_PROVIDER_IDS.includes(provider.id) && !managedIds.has(provider.id),
   );
   const openProvider = openProviderId
     ? providerList.find((provider) => provider.id === openProviderId) ?? null
@@ -558,6 +582,20 @@ export function ProvidersTab() {
       copiedLinkTimerRef.current = null;
       setCopiedLink(false);
     }, 2_500);
+  };
+
+  /** Removes a user-defined provider after the confirmation dialog. */
+  const removeCustomProvider = async () => {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setPendingDelete(null);
+    try {
+      await api.deleteCustomProvider(target.id);
+      await useAppStore.getState().reloadCatalog();
+      toast.success(t('providers.custom.removed', { name: target.name }));
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
   };
 
   const setLoginError = (providerId: string, message: string | null) => {
@@ -1277,6 +1315,76 @@ export function ProvidersTab() {
         </div>
       </section>
 
+      <section className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[13px] font-semibold tracking-tight text-foreground">
+            {t('providers.custom.yourProviders')}
+          </h3>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="-mr-2.5"
+            leftIcon={<Plus aria-hidden className="size-3.5" />}
+            onClick={() => {
+              setEditingCustom(null);
+              setProviderDialogOpen(true);
+            }}
+          >
+            {t('providers.custom.add')}
+          </Button>
+        </div>
+        {managedProviders.length ? (
+          <div className="rounded-xl bg-surface">
+            <ul className="divide-y divide-border">
+              {managedProviders.map((provider) => (
+                <ProviderRow
+                  key={provider.id}
+                  provider={provider}
+                  description={provider.description || t('providers.custom.description')}
+                  state={rowStateOf(provider)}
+                  recommended={false}
+                  originLabel={
+                    provider.origin === 'plugin'
+                      ? t('providers.custom.originPlugin', {
+                          name: provider.originLabel ?? provider.name,
+                        })
+                      : t('providers.custom.originCustom')
+                  }
+                  extra={
+                    provider.origin === 'custom' ? (
+                      <>
+                        <IconButton
+                          size="sm"
+                          label={t('providers.custom.edit', { name: provider.name })}
+                          onClick={() => {
+                            setEditingCustom(provider);
+                            setProviderDialogOpen(true);
+                          }}
+                        >
+                          <Pencil aria-hidden className="size-3.5" />
+                        </IconButton>
+                        <IconButton
+                          size="sm"
+                          label={t('providers.custom.remove', { name: provider.name })}
+                          onClick={() => setPendingDelete(provider)}
+                        >
+                          <Trash2 aria-hidden className="size-3.5" />
+                        </IconButton>
+                      </>
+                    ) : null
+                  }
+                  onOpen={() => setOpenProviderId(provider.id)}
+                />
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-xs leading-relaxed text-foreground-muted">
+            {t('providers.custom.empty')}
+          </p>
+        )}
+      </section>
+
       <div>
         <Button
           variant="ghost"
@@ -1288,6 +1396,37 @@ export function ProvidersTab() {
           {t('providers.list.more')}
         </Button>
       </div>
+
+      <CustomProviderDialog
+        open={providerDialogOpen}
+        onOpenChange={(next) => {
+          setProviderDialogOpen(next);
+          if (!next) setEditingCustom(null);
+        }}
+        provider={editingCustom}
+      />
+
+      <Dialog
+        open={pendingDelete != null}
+        onOpenChange={(next) => {
+          if (!next) setPendingDelete(null);
+        }}
+      >
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>{t('providers.custom.removeTitle', { name: pendingDelete?.name ?? '' })}</DialogTitle>
+            <DialogDescription>{t('providers.custom.removeBody')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+              {t('providers.custom.cancel')}
+            </Button>
+            <Button variant="danger" onClick={() => void removeCustomProvider()}>
+              {t('providers.custom.removeConfirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SettingsSection
         title={t('providers.resilience.title')}

@@ -364,6 +364,61 @@ fn apply_plan_mode(
     crate::harness::code::session::set_plan_mode(db, conversation_id, plan_mode).map_err(map_err)
 }
 
+/// Explicit plugin-mode state of a conversation (`on`/`off` keys).
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginModesView {
+    pub on: Vec<String>,
+    pub off: Vec<String>,
+}
+
+fn plugin_modes_view(
+    db: &crate::db::Db,
+    conversation_id: &str,
+) -> Result<PluginModesView, String> {
+    let view = crate::harness::code::session::plugin_mode_state(db, conversation_id)
+        .map_err(map_err)?;
+    Ok(PluginModesView {
+        on: view.on,
+        off: view.off,
+    })
+}
+
+/// Plugin-mode state of a conversation (Chat and Code).
+#[tauri::command]
+pub fn plugin_modes_state(
+    state: State<'_, AppState>,
+    conversation_id: String,
+) -> Result<PluginModesView, String> {
+    ensure_conversation(&state.db, &conversation_id)?;
+    plugin_modes_view(&state.db, &conversation_id)
+}
+
+/// Toggles a plugin-contributed harness mode (append-only; the last event wins).
+#[tauri::command]
+pub fn set_plugin_mode(
+    state: State<'_, AppState>,
+    conversation_id: String,
+    mode: String,
+    active: bool,
+) -> Result<PluginModesView, String> {
+    ensure_conversation(&state.db, &conversation_id)?;
+    let known = crate::plugins::global_manager()
+        .map(|manager| manager.mode(&mode).is_some())
+        .unwrap_or(false);
+    if !known {
+        return Err("PLUGIN_MODE_UNKNOWN: unknown plugin mode".to_string());
+    }
+    crate::harness::code::session::set_plugin_mode(
+        &state.db,
+        &conversation_id,
+        &mode,
+        active,
+    )
+    .map_err(map_err)?;
+    plugin_modes_view(&state.db, &conversation_id)
+}
+
 /// Liga/desliga o modo Plugin Creator (`/creator`) da sessão Code.
 #[tauri::command]
 pub async fn set_creator_mode(

@@ -49,8 +49,10 @@ impl PluginManager {
             "settings.all" => self.settings_all(plugin_id, &grants),
             "secrets.has" => self.secrets_has(plugin_id, &grants, &params),
             "secrets.names" => self.secrets_names(plugin_id, &grants),
+            "secrets.read" => self.secrets_read(plugin_id, &grants, &params),
             "net.request" => self.net_request(plugin_id, &grants, &params).await,
             "chat.read" => self.chat_read(plugin_id, &grants, &params),
+            "chat.draft" => self.chat_draft_rpc(plugin_id, &grants, &params),
             "chat.list" => self.chat_list(plugin_id, &grants),
             "log" => self.log_rpc(plugin_id, &params),
             "notify" => self.notify_rpc(plugin_id, &grants, &params),
@@ -199,6 +201,60 @@ impl PluginManager {
             .app()
             .ok_or_else(|| anyhow::anyhow!("PLUGIN_RUNTIME_UNAVAILABLE: no app handle"))?;
         Ok(json!({ "names": crate::config::plugin_secret_names(app, plugin_id) }))
+    }
+
+    /// Returns the secret value. Trusted-only (`secrets.read`); every call is
+    /// audited by the dispatcher with a params digest that never contains the
+    /// value.
+    fn secrets_read(&self, plugin_id: &str, grants: &[String], params: &Value) -> Result<Value> {
+        permissions::require(grants, "secrets.read")?;
+        let key = Self::settings_key(params)?;
+        let app = self
+            .app()
+            .ok_or_else(|| anyhow::anyhow!("PLUGIN_RUNTIME_UNAVAILABLE: no app handle"))?;
+        Ok(json!({
+            "value": crate::config::plugin_secret(app, plugin_id, &key)
+        }))
+    }
+
+    /// Inserts text into the composer draft of the active conversation. The
+    /// renderer listens for `zylara:plugin-composer-draft` and routes it through
+    /// the same composer path as the declarative `insertDraft` action.
+    fn chat_draft_rpc(&self, plugin_id: &str, grants: &[String], params: &Value) -> Result<Value> {
+        permissions::require(grants, "chat.write")?;
+        let text: String = params
+            .get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .chars()
+            .take(20_000)
+            .collect();
+        if text.trim().is_empty() {
+            bail!("PLUGIN_RPC_INVALID: draft text is required");
+        }
+        let mode = params
+            .get("mode")
+            .and_then(Value::as_str)
+            .filter(|mode| matches!(*mode, "append" | "replace" | "prepend"))
+            .unwrap_or("append")
+            .to_string();
+        let conversation_id = params
+            .get("conversationId")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        if let Some(app) = self.app() {
+            use tauri::Emitter;
+            let _ = app.emit(
+                "zylara:plugin-composer-draft",
+                json!({
+                    "pluginId": plugin_id,
+                    "conversationId": conversation_id,
+                    "text": text,
+                    "mode": mode,
+                }),
+            );
+        }
+        Ok(json!({ "ok": true }))
     }
 
     fn log_rpc(&self, plugin_id: &str, params: &Value) -> Result<Value> {

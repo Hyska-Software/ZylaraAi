@@ -20,13 +20,19 @@
     "networkBytes": 10485760,
     "rpcBytes": 1048576,
     "toolResultChars": 120000,
-    "toolTimeoutSecs": 60
+    "toolTimeoutSecs": 60,
+    "modesPerPlugin": 8,
+    "modePromptChars": 8000,
+    "agentTemplatesPerPlugin": 8,
+    "templateInstructionsChars": 8000,
+    "customProviders": 64
   },
   "uiLimits": {
     "slotEntriesPerPlugin": 64,
     "navEntriesPerPlugin": 16,
     "pagesPerPlugin": 16,
     "panelTabsPerPlugin": 16,
+    "sidebarTabsPerPlugin": 16,
     "variantsPerPlugin": 32,
     "presetsPerPlugin": 8,
     "cssCharsPerPlugin": 200000,
@@ -228,30 +234,19 @@
     { "id": "palette.dialog", "title": "Command palette", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": [], "variants": [], "risk": "low", "description": "Command palette dialog." }
   ],
   "reservedSlots": [
-    "app.titlebar.brand", "app.overlay", "sidebar.conversation.row.frame",
-    "code.sidebar.header", "code.sidebar.footer", "agent.sidebar.header",
-    "agent.thread.row.frame", "agent.channel.row.frame", "chat.message.tool.group.frame",
-    "chat.scroll.jump", "chat.composer.input.frame", "chat.composer.notice",
-    "code.session.header.frame", "code.tabs.before", "code.tabs.after",
-    "code.tab.strip.frame", "code.panel.body.frame", "code.terminal.toolbar",
-    "code.diff.toolbar", "code.welcome.actions", "agent.header.actions", "agent.tabs",
-    "agent.panel.header", "right.panel.tabs", "right.panel.body.frame",
-    "settings.rail.before", "settings.rail.after", "settings.page.header",
-    "palette.actions", "palette.footer", "plugins.view.header", "artifact.card.actions",
-    "agent.thread.view.frame", "agent.channel.view.frame", "agent.channel.message.before",
-    "agent.channel.message.after", "agent.channel.message.body.frame",
-    "agent.channel.composer.frame", "agent.channel.composer.actions"
+    "agent.tabs",
+    "right.panel.tabs"
   ],
   "reservedComponents": [
-    "layout.right-panel", "chat.message.tool-group", "chat.message.tool-row",
-    "chat.turn.error", "chat.queue.bar", "chat.composer.input",
-    "sidebar.conversation.row", "code.workbench", "code.session.header",
-    "code.tab.strip", "code.panel", "code.welcome", "agent.workspace",
-    "agent.sidebar", "agent.tab.strip", "agent.thread.view", "agent.channel.view",
-    "agent.channel.message", "agent.channel.composer", "agent.panel",
-    "settings.page", "settings.rail", "plugins.detail", "artifact.panel",
-    "artifact.preview", "palette.dialog"
+    "chat.message.tool-group", "chat.message.tool-row",
+    "chat.composer.input",
+    "code.workbench",
+    "code.tab.strip",
+    "agent.tab.strip", "agent.channel.view",
+    "agent.channel.message", "agent.channel.composer",
+    "settings.page", "settings.rail"
   ],
+  "reservedPermissions": ["process.spawn", "dialog"],
   "events": [
     { "name": "layout/changed", "scope": "ui", "props": ["layout"], "description": "The active layout changed." },
     { "name": "page/changed", "scope": "ui", "props": ["layout", "page"], "description": "The active center page changed." },
@@ -261,7 +256,8 @@
     { "name": "conversation/updated", "scope": "chat", "props": ["conversationId"], "description": "A conversation was updated." },
     { "name": "message/appended", "scope": "chat", "props": ["conversationId", "messageId", "role"], "description": "A message was appended." },
     { "name": "turn/started", "scope": "chat", "props": ["conversationId", "turnId"], "description": "A turn started." },
-    { "name": "turn/finished", "scope": "chat", "props": ["conversationId", "turnId", "status"], "description": "A turn finished." }
+    { "name": "turn/finished", "scope": "chat", "props": ["conversationId", "turnId", "status"], "description": "A turn finished." },
+    { "name": "mode/changed", "scope": "chat", "props": ["conversationId", "mode", "active"], "description": "A harness mode (built-in or plugin) was toggled." }
   ],
   "permissions": [
     { "id": "ui.slot", "scoped": true, "risk": "low", "trustedOnly": false, "description": "Add host-rendered content to a named UI slot." },
@@ -271,6 +267,7 @@
     { "id": "ui.settings", "scoped": false, "risk": "low", "trustedOnly": false, "description": "Register a settings tab." },
     { "id": "ui.command", "scoped": false, "risk": "low", "trustedOnly": false, "description": "Register command palette and slash commands." },
     { "id": "ui.artifact", "scoped": false, "risk": "low", "trustedOnly": false, "description": "Register a viewer for artifact MIME types." },
+    { "id": "ui.sidebar", "scoped": false, "risk": "low", "trustedOnly": false, "description": "Register content tabs inside a layout sidebar." },
     { "id": "ui.variant", "scoped": false, "risk": "low", "trustedOnly": false, "description": "Contribute declarative style variants for host components." },
     { "id": "ui.preset", "scoped": false, "risk": "medium", "trustedOnly": false, "description": "Contribute declarative design presets." },
     { "id": "ui.genui", "scoped": false, "risk": "medium", "trustedOnly": false, "description": "Expose UI components to generative UI blocks." },
@@ -284,19 +281,19 @@
     { "id": "agent.tools", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Expose tools to the agent." },
     { "id": "agent.prompt", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Inject instructions into the agent system prompt." },
     { "id": "agent.skills", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Ship skills and scripts used by the agent." },
+    { "id": "agent.modes", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Define harness modes that inject instructions and adjust the tool catalog." },
+    { "id": "agent.templates", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Ship agent templates for the creation gallery." },
     { "id": "chat.read", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Read conversations selected by the user." },
     { "id": "chat.write", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Insert text into the composer draft." },
     { "id": "fs.read", "scoped": true, "risk": "high", "trustedOnly": false, "description": "Read files granted by a glob scope." },
     { "id": "fs.write", "scoped": true, "risk": "high", "trustedOnly": false, "description": "Write files granted by a glob scope." },
     { "id": "net", "scoped": true, "risk": "high", "trustedOnly": false, "description": "Perform HTTP requests to allowlisted hosts." },
-    { "id": "process.spawn", "scoped": false, "risk": "critical", "trustedOnly": true, "description": "Run a native sidecar process. Trusted plugins only." },
     { "id": "secrets.use", "scoped": false, "risk": "medium", "trustedOnly": false, "description": "Use a namespaced secret through mediated HTTP without reading it." },
     { "id": "secrets.read", "scoped": false, "risk": "critical", "trustedOnly": true, "description": "Read a namespaced secret. Trusted plugins only." },
     { "id": "storage", "scoped": false, "risk": "low", "trustedOnly": false, "description": "Use plugin-scoped key/value storage." },
     { "id": "events", "scoped": true, "risk": "medium", "trustedOnly": false, "description": "Subscribe to normalized host events." },
     { "id": "clipboard.read", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Read the system clipboard." },
     { "id": "notifications", "scoped": false, "risk": "low", "trustedOnly": false, "description": "Show desktop and in-app notifications." },
-    { "id": "dialog", "scoped": false, "risk": "medium", "trustedOnly": false, "description": "Open native file dialogs." },
     { "id": "opener", "scoped": false, "risk": "medium", "trustedOnly": false, "description": "Open external links and folders." },
     { "id": "providers", "scoped": false, "risk": "high", "trustedOnly": false, "description": "Contribute an OpenAI-compatible model provider." },
     { "id": "unsafe.renderer", "scoped": false, "risk": "critical", "trustedOnly": true, "description": "Run JavaScript in the main webview. Trusted plugins only." }

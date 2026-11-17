@@ -328,6 +328,7 @@ export function AgentPanel() {
           );
         })}
         <Slot name="agent.panel.tabs" owner={{ layout: 'agent' }} />
+        <Slot name="agent.panel.header" owner={{ layout: 'agent' }} />
         {agent ? (
           <Tooltip content={t('panel.editAgent')} side="bottom">
             <IconButton label={t('panel.editAgent')} size="sm" onClick={context?.onEdit}>

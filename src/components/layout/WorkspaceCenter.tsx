@@ -91,7 +91,10 @@ export function WorkspaceCenter() {
     }
     return (
       <>
-        <AgentWorkspace />
+        <ComponentSlot
+          name="agent.workspace"
+          fallback={AgentWorkspace as unknown as PluginComponent}
+        />
         <AgentAvatarDialog />
       </>
     );
@@ -156,7 +159,12 @@ export function WorkspaceCenter() {
         aria-hidden={isCode && !showHeader ? true : undefined}
         inert={isCode && !showHeader ? true : undefined}
       >
-        {isCode ? <CodeSessionHeader /> : null}
+        {isCode ? (
+          <ComponentSlot
+            name="code.session.header"
+            fallback={CodeSessionHeader as unknown as PluginComponent}
+          />
+        ) : null}
       </div>
 
       <div
@@ -168,7 +176,14 @@ export function WorkspaceCenter() {
         <ComponentSlot
           name="chat.view"
           fallback={ChatView as unknown as PluginComponent}
-          props={{ welcome: isCode ? <CodeWelcomeScreen /> : undefined }}
+          props={{
+            welcome: isCode ? (
+              <ComponentSlot
+                name="code.welcome"
+                fallback={CodeWelcomeScreen as unknown as PluginComponent}
+              />
+            ) : undefined,
+          }}
         />
       </div>
 

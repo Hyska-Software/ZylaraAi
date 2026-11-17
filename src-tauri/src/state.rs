@@ -317,7 +317,13 @@ impl AppState {
         };
         let mut guard = self.dynamic_models.write();
         for (provider_id, entry) in file.providers {
-            if self.catalog.provider(&provider_id).is_some() {
+            // Account model lists are kept for bundled, user-defined and plugin
+            // providers alike; a provider removed since the cache was written is
+            // dropped instead of resurfacing as a ghost.
+            let known = self.catalog.provider(&provider_id).is_some()
+                || crate::providers::custom::is_custom_id(&provider_id)
+                || self.plugins.provider(&provider_id).is_some();
+            if known {
                 guard.insert(
                     provider_id,
                     DynamicModels {
@@ -352,10 +358,10 @@ impl AppState {
         self.dynamic_models.write().clear();
     }
 
-    /// Bundled catalog plus declarative plugin providers.
+    /// Bundled catalog plus user-defined and declarative plugin providers.
     pub fn catalog_with_plugins(&self) -> CatalogFile {
         let mut catalog = self.catalog.clone();
-        for provider in self.plugins.providers() {
+        for provider in self.plugins.providers().into_iter().chain(self.custom_providers()) {
             if !catalog.providers.iter().any(|known| known.id == provider.id) {
                 catalog.providers.push(provider);
             }
@@ -363,23 +369,33 @@ impl AppState {
         catalog
     }
 
-    /// Provider lookup across the bundled catalog and enabled plugins.
+    /// User-defined providers (`Settings → Providers → Add provider`).
+    pub fn custom_providers(&self) -> Vec<crate::catalog::ProviderInfo> {
+        crate::providers::custom::list(&self.db)
+    }
+
+    /// One user-defined provider by id. Gated on the namespace so bundled and
+    /// plugin lookups never touch the database.
+    pub fn custom_provider(&self, provider_id: &str) -> Option<crate::catalog::ProviderInfo> {
+        if !crate::providers::custom::is_custom_id(provider_id) {
+            return None;
+        }
+        crate::providers::custom::get(&self.db, provider_id)
+    }
+
+    /// Provider lookup across the bundled catalog, user providers and plugins.
     pub fn provider(&self, provider_id: &str) -> Option<crate::catalog::ProviderInfo> {
         self.catalog
             .provider(provider_id)
             .cloned()
+            .or_else(|| self.custom_provider(provider_id))
             .or_else(|| self.plugins.provider(provider_id))
     }
 
     /// Merged list: account list first (order preserved), catalog metadata where
     /// available, conservative entries for models only the account knows.
     pub fn models(&self, provider_id: &str) -> Vec<ModelInfo> {
-        let Some(provider) = self
-            .catalog
-            .provider(provider_id)
-            .cloned()
-            .or_else(|| self.plugins.provider(provider_id))
-        else {
+        let Some(provider) = self.provider(provider_id) else {
             return Vec::new();
         };
         let Some(dynamic) = self.dynamic_models_for(provider_id) else {
@@ -406,13 +422,19 @@ impl AppState {
     }
 
     /// Model lookup used by the harness: dynamic (account) list first, then the
-    /// bundled catalog.
+    /// bundled catalog, user providers and plugin contributions.
     pub fn model(&self, provider_id: &str, model_id: &str) -> Option<ModelInfo> {
         self.catalog
             .model(provider_id, model_id)
             .cloned()
             .or_else(|| {
                 self.dynamic_models_for(provider_id)?
+                    .models
+                    .into_iter()
+                    .find(|model| model.id == model_id)
+            })
+            .or_else(|| {
+                self.custom_provider(provider_id)?
                     .models
                     .into_iter()
                     .find(|model| model.id == model_id)

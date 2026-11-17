@@ -495,6 +495,15 @@ pub fn code_spec_refs() -> Vec<&'static ToolSpec> {
     CODE_SPECS.to_vec()
 }
 
+/// `true` when the tool mutates the workspace or the machine. Used to enforce a
+/// plugin mode that blocks writes.
+pub fn spec_is_mutating(name: &str) -> bool {
+    all_spec_refs()
+        .into_iter()
+        .find(|spec| spec.name == name)
+        .is_some_and(|spec| spec.mutating)
+}
+
 /// Todos os specs dos dois catálogos (Chat primeiro, Code depois).
 pub fn all_spec_refs() -> Vec<&'static ToolSpec> {
     let mut all = chat_spec_refs();

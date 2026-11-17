@@ -11,6 +11,12 @@ import { useIsCompact, useReduceMotion } from './hooks';
 
 const EASE_OUT_SOFT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
+/** Host right-dock container; a trusted plugin can replace it and still receive
+ * the active panel as `children`. */
+function RightPanelFallback({ children }: { children?: ReactNode }) {
+  return <>{children}</>;
+}
+
 export interface AppShellProps {
   children: ReactNode;
   /**
@@ -168,7 +174,11 @@ export function AppShell({
             {children}
           </main>
 
-          {rightPanel}
+          <ComponentSlot
+            name="layout.right-panel"
+            fallback={RightPanelFallback}
+            props={{ children: rightPanel }}
+          />
         </div>
 
         <AnimatePresence>

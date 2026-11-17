@@ -7,6 +7,7 @@ import { pluginIcon } from '@/lib/plugins/icons';
 import { pluginLabel, usePluginRegistry } from '@/lib/plugins/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { PluginSettingsTabPanel } from '@/components/plugins/PluginHosts';
+import { Slot } from '@/components/plugins/ui/Slot';
 import {
   Button,
   Dialog,
@@ -88,6 +89,7 @@ export function SettingsDialog() {
               </DialogDescription>
             </div>
             <TabsList variant="sidebar" className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+              <Slot name="settings.rail.before" />
               {SETTINGS_TABS.map(({ id, labelKey }) => {
                 const Icon = SETTINGS_TAB_ICONS[id];
                 return (
@@ -110,6 +112,7 @@ export function SettingsDialog() {
                   </TabsTrigger>
                 );
               })}
+              <Slot name="settings.rail.after" />
             </TabsList>
             <div className="border-t border-border p-2">
               <Button variant="ghost" size="sm" className="w-full justify-center" onClick={() => setOpen(false)}>
@@ -124,6 +127,7 @@ export function SettingsDialog() {
                 {headerLabel}
               </span>
               <span className="text-[11px] text-foreground-subtle">{t('dialog.autoSave')}</span>
+              <Slot name="settings.page.header" />
             </div>
             <div className="min-h-0 flex-1">
               <ScrollArea className="h-full" type="auto">

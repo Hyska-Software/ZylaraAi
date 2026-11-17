@@ -779,6 +779,23 @@ CREATE TABLE IF NOT EXISTS plugin_tool_calls (
   duration_ms        INTEGER,
   created_at         INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS custom_providers (
+  id                 TEXT PRIMARY KEY,
+  name               TEXT NOT NULL,
+  short_name         TEXT NOT NULL DEFAULT '',
+  description        TEXT NOT NULL DEFAULT '',
+  base_url           TEXT NOT NULL,
+  console_url        TEXT NOT NULL DEFAULT '',
+  endpoints_json     TEXT NOT NULL DEFAULT '{}',
+  headers_json       TEXT NOT NULL DEFAULT '{}',
+  auth_header        TEXT NOT NULL DEFAULT 'authorization',
+  auth_prefix        TEXT NOT NULL DEFAULT 'Bearer ',
+  icon               TEXT,
+  models_json        TEXT NOT NULL DEFAULT '[]',
+  sort_order         INTEGER NOT NULL DEFAULT 0,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS plugin_store_cache (
   key                TEXT PRIMARY KEY,
   etag               TEXT,

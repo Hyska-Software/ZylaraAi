@@ -252,7 +252,47 @@ pub fn definitions(options: &TurnOptions) -> Vec<ToolDefinition> {
             }
         }
     }
+    apply_plugin_mode_tools(options, &mut tools);
     tools
+}
+
+/// Applies the catalog delta of the active plugin modes: `remove` hides tools,
+/// `writes: "blocked"` hides mutating ones and `add` re-exposes catalog tools
+/// that a turn flag disabled.
+fn apply_plugin_mode_tools(options: &TurnOptions, tools: &mut Vec<ToolDefinition>) {
+    if !options.plugin_mode_tools_remove.is_empty() {
+        tools.retain(|tool| {
+            !options
+                .plugin_mode_tools_remove
+                .iter()
+                .any(|name| name == &tool.name)
+        });
+    }
+    if options.plugin_mode_writes_blocked {
+        tools.retain(|tool| !crate::tools::registry::spec_is_mutating(&tool.name));
+        if let Some(manager) = crate::plugins::global_manager() {
+            tools.retain(|tool| {
+                manager
+                    .tool_risk(&tool.name)
+                    .map_or(true, |risk| risk != "write" && risk != "shell")
+            });
+        }
+    }
+    if !options.plugin_mode_tools_add.is_empty() {
+        for candidate in crate::tools::registry::definitions_for(crate::domain::TurnProfile::Chat) {
+            if options
+                .plugin_mode_tools_add
+                .iter()
+                .any(|name| name == &candidate.name)
+                && !tools.iter().any(|tool| tool.name == candidate.name)
+                && tool_allowed(options, &candidate.name)
+                && !(options.plugin_mode_writes_blocked
+                    && crate::tools::registry::spec_is_mutating(&candidate.name))
+            {
+                tools.push(candidate);
+            }
+        }
+    }
 }
 
 /// Execute a tool call. Must never panic: failures are returned as `ToolOutcome::error`.

@@ -64,6 +64,16 @@ pub struct ProviderInfo {
     /// Prompt-cache capabilities of the provider/route (docs/goals/prompt-cache).
     #[serde(default)]
     pub cache: Option<CacheInfo>,
+    /// Package-relative asset or image URL used instead of the built-in glyph.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// `custom` for user-defined providers, `plugin` for contributed ones.
+    /// Bundled catalog entries omit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
+    /// Human label for the origin (plugin name, "Custom provider").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_label: Option<String>,
 }
 
 /// Prompt-cache capabilities of a provider or a model override. `min_tokens:

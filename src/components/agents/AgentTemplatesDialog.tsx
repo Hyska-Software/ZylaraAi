@@ -3,7 +3,14 @@ import { Bot, Sparkles } from 'lucide-react';
 
 import { AgentAvatar } from './AgentAvatar';
 import { AgentDialogBody } from './AgentDialogBody';
-import { AGENT_TEMPLATES, localizedAgentTemplate, type AgentTemplate } from '@/lib/agentTemplates';
+import {
+  AGENT_TEMPLATES,
+  localizedAgentTemplate,
+  pluginAgentTemplates,
+  type AgentTemplate,
+} from '@/lib/agentTemplates';
+import { usePluginStore } from '@/lib/plugins/store';
+import { Badge } from '@/components/ui';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +35,11 @@ export function AgentTemplatesDialog({
   onPick: (template: AgentTemplate) => void | Promise<void>;
 }) {
   const { t } = useTranslation('agents');
+  const pluginTemplates = usePluginStore((state) => state.snapshot.agentTemplates) ?? [];
+  const templates = [
+    ...pluginAgentTemplates(pluginTemplates),
+    ...AGENT_TEMPLATES,
+  ];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -42,7 +54,7 @@ export function AgentTemplatesDialog({
         </DialogHeader>
         <AgentDialogBody>
           <div className="grid gap-2.5 sm:grid-cols-2">
-            {AGENT_TEMPLATES.map((template) => {
+            {templates.map((template) => {
               const localized = localizedAgentTemplate(template);
               return (
                 <button
@@ -68,6 +80,11 @@ export function AgentTemplatesDialog({
                           department: localized.department,
                         })}
                       </span>
+                      {localized.plugin ? (
+                        <Badge size="sm" className="mt-1">
+                          {t('templatesDialog.fromPlugin', { name: localized.plugin.name })}
+                        </Badge>
+                      ) : null}
                     </span>
                   </span>
                   <span className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-foreground-muted">

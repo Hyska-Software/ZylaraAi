@@ -23,6 +23,7 @@ in Rust; unknown methods and ungranted calls fail closed.
 | `ui.settings` | no | no | low | Register a settings tab. |
 | `ui.command` | no | no | low | Register command palette and slash commands. |
 | `ui.artifact` | no | no | low | Register a viewer for artifact MIME types. |
+| `ui.sidebar` | no | no | low | Register content tabs inside a layout sidebar. |
 | `ui.variant` | no | no | low | Contribute declarative style variants for host components. |
 | `ui.preset` | no | no | medium | Contribute declarative design presets. |
 | `ui.genui` | no | no | medium | Expose UI components to generative UI blocks. |
@@ -36,19 +37,19 @@ in Rust; unknown methods and ungranted calls fail closed.
 | `agent.tools` | no | no | high | Expose tools to the agent. |
 | `agent.prompt` | no | no | high | Inject instructions into the agent system prompt. |
 | `agent.skills` | no | no | high | Ship skills and scripts used by the agent. |
+| `agent.modes` | no | no | high | Define harness modes that inject instructions and adjust the tool catalog. |
+| `agent.templates` | no | no | high | Ship agent templates for the creation gallery. |
 | `chat.read` | no | no | high | Read conversations selected by the user. |
 | `chat.write` | no | no | high | Insert text into the composer draft. |
 | `fs.read` | yes | no | high | Read files granted by a glob scope. |
 | `fs.write` | yes | no | high | Write files granted by a glob scope. |
 | `net` | yes | no | high | Perform HTTP requests to allowlisted hosts. |
-| `process.spawn` | no | yes | critical | Run a native sidecar process. Trusted plugins only. |
 | `secrets.use` | no | no | medium | Use a namespaced secret through mediated HTTP without reading it. |
 | `secrets.read` | no | yes | critical | Read a namespaced secret. Trusted plugins only. |
 | `storage` | no | no | low | Use plugin-scoped key/value storage. |
 | `events` | yes | no | medium | Subscribe to normalized host events. |
 | `clipboard.read` | no | no | high | Read the system clipboard. |
 | `notifications` | no | no | low | Show desktop and in-app notifications. |
-| `dialog` | no | no | medium | Open native file dialogs. |
 | `opener` | no | no | medium | Open external links and folders. |
 | `providers` | no | no | high | Contribute an OpenAI-compatible model provider. |
 | `unsafe.renderer` | no | yes | critical | Run JavaScript in the main webview. Trusted plugins only. |
@@ -66,6 +67,7 @@ in Rust; unknown methods and ungranted calls fail closed.
 | `message/appended` | conversationId, messageId, role | A message was appended. |
 | `turn/started` | conversationId, turnId | A turn started. |
 | `turn/finished` | conversationId, turnId, status | A turn finished. |
+| `mode/changed` | conversationId, mode, active | A harness mode (built-in or plugin) was toggled. |
 
 ### Limits
 
@@ -84,6 +86,11 @@ in Rust; unknown methods and ungranted calls fail closed.
 | `rpcBytes` | 1048576 |
 | `toolResultChars` | 120000 |
 | `toolTimeoutSecs` | 60 |
+| `modesPerPlugin` | 8 |
+| `modePromptChars` | 8000 |
+| `agentTemplatesPerPlugin` | 8 |
+| `templateInstructionsChars` | 8000 |
+| `customProviders` | 64 |
 
 ### UI limits
 
@@ -93,6 +100,7 @@ in Rust; unknown methods and ungranted calls fail closed.
 | `navEntriesPerPlugin` | 16 |
 | `pagesPerPlugin` | 16 |
 | `panelTabsPerPlugin` | 16 |
+| `sidebarTabsPerPlugin` | 16 |
 | `variantsPerPlugin` | 32 |
 | `presetsPerPlugin` | 8 |
 | `cssCharsPerPlugin` | 200000 |

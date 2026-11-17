@@ -19,6 +19,7 @@ import { CircleStop, Eraser, Plus, RotateCcw, SquareTerminal, X } from 'lucide-r
 // Mandatory: without xterm.css the viewport/screen/char-measure elements fall
 // back to normal DOM flow (visible "WWWW…" measure text and broken rows).
 import '@xterm/xterm/css/xterm.css';
+import { Slot } from '@/components/plugins/ui/Slot';
 
 import {
   Button,
@@ -187,6 +188,7 @@ export function TerminalPanel({
     <div className={cn('flex min-h-0 flex-1 flex-col bg-surface', className)}>
       {showTabStrip ? (
         <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border px-2">
+        <Slot name="code.terminal.toolbar" owner={{ layout: 'code' }} />
         <div
           ref={tabStripRef}
           role="tablist"

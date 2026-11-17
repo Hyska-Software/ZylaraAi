@@ -98,6 +98,8 @@ pub struct PluginContributions {
     pub locales: Vec<String>,
     pub providers: Vec<ProviderContribution>,
     pub artifact_viewers: Vec<ArtifactViewerContribution>,
+    pub modes: Vec<ModeContribution>,
+    pub agent_templates: Vec<AgentTemplateContribution>,
 }
 
 /// `tools` may be an inline array or the package-relative path to a JSON file.
@@ -114,6 +116,7 @@ pub struct PluginUiContributions {
     pub slots: Vec<SlotContribution>,
     pub views: Vec<ViewContribution>,
     pub nav: Vec<NavContribution>,
+    pub sidebar_tabs: Vec<SidebarTabContribution>,
     pub panels: Vec<PanelContribution>,
     pub commands: Vec<CommandContribution>,
     pub settings_tabs: Vec<SettingsTabContribution>,
@@ -209,6 +212,28 @@ pub struct NavContribution {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SidebarTabContribution {
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub title_key: Option<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
+    /// Layouts whose sidebar renders the tab (`chat`, `code`, `agent`).
+    #[serde(default)]
+    pub sidebars: Vec<String>,
+    #[serde(default)]
+    pub entry: Option<String>,
+    #[serde(default)]
+    pub component: Option<String>,
+    #[serde(default)]
+    pub order: Option<u32>,
+    #[serde(default)]
+    pub badge: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PanelContribution {
     pub id: String,
     pub title: String,
@@ -289,6 +314,10 @@ pub enum PluginAction {
         target: String,
         #[serde(default)]
         layout: Option<String>,
+    },
+    /// Toggle a plugin mode (`<pluginId>:<modeId>`) in the active conversation.
+    ToggleMode {
+        target: String,
     },
     InsertDraft {
         text: String,
@@ -490,6 +519,17 @@ pub struct ProviderContribution {
     pub base_url: String,
     #[serde(default)]
     pub console_url: String,
+    /// Package-relative icon asset shown in the providers page.
+    #[serde(default)]
+    pub icon: Option<String>,
+    /// Header that carries the key (`authorization` by default).
+    #[serde(default)]
+    pub auth_header: Option<String>,
+    #[serde(default)]
+    pub auth_prefix: Option<String>,
+    /// Static headers sent with every request (never credentials).
+    #[serde(default)]
+    pub headers: BTreeMap<String, String>,
     #[serde(default)]
     pub endpoints: BTreeMap<String, String>,
     pub models: Vec<ProviderModelContribution>,
@@ -511,6 +551,96 @@ pub struct ProviderModelContribution {
     #[serde(default)]
     pub attachment: bool,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ModeTools {
+    pub add: Vec<String>,
+    pub remove: Vec<String>,
+}
+
+/// A harness mode (`contributes.modes`). Active modes append instructions to
+/// the system prompt and can widen or narrow the tool catalog.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModeContribution {
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub title_key: Option<String>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub description_key: Option<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
+    /// `chat` and/or `code`; empty means both.
+    #[serde(default)]
+    pub profiles: Vec<String>,
+    #[serde(default)]
+    pub prompt: Option<String>,
+    #[serde(default)]
+    pub prompt_file: Option<String>,
+    #[serde(default)]
+    pub tools: ModeTools,
+    /// `allowed` (default) or `blocked`: a blocked mode hides mutating tools.
+    #[serde(default = "default_mode_writes")]
+    pub writes: String,
+    #[serde(default)]
+    pub default_on: bool,
+}
+
+fn default_mode_writes() -> String {
+    "allowed".to_string()
+}
+
+/// An agent template shown in the creation gallery (`contributes.agentTemplates`).
+/// Capabilities are deny-only: applying a template can restrict, never grant.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentTemplateContribution {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub name_key: Option<String>,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub description_key: Option<String>,
+    #[serde(default)]
+    pub role: String,
+    #[serde(default)]
+    pub icon: Option<String>,
+    #[serde(default)]
+    pub instructions: Option<String>,
+    #[serde(default)]
+    pub instructions_file: Option<String>,
+    #[serde(default)]
+    pub starters: Vec<String>,
+    #[serde(default)]
+    pub capabilities: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub permission_mode: Option<String>,
+}
+
+/// Capability keys a template may restrict (mirrors `AgentCapabilities`).
+const TEMPLATE_CAPABILITY_KEYS: &[&str] = &[
+    "web_search",
+    "file_access",
+    "code_execution",
+    "delegation",
+    "automation",
+    "shared_memory",
+    "skills_write",
+    "create_agents",
+    "computer_use",
+    "screen_capture",
+    "browser_use",
+    "docker_execution",
+    "skills",
+    "tools",
+    "mcp_servers",
+];
 
 impl PluginManifest {
     pub fn parse(bytes: &[u8]) -> Result<Self> {
@@ -597,6 +727,11 @@ impl PluginManifest {
         for permission in &self.permissions {
             if !seen.insert(permission.as_str()) {
                 bail!("duplicate permission `{permission}`");
+            }
+            if contract::permission_reserved(permission) {
+                bail!(
+                    "PLUGIN_PERMISSION_RESERVED: permission `{permission}` is not implemented by this host"
+                );
             }
             if !contract::permission_known(permission) {
                 bail!("unknown permission `{permission}`");
@@ -1059,6 +1194,41 @@ impl PluginManifest {
             if !provider.base_url.starts_with("https://") {
                 bail!("provider `{}` baseUrl must use https", provider.id);
             }
+            if let Some(icon) = &provider.icon {
+                validate_relative_path(icon)?;
+            }
+            if provider.headers.len() > 16 {
+                bail!("provider `{}` declares too many headers", provider.id);
+            }
+            for (name, value) in &provider.headers {
+                let lower = name.trim().to_ascii_lowercase();
+                if lower.is_empty() || lower.chars().any(char::is_whitespace) {
+                    bail!("provider `{}` has an invalid header name", provider.id);
+                }
+                if matches!(lower.as_str(), "authorization" | "cookie" | "host") {
+                    bail!(
+                        "provider `{}` cannot set the `{name}` header; credentials are never declarative",
+                        provider.id
+                    );
+                }
+                if value.chars().count() > 256 || value.contains('\n') || value.contains('\r') {
+                    bail!("provider `{}` header `{name}` has an invalid value", provider.id);
+                }
+            }
+            if let Some(header) = &provider.auth_header {
+                let header = header.trim();
+                if header.is_empty()
+                    || header.chars().any(char::is_whitespace)
+                    || header.chars().count() > 64
+                {
+                    bail!("provider `{}` authHeader is invalid", provider.id);
+                }
+            }
+            if let Some(prefix) = &provider.auth_prefix {
+                if prefix.chars().count() > 32 || prefix.contains('\r') || prefix.contains('\n') {
+                    bail!("provider `{}` authPrefix is invalid", provider.id);
+                }
+            }
             if provider.models.is_empty() {
                 bail!("provider `{}` needs at least one model", provider.id);
             }
@@ -1100,6 +1270,139 @@ impl PluginManifest {
             }
             if viewer.entry.is_none() && viewer.component.is_none() {
                 bail!("artifact viewer `{}` needs `entry` or `component`", viewer.id);
+            }
+        }
+
+        if !self.contributes.ui.sidebar_tabs.is_empty() && !self.has_permission("ui.sidebar") {
+            bail!("ui.sidebarTabs requires the `ui.sidebar` permission");
+        }
+        if self.contributes.ui.sidebar_tabs.len() > contract::ui_limits().sidebar_tabs_per_plugin {
+            bail!("too many sidebar tab contributions");
+        }
+        let mut sidebar_tab_ids = HashSet::new();
+        for tab in &self.contributes.ui.sidebar_tabs {
+            validate_contribution_id(&tab.id, "sidebar tab")?;
+            if !sidebar_tab_ids.insert(tab.id.as_str()) {
+                bail!("duplicate sidebar tab id `{}`", tab.id);
+            }
+            if tab.sidebars.is_empty() {
+                bail!("sidebar tab `{}` needs at least one sidebar", tab.id);
+            }
+            validate_layouts(
+                &tab.sidebars,
+                contract::layout_ids(),
+                &format!("sidebar tab {}", tab.id),
+            )?;
+            validate_order(tab.order, "sidebar tab order")?;
+            if let Some(entry) = &tab.entry {
+                validate_relative_path(entry)?;
+            }
+            if let Some(component) = &tab.component {
+                validate_component_name(component, "sidebar tab")?;
+            }
+            if tab.entry.is_none() && tab.component.is_none() {
+                bail!("sidebar tab `{}` needs `entry` or `component`", tab.id);
+            }
+            if tab.badge.as_deref().is_some_and(|badge| badge.chars().count() > 24) {
+                bail!("sidebar tab `{}` badge is too long", tab.id);
+            }
+        }
+
+        if !self.contributes.modes.is_empty() && !self.has_permission("agent.modes") {
+            bail!("modes require the `agent.modes` permission");
+        }
+        if self.contributes.modes.len() > contract::limits().modes_per_plugin {
+            bail!("too many mode contributions");
+        }
+        let mut mode_ids = HashSet::new();
+        for mode in &self.contributes.modes {
+            validate_entry_id(&mode.id, "mode")?;
+            if !mode_ids.insert(mode.id.as_str()) {
+                bail!("duplicate mode id `{}`", mode.id);
+            }
+            if mode.title.trim().is_empty() || mode.title.chars().count() > 80 {
+                bail!("mode `{}` needs a title of at most 80 characters", mode.id);
+            }
+            for profile in &mode.profiles {
+                if !matches!(profile.as_str(), "chat" | "code") {
+                    bail!("mode `{}` has unsupported profile `{profile}`", mode.id);
+                }
+            }
+            match (&mode.prompt, &mode.prompt_file) {
+                (Some(prompt), None) => {
+                    if prompt.trim().is_empty() {
+                        bail!("mode `{}` has an empty prompt", mode.id);
+                    }
+                    if prompt.chars().count() > contract::limits().mode_prompt_chars {
+                        bail!("mode `{}` prompt exceeds the character limit", mode.id);
+                    }
+                }
+                (None, Some(file)) => validate_relative_path(file)?,
+                (Some(_), Some(_)) => {
+                    bail!("mode `{}` declares both `prompt` and `promptFile`", mode.id)
+                }
+                (None, None) => bail!("mode `{}` needs `prompt` or `promptFile`", mode.id),
+            }
+            for tool in mode.tools.add.iter().chain(mode.tools.remove.iter()) {
+                validate_tool_name(tool)?;
+            }
+            if !matches!(mode.writes.as_str(), "allowed" | "blocked") {
+                bail!("mode `{}` has invalid `writes` value", mode.id);
+            }
+        }
+
+        if !self.contributes.agent_templates.is_empty() && !self.has_permission("agent.templates") {
+            bail!("agentTemplates require the `agent.templates` permission");
+        }
+        if self.contributes.agent_templates.len() > contract::limits().agent_templates_per_plugin {
+            bail!("too many agent template contributions");
+        }
+        let mut template_ids = HashSet::new();
+        for template in &self.contributes.agent_templates {
+            validate_entry_id(&template.id, "agent template")?;
+            if !template_ids.insert(template.id.as_str()) {
+                bail!("duplicate agent template id `{}`", template.id);
+            }
+            if template.name.trim().is_empty() || template.name.chars().count() > 80 {
+                bail!(
+                    "agent template `{}` needs a name of at most 80 characters",
+                    template.id
+                );
+            }
+            match (&template.instructions, &template.instructions_file) {
+                (Some(instructions), None) => {
+                    if instructions.chars().count() > contract::limits().template_instructions_chars {
+                        bail!("agent template `{}` instructions exceed the limit", template.id);
+                    }
+                }
+                (None, Some(file)) => validate_relative_path(file)?,
+                (Some(_), Some(_)) => bail!(
+                    "agent template `{}` declares both `instructions` and `instructionsFile`",
+                    template.id
+                ),
+                (None, None) => bail!(
+                    "agent template `{}` needs `instructions` or `instructionsFile`",
+                    template.id
+                ),
+            }
+            if template.starters.len() > 8 {
+                bail!("agent template `{}` has too many starters", template.id);
+            }
+            for key in template.capabilities.keys() {
+                if !TEMPLATE_CAPABILITY_KEYS.contains(&key.as_str()) {
+                    bail!("agent template `{}` has unknown capability `{key}`", template.id);
+                }
+            }
+            if let Some(permission_mode) = &template.permission_mode {
+                if !matches!(
+                    permission_mode.as_str(),
+                    "read_only" | "edit" | "autonomous" | "review"
+                ) {
+                    bail!(
+                        "agent template `{}` has invalid permissionMode `{permission_mode}`",
+                        template.id
+                    );
+                }
             }
         }
 
@@ -1218,6 +1521,13 @@ fn validate_action(action: &PluginAction) -> Result<()> {
                 bail!("action text exceeds 20000 characters");
             }
         }
+        PluginAction::ToggleMode { target } => {
+            let (plugin, mode) = target
+                .split_once(':')
+                .ok_or_else(|| anyhow::anyhow!("action mode target must be `<pluginId>:<modeId>`"))?;
+            validate_plugin_id(plugin)?;
+            validate_entry_id(mode, "action mode target")?;
+        }
         PluginAction::OpenExternal { url } => {
             let parsed = url::Url::parse(url)
                 .map_err(|_| anyhow::anyhow!("action url `{url}` is invalid"))?;
@@ -1249,6 +1559,20 @@ fn validate_component_name(id: &str, what: &str) -> Result<()> {
         || !chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '.' | '-'))
     {
         bail!("{what} component name `{id}` is invalid");
+    }
+    Ok(())
+}
+
+/// Tool names are snake_case slugs (`web_search`, `plugin__x__y`); they are more
+/// permissive than entry ids because they mirror the built-in catalog.
+fn validate_tool_name(name: &str) -> Result<()> {
+    if name.is_empty()
+        || name.chars().count() > 64
+        || !name
+            .chars()
+            .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_')
+    {
+        bail!("mode tool `{name}` is not a valid tool name");
     }
     Ok(())
 }
@@ -1587,6 +1911,138 @@ mod tests {
     }
 
     #[test]
+    fn validates_harness_modes() {
+        let mut value = manifest_json();
+        value["schemaVersion"] = serde_json::json!(2);
+        value["apiVersion"] = serde_json::json!(2);
+        value["permissions"] = serde_json::json!(["agent.modes"]);
+        value["contributes"] = serde_json::json!({
+            "modes": [{
+                "id": "review",
+                "title": "Review",
+                "prompt": "Review every change.",
+                "profiles": ["chat", "code"],
+                "tools": { "add": ["web_search"], "remove": ["install_plugin"] },
+                "writes": "blocked"
+            }]
+        });
+        let manifest = parse(value.clone()).expect("mode manifest");
+        assert_eq!(manifest.contributes.modes.len(), 1);
+        assert!(manifest.contributes.modes[0].tools.add.contains(&"web_search".to_string()));
+
+        // Missing permission.
+        let mut missing = value.clone();
+        missing["permissions"] = serde_json::json!([]);
+        assert!(parse(missing).is_err());
+
+        // Inline prompt and promptFile are mutually exclusive.
+        let mut both = value.clone();
+        both["contributes"]["modes"][0]["promptFile"] = serde_json::json!("modes/review.md");
+        assert!(parse(both).is_err());
+
+        // A mode needs one prompt source.
+        let mut empty = value.clone();
+        empty["contributes"]["modes"][0]
+            .as_object_mut()
+            .expect("mode object")
+            .remove("prompt");
+        assert!(parse(empty).is_err());
+
+        // Unknown profile.
+        let mut profile = value;
+        profile["contributes"]["modes"][0]["profiles"] = serde_json::json!(["agent"]);
+        assert!(parse(profile).is_err());
+    }
+
+    #[test]
+    fn validates_agent_templates_are_deny_only() {
+        let mut value = manifest_json();
+        value["schemaVersion"] = serde_json::json!(2);
+        value["apiVersion"] = serde_json::json!(2);
+        value["permissions"] = serde_json::json!(["agent.templates"]);
+        value["contributes"] = serde_json::json!({
+            "agentTemplates": [{
+                "id": "reviewer",
+                "name": "Reviewer",
+                "role": "Code reviewer",
+                "instructions": "Read the diff first.",
+                "starters": ["Review this pull request"],
+                "capabilities": { "code_execution": false },
+                "permissionMode": "read_only"
+            }]
+        });
+        let manifest = parse(value.clone()).expect("template manifest");
+        assert_eq!(manifest.contributes.agent_templates.len(), 1);
+
+        let mut unknown = value.clone();
+        unknown["contributes"]["agentTemplates"][0]["capabilities"] =
+            serde_json::json!({ "not_a_capability": true });
+        assert!(parse(unknown).is_err());
+
+        let mut mode = value;
+        mode["contributes"]["agentTemplates"][0]["permissionMode"] = serde_json::json!("god");
+        assert!(parse(mode).is_err());
+    }
+
+    #[test]
+    fn validates_sidebar_tabs() {
+        let mut value = manifest_json();
+        value["schemaVersion"] = serde_json::json!(2);
+        value["apiVersion"] = serde_json::json!(2);
+        value["permissions"] = serde_json::json!(["ui.sidebar"]);
+        value["contributes"] = serde_json::json!({
+            "ui": {
+                "sidebarTabs": [{
+                    "id": "notes",
+                    "title": "Notes",
+                    "icon": "Library",
+                    "sidebars": ["chat", "code"],
+                    "entry": "ui/notes.html"
+                }]
+            }
+        });
+        assert!(parse(value.clone()).is_ok());
+
+        let mut missing_permission = value.clone();
+        missing_permission["permissions"] = serde_json::json!([]);
+        assert!(parse(missing_permission).is_err());
+
+        let mut no_sidebars = value;
+        no_sidebars["contributes"]["ui"]["sidebarTabs"][0]["sidebars"] = serde_json::json!([]);
+        assert!(parse(no_sidebars).is_err());
+    }
+
+    #[test]
+    fn rejects_reserved_permissions() {
+        let mut value = manifest_json();
+        value["permissions"] = serde_json::json!(["process.spawn"]);
+        let error = parse(value).expect_err("reserved permission");
+        assert!(error.to_string().contains("PLUGIN_PERMISSION_RESERVED"));
+    }
+
+    #[test]
+    fn provider_headers_never_carry_credentials() {
+        let mut value = manifest_json();
+        value["schemaVersion"] = serde_json::json!(2);
+        value["apiVersion"] = serde_json::json!(2);
+        value["permissions"] = serde_json::json!(["providers"]);
+        value["contributes"] = serde_json::json!({
+            "providers": [{
+                "id": "gateway",
+                "name": "Acme Gateway",
+                "baseUrl": "https://api.acme.dev/v1",
+                "models": [{ "id": "acme-1", "name": "Acme 1" }]
+            }]
+        });
+        assert!(parse(value.clone()).is_ok());
+
+        let mut header = value;
+        header["contributes"]["providers"][0]["headers"] =
+            serde_json::json!({ "Authorization": "Bearer leaked" });
+        assert!(parse(header).is_err());
+    }
+
+    #[test]
     fn rejects_unknown_or_unscoped_permissions() {
         let mut value = manifest_json();
         value["permissions"] = serde_json::json!(["net:evil.example"]);
@@ -1649,9 +2105,9 @@ mod tests {
         value["permissions"]
             .as_array_mut()
             .expect("permissions")
-            .push(serde_json::json!("ui.slot:app.overlay"));
+            .push(serde_json::json!("ui.slot:palette.actions"));
         value["contributes"]["ui"]["slots"] = serde_json::json!([
-            { "slot": "app.overlay", "entry": "ui/overlay.html" }
+            { "slot": "palette.actions", "entry": "ui/palette.html" }
         ]);
         assert!(parse(value).is_err());
 

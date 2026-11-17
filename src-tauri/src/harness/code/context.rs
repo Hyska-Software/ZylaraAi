@@ -80,6 +80,12 @@ pub struct CodeTurnContext {
     /// Autonomous worker subagent: keeps the editing/verification rules and
     /// the write+shell catalog.
     pub subagent_writable: bool,
+    /// Plugin mode catalog delta for this turn (`contributes.modes[].tools`).
+    /// A mode can hide tools or re-expose catalog tools; `mode_writes_blocked`
+    /// hides mutating tools while the mode is active.
+    pub mode_tools_add: Vec<String>,
+    pub mode_tools_remove: Vec<String>,
+    pub mode_writes_blocked: bool,
 }
 
 impl CodeTurnContext {

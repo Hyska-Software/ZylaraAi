@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "id": "com.acme.modes",
+  "name": "Acme Modes",
+  "version": "1.0.0",
+  "description": "Harness modes and an agent template contributed by a plugin.",
+  "author": "Acme",
+  "apiVersion": 2,
+  "engines": { "zylara": ">=0.12.0 <1.0.0" },
+  "publisher": { "id": "acme", "name": "Acme", "keyId": "acme-fixture-2026" },
+  "permissions": ["agent.modes", "agent.templates"],
+  "contributes": {
+    "modes": [
+      {
+        "id": "review",
+        "title": "Review",
+        "description": "Read the diff and report risks before answering.",
+        "icon": "ListChecks",
+        "profiles": ["chat", "code"],
+        "promptFile": "modes/review.md",
+        "tools": { "remove": ["install_plugin"] },
+        "writes": "blocked"
+      },
+      {
+        "id": "deep-dive",
+        "title": "Deep dive",
+        "description": "Explain the trade-offs before proposing a plan.",
+        "icon": "Sparkles",
+        "profiles": ["chat"],
+        "prompt": "Before answering, list the assumptions you are making and the trade-offs of at least two options."
+      }
+    ],
+    "agentTemplates": [
+      {
+        "id": "reviewer",
+        "name": "Acme Reviewer",
+        "role": "Code reviewer",
+        "description": "Reads diffs and reports risks with file references.",
+        "instructionsFile": "templates/reviewer.md",
+        "starters": ["Review this pull request"],
+        "capabilities": { "code_execution": false },
+        "permissionMode": "read_only"
+      }
+    ]
+  },
+  "runtime": { "ui": "declarative" }
+}

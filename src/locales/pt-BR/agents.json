@@ -1175,7 +1175,8 @@
     "title": "Templates de agentes",
     "description": "Comece por um papel testado e ajuste identidade, instruções e modelo no editor.",
     "use": "Usar template",
-    "roleWithDepartment": "{{role}} · {{department}}"
+    "roleWithDepartment": "{{role}} · {{department}}",
+    "fromPlugin": "Do plugin {{name}}"
   },
   "builder": {
     "title": "Criar agente com IA",

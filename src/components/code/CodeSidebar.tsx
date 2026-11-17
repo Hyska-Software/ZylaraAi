@@ -59,6 +59,10 @@ import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { navEntries, openNavTarget } from '@/lib/plugins/ui/nav';
 import { Slot } from '@/components/plugins/ui/Slot';
+import {
+  PluginSidebarTabHost,
+  PluginSidebarTabStrip,
+} from '@/components/plugins/ui/PluginSidebarTabHost';
 import { pluginIcon } from '@/lib/plugins/icons';
 import {
   selectConversationStream,
@@ -1121,6 +1125,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
         ) : null}
       </div>
 
+      <Slot name="code.sidebar.header" owner={{ layout: 'code' }} />
       <SidebarAction
         icon={<FolderPlus className="size-4" />}
         label={t('code:sidebar.openFolder')}
@@ -1166,6 +1171,8 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
         );
       })}
       <Slot name="sidebar.nav.after" owner={{ layout: 'code' }} />
+      <PluginSidebarTabStrip layout="code" />
+      <PluginSidebarTabHost layout="code" />
 
       <div className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
         <section
@@ -1500,6 +1507,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
             {appInfo?.version ? `v${appInfo.version}` : ''}
           </span>
         </button>
+        <Slot name="code.sidebar.footer" owner={{ layout: 'code' }} />
       </div>
 
       <AddChatSessionDialog

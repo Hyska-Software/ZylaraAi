@@ -45,6 +45,7 @@ import {
   sortableDropClassHorizontal,
 } from '@/components/ui';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { RecipeDiv } from '@/lib/plugins/ui/recipe';
 import type { SortableListApi } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -1045,6 +1046,7 @@ export function CodeSessionHeader() {
   };
 
   return (
+    <Slot name="code.session.header.frame" owner={{ layout: 'code' }}>
     <header className="flex shrink-0 flex-col bg-background">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
         <h2
@@ -1110,6 +1112,7 @@ export function CodeSessionHeader() {
       </div>
 
       <div className="flex h-10 shrink-0 items-center gap-1 px-2">
+        <Slot name="code.tabs.before" owner={{ layout: 'code', workspaceId: workspace?.id ?? null }} />
         {/* Active tabs use a neutral fill instead of a raised surface + shadow:
             on the white header the shadow reads as a glow in light mode. */}
         <SortableList
@@ -1120,6 +1123,7 @@ export function CodeSessionHeader() {
           onReorder={setCodeTabOrder}
         >
           {(sortable) => (
+            <Slot name="code.tab.strip.frame" owner={{ layout: 'code' }}>
             <RecipeDiv
               component="code.tab.strip"
               ref={(node) => {
@@ -1667,8 +1671,11 @@ export function CodeSessionHeader() {
                 );
               })}
             </RecipeDiv>
+            </Slot>
           )}
         </SortableList>
+
+        <Slot name="code.tabs.after" owner={{ layout: 'code' }} />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -1709,6 +1716,7 @@ export function CodeSessionHeader() {
         onCancel={() => void handleCancelTrust()}
       />
     </header>
+    </Slot>
   );
 }
 

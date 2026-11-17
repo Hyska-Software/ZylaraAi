@@ -170,6 +170,58 @@ pub struct PluginToolView {
     pub parameters: Value,
 }
 
+/// One harness mode contributed by an active plugin (`contributes.modes`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginModeView {
+    /// `<pluginId>:<modeId>`; also the key persisted in the session store.
+    pub key: String,
+    pub plugin_id: String,
+    pub plugin_name: String,
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub icon: Option<String>,
+    pub profiles: Vec<String>,
+    /// Prompt text read from `prompt`/`promptFile` (already capped).
+    pub prompt: String,
+    pub tools_add: Vec<String>,
+    pub tools_remove: Vec<String>,
+    /// A blocked mode hides mutating tools for the turn.
+    pub writes_blocked: bool,
+    pub default_on: bool,
+}
+
+impl PluginModeView {
+    /// Empty `profiles` means the mode applies to Chat and Code.
+    pub fn supports(&self, profile: &str) -> bool {
+        self.profiles.is_empty() || self.profiles.iter().any(|entry| entry == profile)
+    }
+}
+
+/// One agent template contributed by an active plugin (`contributes.agentTemplates`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginTemplateView {
+    /// `<pluginId>:<templateId>`.
+    pub key: String,
+    pub plugin_id: String,
+    pub plugin_name: String,
+    pub id: String,
+    pub name: String,
+    pub name_key: Option<String>,
+    pub description: String,
+    pub description_key: Option<String>,
+    pub role: String,
+    pub icon: Option<String>,
+    /// Instructions read from `instructions`/`instructionsFile` (capped).
+    pub instructions: String,
+    pub starters: Vec<String>,
+    /// Deny-only capability overrides.
+    pub capabilities: Value,
+    pub permission_mode: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginRecord {
@@ -219,6 +271,11 @@ pub struct PluginSnapshot {
     pub allow_trusted: bool,
     pub dev_mode: bool,
     pub config_fingerprint: String,
+    /// Harness modes and agent templates contributed by active plugins.
+    #[serde(default)]
+    pub modes: Vec<PluginModeView>,
+    #[serde(default)]
+    pub agent_templates: Vec<PluginTemplateView>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -341,6 +398,8 @@ struct RuntimeState {
     prompt_text: String,
     fingerprint: String,
     skills: Vec<PluginSkillRoot>,
+    modes: Vec<PluginModeView>,
+    templates: Vec<PluginTemplateView>,
 }
 
 impl Default for RuntimeState {
@@ -352,6 +411,8 @@ impl Default for RuntimeState {
             prompt_text: String::new(),
             fingerprint: sha256_hex(b"plugins:none"),
             skills: Vec::new(),
+            modes: Vec::new(),
+            templates: Vec::new(),
         }
     }
 }
@@ -760,7 +821,75 @@ impl PluginManager {
             &genui_components,
             4_000,
         ));
-        let fingerprint = compute_fingerprint(&active, &tools, &prompt_text, &skills);
+        let mut modes = Vec::new();
+        let mut templates = Vec::new();
+        for plugin in &active {
+            if permissions::granted_any(&plugin.grants, "agent.modes") {
+                for contribution in &plugin.manifest.contributes.modes {
+                    let Some(prompt) = load_contribution_text(
+                        &plugin.root,
+                        contribution.prompt.as_deref(),
+                        contribution.prompt_file.as_deref(),
+                        contract::limits().mode_prompt_chars,
+                    ) else {
+                        continue;
+                    };
+                    modes.push(PluginModeView {
+                        key: format!("{}:{}", plugin.stored.id, contribution.id),
+                        plugin_id: plugin.stored.id.clone(),
+                        plugin_name: plugin.manifest.name.clone(),
+                        id: contribution.id.clone(),
+                        title: contribution.title.clone(),
+                        description: contribution.description.clone(),
+                        icon: contribution.icon.clone(),
+                        profiles: contribution.profiles.clone(),
+                        prompt,
+                        tools_add: contribution.tools.add.clone(),
+                        tools_remove: contribution.tools.remove.clone(),
+                        writes_blocked: contribution.writes == "blocked",
+                        default_on: contribution.default_on,
+                    });
+                }
+            }
+            if permissions::granted_any(&plugin.grants, "agent.templates") {
+                for contribution in &plugin.manifest.contributes.agent_templates {
+                    let Some(instructions) = load_contribution_text(
+                        &plugin.root,
+                        contribution.instructions.as_deref(),
+                        contribution.instructions_file.as_deref(),
+                        contract::limits().template_instructions_chars,
+                    ) else {
+                        continue;
+                    };
+                    templates.push(PluginTemplateView {
+                        key: format!("{}:{}", plugin.stored.id, contribution.id),
+                        plugin_id: plugin.stored.id.clone(),
+                        plugin_name: plugin.manifest.name.clone(),
+                        id: contribution.id.clone(),
+                        name: contribution.name.clone(),
+                        name_key: contribution.name_key.clone(),
+                        description: contribution.description.clone(),
+                        description_key: contribution.description_key.clone(),
+                        role: contribution.role.clone(),
+                        icon: contribution.icon.clone(),
+                        instructions,
+                        starters: contribution.starters.clone(),
+                        capabilities: Value::Object(
+                            contribution
+                                .capabilities
+                                .iter()
+                                .map(|(key, value)| (key.clone(), value.clone()))
+                                .collect(),
+                        ),
+                        permission_mode: contribution.permission_mode.clone(),
+                    });
+                }
+            }
+        }
+        modes.sort_by(|left, right| left.key.cmp(&right.key));
+        templates.sort_by(|left, right| left.key.cmp(&right.key));
+        let fingerprint =
+            compute_fingerprint(&active, &tools, &prompt_text, &skills, &modes, &templates);
         let state = RuntimeState {
             active,
             records,
@@ -768,6 +897,8 @@ impl PluginManager {
             prompt_text,
             fingerprint,
             skills,
+            modes,
+            templates,
         };
         let active_ids: HashSet<String> = state
             .active
@@ -818,6 +949,8 @@ impl PluginManager {
             allow_trusted: options.allow_trusted,
             dev_mode: options.dev_mode,
             config_fingerprint: state.fingerprint.clone(),
+            modes: state.modes.clone(),
+            agent_templates: state.templates.clone(),
         }
     }
 
@@ -880,6 +1013,26 @@ impl PluginManager {
         out
     }
 
+    /// Harness modes contributed by active plugins (`agent.modes`).
+    pub fn modes(&self) -> Vec<PluginModeView> {
+        self.state.read().modes.clone()
+    }
+
+    /// One mode by `<pluginId>:<modeId>`.
+    pub fn mode(&self, key: &str) -> Option<PluginModeView> {
+        self.state
+            .read()
+            .modes
+            .iter()
+            .find(|mode| mode.key == key)
+            .cloned()
+    }
+
+    /// Agent templates contributed by active plugins (`agent.templates`).
+    pub fn agent_templates(&self) -> Vec<PluginTemplateView> {
+        self.state.read().templates.clone()
+    }
+
     pub fn skill_roots(&self) -> Vec<ExternalSkillRoot> {
         self.state
             .read()
@@ -927,6 +1080,12 @@ impl PluginManager {
             .tools
             .get(wire_name)
             .map(|(plugin, tool)| (plugin.clone(), tool.clone()))
+    }
+
+    /// Risk class of a plugin tool by wire name (`read`, `network`, `write`,
+    /// `shell`). Used by plugin modes that block writes.
+    pub fn tool_risk(&self, wire_name: &str) -> Option<String> {
+        self.tool_owner(wire_name).map(|(_, tool)| tool.risk)
     }
 
     pub async fn execute_tool(
@@ -2062,6 +2221,31 @@ fn resolve_tools_from_root(
     Ok(tools)
 }
 
+/// Reads an inline contribution text or a package-relative file, trimming it and
+/// capping the length. A missing/unreadable file drops the contribution instead
+/// of failing the whole reload.
+fn load_contribution_text(
+    root: &Path,
+    inline: Option<&str>,
+    file: Option<&str>,
+    max_chars: usize,
+) -> Option<String> {
+    let raw = match (inline, file) {
+        (Some(text), _) => text.to_string(),
+        (None, Some(relative)) => std::fs::read_to_string(root.join(relative)).ok()?,
+        (None, None) => return None,
+    };
+    let mut text = raw.trim().to_string();
+    if text.is_empty() {
+        return None;
+    }
+    if text.chars().count() > max_chars {
+        text = text.chars().take(max_chars).collect();
+        text.push_str("\n[truncated by the host]");
+    }
+    Some(text)
+}
+
 fn load_prompt(manifest: &PluginManifest, root: &Path) -> Result<String> {
     let mut sections = Vec::new();
     for section in &manifest.contributes.prompt_sections {
@@ -2300,6 +2484,8 @@ fn compute_fingerprint(
     tools: &BTreeMap<String, (String, ToolContribution)>,
     prompt_text: &str,
     skills: &[PluginSkillRoot],
+    modes: &[PluginModeView],
+    templates: &[PluginTemplateView],
 ) -> String {
     let plugins: Vec<Value> = active
         .iter()
@@ -2343,6 +2529,25 @@ fn compute_fingerprint(
         "tools": tools,
         "promptHash": sha256_hex(prompt_text.as_bytes()),
         "skills": skills_json,
+        "modes": modes
+            .iter()
+            .map(|mode| serde_json::json!({
+                "key": mode.key,
+                "profiles": mode.profiles,
+                "promptHash": sha256_hex(mode.prompt.as_bytes()),
+                "add": mode.tools_add,
+                "remove": mode.tools_remove,
+                "writesBlocked": mode.writes_blocked,
+            }))
+            .collect::<Vec<_>>(),
+        "templates": templates
+            .iter()
+            .map(|template| serde_json::json!({
+                "key": template.key,
+                "instructionsHash": sha256_hex(template.instructions.as_bytes()),
+                "capabilities": template.capabilities,
+            }))
+            .collect::<Vec<_>>(),
     });
     sha256_hex(canonical.to_string().as_bytes())
 }

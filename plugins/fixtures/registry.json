@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Zylara fixtures",
-  "generatedAt": "2026-11-16T16:08:59.565Z",
+  "generatedAt": "2026-11-16T22:57:32.156Z",
   "plugins": [
     {
       "id": "com.acme.gateway",
@@ -17,7 +17,7 @@
       "summary": "Declarative OpenAI-compatible provider fixture.",
       "description": "Declarative OpenAI-compatible provider fixture.",
       "packageUrl": "provider-demo-1.0.0.zplugin",
-      "packageSha256": "a73303efc8de92c46f4cf3eeea458a0b969434be5ec77d855ca6f82d82773bf1",
+      "packageSha256": "58b3ded89e7ee5adaeb57b5f3fb1d5db79d614e8ee119ba2b9af316bc47a2942",
       "packageSize": 2183,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -25,7 +25,32 @@
         "providers"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-16T16:08:59.542Z"
+      "publishedAt": "2026-11-16T22:57:32.137Z"
+    },
+    {
+      "id": "com.acme.modes",
+      "name": "Acme Modes",
+      "version": "1.0.0",
+      "apiVersion": 2,
+      "publisher": {
+        "id": "acme",
+        "name": "Acme",
+        "keyId": "acme-fixture-2026",
+        "publicKey": "y4c2Uk3O3hvijSk/3cVA8eJUTiuIyCKK9J6mX0wlxmw="
+      },
+      "summary": "Harness modes and an agent template contributed by a plugin.",
+      "description": "Harness modes and an agent template contributed by a plugin.",
+      "packageUrl": "modes-demo-1.0.0.zplugin",
+      "packageSha256": "3a8cab41c723cbacac7b527aa225fe26dde831be94a574063db758aad9fbd7b3",
+      "packageSize": 2984,
+      "minAppVersion": "0.11.0",
+      "channel": "stable",
+      "permissions": [
+        "agent.modes",
+        "agent.templates"
+      ],
+      "yanked": false,
+      "publishedAt": "2026-11-16T22:57:32.132Z"
     },
     {
       "id": "com.acme.notes",
@@ -41,7 +66,7 @@
       "summary": "Reference sandboxed plugin: nav tab, dock tab, variants, preset, scoped CSS, GenUI, tools and skills.",
       "description": "Reference sandboxed plugin: nav tab, dock tab, variants, preset, scoped CSS, GenUI, tools and skills.",
       "packageUrl": "sandbox-demo-1.2.0.zplugin",
-      "packageSha256": "c5b5d326a4eee453c0adcee9f78b250bcd591fecf6db5db514e425ebbf71247d",
+      "packageSha256": "9e5565d2822af2547e0c74c9f97085fb0963570802848f6d5afbcbfbb7b8d390",
       "packageSize": 20878,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -66,7 +91,7 @@
         "hotkeys"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-16T16:08:59.547Z"
+      "publishedAt": "2026-11-16T22:57:32.141Z"
     },
     {
       "id": "com.acme.trusted-demo",
@@ -82,7 +107,7 @@
       "summary": "Trusted reference plugin: React page/panel, per-layout nav, variants, presets, GenUI and an agent tool.",
       "description": "Trusted reference plugin: React page/panel, per-layout nav, variants, presets, GenUI and an agent tool.",
       "packageUrl": "trusted-demo-1.0.0.zplugin",
-      "packageSha256": "08d8f1a0877a0524a3ea7b6ee201d1720912e11054da54c8829abf6e12495c8c",
+      "packageSha256": "3c450efc5db7e4341ec9988ee5d0e37984d9a6a723d5948988a31d400be66e4f",
       "packageSize": 15885,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -108,7 +133,7 @@
         "providers"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-16T16:08:59.551Z"
+      "publishedAt": "2026-11-16T22:57:32.143Z"
     }
   ],
   "revoked": [],
@@ -117,6 +142,6 @@
     "algorithm": "ed25519",
     "keyId": "registry-fixture-2026",
     "publicKey": "WO4w8KkOFvUAd+1BbK94946rGnviHQvKID39iRaEgXc=",
-    "signature": "DsB56cW4dXPYLRz6UL7iLekuYhd77KhCdTksv0rhG5Y4ya0n9s/HvaNFBesfiHl3NGMhY1bGoU4bYxaHk9UwBQ=="
+    "signature": "OzmfqOneZrsv4J45oLHZQdKHnxHsHeMdRMa1+UVyA4LQscbi+Te6hg5LDmhK2D6Bb9QItFW8vUr20mUXlcADBg=="
   }
 }

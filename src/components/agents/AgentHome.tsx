@@ -4,6 +4,9 @@ import type { TFunction } from 'i18next';
 import { ArrowUpRight, MessageSquarePlus, Pencil, Pin, Sparkles } from 'lucide-react';
 
 import { AgentAvatar } from './AgentAvatar';
+import { Slot } from '@/components/plugins/ui/Slot';
+import { ComponentSlot } from '@/components/plugins/ui/Slot';
+import type { PluginComponent } from '@/lib/plugins/ui/types';
 import {
   formatUsageCost,
   formatUsageTokens,
@@ -220,18 +223,27 @@ export function AgentHome({ agent }: { agent: Agent }) {
   const recentThreads = threads.filter((thread) => !thread.isMain);
 
   return (
-    <ChatView
-      key={`agent-home-${agent.id}`}
-      welcome={
-        <AgentWelcome
-          agent={agent}
-          threads={recentThreads}
-          onNewConversation={() => void startNewConversation('agent', { agentId: agent.id })}
-          onEdit={() => openEditor({ mode: 'edit', agentId: agent.id })}
-          onOpenThread={(id) => void openConversation(id)}
-          onOpenMain={main ? () => void openConversation(main.id) : undefined}
-        />
-      }
-    />
+    <Slot
+      name="agent.thread.view.frame"
+      owner={{ agentId: agent.id, conversationId: main?.id ?? null }}
+    >
+      <ComponentSlot
+        name="agent.thread.view"
+        fallback={ChatView as unknown as PluginComponent}
+        props={{
+          welcome: (
+            <AgentWelcome
+              agent={agent}
+              threads={recentThreads}
+              onNewConversation={() => void startNewConversation('agent', { agentId: agent.id })}
+              onEdit={() => openEditor({ mode: 'edit', agentId: agent.id })}
+              onOpenThread={(id) => void openConversation(id)}
+              onOpenMain={main ? () => void openConversation(main.id) : undefined}
+            />
+          ),
+          key: `agent-home-${agent.id}`,
+        }}
+      />
+    </Slot>
   );
 }

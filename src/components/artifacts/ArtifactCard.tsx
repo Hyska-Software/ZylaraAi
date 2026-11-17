@@ -1,4 +1,5 @@
 import { Download } from 'lucide-react';
+import { Slot } from '@/components/plugins/ui/Slot';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import type { MouseEvent as ReactMouseEvent } from 'react';
@@ -112,6 +113,10 @@ export function ArtifactCard({
             <Download className="size-3.5" />
           </IconButton>
         </Tooltip>
+        <Slot
+          name="artifact.card.actions"
+          owner={{ artifactId: artifact.id, artifactKind: artifact.kind }}
+        />
       </div>
     </div>
   );

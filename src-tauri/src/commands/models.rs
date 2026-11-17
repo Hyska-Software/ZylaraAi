@@ -591,7 +591,7 @@ fn cache_path(state: &AppState) -> PathBuf {
 
 fn save_models_cache(app: &AppHandle, state: &AppState) -> anyhow::Result<()> {
     let mut providers = std::collections::BTreeMap::new();
-    for provider in &state.catalog.providers {
+    for provider in &state.catalog_with_plugins().providers {
         if let Some(dynamic) = state.dynamic_models_for(&provider.id) {
             providers.insert(
                 provider.id.clone(),
@@ -620,7 +620,7 @@ fn save_models_cache(app: &AppHandle, state: &AppState) -> anyhow::Result<()> {
 
 fn refreshed_at(state: &AppState) -> Option<i64> {
     state
-        .catalog
+        .catalog_with_plugins()
         .providers
         .iter()
         .filter_map(|provider| state.dynamic_models_for(&provider.id))
@@ -645,6 +645,29 @@ pub fn catalog_view(app: &AppHandle, state: &AppState) -> CatalogView {
 #[tauri::command]
 pub fn get_catalog(app: AppHandle, state: State<'_, AppState>) -> CatalogView {
     catalog_view(&app, &state)
+}
+
+/// Creates or updates a user-defined provider (Settings → Providers).
+#[tauri::command]
+pub fn save_custom_provider(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: crate::providers::custom::CustomProviderInput,
+) -> Result<CatalogView, String> {
+    crate::providers::custom::save(&state.db, input).map_err(|error| error.to_string())?;
+    Ok(catalog_view(&app, &state))
+}
+
+/// Removes a user-defined provider. The stored API key is preserved so
+/// re-adding the same id keeps working offline.
+#[tauri::command]
+pub fn delete_custom_provider(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    provider_id: String,
+) -> Result<CatalogView, String> {
+    crate::providers::custom::remove(&state.db, &provider_id).map_err(|error| error.to_string())?;
+    Ok(catalog_view(&app, &state))
 }
 
 /// Refreshes the account model list of one provider and returns the merged view.
