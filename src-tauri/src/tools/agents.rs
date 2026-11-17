@@ -946,6 +946,7 @@ fn create_agent_tool(
         computer_environment: json_str(args, "computerEnvironment")
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| "auto".to_string()),
+        template: None,
     };
     match hooks.create_agent(&input) {
         Ok(agent) => {
@@ -1184,6 +1185,7 @@ mod tests {
             permission_mode: PermissionMode::Edit,
             docker_image: None,
             computer_environment: "auto".to_string(),
+            template: None,
         })
         .expect("agent")
     }

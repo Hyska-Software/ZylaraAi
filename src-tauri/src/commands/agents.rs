@@ -12,6 +12,7 @@ use crate::agents::{
 };
 use crate::harness::{self, HarnessDeps};
 use crate::state::AppState;
+use serde_json::Value;
 
 fn to_error(error: impl std::fmt::Display) -> String {
     format!("{error:#}")
@@ -70,6 +71,69 @@ fn validate_fallback(state: &AppState, input: &AgentInput) -> Result<(), String>
             crate::i18n::t("agents.errors.fallbackPairRequired").to_string(),
         ),
     }
+}
+
+/// A plugin template is a gallery starting point, never an authority: the agent
+/// must keep every capability the template disabled, and the origin is recorded
+/// in `plugin_audit` so the store UI can explain where the persona came from.
+/// `true` when the agent enables something the template disabled. Capabilities
+/// are deny-only, so a `false` in the template must stay `false` and a narrowed
+/// list must stay a subset (`null` means "all", which is wider).
+fn template_capability_widened(allowed: &Value, current: &Value) -> bool {
+    match allowed {
+        Value::Bool(false) => current.as_bool() == Some(true),
+        Value::Array(list) => match current {
+            Value::Null => true,
+            Value::Array(chosen) => !chosen.iter().all(|item| list.contains(item)),
+            _ => true,
+        },
+        _ => false,
+    }
+}
+
+fn validate_template(state: &AppState, input: &AgentInput) -> Result<(), String> {
+    let Some(reference) = input.template.as_ref() else {
+        return Ok(());
+    };
+    let manager = crate::plugins::global_manager()
+        .ok_or_else(|| crate::i18n::t("agents.commands.templateUnknown").to_string())?;
+    let template = manager
+        .agent_templates()
+        .into_iter()
+        .find(|entry| entry.plugin_id == reference.plugin_id && entry.id == reference.template_id)
+        .ok_or_else(|| {
+            crate::i18n::t_args(
+                "agents.commands.templateUnknown",
+                &[
+                    ("plugin_id", &reference.plugin_id),
+                    ("template_id", &reference.template_id),
+                ],
+            )
+        })?;
+    let narrowed = template
+        .capabilities
+        .as_object()
+        .ok_or_else(|| crate::i18n::t("agents.commands.templateInvalid").to_string())?;
+    let input_capabilities = serde_json::to_value(&input.capabilities)
+        .map_err(|error| format!("AGENT_TEMPLATE_INVALID: {error}"))?;
+    for (key, value) in narrowed {
+        let current = input_capabilities.get(key).cloned().unwrap_or(Value::Null);
+        if template_capability_widened(value, &current) {
+            return Err(crate::i18n::t_args(
+                "agents.commands.templateWidened",
+                &[("capability", key)],
+            ));
+        }
+    }
+    let digest = format!("{}:{}", reference.plugin_id, reference.template_id);
+    // Audit is evidence, not a gate: a write failure must not block the creation.
+    if let Err(error) = state
+        .db
+        .plugin_audit(&reference.plugin_id, "agent.template", Some(&digest), "applied")
+    {
+        eprintln!("[agents] template audit failed: {error}");
+    }
+    Ok(())
 }
 
 fn validate_model(state: &AppState, input: &AgentInput) -> Result<(), String> {
@@ -134,6 +198,7 @@ pub(crate) fn create_agent_validated(
     validate_model(state, &input)?;
     validate_fallback(state, &input)?;
     validate_workspace(state, &input)?;
+    validate_template(state, &input)?;
     state.db.create_agent(&input).map_err(to_error)
 }
 
@@ -147,6 +212,7 @@ pub fn update_agent(
     validate_model(&state, &input)?;
     validate_fallback(&state, &input)?;
     validate_workspace(&state, &input)?;
+    validate_template(&state, &input)?;
     state.db.update_agent(&agent_id, &input).map_err(to_error)
 }
 
@@ -345,6 +411,7 @@ pub fn duplicate_agent(state: State<'_, AppState>, agent_id: String) -> Result<A
         permission_mode: current.permission_mode,
         docker_image: current.docker_image,
         computer_environment: current.computer_environment,
+        template: None,
     };
     let input = crate::agents::normalize_input(input).map_err(to_error)?;
     validate_model(&state, &input)?;
@@ -606,6 +673,7 @@ pub async fn suggest_agent(
         permission_mode: crate::domain::PermissionMode::Autonomous,
         docker_image: None,
         computer_environment: "auto".to_string(),
+        template: None,
     };
     crate::agents::normalize_input(input).map_err(to_error)
 }
@@ -787,4 +855,40 @@ pub fn import_agent(
             .map_err(to_error)?;
     }
     Ok(Some(agent))
+}
+
+#[cfg(test)]
+mod template_tests {
+    use super::template_capability_widened;
+    use serde_json::json;
+
+    #[test]
+    fn a_disabled_capability_cannot_be_re_enabled() {
+        assert!(template_capability_widened(&json!(false), &json!(true)));
+        assert!(!template_capability_widened(&json!(false), &json!(false)));
+        // Absent (`null`) keeps the backend default, which is not a widening of
+        // an explicit `false` only when the default is also off.
+        assert!(!template_capability_widened(&json!(false), &json!(null)));
+    }
+
+    #[test]
+    fn narrowed_lists_must_stay_subsets() {
+        assert!(!template_capability_widened(
+            &json!(["fs_read"]),
+            &json!(["fs_read"])
+        ));
+        assert!(!template_capability_widened(&json!(["fs_read"]), &json!([])));
+        assert!(template_capability_widened(
+            &json!(["fs_read"]),
+            &json!(["fs_read", "run_command"])
+        ));
+        // `null` means "every item", which is wider than any list.
+        assert!(template_capability_widened(&json!(["fs_read"]), &json!(null)));
+    }
+
+    #[test]
+    fn enabled_capabilities_are_ignored() {
+        assert!(!template_capability_widened(&json!(true), &json!(true)));
+        assert!(!template_capability_widened(&json!(true), &json!(false)));
+    }
 }

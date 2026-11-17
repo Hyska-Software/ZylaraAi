@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useUiStore } from '@/lib/store';
@@ -8,6 +8,8 @@ import { pluginLabel, usePluginRegistry } from '@/lib/plugins/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { PluginSettingsTabPanel } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
+import { ComponentSlot } from '@/components/plugins/ui/Slot';
+import type { PluginComponent } from '@/lib/plugins/ui/types';
 import {
   Button,
   Dialog,
@@ -41,6 +43,53 @@ import { ToolsTab } from './ToolsTab';
  * The active tab lives in `useUiStore` so the command palette can open the
  * dialog straight on "Configurações › Ferramentas" (docs/COMMAND_PALETTE.md).
  */
+type SettingsTabs = ReturnType<typeof usePluginRegistry>['settingsTabs'];
+
+/** Host settings rail. A trusted plugin can replace it and still receive the
+ * host tab list through `pluginTabs`. */
+function SettingsRail({ pluginTabs }: { pluginTabs: SettingsTabs }) {
+  const { t } = useTranslation('settings');
+  return (
+    <TabsList variant="sidebar" className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <Slot name="settings.rail.before" />
+      {SETTINGS_TABS.map(({ id, labelKey }) => {
+        const Icon = SETTINGS_TAB_ICONS[id];
+        return (
+          <TabsTrigger key={id} value={id} variant="sidebar">
+            <Icon aria-hidden className="size-4" />
+            {t(labelKey)}
+          </TabsTrigger>
+        );
+      })}
+      {pluginTabs.map((entry) => {
+        const Icon = pluginIcon(entry.tab.icon);
+        return (
+          <TabsTrigger
+            key={`plugin:${entry.key}`}
+            value={`plugin:${entry.key}`}
+            variant="sidebar"
+          >
+            <Icon aria-hidden className="size-4" />
+            {pluginLabel(entry.plugin, entry.tab.titleKey, entry.tab.title)}
+          </TabsTrigger>
+        );
+      })}
+      <Slot name="settings.rail.after" />
+    </TabsList>
+  );
+}
+
+/** Host settings page body. A trusted plugin can replace it and still receive
+ * the host tab contents as `children`. */
+function SettingsPageFallback({
+  children,
+}: {
+  tab?: string;
+  children?: ReactNode;
+}) {
+  return <div className="px-6 py-5">{children}</div>;
+}
+
 export function SettingsDialog() {
   const { t } = useTranslation('settings');
   const { t: common } = useTranslation('common');
@@ -88,32 +137,11 @@ export function SettingsDialog() {
                 {t('dialog.description')}
               </DialogDescription>
             </div>
-            <TabsList variant="sidebar" className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-              <Slot name="settings.rail.before" />
-              {SETTINGS_TABS.map(({ id, labelKey }) => {
-                const Icon = SETTINGS_TAB_ICONS[id];
-                return (
-                  <TabsTrigger key={id} value={id} variant="sidebar">
-                    <Icon aria-hidden className="size-4" />
-                    {t(labelKey)}
-                  </TabsTrigger>
-                );
-              })}
-              {pluginTabs.map((entry) => {
-                const Icon = pluginIcon(entry.tab.icon);
-                return (
-                  <TabsTrigger
-                    key={`plugin:${entry.key}`}
-                    value={`plugin:${entry.key}`}
-                    variant="sidebar"
-                  >
-                    <Icon aria-hidden className="size-4" />
-                    {pluginLabel(entry.plugin, entry.tab.titleKey, entry.tab.title)}
-                  </TabsTrigger>
-                );
-              })}
-              <Slot name="settings.rail.after" />
-            </TabsList>
+            <ComponentSlot
+              name="settings.rail"
+              fallback={SettingsRail as unknown as PluginComponent}
+              props={{ pluginTabs: pluginTabs as SettingsTabs }}
+            />
             <div className="border-t border-border p-2">
               <Button variant="ghost" size="sm" className="w-full justify-center" onClick={() => setOpen(false)}>
                 {common('actions.close')}
@@ -131,7 +159,13 @@ export function SettingsDialog() {
             </div>
             <div className="min-h-0 flex-1">
               <ScrollArea className="h-full" type="auto">
-                <div className="px-6 py-5">
+                <ComponentSlot
+                  name="settings.page"
+                  fallback={SettingsPageFallback}
+                  props={{
+                    tab,
+                    children: (
+                      <>
                   <TabsContent value="general">
                     <GeneralTab />
                   </TabsContent>
@@ -173,7 +207,10 @@ export function SettingsDialog() {
                       <PluginSettingsTabPanel tabKey={entry.key} />
                     </TabsContent>
                   ))}
-                </div>
+                      </>
+                    ),
+                  }}
+                />
               </ScrollArea>
             </div>
           </div>

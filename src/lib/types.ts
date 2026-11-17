@@ -1400,6 +1400,8 @@ export interface AgentInput {
   permissionMode: PermissionMode;
   dockerImage?: string | null;
   computerEnvironment?: ComputerEnvironment;
+  /** Origin of a gallery template contributed by a plugin (audit only). */
+  template?: { pluginId: string; templateId: string } | null;
 }
 
 export interface AgentChange {

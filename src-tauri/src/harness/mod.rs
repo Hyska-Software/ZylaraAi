@@ -6827,6 +6827,7 @@ mod agent_loop_tests {
             permission_mode: crate::domain::PermissionMode::Edit,
             docker_image: None,
             computer_environment: "auto".to_string(),
+            template: None,
         })
         .expect("agent input");
         let agent = temp.db.create_agent(&input).expect("agent");
@@ -6895,6 +6896,7 @@ mod agent_loop_tests {
             },
             memory_enabled: false, workspace_id: None, permission_mode: crate::domain::PermissionMode::Edit,
             docker_image: None, computer_environment: "auto".into(),
+            template: None,
         }).expect("input");
         let agent = temp.db.create_agent(&input).expect("agent");
         let conversation = temp.db.create_agent_conversation(&agent.id, "Thread").expect("conversation");

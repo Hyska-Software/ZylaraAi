@@ -395,6 +395,7 @@ impl AgentExportDocument {
                 permission_mode: agent.permission_mode,
                 docker_image: agent.docker_image.clone(),
                 computer_environment: agent.computer_environment.clone(),
+                template: None,
             },
             memories: memories
                 .iter()
@@ -547,6 +548,7 @@ impl From<&Agent> for AgentInput {
             permission_mode: agent.permission_mode,
             docker_image: agent.docker_image.clone(),
             computer_environment: agent.computer_environment.clone(),
+            template: None,
         }
     }
 }
@@ -1154,6 +1156,17 @@ pub struct AgentInput {
     /// `this_computer`, `browser` or `off`.
     #[serde(default = "default_computer_environment")]
     pub computer_environment: String,
+    /// Origin of the plugin template this agent was created from (audit only).
+    #[serde(default)]
+    pub template: Option<AgentTemplateRef>,
+}
+
+/// `<plugin id>:<template id>` of a gallery template contributed by a plugin.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentTemplateRef {
+    pub plugin_id: String,
+    pub template_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1550,6 +1563,7 @@ mod tests {
             permission_mode: PermissionMode::Edit,
             docker_image: None,
             computer_environment: "auto".to_string(),
+            template: None,
         }
     }
 

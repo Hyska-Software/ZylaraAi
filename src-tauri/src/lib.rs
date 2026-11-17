@@ -374,6 +374,7 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             commands::settings::open_data_dir,
             commands::settings::reset_app_data,
             commands::settings::validate_provider,
+            commands::settings::test_custom_provider,
             commands::settings::get_code_environment,
             commands::settings::open_skills_dir,
             commands::themes::list_themes,

@@ -1878,6 +1878,7 @@ mod tests {
             fallback_provider_id: None, fallback_model_id: None, reasoning: None, instructions: String::new(),
             starters: Vec::new(), capabilities: crate::agents::AgentCapabilities { browser_use: true, ..Default::default() }, memory_enabled: false, workspace_id: None,
             permission_mode: crate::domain::PermissionMode::Edit, docker_image: None, computer_environment: "auto".into(),
+            template: None,
         }).expect("input");
         let agent = db.create_agent(&input).expect("agent");
         let recorded = Arc::new(Mutex::new(Vec::<String>::new()));

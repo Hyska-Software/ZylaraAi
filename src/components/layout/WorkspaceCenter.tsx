@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import type { ReactNode } from 'react';
 import { AgentAvatarDialog } from '@/components/agents/AgentAvatarDialog';
 import { AgentWorkspace } from '@/components/agents/AgentWorkspace';
 import { ChatView } from '@/components/chat/ChatView';
@@ -28,6 +29,12 @@ import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
 import type { PluginComponent } from '@/lib/plugins/ui/types';
 import { cn } from '@/lib/utils';
+
+/** Host center workbench of the Code layout. A trusted plugin can replace it and
+ * still receive the host tree as `children`. */
+function CodeWorkbenchFallback({ children }: { children?: ReactNode }) {
+  return <>{children}</>;
+}
 
 /**
  * Center column of the application shell.
@@ -147,8 +154,8 @@ export function WorkspaceCenter() {
       showIssues ||
       showIssue);
 
-  return (
-    <div className="flex h-full min-h-0 flex-col">
+  const body = (
+    <>
       {/* Stable wrapper: the conversation below keeps its DOM position across
           layout switches (see `aria-controls` of the Code session tabs). The
           header stays mounted while the Code Skills page is open so the open
@@ -345,6 +352,19 @@ export function WorkspaceCenter() {
           onClose={closeGoalDialog}
         />
       ) : null}
+    </>
+  );
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {/* `code.workbench` only matches in the Code layout (contract `layouts`),
+          so keeping the slot mounted in every layout preserves the chat
+          instance across layout switches. */}
+      <ComponentSlot
+        name="code.workbench"
+        fallback={CodeWorkbenchFallback}
+        props={{ children: body }}
+      />
     </div>
   );
 }

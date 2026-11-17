@@ -874,6 +874,7 @@ mod tests {
             fallback_provider_id: None, fallback_model_id: None, reasoning: None, instructions: String::new(),
             starters: Vec::new(), capabilities: Default::default(), memory_enabled: false, workspace_id: None,
             permission_mode: crate::domain::PermissionMode::Edit, docker_image: None, computer_environment: "auto".into(),
+            template: None,
         }).expect("agent input");
         let agent = db.create_agent(&input).expect("agent");
         let conversation = db.create_agent_conversation(&agent.id, "Thread").expect("conversation");

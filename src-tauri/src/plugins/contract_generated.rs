@@ -336,14 +336,11 @@ pub static RESERVED_COMPONENT_IDS: &[&str] = &[
     "chat.message.tool-group",
     "chat.message.tool-row",
     "chat.composer.input",
-    "code.workbench",
     "code.tab.strip",
     "agent.tab.strip",
     "agent.channel.view",
     "agent.channel.message",
     "agent.channel.composer",
-    "settings.page",
-    "settings.rail",
 ];
 
 pub static PERMISSION_IDS: &[&str] = &[

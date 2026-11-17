@@ -8322,6 +8322,7 @@ mod tests {
             permission_mode: crate::domain::PermissionMode::Edit,
             docker_image: None,
             computer_environment: "auto".to_string(),
+            template: None,
         }
     }
 

@@ -208,6 +208,8 @@ export const api = {
     invoke<CatalogView>('save_custom_provider', { input }),
   deleteCustomProvider: (providerId: string) =>
     invoke<CatalogView>('delete_custom_provider', { providerId }),
+  testCustomProvider: (providerId: string) =>
+    invoke<ProviderValidation>('test_custom_provider', { providerId }),
 
   /* -------- OpenAI ChatGPT plan auth (two-phase login) -------- */
   openaiLoginStart: (providerId: string, forceConsent = false) =>

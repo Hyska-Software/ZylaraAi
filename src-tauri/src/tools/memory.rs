@@ -415,6 +415,7 @@ mod tests {
             permission_mode: crate::domain::PermissionMode::Edit,
             docker_image: None,
             computer_environment: "auto".to_string(),
+            template: None,
         };
         let agent = rt.db.create_agent(&agent).expect("agent");
         let rt = ToolRuntime {

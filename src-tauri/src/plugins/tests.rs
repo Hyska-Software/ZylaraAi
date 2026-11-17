@@ -865,7 +865,7 @@ fn store_view_merges_two_signed_registries_and_ignores_one_failure() {
             false,
         ))
         .expect("merged registry");
-    assert_eq!(view.plugins.len(), 4);
+    assert_eq!(view.plugins.len(), 5);
     assert!(view.registry_name.contains(" + "));
     let installed = runtime
         .block_on(manager.install_from_registry(
@@ -992,4 +992,98 @@ fn manifest_schema_artifact_is_valid_and_documents_the_runtime() {
         schema["$defs"]["provider"]["properties"]["baseUrl"]["pattern"],
         "^https://"
     );
+}
+
+/// Enforcement matrix for the permission catalog. Adding a permission to
+/// `data/plugin-contract.json` without wiring it (or reserving it) fails here,
+/// because every declared id must name where the host enforces it.
+const ENFORCED_PERMISSIONS: &[(&str, &str)] = &[
+    ("ui.slot", "manifest `ui.slot:<slot>` + renderer Slot filter"),
+    ("ui.view", "manifest + registry `hasPermission(ui.view)`"),
+    ("ui.nav", "manifest + registry `hasPermission(ui.nav)`"),
+    ("ui.panel", "manifest + registry `hasPermission(ui.panel)`"),
+    ("ui.settings", "manifest + registry `hasPermission(ui.settings)`"),
+    ("ui.command", "manifest + registry `hasPermission(ui.command)`"),
+    ("ui.artifact", "manifest + registry `hasPermission(ui.artifact)`"),
+    ("ui.sidebar", "manifest + registry `hasPermission(ui.sidebar)`"),
+    ("ui.variant", "manifest + trusted `ui.variant` + registry variants"),
+    ("ui.preset", "manifest + host `setPreset` action gate"),
+    ("ui.genui", "`PluginManager::genui_components` grant filter"),
+    ("ui.override", "manifest target check + `ComponentSlot` override gate"),
+    ("ui.css.global", "trusted `addCss`/`addGlobalCss` requirePermission"),
+    ("ui.shell", "trusted `replaceShell` requirePermission"),
+    ("ui.theme", "manifest + plugin-wide grant gate (`permissions_incomplete`)"),
+    ("commands", "host `execute` action requires `commands`"),
+    ("hotkeys", "manifest: command hotkey requires `hotkeys`"),
+    ("settings", "broker `settings.*`"),
+    ("agent.tools", "`tool_definitions`/`dispatch_tool` grant filter"),
+    ("agent.prompt", "manifest + plugin-wide grant gate"),
+    ("agent.skills", "manifest + `skill_roots` + plugin-wide grant gate"),
+    ("agent.modes", "`PluginManager::modes` grant filter"),
+    ("agent.templates", "`PluginManager::agent_templates` grant filter"),
+    ("chat.read", "broker `chat.read`/`chat.list`"),
+    ("chat.write", "broker `chat.draft`"),
+    ("fs.read", "broker `fs.read`/`fs.list` glob scope"),
+    ("fs.write", "broker `fs.write` glob scope"),
+    ("net", "broker `net.request` host allowlist"),
+    ("secrets.use", "broker `secrets.has`/`secrets.names`/`net.request`"),
+    ("secrets.read", "broker `secrets.read` (trusted only)"),
+    ("storage", "broker `storage.*`"),
+    ("events", "renderer event bridge scope check"),
+    ("clipboard.read", "broker `clipboard.read`"),
+    ("notifications", "broker `notify`"),
+    ("opener", "broker `opener.open` + host `openExternal`"),
+    ("providers", "`PluginManager::providers` grant filter"),
+    ("unsafe.renderer", "manifest trusted gate + trusted loader"),
+];
+
+#[test]
+fn every_contract_permission_is_enforced_or_reserved() {
+    let contract = super::contract::contract();
+    for permission in &contract.permissions {
+        assert!(
+            ENFORCED_PERMISSIONS
+                .iter()
+                .any(|(id, _)| *id == permission.id.as_str()),
+            "permission `{}` has no enforcement entry",
+            permission.id
+        );
+    }
+    for (id, _) in ENFORCED_PERMISSIONS {
+        assert!(
+            contract
+                .permissions
+                .iter()
+                .any(|permission| permission.id == *id),
+            "enforcement entry `{id}` is not declared in the contract"
+        );
+    }
+    for reserved in &contract.reserved_permissions {
+        assert!(
+            !contract
+                .permissions
+                .iter()
+                .any(|permission| &permission.id == reserved),
+            "reserved permission `{reserved}` is also declared as implemented"
+        );
+        assert!(
+            ENFORCED_PERMISSIONS.iter().all(|(id, _)| id != reserved),
+            "reserved permission `{reserved}` has an enforcement entry"
+        );
+    }
+}
+
+#[test]
+fn reserved_permissions_are_rejected_by_the_manifest() {
+    let contract = super::contract::contract();
+    for reserved in &contract.reserved_permissions {
+        assert!(
+            super::contract::permission_reserved(reserved),
+            "`{reserved}` must be reported as reserved"
+        );
+        assert!(
+            !super::contract::permission_known(reserved),
+            "`{reserved}` must not be installable"
+        );
+    }
 }

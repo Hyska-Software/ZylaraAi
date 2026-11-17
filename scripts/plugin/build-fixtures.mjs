@@ -37,6 +37,12 @@ const packages = [
     key: join(fixtures, 'sandbox-demo', 'META-INF', 'publisher.pem'),
     publisher: 'acme',
   },
+  {
+    folder: join(fixtures, 'surfaces-demo'),
+    file: join(fixtures, 'surfaces-demo-1.0.0.zplugin'),
+    key: join(fixtures, 'sandbox-demo', 'META-INF', 'publisher.pem'),
+    publisher: 'acme',
+  },
 ];
 
 for (const entry of packages) {

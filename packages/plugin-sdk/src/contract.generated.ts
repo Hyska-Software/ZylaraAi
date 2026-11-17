@@ -253,14 +253,11 @@ export const RESERVED_COMPONENT_IDS = [
     "chat.message.tool-group",
     "chat.message.tool-row",
     "chat.composer.input",
-    "code.workbench",
     "code.tab.strip",
     "agent.tab.strip",
     "agent.channel.view",
     "agent.channel.message",
     "agent.channel.composer",
-    "settings.page",
-    "settings.rail",
 ] as const;
 
 export const PERMISSION_IDS = [

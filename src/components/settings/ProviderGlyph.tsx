@@ -1,6 +1,7 @@
 import { fallbackInitials } from '@/lib/modelIcons';
 import { PROVIDER_ICON_SVG } from '@/lib/providerIconAssets';
 import { PROVIDER_ICON_LABELS, providerIconFor } from '@/lib/providerIcons';
+import { pluginIcon } from '@/lib/plugins/icons';
 import { cn } from '@/lib/utils';
 
 export interface ProviderGlyphProps {
@@ -11,6 +12,8 @@ export interface ProviderGlyphProps {
   className?: string;
   /** Tooltip; defaults to the brand label of the resolved mark. */
   title?: string;
+  /** Declarative icon name (plugin/user provider); falls back to initials. */
+  icon?: string | null;
 }
 
 /**
@@ -24,8 +27,28 @@ export function ProviderGlyph({
   size = 20,
   className,
   title,
+  icon: iconName,
 }: ProviderGlyphProps) {
   const icon = providerIconFor(providerId);
+  // A contributed icon (lucide name from `contributes.providers[].icon` or a
+  // user-defined provider) wins over the bundled brand map.
+  const Contributed = iconName ? pluginIcon(iconName) : null;
+
+  if (Contributed) {
+    return (
+      <span
+        aria-hidden
+        title={title}
+        style={{ width: size, height: size }}
+        className={cn(
+          'inline-flex shrink-0 select-none items-center justify-center text-foreground',
+          className,
+        )}
+      >
+        <Contributed aria-hidden style={{ width: size, height: size }} strokeWidth={1.75} />
+      </span>
+    );
+  }
 
   if (icon) {
     return (

@@ -171,7 +171,7 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `chat.composer.input` | reserved | chat, code | — | — | — |
 | `sidebar.nav.item` | available | chat, code, agent | default, pill, underline | icon, label, active, badge, onSelect | default, pill, underline |
 | `sidebar.conversation.row` | available | chat, code | default, compact, card | conversation, active | default, compact, card |
-| `code.workbench` | reserved | code | — | — | — |
+| `code.workbench` | available | code | — | — | — |
 | `code.session.header` | available | code | — | — | — |
 | `code.tab.strip` | reserved | code | default, segmented, underline | — | default, segmented, underline |
 | `code.panel` | available | code | — | — | — |
@@ -185,8 +185,8 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | `agent.channel.composer` | reserved | agent | — | channelId | — |
 | `agent.panel` | available | agent | — | — | — |
 | `settings.dialog` | available | chat, code, agent | default, wide, compact | — | default, wide, compact |
-| `settings.page` | reserved | chat, code, agent | — | tab | — |
-| `settings.rail` | reserved | chat, code, agent | — | — | — |
+| `settings.page` | available | chat, code, agent | — | tab | — |
+| `settings.rail` | available | chat, code, agent | — | — | — |
 | `plugins.view` | available | chat, code, agent | — | — | — |
 | `plugins.detail` | available | chat, code, agent | — | pluginId | — |
 | `artifact.panel` | available | chat, code, agent | — | — | — |

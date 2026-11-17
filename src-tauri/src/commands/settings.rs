@@ -405,6 +405,21 @@ async fn probe_models(
         .await
 }
 
+/// Same probe as `validate_provider`, restricted to user-defined providers
+/// (`custom__<slug>`) so the creation dialog can offer a "Test connection"
+/// button without touching first-party or plugin-contributed providers.
+#[tauri::command]
+pub async fn test_custom_provider(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    provider_id: String,
+) -> Result<ProviderValidation, String> {
+    if !crate::providers::custom::is_custom_id(&provider_id) {
+        return Err(crate::i18n::t("settings.errors.providerUnknown").to_string());
+    }
+    validate_provider(app, state, provider_id).await
+}
+
 #[tauri::command]
 pub async fn validate_provider(
     app: AppHandle,

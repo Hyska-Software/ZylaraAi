@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 
 import { api } from '@/lib/api';
+import { t } from '@/lib/i18n';
+import { useAppStore } from '@/lib/store/appStore';
 import type { Agent, AgentAvatar, AgentInput } from '@/lib/types';
 import { createSerialRunner } from '@/lib/utils';
 import { compareText } from '@/lib/i18n/format';
@@ -8,6 +10,18 @@ import { compareText } from '@/lib/i18n/format';
 let initializePromise: Promise<void> | null = null;
 const avatarSequence = new Map<string, number>();
 const runReorder = createSerialRunner();
+
+/**
+ * The provider list is the merged catalog (bundled + user-defined + plugin), so
+ * an id outside it can never resolve a route. An empty list means the catalog
+ * has not loaded yet: the backend validation stays authoritative in that case.
+ */
+function assertKnownProvider(input: AgentInput): void {
+  const providers = useAppStore.getState().providers;
+  if (providers.length === 0) return;
+  if (providers.some((provider) => provider.id === input.providerId)) return;
+  throw new Error(t('agents:team.providerUnknown', { providerId: input.providerId }));
+}
 
 function sortAgents(agents: Agent[]): Agent[] {
   return [...agents].sort((left, right) => {
@@ -81,6 +95,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   },
 
   create: async (input) => {
+    assertKnownProvider(input);
     const agent = await api.createAgent(input);
     set((state) => {
       const next = { ...state.agentsById, [agent.id]: agent };
@@ -91,6 +106,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   },
 
   update: async (id, input) => {
+    assertKnownProvider(input);
     set((state) => ({ mutationById: { ...state.mutationById, [id]: 'saving' } }));
     try {
       const agent = await api.updateAgent(id, input);

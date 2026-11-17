@@ -1074,6 +1074,7 @@ mod tests {
             permission_mode: PermissionMode::Edit,
             docker_image: None,
             computer_environment: "auto".to_string(),
+            template: None,
         })
         .expect("agent")
     }

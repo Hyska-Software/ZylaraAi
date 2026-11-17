@@ -281,6 +281,7 @@ function ProviderRow({
       <ProviderGlyph
         providerId={provider.id}
         name={provider.name}
+        icon={provider.icon}
         size={20}
         className="mt-0.5"
       />
@@ -734,7 +735,12 @@ export function ProvidersTab() {
       return next;
     });
     try {
-      const result = await validateProvider(providerId);
+      // User-defined providers use the dedicated command: same probe, but it
+      // refuses ids outside the `custom__` namespace.
+      const custom = providerList.find((entry) => entry.id === providerId)?.origin === 'custom';
+      const result = custom
+        ? await api.testCustomProvider(providerId)
+        : await validateProvider(providerId);
       setTests((current) => ({
         ...current,
         [providerId]: result.ok

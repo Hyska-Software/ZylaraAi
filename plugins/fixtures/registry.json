@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "name": "Zylara fixtures",
-  "generatedAt": "2026-11-16T22:57:32.156Z",
+  "generatedAt": "2026-11-17T00:45:41.922Z",
   "plugins": [
     {
       "id": "com.acme.gateway",
@@ -17,7 +17,7 @@
       "summary": "Declarative OpenAI-compatible provider fixture.",
       "description": "Declarative OpenAI-compatible provider fixture.",
       "packageUrl": "provider-demo-1.0.0.zplugin",
-      "packageSha256": "58b3ded89e7ee5adaeb57b5f3fb1d5db79d614e8ee119ba2b9af316bc47a2942",
+      "packageSha256": "51715792672e0cd5d66b909b0e2916505b78d2e28e275302845a7c6dfb6991eb",
       "packageSize": 2183,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -25,7 +25,7 @@
         "providers"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-16T22:57:32.137Z"
+      "publishedAt": "2026-11-17T00:45:41.898Z"
     },
     {
       "id": "com.acme.modes",
@@ -41,7 +41,7 @@
       "summary": "Harness modes and an agent template contributed by a plugin.",
       "description": "Harness modes and an agent template contributed by a plugin.",
       "packageUrl": "modes-demo-1.0.0.zplugin",
-      "packageSha256": "3a8cab41c723cbacac7b527aa225fe26dde831be94a574063db758aad9fbd7b3",
+      "packageSha256": "0c688d199a560a5db421a5eaddcfd8f6fd43b0b32c872bbace24dd7fd136d662",
       "packageSize": 2984,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -50,7 +50,7 @@
         "agent.templates"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-16T22:57:32.132Z"
+      "publishedAt": "2026-11-17T00:45:41.894Z"
     },
     {
       "id": "com.acme.notes",
@@ -66,7 +66,7 @@
       "summary": "Reference sandboxed plugin: nav tab, dock tab, variants, preset, scoped CSS, GenUI, tools and skills.",
       "description": "Reference sandboxed plugin: nav tab, dock tab, variants, preset, scoped CSS, GenUI, tools and skills.",
       "packageUrl": "sandbox-demo-1.2.0.zplugin",
-      "packageSha256": "9e5565d2822af2547e0c74c9f97085fb0963570802848f6d5afbcbfbb7b8d390",
+      "packageSha256": "f8ad8b6d5149415db0ae3ed1e8eacb83f7e88aab033c52293a14acddc6d6d9f4",
       "packageSize": 20878,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -91,7 +91,34 @@
         "hotkeys"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-16T22:57:32.141Z"
+      "publishedAt": "2026-11-17T00:45:41.902Z"
+    },
+    {
+      "id": "com.acme.surfaces",
+      "name": "Acme Surfaces",
+      "version": "1.0.0",
+      "apiVersion": 2,
+      "publisher": {
+        "id": "acme",
+        "name": "Acme",
+        "keyId": "acme-fixture-2026",
+        "publicKey": "y4c2Uk3O3hvijSk/3cVA8eJUTiuIyCKK9J6mX0wlxmw="
+      },
+      "summary": "Trusted acceptance fixture: wraps the code workbench, replaces the settings page and adds a command palette action.",
+      "description": "Trusted acceptance fixture: wraps the code workbench, replaces the settings page and adds a command palette action.",
+      "packageUrl": "surfaces-demo-1.0.0.zplugin",
+      "packageSha256": "726747762ebcb01f506f57e6fceba879a140b13f214dce90a90ef9a5d64dd1d4",
+      "packageSize": 4015,
+      "minAppVersion": "0.11.0",
+      "channel": "stable",
+      "permissions": [
+        "unsafe.renderer",
+        "ui.override:code.workbench",
+        "ui.override:settings.page",
+        "ui.slot:palette.actions"
+      ],
+      "yanked": false,
+      "publishedAt": "2026-11-17T00:45:41.905Z"
     },
     {
       "id": "com.acme.trusted-demo",
@@ -107,7 +134,7 @@
       "summary": "Trusted reference plugin: React page/panel, per-layout nav, variants, presets, GenUI and an agent tool.",
       "description": "Trusted reference plugin: React page/panel, per-layout nav, variants, presets, GenUI and an agent tool.",
       "packageUrl": "trusted-demo-1.0.0.zplugin",
-      "packageSha256": "3c450efc5db7e4341ec9988ee5d0e37984d9a6a723d5948988a31d400be66e4f",
+      "packageSha256": "ee3696287336de5461a6af321ba41d243c1b1c6b6a79c6a55d4c9405c34629ba",
       "packageSize": 15885,
       "minAppVersion": "0.11.0",
       "channel": "stable",
@@ -133,7 +160,7 @@
         "providers"
       ],
       "yanked": false,
-      "publishedAt": "2026-11-16T22:57:32.143Z"
+      "publishedAt": "2026-11-17T00:45:41.909Z"
     }
   ],
   "revoked": [],
@@ -142,6 +169,6 @@
     "algorithm": "ed25519",
     "keyId": "registry-fixture-2026",
     "publicKey": "WO4w8KkOFvUAd+1BbK94946rGnviHQvKID39iRaEgXc=",
-    "signature": "OzmfqOneZrsv4J45oLHZQdKHnxHsHeMdRMa1+UVyA4LQscbi+Te6hg5LDmhK2D6Bb9QItFW8vUr20mUXlcADBg=="
+    "signature": "7z28D4mlAkq9ZBOhYLu7N+wZNr/f6oHhKzt1lESISCUyAP3kpPe6WNKF6V7vwMW+9bbdBj9jNvzejYk7V6jQBA=="
   }
 }

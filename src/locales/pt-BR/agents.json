@@ -1052,6 +1052,7 @@
     "archiveAria": "Arquivar agente {{name}}",
     "archive": "Arquivar",
     "noProvider": "Nenhum provedor configurado",
+    "providerUnknown": "O provedor {{providerId}} não está disponível",
     "createdFromTemplate": "Agente criado a partir do template",
     "createError": "Não foi possível criar o agente",
     "archived": "Agente arquivado",

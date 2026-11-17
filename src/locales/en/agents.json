@@ -1052,6 +1052,7 @@
     "archiveAria": "Archive agent {{name}}",
     "archive": "Archive",
     "noProvider": "No provider configured",
+    "providerUnknown": "The provider {{providerId}} is not available",
     "createdFromTemplate": "Agent created from template",
     "createError": "Could not create the agent",
     "archived": "Agent archived",

@@ -33,6 +33,8 @@ export interface PluginTemplateTexts {
   starters: string[];
   pluginName: string;
   pluginId: string;
+  /** Template id inside the plugin package (the gallery key is `pluginId:id`). */
+  templateId: string;
 }
 
 export interface LocalizedAgentTemplate {
@@ -49,6 +51,8 @@ export interface LocalizedAgentTemplate {
   permissionMode?: PermissionMode;
   /** Origin of a plugin-contributed template. */
   plugin?: { id: string; name: string } | null;
+  /** Backend reference sent when creating the agent (`agent.template` audit). */
+  template?: { pluginId: string; templateId: string } | null;
 }
 
 export const AGENT_TEMPLATES: AgentTemplate[] = [
@@ -171,6 +175,7 @@ export function pluginAgentTemplates(
       starters: template.starters,
       pluginName: template.pluginName,
       pluginId: template.pluginId,
+      templateId: template.id,
     },
   }));
 }
@@ -188,6 +193,12 @@ export function localizedAgentTemplate(template: AgentTemplate): LocalizedAgentT
     permissionMode: template.permissionMode,
     plugin: template.literal
       ? { id: template.literal.pluginId, name: template.literal.pluginName }
+      : null,
+    template: template.literal
+      ? {
+          pluginId: template.literal.pluginId,
+          templateId: template.literal.templateId,
+        }
       : null,
   };
   if (template.literal) {

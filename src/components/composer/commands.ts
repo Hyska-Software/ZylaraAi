@@ -10,6 +10,7 @@
  * resolves them for the active language, so the menu and the inserted fill text
  * follow a runtime language change. `id`, `command` and `invoke` stay stable.
  */
+import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
 import {
   commandDescription,
@@ -18,6 +19,8 @@ import {
   runPluginCommand,
 } from '@/lib/plugins/host';
 import { getPluginRegistryState } from '@/lib/plugins/registry';
+import { pluginUiState } from '@/lib/plugins/ui/registry';
+import { useChatStore, useUiStore } from '@/lib/store';
 
 /** Stable group ids (labels are resolved through `SLASH_GROUP_LABEL_KEYS`). */
 export type SlashCommandGroup =
@@ -231,14 +234,79 @@ export function builtinSlashCommandNames(): string[] {
   return SLASH_COMMANDS.map((entry) => entry.command.toLowerCase());
 }
 
+/** `plugin.id` → `plugin-id`, so a mode command never contains `:` or dots. */
+function slashSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Toggles a plugin mode for the active conversation. The backend owns the
+ * state; the event keeps the composer chips in sync. */
+async function togglePluginMode(key: string, defaultOn: boolean): Promise<void> {
+  const conversationId = useChatStore.getState().activeId;
+  if (!conversationId) return;
+  const state = await api.pluginModesState(conversationId);
+  const active = state.on.includes(key) || (defaultOn && !state.off.includes(key));
+  await api.setPluginMode(conversationId, key, !active);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('zylara:plugin-mode-changed', {
+        detail: { conversationId, mode: key, active: !active },
+      }),
+    );
+  }
+}
+
+/**
+ * One slash command per plugin mode of the active layout (`/<id>`, or
+ * `/<plugin>-<id>` when the plain id is taken). Modes are contributed by
+ * `contributes.modes`; the command toggles the mode for the open conversation.
+ */
+export function pluginModeCommands(taken: ReadonlySet<string> = new Set()): SlashCommandView[] {
+  if (typeof window === 'undefined') return [];
+  const layout = useUiStore.getState().layoutMode;
+  if (layout === 'agent') return [];
+  const profile = layout === 'code' ? 'code' : 'chat';
+  const reserved = new Set(taken);
+  const modes = (pluginUiState().modes ?? []).filter(
+    (mode) => mode.profiles.length === 0 || mode.profiles.includes(profile),
+  );
+  const out: SlashCommandView[] = [];
+  for (const mode of modes) {
+    let name = mode.id;
+    let command = `/${name}`;
+    if (reserved.has(command.toLowerCase())) {
+      name = `${slashSlug(mode.pluginId)}-${mode.id}`;
+      command = `/${name}`;
+    }
+    if (!name || reserved.has(command.toLowerCase())) continue;
+    reserved.add(command.toLowerCase());
+    out.push({
+      id: `plugin-mode:${mode.key}`,
+      command,
+      titleKey: '',
+      descriptionKey: '',
+      group: 'plugins',
+      action: 'invoke',
+      title: mode.title,
+      description: mode.description || mode.pluginName,
+      fill: null,
+      groupLabel: t(SLASH_GROUP_LABEL_KEYS.plugins),
+      run: () => togglePluginMode(mode.key, mode.defaultOn),
+    });
+  }
+  return out;
+}
+
 /** Filtro tolerante (sem caixa) por comando, título ou descrição. */
 export function filterSlashCommands(query: string): SlashCommandView[] {
   const localized = SLASH_COMMANDS.map(localizeSlashCommand);
   const builtins = new Set(localized.map((entry) => entry.command.toLowerCase()));
   const pluginCommands: SlashCommandView[] = getPluginRegistryState().commands
     .filter((resolved) => !builtins.has(commandSlashName(resolved).toLowerCase()))
-    .map(
-    (resolved) => {
+    .map((resolved) => {
       const title = commandLabel(resolved);
       const description = commandDescription(resolved);
       const command = commandSlashName(resolved);
@@ -255,9 +323,12 @@ export function filterSlashCommands(query: string): SlashCommandView[] {
         groupLabel: t(SLASH_GROUP_LABEL_KEYS.plugins),
         run: () => runPluginCommand(resolved),
       };
-    },
-  );
-  const all = [...localized, ...pluginCommands];
+    });
+  const taken = new Set([
+    ...builtins,
+    ...pluginCommands.map((entry) => entry.command.toLowerCase()),
+  ]);
+  const all = [...localized, ...pluginCommands, ...pluginModeCommands(taken)];
   const needle = query.trim().toLowerCase();
   if (!needle) return all;
   return all.filter((entry) => {

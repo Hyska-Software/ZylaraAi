@@ -188,6 +188,7 @@ export function TeamView() {
         memoryEnabled: template.memoryEnabled ?? false,
         workspaceId: null,
         permissionMode: template.permissionMode ?? 'autonomous',
+        template: localized.template ?? null,
       });
       await useChatStore.getState().refreshConversations();
       setActiveAgentId(agent.id);

@@ -56,6 +56,23 @@ export function PluginModeChips({ conversationId, profile, className }: PluginMo
     };
   }, [conversationId]);
 
+  // A slash command or another layout can toggle a mode; the backend event keeps
+  // the chips in sync without a manual reload.
+  useEffect(() => {
+    if (!conversationId) return undefined;
+    const onChanged = () => {
+      if (typeof api.pluginModesState !== 'function') return;
+      api
+        .pluginModesState(conversationId)
+        .then((next) => setState(next))
+        .catch(() => {
+          /* the chips keep the last known state */
+        });
+    };
+    window.addEventListener('zylara:plugin-mode-changed', onChanged);
+    return () => window.removeEventListener('zylara:plugin-mode-changed', onChanged);
+  }, [conversationId]);
+
   const visible = modes.filter(
     (mode) => mode.profiles.length === 0 || mode.profiles.includes(profile),
   );
