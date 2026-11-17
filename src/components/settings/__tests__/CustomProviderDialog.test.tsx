@@ -55,4 +55,52 @@ describe('CustomProviderDialog', () => {
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(mocks.saveCustomProvider).not.toHaveBeenCalled();
   });
+
+  it('accepts plain http only for loopback endpoints, like the backend', async () => {
+    render(<CustomProviderDialog open onOpenChange={() => {}} provider={null} />);
+    fill('Acme Gateway', 'Acme Gateway');
+    fill('https://api.exemplo.com/v1', 'http://api.acme.dev/v1');
+    fill('Id do modelo', 'acme-chat-1');
+
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar provedor|Add provider/i }));
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(mocks.saveCustomProvider).not.toHaveBeenCalled();
+
+    // Editing the field clears the message and a local server goes through.
+    fill('https://api.exemplo.com/v1', 'http://localhost:11434/v1');
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar provedor|Add provider/i }));
+    await waitFor(() => expect(mocks.saveCustomProvider).toHaveBeenCalledTimes(1));
+    expect(mocks.saveCustomProvider.mock.calls[0][0].baseUrl).toBe('http://localhost:11434/v1');
+  });
+
+  it('toggles model capabilities from the switch labels', async () => {
+    render(<CustomProviderDialog open onOpenChange={() => {}} provider={null} />);
+    fill('Acme Gateway', 'Acme Gateway');
+    fill('https://api.exemplo.com/v1', 'https://api.acme.dev/v1');
+    fill('Id do modelo', 'acme-chat-1');
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Raciocínio' }));
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar provedor|Add provider/i }));
+
+    await waitFor(() => expect(mocks.saveCustomProvider).toHaveBeenCalledTimes(1));
+    expect(mocks.saveCustomProvider.mock.calls[0][0].models[0]).toMatchObject({
+      id: 'acme-chat-1',
+      reasoning: true,
+      attachment: false,
+    });
+  });
+
+  it('reveals the advanced auth fields through a disclosure', () => {
+    render(<CustomProviderDialog open onOpenChange={() => {}} provider={null} />);
+
+    const toggle = screen.getByRole('button', { name: 'Avançado' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByLabelText('Header de auth')).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByLabelText('Header de auth')).toBeTruthy();
+  });
 });
