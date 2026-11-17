@@ -45,9 +45,7 @@ use transcript::{
     fit_raw_transcript, fit_transcript, render_history_transcript, TranscriptLevel,
 };
 
-/// Fraction of the window kept free before automatic compaction.
-pub const RESERVE_SHARE: f64 = 0.15;
-/// Minimum absolute reserve (small windows cannot give up 15% safely).
+/// Minimum absolute reserve (small windows cannot give up the proportional reserve safely).
 pub const RESERVE_MIN_TOKENS: u32 = 16_384;
 /// Recent tail kept verbatim after compaction.
 pub const KEEP_RECENT_TOKENS: u32 = 15_000;
@@ -115,6 +113,8 @@ pub struct CompactionTrigger {
     pub window: u32,
     pub used_floor: Option<u32>,
     pub reason: CompactionReason,
+    /// Trigger percentage (50..=90); default 85.
+    pub threshold_percent: u32,
 }
 
 /// Result of a successful compaction.
@@ -311,12 +311,20 @@ pub fn history_tokens(history: &[HistoryMessage]) -> u32 {
     history.iter().map(message_tokens).sum()
 }
 
-/// Trigger point: `window - max(15% * window, 16_384)`, clamped below the window.
-pub fn compaction_threshold(window: u32) -> u32 {
+/// Trigger point: `window - max((100 - percent)% * window, 16_384)`, clamped
+/// below the window. The default percentage (85) reproduces the historical
+/// behavior; small windows fall back to the proportional reserve when the 16k
+/// floor would consume the whole budget.
+pub fn compaction_threshold(window: u32, percent: u32) -> u32 {
     if window == 0 {
         return 0;
     }
-    let proportional = (f64::from(window) * RESERVE_SHARE) as u32;
+    let percent = percent.clamp(
+        crate::config::COMPACT_THRESHOLD_MIN_PERCENT,
+        crate::config::COMPACT_THRESHOLD_MAX_PERCENT,
+    );
+    let reserve_percent = 100u32.saturating_sub(percent);
+    let proportional = (u64::from(window) * u64::from(reserve_percent) / 100) as u32;
     let reserve = proportional.max(RESERVE_MIN_TOKENS);
     let reserve = if reserve >= window.saturating_sub(proportional) {
         proportional.max(1)
@@ -329,8 +337,8 @@ pub fn compaction_threshold(window: u32) -> u32 {
 }
 
 /// Recent tail kept verbatim at the current trigger.
-pub fn tail_budget(window: u32, forced: bool) -> u32 {
-    let threshold = compaction_threshold(window);
+pub fn tail_budget(window: u32, forced: bool, percent: u32) -> u32 {
+    let threshold = compaction_threshold(window, percent);
     if threshold == 0 {
         return 0;
     }
@@ -346,8 +354,8 @@ pub fn tail_budget(window: u32, forced: bool) -> u32 {
 }
 
 /// Whether `used` reached the trigger.
-pub fn should_compact(used: u32, window: u32) -> bool {
-    let threshold = compaction_threshold(window);
+pub fn should_compact(used: u32, window: u32, percent: u32) -> bool {
+    let threshold = compaction_threshold(window, percent);
     threshold > 0 && used >= threshold
 }
 
@@ -922,15 +930,17 @@ pub async fn maybe_compact(
     .saturating_add(history_image_tokens(history))
     .saturating_add(history_opaque_state_tokens(history));
     let used = trigger.used_floor.map_or(used, |floor| used.max(floor));
-    if trigger.reason == CompactionReason::Threshold && !should_compact(used, trigger.window) {
+    if trigger.reason == CompactionReason::Threshold
+        && !should_compact(used, trigger.window, trigger.threshold_percent)
+    {
         return None;
     }
-    let threshold = compaction_threshold(trigger.window);
+    let threshold = compaction_threshold(trigger.window, trigger.threshold_percent);
     if threshold == 0 {
         return None;
     }
     let forced = trigger.reason == CompactionReason::Overflow;
-    let keep = tail_budget(trigger.window, forced);
+    let keep = tail_budget(trigger.window, forced, trigger.threshold_percent);
     let cut = cut_index(history, keep)
         .and_then(|candidate| {
             align_cut(history, anchors, candidate)
@@ -1358,12 +1368,18 @@ pub async fn summarize_manual_for_conversation(
             1,
         ),
     };
-    let Some(cut) = cut_index(&history, tail_budget(model.context_window, false)).and_then(
-        |candidate| {
-            align_cut(&history, &anchors, candidate)
-                .or_else(|| align_cut_backward(&history, &anchors, candidate))
-        },
-    ) else {
+    let Some(cut) = cut_index(
+        &history,
+        tail_budget(
+            model.context_window,
+            false,
+            settings.compact_threshold_percent,
+        ),
+    )
+    .and_then(|candidate| {
+        align_cut(&history, &anchors, candidate)
+            .or_else(|| align_cut_backward(&history, &anchors, candidate))
+    }) else {
         eprintln!("zylara: /compact has no history large enough to summarize");
         return Ok(None);
     };
@@ -1501,20 +1517,31 @@ mod tests {
 
     #[test]
     fn threshold_matches_85_percent_and_reserve_floor() {
-        assert_eq!(compaction_threshold(200_000), 170_000);
-        assert_eq!(compaction_threshold(1_000_000), 850_000);
-        assert_eq!(compaction_threshold(32_768), 16_384);
-        assert_eq!(compaction_threshold(16_384), 13_927);
-        assert_eq!(compaction_threshold(0), 0);
-        assert!(should_compact(170_000, 200_000));
-        assert!(!should_compact(169_999, 200_000));
+        assert_eq!(compaction_threshold(200_000, 85), 170_000);
+        assert_eq!(compaction_threshold(1_000_000, 85), 850_000);
+        assert_eq!(compaction_threshold(32_768, 85), 16_384);
+        assert_eq!(compaction_threshold(16_384, 85), 13_927);
+        assert_eq!(compaction_threshold(0, 85), 0);
+        assert!(should_compact(170_000, 200_000, 85));
+        assert!(!should_compact(169_999, 200_000, 85));
+    }
+
+    #[test]
+    fn threshold_honors_the_configured_percentage_and_clamps_it() {
+        assert_eq!(compaction_threshold(200_000, 70), 140_000);
+        assert_eq!(compaction_threshold(200_000, 50), 100_000);
+        // Out-of-range values clamp to 50..=90.
+        assert_eq!(compaction_threshold(200_000, 10), 100_000);
+        assert_eq!(compaction_threshold(200_000, 95), 180_000);
+        // Small windows keep the 16k reserve floor.
+        assert_eq!(compaction_threshold(32_768, 70), 16_384);
     }
 
     #[test]
     fn tail_budget_keeps_15k_and_halves_on_overflow() {
-        assert_eq!(tail_budget(200_000, false), KEEP_RECENT_TOKENS);
-        assert_eq!(tail_budget(200_000, true), KEEP_RECENT_TOKENS / 2);
-        assert!(tail_budget(32_768, false) < 32_768);
+        assert_eq!(tail_budget(200_000, false, 85), KEEP_RECENT_TOKENS);
+        assert_eq!(tail_budget(200_000, true, 85), KEEP_RECENT_TOKENS / 2);
+        assert!(tail_budget(32_768, false, 85) < 32_768);
     }
 
     #[test]

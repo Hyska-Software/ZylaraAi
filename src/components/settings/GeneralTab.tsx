@@ -2,6 +2,11 @@ import { useTranslation } from 'react-i18next';
 
 import { SUPPORTED_LANGUAGES, type AppLocale } from '@/lib/i18n/languages';
 import type { ThemeMode } from '@/lib/types';
+import {
+  COMPACT_THRESHOLD_DEFAULT_PERCENT,
+  COMPACT_THRESHOLD_MAX_PERCENT,
+  COMPACT_THRESHOLD_MIN_PERCENT,
+} from '@/lib/compactionSettings';
 import { LAYOUT_MODES } from '@/lib/layoutModes';
 import { useAppStore, useUiStore } from '@/lib/store';
 import { NativeSelect, SegmentedControl, Slider, Switch } from '@/components/ui';
@@ -17,6 +22,13 @@ export function GeneralTab() {
   const enabledLayouts = useUiStore((state) => state.enabledLayouts);
   const setLayoutEnabled = useUiStore((state) => state.setLayoutEnabled);
   const enabledCount = LAYOUT_MODES.filter((mode) => enabledLayouts[mode.value]).length;
+  const compactThresholdPercent = Math.min(
+    COMPACT_THRESHOLD_MAX_PERCENT,
+    Math.max(
+      COMPACT_THRESHOLD_MIN_PERCENT,
+      settings.compactThresholdPercent ?? COMPACT_THRESHOLD_DEFAULT_PERCENT,
+    ),
+  );
 
   const themeOptions = [
     { value: 'light', label: t('general.theme.light') },
@@ -169,6 +181,31 @@ export function GeneralTab() {
             checked={settings.closeToTray !== false}
             onCheckedChange={(checked) => void saveSettings({ closeToTray: checked })}
             aria-label={t('general.keepInTray.aria')}
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('general.context.title')}
+        description={t('general.context.description')}
+      >
+        <SettingRow
+          vertical
+          label={t('general.compactionThreshold.label')}
+          description={t('general.compactionThreshold.description', {
+            percent: compactThresholdPercent,
+          })}
+        >
+          <Slider
+            min={COMPACT_THRESHOLD_MIN_PERCENT}
+            max={COMPACT_THRESHOLD_MAX_PERCENT}
+            step={1}
+            value={compactThresholdPercent}
+            valueLabel={`${compactThresholdPercent}%`}
+            onValueChange={(value) =>
+              void saveSettings({ compactThresholdPercent: Math.round(value) })
+            }
+            aria-label={t('general.compactionThreshold.aria')}
           />
         </SettingRow>
       </SettingsSection>

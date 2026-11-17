@@ -74,6 +74,13 @@ pub const TERMINAL_FONT_FAMILY_MAX_CHARS: usize = 200;
 pub const SPILL_RETENTION_MIN_DAYS: u32 = 1;
 pub const SPILL_RETENTION_MAX_DAYS: u32 = 365;
 
+/// Percentual da janela em que a compactação automática dispara. Abaixo de 50%
+/// desperdiça contexto; acima de 90% não sobra espaço confortável para a
+/// resposta. O valor padrão (85) preserva o comportamento histórico.
+pub const COMPACT_THRESHOLD_MIN_PERCENT: u32 = 50;
+pub const COMPACT_THRESHOLD_MAX_PERCENT: u32 = 90;
+pub const COMPACT_THRESHOLD_DEFAULT_PERCENT: u32 = 85;
+
 /// Tempo máximo para o usuário responder a uma aprovação do harness, em
 /// segundos (30 s .. 1 h). Fora da faixa, o valor é clampado.
 pub const APPROVAL_TIMEOUT_MIN_SECS: u32 = 30;
@@ -232,6 +239,9 @@ fn normalize_settings(mut settings: Settings) -> Settings {
     settings.spill_retention_days = settings
         .spill_retention_days
         .clamp(SPILL_RETENTION_MIN_DAYS, SPILL_RETENTION_MAX_DAYS);
+    settings.compact_threshold_percent = settings
+        .compact_threshold_percent
+        .clamp(COMPACT_THRESHOLD_MIN_PERCENT, COMPACT_THRESHOLD_MAX_PERCENT);
     settings.approval_timeout_secs = settings
         .approval_timeout_secs
         .clamp(APPROVAL_TIMEOUT_MIN_SECS, APPROVAL_TIMEOUT_MAX_SECS);
@@ -2303,6 +2313,10 @@ mod tests {
         assert_eq!(defaults.docker_image, "node:22-bookworm");
         assert!(!defaults.docker_network);
         assert!(defaults.auto_compact);
+        assert_eq!(
+            defaults.compact_threshold_percent,
+            COMPACT_THRESHOLD_DEFAULT_PERCENT
+        );
         assert_eq!(defaults.spill_retention_days, 30);
         assert_eq!(defaults.approval_timeout_secs, 600);
         assert!(defaults.notifications_enabled);
@@ -2392,6 +2406,31 @@ mod tests {
     }
 
     #[test]
+    fn compact_threshold_percent_clamps_to_the_ui_range() {
+        let low = normalize_settings(Settings {
+            compact_threshold_percent: 1,
+            ..Settings::default()
+        });
+        assert_eq!(
+            low.compact_threshold_percent,
+            COMPACT_THRESHOLD_MIN_PERCENT
+        );
+        let high = normalize_settings(Settings {
+            compact_threshold_percent: 100,
+            ..Settings::default()
+        });
+        assert_eq!(
+            high.compact_threshold_percent,
+            COMPACT_THRESHOLD_MAX_PERCENT
+        );
+        let valid = normalize_settings(Settings {
+            compact_threshold_percent: 70,
+            ..Settings::default()
+        });
+        assert_eq!(valid.compact_threshold_percent, 70);
+    }
+
+    #[test]
     fn legacy_settings_file_without_code_harness_fields_uses_defaults() {
         // `settings.json` de antes do harness de código.
         let raw = r#"{"theme":"dark","maxSteps":10,"codeMaxSteps":9999}"#;
@@ -2401,6 +2440,10 @@ mod tests {
         // Campos ausentes: defaults do harness.
         assert!(normalized.shell_enabled);
         assert!(normalized.auto_compact);
+        assert_eq!(
+            normalized.compact_threshold_percent,
+            COMPACT_THRESHOLD_DEFAULT_PERCENT
+        );
         assert_eq!(normalized.spill_retention_days, 30);
         assert_eq!(normalized.approval_timeout_secs, 600);
         assert!(normalized.notifications_enabled);
@@ -2597,6 +2640,10 @@ mod tests {
             serde_json::to_value(Settings::default()).expect("serializar settings do harness");
         assert_eq!(value["shellEnabled"], true);
         assert_eq!(value["autoCompact"], true);
+        assert_eq!(
+            value["compactThresholdPercent"],
+            COMPACT_THRESHOLD_DEFAULT_PERCENT
+        );
         assert_eq!(value["spillRetentionDays"], 30);
         assert_eq!(value["approvalTimeoutSecs"], 600);
         assert_eq!(value["notificationsEnabled"], true);

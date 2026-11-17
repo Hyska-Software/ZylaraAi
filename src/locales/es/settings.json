@@ -51,6 +51,15 @@
       "description": "El bloque de razonamiento y pasos del agente empieza cerrado y no se abre solo durante la transmisión. Puedes expandirlo en cualquier momento.",
       "aria": "Razonamiento contraído por defecto"
     },
+    "context": {
+      "title": "Contexto",
+      "description": "Cuando la conversación se acerca a la ventana del modelo, los mensajes antiguos se resumen y el trabajo reciente se mantiene íntegro."
+    },
+    "compactionThreshold": {
+      "label": "Límite de la compactación automática",
+      "description": "Compacta cuando el contexto alcanza el {{percent}}% de la ventana del modelo. Predeterminado: 85%. Los valores fuera de 50–90% se ajustan, y las ventanas pequeñas mantienen al menos 16 mil tokens libres para la respuesta.",
+      "aria": "Límite de la compactación automática"
+    },
     "keepInTray": {
       "label": "Seguir en segundo plano en la bandeja del sistema",
       "description": "Cerrar la ventana oculta Zylara en vez de salir, así que los turnos de los agentes, las rutinas y las tareas siguen ejecutándose. Vuelve a abrirlo o sal desde el icono de la bandeja.",

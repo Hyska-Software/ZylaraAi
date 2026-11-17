@@ -51,6 +51,15 @@
       "description": "The reasoning and agent-step block starts closed and does not open by itself while streaming. You can expand it at any time.",
       "aria": "Reasoning collapsed by default"
     },
+    "context": {
+      "title": "Context",
+      "description": "When the conversation approaches the model window, older messages are summarized and recent work is kept verbatim."
+    },
+    "compactionThreshold": {
+      "label": "Auto-compaction threshold",
+      "description": "Compacts when the context reaches {{percent}}% of the model window. Default: 85%. Values outside 50–90% are clamped, and small windows keep at least 16k tokens free for the reply.",
+      "aria": "Auto-compaction threshold"
+    },
     "keepInTray": {
       "label": "Keep running in the system tray",
       "description": "Closing the window hides Zylara instead of quitting, so agent turns, routines and tasks keep running. Open it again or quit from the tray icon.",

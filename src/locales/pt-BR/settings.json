@@ -51,6 +51,15 @@
       "description": "O bloco de raciocínio e passos do agente começa fechado e não abre sozinho durante o streaming. Você pode expandi-lo a qualquer momento.",
       "aria": "Raciocínio recolhido por padrão"
     },
+    "context": {
+      "title": "Contexto",
+      "description": "Quando a conversa se aproxima da janela do modelo, mensagens antigas são resumidas e o trabalho recente é mantido integralmente."
+    },
+    "compactionThreshold": {
+      "label": "Limite da compactação automática",
+      "description": "Compacta quando o contexto atinge {{percent}}% da janela do modelo. Padrão: 85%. Valores fora de 50–90% são ajustados, e janelas pequenas mantêm ao menos 16 mil tokens livres para a resposta.",
+      "aria": "Limite da compactação automática"
+    },
     "keepInTray": {
       "label": "Continuar em segundo plano na bandeja do sistema",
       "description": "Fechar a janela oculta o Zylara em vez de encerrar, então turnos dos agentes, rotinas e tarefas continuam rodando. Reabra ou saia pelo ícone da bandeja.",

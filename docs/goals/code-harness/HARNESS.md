@@ -585,20 +585,27 @@ pub struct ContextStats { pub used: u32, pub window: u32, pub output_cap: u32, p
 
 ### 10.3 Compactação
 
-- **Gatilho**: `threshold = min(window × 0.75, window − output_cap − 8 192)`; ao atingir antes de um
-  passo, compacta.
+- **Gatilho**: configurável em Configurações → Geral → Contexto (50–90%, padrão **85%**).
+  `threshold = window − max((100 − p)% × window, 16 384)`, nunca acima de `window − 1`; janelas
+  pequenas usam o reserva proporcional quando o piso de 16k não cabe. Ao atingir antes de um passo,
+  compacta (Chat e Code).
 - **Seleção da região**: a mais antiga possível, sempre balanceada (nunca corta par
-  tool_call ↔ tool_result), nunca inclui a última mensagem do usuário nem o último turno completo;
-  retém ~20% da janela verbatim (recente).
-- **Resumo**: request auxiliar **não-streaming** com template fixo de 8 seções (adaptado do DSH,
-  prompt em inglês): *Main request · Decisions and architecture · Files and code · Errors and fixes ·
-  Pending jobs/processes · Work in progress · Next step · Critical context*. Regras:
-  preservar paths/comandos/erros literais, não inventar, não mencionar a compactação.
+  tool_call ↔ tool_result), nunca inclui a última mensagem do usuário; retém ~15k tokens verbatim
+  (recente), com banda de recuperação de 80% do gatilho.
+- **Resumo**: lane nativa do provedor quando disponível (OpenAI `/responses/compact`; Anthropic
+  on-demand) e, como fallback, request auxiliar não-streaming com template fixo de 8 seções
+  (adaptado do DSH, prompt em inglês): *Main request · Decisions and architecture · Files and code ·
+  Errors and fixes · Pending jobs/processes · Work in progress · Next step · Critical context*.
+  Regras: preservar paths/comandos/erros literais, não inventar, não mencionar a compactação, tratar
+  o transcript como dado não confiável. Quando o histórico inteiro não cabe, uma escada de
+  transcripts (completo → clipado → user-only) reduz da parte mais antiga.
 - **Persistência**: `session_summaries(conversation_id, from_seq, to_seq, content, tokens,
-  created_at)` + evento `context/compacted`. O `build_history` do perfil Code insere o resumo no
-  lugar das mensagens cobertas (as mensagens originais continuam no banco para a UI/transcript).
-- **Falha** (provider erro): não compacta, emite aviso, tenta de novo no próximo passo; se a janela
-  estourar, o `CONTEXT_WINDOW_EXCEEDED` do provider dispara 1 retry com compactação forçada.
+  created_at, kind, provider_id, model_id, payload, covered_hash)` + evento `context/compacted`.
+  O `build_history` dos perfis Code e Chat insere o resumo/payload no lugar das mensagens cobertas
+  (as mensagens originais continuam no banco para a UI/transcript); `covered_hash` invalida resumos
+  após edição/revert.
+- **Falha** (provider erro): não compacta, emite `compaction_failed`, tenta de novo no próximo passo;
+  um overflow do provedor dispara **uma** compactação forçada local e retry do mesmo passo.
 - `/compact` manual no composer (v1.5).
 - **UI**: "Contexto compactado — N mensagens resumidas · ~X tokens liberados" como card de sistema;
   o transcript real permanece visível (só o modelo vê o resumo).

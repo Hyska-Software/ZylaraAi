@@ -194,3 +194,24 @@ describe('GeneralTab — bandeja do sistema', () => {
     expect(useAppStore.getState().settings.closeToTray).toBe(false);
   });
 });
+
+describe('GeneralTab — limite da compactação', () => {
+  it('mostra 85% por padrão e salva a nova porcentagem', async () => {
+    render(<GeneralTab />);
+
+    expect(screen.getByText('Contexto')).toBeTruthy();
+    const slider = screen.getByRole('slider', {
+      name: 'Limite da compactação automática',
+    }) as HTMLInputElement;
+    expect(slider.value).toBe('85');
+    expect(screen.getByText('85%')).toBeTruthy();
+
+    fireEvent.change(slider, { target: { value: '70' } });
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ compactThresholdPercent: 70 }),
+      );
+    });
+  });
+});

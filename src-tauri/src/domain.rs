@@ -1323,6 +1323,11 @@ fn default_true() -> bool {
     true
 }
 
+/// Default compaction trigger: 85% of the model window (the historical value).
+fn default_compact_threshold_percent() -> u32 {
+    85
+}
+
 fn default_execution_environment() -> String {
     "local".to_string()
 }
@@ -1551,6 +1556,10 @@ pub struct Settings {
     pub computer_max_actions_per_hour: u32,
     /// Compacta o contexto automaticamente quando a janela aperta.
     pub auto_compact: bool,
+    /// Gatilho percentual da compactação automática (50..=90; padrão 85).
+    /// `compaction_threshold` mantém ao menos 16k tokens livres para a resposta.
+    #[serde(default = "default_compact_threshold_percent")]
+    pub compact_threshold_percent: u32,
     /// Retenção dos arquivos de spill (saída completa de tools), em dias.
     pub spill_retention_days: u32,
     /// Tempo máximo para o usuário responder uma aprovação (segundos).
@@ -1674,6 +1683,7 @@ impl Default for Settings {
             computer_max_actions_per_turn: default_computer_max_actions_per_turn(),
             computer_max_actions_per_hour: default_computer_max_actions_per_hour(),
             auto_compact: true,
+            compact_threshold_percent: default_compact_threshold_percent(),
             spill_retention_days: 30,
             approval_timeout_secs: 600,
             notifications_enabled: true,

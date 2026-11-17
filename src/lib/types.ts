@@ -2349,6 +2349,8 @@ export interface Settings {
   computerMaxActionsPerHour?: number;
   /** Compacta o contexto automaticamente quando a janela aperta. */
   autoCompact?: boolean;
+  /** Gatilho da compactação em % da janela (50..90; padrão 85). */
+  compactThresholdPercent?: number;
   /** Retenção dos arquivos de spill, em dias. */
   spillRetentionDays?: number;
   /** Tempo máximo para responder uma aprovação (segundos). */
