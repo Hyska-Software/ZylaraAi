@@ -1927,19 +1927,11 @@ pub async fn run_turn(
     } else {
         None
     };
-    let workspace_lock_key = conversation
-        .workspace_id
-        .as_deref()
-        .map(|id| format!("workspace:{id}"))
-        .or_else(|| conversation.task_id.as_deref().map(|id| format!("task:{id}")));
-    let _workspace_lock_guard = if payload.options.delegation_depth > 0 {
-        None
-    } else {
-        match workspace_lock_key {
-            Some(key) => Some(crate::agents::acquire_workspace_execution(&key, &cancel).await?),
-            None => None,
-        }
-    };
+    // No turn-wide workspace lock: conversations sharing a project must run
+    // concurrently. The workspace directory is protected per mutation
+    // (`workspace::access`) and each conversation observes its own file
+    // versions, so a stale write fails with FS_STALE_VERSION instead of
+    // overwriting another session's work.
     // Per-agent Docker image override. It is a deny-only capability gate: the
     // renderer cannot force Docker when the persona did not opt in.
     if let Some(agent) = agent.as_ref() {

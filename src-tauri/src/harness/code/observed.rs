@@ -55,9 +55,13 @@ struct ReadRepeat {
 }
 
 /// Arquivos observados nesta execução do app (compartilhado no `AppState`).
+///
+/// A versão é **por conversa**: duas sessões no mesmo workspace não podem
+/// autorizar a escrita uma da outra (B lendo/escrevendo não revalida a leitura
+/// de A). O path é absoluto e o executor resolve antes de consultar.
 #[derive(Default)]
 pub struct ObservedFiles {
-    entries: Mutex<HashMap<PathBuf, ObservedVersion>>,
+    entries: Mutex<HashMap<(String, PathBuf), ObservedVersion>>,
     reads: Mutex<HashMap<(String, PathBuf), ReadRepeat>>,
 }
 
@@ -67,9 +71,9 @@ impl ObservedFiles {
     }
 
     /// Registra a versão atual (chamado por `read_file` e por escritas bem-sucedidas).
-    pub fn record(&self, path: &Path, bytes: &[u8]) {
+    pub fn record(&self, conversation_id: &str, path: &Path, bytes: &[u8]) {
         self.entries.lock().insert(
-            path.to_path_buf(),
+            (conversation_id.to_string(), path.to_path_buf()),
             ObservedVersion {
                 hash: hash_bytes(bytes),
                 size: bytes.len() as u64,
@@ -77,10 +81,10 @@ impl ObservedFiles {
         );
     }
 
-    /// Compara o conteúdo atual com a versão observada.
-    pub fn check(&self, path: &Path, current: &[u8]) -> ObservationState {
+    /// Compara o conteúdo atual com a versão observada pela conversa.
+    pub fn check(&self, conversation_id: &str, path: &Path, current: &[u8]) -> ObservationState {
         let entries = self.entries.lock();
-        match entries.get(path) {
+        match entries.get(&(conversation_id.to_string(), path.to_path_buf())) {
             None => ObservationState::Missing,
             Some(version) => {
                 if version.size == current.len() as u64 && version.hash == hash_bytes(current) {
@@ -130,8 +134,10 @@ impl ObservedFiles {
 
     /// Esquece um arquivo (ex.: removido pelo agente).
     #[allow(dead_code)]
-    pub fn forget(&self, path: &Path) {
-        self.entries.lock().remove(path);
+    pub fn forget(&self, conversation_id: &str, path: &Path) {
+        self.entries
+            .lock()
+            .remove(&(conversation_id.to_string(), path.to_path_buf()));
     }
 
     #[allow(dead_code)]
@@ -148,18 +154,39 @@ mod tests {
     fn records_and_detects_changes() {
         let observed = ObservedFiles::new();
         let path = Path::new("C:/proj/a.ts");
-        observed.record(path, b"let a = 1;\n");
+        observed.record("conv", path, b"let a = 1;\n");
         assert_eq!(
-            observed.check(path, b"let a = 1;\n"),
+            observed.check("conv", path, b"let a = 1;\n"),
             ObservationState::Fresh
         );
         assert_eq!(
-            observed.check(path, b"let a = 2;\n"),
+            observed.check("conv", path, b"let a = 2;\n"),
             ObservationState::Stale
         );
         assert_eq!(
-            observed.check(Path::new("C:/proj/b.ts"), b"x"),
+            observed.check("conv", Path::new("C:/proj/b.ts"), b"x"),
             ObservationState::Missing
+        );
+    }
+
+    #[test]
+    fn observations_are_scoped_per_conversation() {
+        let observed = ObservedFiles::new();
+        let path = Path::new("C:/proj/a.ts");
+        observed.record("conv-a", path, b"let a = 1;\n");
+        // Reading in A never authorizes B, and B's write never refreshes A.
+        assert_eq!(
+            observed.check("conv-b", path, b"let a = 1;\n"),
+            ObservationState::Missing
+        );
+        observed.record("conv-b", path, b"let a = 2;\n");
+        assert_eq!(
+            observed.check("conv-a", path, b"let a = 2;\n"),
+            ObservationState::Stale
+        );
+        assert_eq!(
+            observed.check("conv-b", path, b"let a = 2;\n"),
+            ObservationState::Fresh
         );
     }
 
@@ -204,8 +231,11 @@ mod tests {
     fn forget_removes_the_entry() {
         let observed = ObservedFiles::new();
         let path = Path::new("C:/proj/a.ts");
-        observed.record(path, b"conteudo");
-        observed.forget(path);
-        assert_eq!(observed.check(path, b"conteudo"), ObservationState::Missing);
+        observed.record("conv", path, b"conteudo");
+        observed.forget("conv", path);
+        assert_eq!(
+            observed.check("conv", path, b"conteudo"),
+            ObservationState::Missing
+        );
     }
 }

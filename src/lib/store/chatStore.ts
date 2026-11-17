@@ -80,6 +80,12 @@ interface ChatState {
   streamsByConversation: Record<string, StreamingState>;
   /** Visible stream of the active conversation (always mirrors the map). */
   streaming: StreamingState | null;
+  /**
+   * Turns admitted by Rust before the user message exists. They have no
+   * assistant row, so they never create a phantom stream, but they keep their
+   * conversation busy across a reload (send queues, Stop cancels).
+   */
+  pendingTurnsByConversation: Record<string, { turnId: string; startedAt: number }>;
   pendingAttachments: AttachmentInfo[];
   error: string | null;
   /** Machine-readable code of the last turn error (`subscription_sharing_*`, `auth_required`, ...). */
@@ -665,6 +671,31 @@ export const useChatStore = create<ChatState>()((set, get) => {
     setStream(conversationId, update(current));
   };
 
+  /**
+   * A turn accepted by Rust but not yet persisted as a message row. There is no
+   * assistant id to stream into, so it gets its own map: the conversation keeps
+   * being busy (send queues, Stop cancels) while another conversation runs.
+   */
+  const markPendingTurn = (conversationId: string, turnId: string, startedAt: number) => {
+    set((state) => ({
+      pendingTurnsByConversation: {
+        ...state.pendingTurnsByConversation,
+        [conversationId]: { turnId, startedAt },
+      },
+    }));
+  };
+
+  const clearPendingTurn = (conversationId: string, turnId?: string) => {
+    set((state) => {
+      const current = state.pendingTurnsByConversation[conversationId];
+      if (!current) return {};
+      if (turnId && current.turnId !== turnId) return {};
+      const pendingTurnsByConversation = { ...state.pendingTurnsByConversation };
+      delete pendingTurnsByConversation[conversationId];
+      return { pendingTurnsByConversation };
+    });
+  };
+
   const finalizeAssistant = (conversationId: string, message: ChatMessage) => {
     set((state) => {
       const list = state.messagesByConversation[conversationId] ?? [];
@@ -727,9 +758,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
     if (conversation.mode === 'agent') {
       return conversation.workspaceId ? 'code' : 'chat';
     }
-    const layout = currentLayout();
-    if (layout === 'chat') return 'chat';
-    return conversation.mode === 'code' || conversation.codeLinked ? 'code' : 'chat';
+    // A native Code session always runs the Code profile: a queued background
+    // turn must behave the same while the user is looking at the Chat layout.
+    // A Chat session shared with Code keeps the historical split (Code profile
+    // only while the Code layout is on screen).
+    if (conversation.mode === 'code') return 'code';
+    if (conversation.codeLinked) return currentLayout() === 'code' ? 'code' : 'chat';
+    return 'chat';
   };
 
   /** True when the conversation owns Code-session state. */
@@ -973,9 +1008,12 @@ export const useChatStore = create<ChatState>()((set, get) => {
         }
       }
       switch (event.type) {
+        case 'accepted':
+          // Admitted with no message row yet; the optimistic stream already
+          // shows "starting", so there is nothing to patch.
+          break;
         case 'queued':
-          // Accepted by Rust but still waiting for a concurrency/workspace
-          // slot: keep the placeholder honest instead of "Generating…".
+          // Legacy journal row from the former slot queue (replay only).
           patchStream(context.conversationId, (stream) => ({ ...stream, phase: 'queued' }));
           break;
         case 'turn_started': {
@@ -1585,9 +1623,6 @@ export const useChatStore = create<ChatState>()((set, get) => {
           if (records.length < 5_000 || finished) return;
         }
         if (finished) return;
-        if ((appliedTurnSeq.get(turnId) ?? 0) === 0) {
-          patchStream(context.conversationId, (stream) => ({ ...stream, phase: 'queued' }));
-        }
         const active = await safe(() => api.listActiveTurns());
         if (!Array.isArray(active)) return;
         if (active.some((turn) => turn.turnId === turnId)) {
@@ -1916,6 +1951,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     const target = conversationId ?? get().activeId;
     if (!target) return false;
     if (selectConversationStream(get(), target)) return false;
+    if (get().pendingTurnsByConversation[target]) return false;
     if (preemptions.has(target)) return false;
     const queue = useMessageQueueStore.getState();
     if (queue.isPaused(target)) return false;
@@ -1929,6 +1965,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     try {
       if (!(await waitForIdleTurn(target))) return false;
       if (selectConversationStream(get(), target)) return false;
+      if (get().pendingTurnsByConversation[target]) return false;
       if (useMessageQueueStore.getState().isPaused(target)) return false;
       if (!startQueueItem(target, item)) return false;
       useMessageQueueStore.getState().dequeue(target);
@@ -1995,9 +2032,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
    */
   const drainMessageQueues = async () => {
     const ids = Object.keys(useMessageQueueStore.getState().byConversation);
-    for (const id of ids) {
-      await processQueue(id);
-    }
+    // Threads drain independently: a conversation that is still finishing must
+    // not delay the delivery of another. `draining` keeps one item per thread.
+    await Promise.all(ids.map((id) => processQueue(id)));
   };
 
   return {
@@ -2009,6 +2046,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     loadingConversationId: null,
     streamsByConversation: {},
     streaming: null,
+    pendingTurnsByConversation: {},
     pendingAttachments: [],
     error: null,
     errorCode: null,
@@ -2613,9 +2651,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
       const attachments = state.pendingAttachments;
       if (!trimmed && !attachments.length) return false;
       // Only the conversation being sent to is busy. A background agent turn
-      // never blocks another thread.
+      // never blocks another thread — nor does one that was admitted but has not
+      // persisted its message yet.
       const activeStream = selectActiveStream(state);
-      if (activeStream) {
+      const activePending = state.activeId
+        ? state.pendingTurnsByConversation[state.activeId]
+        : undefined;
+      if (activeStream || activePending) {
         const conversationId = state.activeId;
         if (!conversationId) {
           toast.info(t('chat:toasts.waitForResponse'));
@@ -2742,7 +2784,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
     regenerate: async () => {
       const state = get();
-      if (!state.activeId || selectActiveStream(state)) return;
+      if (
+        !state.activeId ||
+        selectActiveStream(state) ||
+        state.pendingTurnsByConversation[state.activeId]
+      ) {
+        return;
+      }
       const conversationId = state.activeId;
       const messages = state.messagesByConversation[conversationId] ?? [];
       const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
@@ -2920,8 +2968,25 @@ export const useChatStore = create<ChatState>()((set, get) => {
       const conversationId = state.activeId;
       // Stop cancels a pending "Enviar agora": the item stays queued (paused).
       if (conversationId) preemptions.delete(conversationId);
-      const streaming = selectConversationStream(state, conversationId) ?? state.streaming;
-      if (!streaming) return;
+      // Identity-checked lookup: a stale visible mirror must never cancel the
+      // turn of another conversation. Without an active conversation the mirror
+      // is the only record (legacy callers/tests).
+      const streaming =
+        selectConversationStream(state, conversationId) ??
+        (conversationId ? null : state.streaming);
+      if (!streaming) {
+        // The turn was admitted but has not persisted its message yet: cancel it
+        // by id so the conversation does not stay busy.
+        const pending = conversationId ? state.pendingTurnsByConversation[conversationId] : undefined;
+        if (!conversationId || !pending) return;
+        clearPendingTurn(conversationId, pending.turnId);
+        try {
+          await api.cancelTurn(pending.turnId);
+        } catch (error) {
+          console.error('cancel failed', error);
+        }
+        return;
+      }
       goalSkips.add(streaming.turnId);
       if (conversationId) {
         setStream(conversationId, { ...streaming, phase: 'starting' });
@@ -2970,6 +3035,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         } catch (error) {
           console.error('cancel conversation failed', error);
         }
+        clearPendingTurn(conversationId);
         return;
       }
       setStream(conversationId, { ...streaming, phase: 'starting' });
@@ -3208,12 +3274,20 @@ export const useChatStore = create<ChatState>()((set, get) => {
       }
       const conversation = get().conversations.find((entry) => entry.id === conversationId);
       let stream = selectConversationStream(get(), conversationId);
+      if (event.type === 'accepted') {
+        // Admitted by Rust without a message row yet: keep the conversation busy
+        // without inventing a phantom stream or an empty assistant bubble.
+        markPendingTurn(conversationId, turnId, Date.now());
+        return;
+      }
       if (event.type === 'queued') {
-        // No message row exists yet: never invent a phantom stream for it.
+        // Legacy journal row (the former slot queue). Only updates an existing
+        // stream: a waiting turn still has no message row.
         if (stream) setStream(conversationId, { ...stream, phase: 'queued' });
         return;
       }
       if (event.type === 'turn_started') {
+        clearPendingTurn(conversationId, turnId);
         stream = {
           turnId,
           conversationId,
@@ -3261,12 +3335,17 @@ export const useChatStore = create<ChatState>()((set, get) => {
         }
         return;
       }
+      // Any terminal event closes the "accepted, no row yet" window, even when
+      // the turn never persisted a message (preflight refusal or early cancel).
+      if (event.type === 'done' || event.type === 'cancelled' || event.type === 'error') {
+        clearPendingTurn(conversationId, turnId);
+      }
       if (!stream) {
         const list = get().messagesByConversation[conversationId] ?? [];
         const assistant = [...list]
           .reverse()
           .find((message) => message.role === 'assistant' && message.status === 'streaming');
-        // Between `queued` and `turn_started` there is no assistant row yet;
+        // Between `accepted` and `turn_started` there is no assistant row yet;
         // a later terminal event still reconciles through the journal.
         if (!assistant) return;
         stream = {

@@ -957,7 +957,7 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let tmp = parent.join(format!(
         ".zylara-revert-{}-{}",
         std::process::id(),
-        crate::domain::now_ms()
+        uuid::Uuid::new_v4().simple()
     ));
     std::fs::write(&tmp, bytes)?;
     std::fs::rename(&tmp, path).or_else(|error| {
@@ -966,42 +966,103 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     })
 }
 
-fn revert_entries(
-    state: &AppState,
-    conversation_id: &str,
+/// Reversão planejada de todas as mutações de um path.
+#[derive(Debug)]
+struct RevertPlan {
+    path: String,
+    /// Hash do conteúdo anterior à primeira mutação (`None` = o arquivo não
+    /// existia antes, então reverter remove).
+    restore: Option<String>,
+}
+
+/// Valida a cadeia de mutações de cada path **antes** de tocar no disco.
+///
+/// O estado atual precisa ser exatamente o `after` da mutação mais recente, e o
+/// `after` de cada mutação anterior precisa casar com o `before` simulado da
+/// seguinte. Assim uma edição de outra sessão no meio da cadeia
+/// (`A1 → B1 → A2`) desmonta a simulação e a reversão inteira é recusada, sem
+/// apagar o trabalho do vizinho.
+fn plan_reverts(
+    objects: &crate::workspace::journal::ObjectStore,
     root: &Path,
-    mut entries: Vec<crate::db::FileJournalEntry>,
-) -> Result<u32, String> {
-    // Reverte do mais recente para o mais antigo; cada path uma vez.
-    entries.sort_by_key(|entry| std::cmp::Reverse(entry.id));
-    let objects = crate::workspace::journal::ObjectStore::new(objects_dir(&state.data_dir));
-    let mut seen = std::collections::HashSet::new();
-    let mut reverted = 0u32;
-    for entry in entries {
-        if !seen.insert(entry.path.clone()) {
-            continue;
+    entries: Vec<crate::db::FileJournalEntry>,
+) -> Result<Vec<RevertPlan>, String> {
+    let mut sorted = entries;
+    sorted.sort_by_key(|entry| std::cmp::Reverse(entry.id));
+    let mut chains: Vec<(String, Vec<crate::db::FileJournalEntry>)> = Vec::new();
+    for entry in sorted {
+        match chains.iter_mut().find(|(path, _)| *path == entry.path) {
+            Some((_, chain)) => chain.push(entry),
+            None => chains.push((entry.path.clone(), vec![entry])),
         }
+    }
+
+    let mut plans = Vec::with_capacity(chains.len());
+    for (path, chain) in chains {
         let target = crate::workspace::safe_path::resolve(
             root,
-            &entry.path,
+            &path,
             crate::workspace::safe_path::Access::Write,
         )
         .map_err(map_err)?;
-        // Verificação de corrida: o arquivo precisa estar como o turno deixou.
         let current = std::fs::read(&target).ok();
-        if let (Some(after_hash), Some(current_bytes)) = (&entry.after_hash, &current) {
-            if &sha256_hex(current_bytes) != after_hash {
+        // `None` com arquivo ausente é um estado válido (mutação que apagou);
+        // `None` com arquivo presente, ou o contrário, é divergência.
+        let matches_after = match (chain[0].after_hash.as_deref(), current.as_deref()) {
+            (Some(expected), Some(bytes)) => sha256_hex(bytes) == expected,
+            (None, None) => true,
+            _ => false,
+        };
+        if !matches_after {
+            return Err(format!(
+                "FS_STALE_VERSION: {}",
+                crate::i18n::t_args("code.errors.revertStale", &[("path", &path)])
+            ));
+        }
+        let mut state = chain[0].before_hash.clone();
+        for older in chain.iter().skip(1) {
+            if older.after_hash.as_deref() != state.as_deref() {
                 return Err(format!(
-                    "FS_STALE_VERSION: `{}` mudou desde o turno; revise o diff antes de reverter",
-                    entry.path
+                    "FS_STALE_VERSION: {}",
+                    crate::i18n::t_args("code.errors.revertForeignEdits", &[("path", &path)])
                 ));
             }
+            state = older.before_hash.clone();
         }
-        match &entry.before_hash {
-            Some(before_hash) => {
-                let bytes = objects
-                    .get(before_hash)
-                    .map_err(|error| format!("checkpoint ausente para `{}`: {error}", entry.path))?;
+        if let Some(hash) = state.as_deref() {
+            objects.get(hash).map_err(|error| {
+                crate::i18n::t_args(
+                    "code.errors.revertMissingCheckpoint",
+                    &[("path", &path), ("error", &error.to_string())],
+                )
+            })?;
+        }
+        plans.push(RevertPlan { path, restore: state });
+    }
+    Ok(plans)
+}
+
+fn apply_reverts(
+    objects: &crate::workspace::journal::ObjectStore,
+    root: &Path,
+    plans: Vec<RevertPlan>,
+) -> Result<u32, String> {
+    let mut reverted = 0u32;
+    for plan in plans {
+        let target = crate::workspace::safe_path::resolve(
+            root,
+            &plan.path,
+            crate::workspace::safe_path::Access::Write,
+        )
+        .map_err(map_err)?;
+        match plan.restore {
+            Some(hash) => {
+                let bytes = objects.get(&hash).map_err(|error| {
+                    crate::i18n::t_args(
+                        "code.errors.revertMissingCheckpoint",
+                        &[("path", &plan.path), ("error", &error.to_string())],
+                    )
+                })?;
                 atomic_write(&target, &bytes).map_err(map_err)?;
             }
             None => {
@@ -1013,6 +1074,24 @@ fn revert_entries(
         reverted += 1;
     }
     Ok(reverted)
+}
+
+async fn revert_entries(
+    state: &AppState,
+    root: &Path,
+    entries: Vec<crate::db::FileJournalEntry>,
+) -> Result<u32, String> {
+    let objects = crate::workspace::journal::ObjectStore::new(objects_dir(&state.data_dir));
+    // Lock do root cobre preflight + aplicação: outra sessão não pode trocar um
+    // arquivo entre a validação e o restore. O comando não tem token de turno.
+    let _guard = crate::workspace::access::acquire_mutation(
+        root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .map_err(map_err)?;
+    let plans = plan_reverts(&objects, root, entries)?;
+    apply_reverts(&objects, root, plans)
 }
 
 /// Reverte um arquivo ao estado anterior à primeira edição do turno.
@@ -1044,7 +1123,7 @@ pub async fn revert_file(
     if entries.is_empty() {
         return Err(crate::i18n::t_args("code.errors.noChangeForPath", &[("path", &path)]));
     }
-    let reverted = revert_entries(&state, &conversation_id, &root, entries)?;
+    let reverted = revert_entries(&state, &root, entries).await?;
     let payload = serde_json::json!({ "files": [path], "reverted": reverted }).to_string();
     state
         .db
@@ -1081,7 +1160,7 @@ pub async fn revert_turn(
         return Err(crate::i18n::t("code.errors.noTurnChanges"));
     }
     let paths: Vec<String> = entries.iter().map(|entry| entry.path.clone()).collect();
-    let reverted = revert_entries(&state, &conversation_id, &root, entries)?;
+    let reverted = revert_entries(&state, &root, entries).await?;
     let payload = serde_json::json!({ "turnId": turn_id, "files": paths, "reverted": reverted })
         .to_string();
     state
@@ -2677,5 +2756,113 @@ mod tests {
             clamp_rounds_limit(Some(10_000)),
             goal::GOAL_ROUNDS_LIST_LIMIT
         );
+    }
+
+    /* ---- reversão em workspace compartilhado ---- */
+
+    fn journal_entry(
+        id: i64,
+        path: &str,
+        before: Option<&str>,
+        after: Option<&str>,
+    ) -> crate::db::FileJournalEntry {
+        let mut entry = crate::db::FileJournalEntry::new(
+            "conv",
+            "turn",
+            path.to_string(),
+            crate::domain::FileChangeKind::Modified,
+        )
+        .with_hashes(before, after);
+        entry.id = id;
+        entry
+    }
+
+    /// Workspace temporário com o arquivo final e os checkpoints já publicados.
+    fn revert_fixture(
+        current: &[u8],
+        checkpoints: &[&[u8]],
+    ) -> (
+        tempfile::TempDir,
+        std::path::PathBuf,
+        crate::workspace::journal::ObjectStore,
+    ) {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path().join("ws");
+        std::fs::create_dir_all(&root).expect("root");
+        std::fs::write(root.join("a.txt"), current).expect("arquivo");
+        let store = crate::workspace::journal::ObjectStore::new(temp.path().join("objects"));
+        for bytes in checkpoints {
+            store.put_bytes(bytes).expect("checkpoint");
+        }
+        (temp, root, store)
+    }
+
+    #[test]
+    fn plan_reverts_restores_the_state_before_the_first_edit() {
+        let (_temp, root, store) = revert_fixture(b"v2", &[b"v0", b"v1"]);
+        let (h0, h1, h2) = (sha256_hex(b"v0"), sha256_hex(b"v1"), sha256_hex(b"v2"));
+        let entries = vec![
+            journal_entry(2, "a.txt", Some(&h1), Some(&h2)),
+            journal_entry(1, "a.txt", Some(&h0), Some(&h1)),
+        ];
+        let plans = plan_reverts(&store, &root, entries).expect("plano");
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].restore.as_deref(), Some(h0.as_str()));
+
+        assert_eq!(apply_reverts(&store, &root, plans).expect("aplicar"), 1);
+        assert_eq!(std::fs::read(root.join("a.txt")).expect("ler"), b"v0");
+    }
+
+    #[test]
+    fn plan_reverts_refuses_a_foreign_edit_between_two_edits() {
+        // A: v0 -> a1, then A: b1 -> a2. B's a1 -> b1 is not in A's journal.
+        let (_temp, root, store) = revert_fixture(b"a2", &[b"v0", b"b1"]);
+        let (h0, ha1, hb1, ha2) = (
+            sha256_hex(b"v0"),
+            sha256_hex(b"a1"),
+            sha256_hex(b"b1"),
+            sha256_hex(b"a2"),
+        );
+        let entries = vec![
+            journal_entry(3, "a.txt", Some(&hb1), Some(&ha2)),
+            journal_entry(1, "a.txt", Some(&h0), Some(&ha1)),
+        ];
+        let error = plan_reverts(&store, &root, entries).expect_err("interleaving");
+        assert!(error.contains("FS_STALE_VERSION"), "{error}");
+        // Nothing was touched: B's work is still on disk.
+        assert_eq!(std::fs::read(root.join("a.txt")).expect("ler"), b"a2");
+    }
+
+    #[test]
+    fn plan_reverts_refuses_a_file_changed_since_the_turn() {
+        let (_temp, root, store) = revert_fixture(b"editado por fora", &[b"v0"]);
+        let (h0, h1) = (sha256_hex(b"v0"), sha256_hex(b"v1"));
+        let error = plan_reverts(&store, &root, vec![journal_entry(1, "a.txt", Some(&h0), Some(&h1))])
+            .expect_err("stale");
+        assert!(error.contains("FS_STALE_VERSION"), "{error}");
+    }
+
+    #[test]
+    fn plan_reverts_requires_the_checkpoint_object() {
+        let (_temp, root, store) = revert_fixture(b"v1", &[]);
+        let (h0, h1) = (sha256_hex(b"v0"), sha256_hex(b"v1"));
+        let error = plan_reverts(&store, &root, vec![journal_entry(1, "a.txt", Some(&h0), Some(&h1))])
+            .expect_err("checkpoint");
+        assert!(error.to_lowercase().contains("checkpoint"), "{error}");
+    }
+
+    #[test]
+    fn plan_reverts_removes_a_file_created_by_the_turn() {
+        let (_temp, root, store) = revert_fixture(b"novo", &[]);
+        let hafter = sha256_hex(b"novo");
+        let plans = plan_reverts(
+            &store,
+            &root,
+            vec![journal_entry(1, "a.txt", None, Some(&hafter))],
+        )
+        .expect("plano");
+        assert_eq!(plans[0].restore, None);
+        assert_eq!(apply_reverts(&store, &root, plans).expect("aplicar"), 1);
+        assert!(!root.join("a.txt").exists());
     }
 }

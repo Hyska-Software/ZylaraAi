@@ -78,7 +78,7 @@ describe('AgentsTab', () => {
   it('organiza concorrência, orçamento, notificações, navegador, apps e desktop', () => {
     render(<AgentsTab />);
 
-    expect(screen.getByText('Execução e fila')).toBeTruthy();
+    expect(screen.getByText('Execução em segundo plano')).toBeTruthy();
     expect(screen.getByText('Orçamento')).toBeTruthy();
     expect(screen.getByText('Notificações')).toBeTruthy();
     expect(screen.getByText('Navegador controlado')).toBeTruthy();
@@ -89,7 +89,7 @@ describe('AgentsTab', () => {
   it('salva os limites de concorrência e fila', async () => {
     render(<AgentsTab />);
 
-    const turns = screen.getByLabelText('Máximo de turnos simultâneos') as HTMLInputElement;
+    const turns = screen.getByLabelText('Máximo de execuções em segundo plano') as HTMLInputElement;
     expect(turns.value).toBe('10');
     expect(turns.max).toBe('32');
 

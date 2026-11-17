@@ -698,17 +698,17 @@
   "agents": {
     "intro": "El modelo, las instrucciones, el espacio de trabajo, los permisos y las capacidades se definen individualmente en cada agente, en el editor de la persona. Esta pestaña solo reúne las preferencias globales del diseño Agentes.",
     "queue": {
-      "title": "Ejecución y cola",
-      "description": "Cuántos turnos pueden ejecutarse a la vez y el tamaño de la cola de cada hilo. Los turnos por encima del límite esperan en la cola de su propia conversación.",
+      "title": "Ejecución en segundo plano",
+      "description": "Límites de las ejecuciones sin supervisión (tareas, rutinas, inbox y canales). Tus conversaciones empiezan al instante y se ejecutan en paralelo, cada una con su propia cola.",
       "global": {
-        "label": "Turnos simultáneos (global)",
-        "description": "Hasta {{count}} turnos ejecutándose a la vez en toda la app. El backend también aplica este límite.",
-        "aria": "Máximo de turnos simultáneos"
+        "label": "Ejecuciones en segundo plano (global)",
+        "description": "Hasta {{count}} ejecuciones sin supervisión a la vez. Las conversaciones no se ven afectadas por este límite.",
+        "aria": "Máximo de ejecuciones en segundo plano"
       },
       "perAgent": {
-        "label": "Turnos simultáneos por agente",
-        "description": "Evita que un solo agente ocupe todos los espacios. Predeterminado: 1.",
-        "aria": "Máximo de turnos simultáneos por agente"
+        "label": "Ejecuciones en segundo plano por agente",
+        "description": "Evita que un solo agente ocupe todos los espacios en segundo plano. Predeterminado: 1.",
+        "aria": "Máximo de ejecuciones en segundo plano por agente"
       },
       "queueLength": {
         "label": "Mensajes en cola por hilo",

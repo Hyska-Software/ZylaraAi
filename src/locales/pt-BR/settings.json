@@ -699,17 +699,17 @@
   "agents": {
     "intro": "Modelo, instruções, workspace, permissões e capabilities são definidos individualmente em cada agente, no editor da persona. Esta aba reúne apenas as preferências globais do layout Agentes.",
     "queue": {
-      "title": "Execução e fila",
-      "description": "Quantos turnos podem rodar ao mesmo tempo e o tamanho da fila de cada thread. Turnos além do limite aguardam na fila da própria conversa.",
+      "title": "Execução em segundo plano",
+      "description": "Limites das execuções não assistidas (tarefas, rotinas, inbox e canais). As suas conversas começam na hora e rodam em paralelo, cada uma com a própria fila.",
       "global": {
-        "label": "Turnos simultâneos (global)",
-        "description": "Até {{count}} turnos rodando ao mesmo tempo em todo o app. O backend também aplica este limite.",
-        "aria": "Máximo de turnos simultâneos"
+        "label": "Execuções em segundo plano (global)",
+        "description": "Até {{count}} execuções não assistidas ao mesmo tempo. As conversas não são afetadas por este limite.",
+        "aria": "Máximo de execuções em segundo plano"
       },
       "perAgent": {
-        "label": "Turnos simultâneos por agente",
-        "description": "Evita que um único agente ocupe todos os slots. Padrão: 1.",
-        "aria": "Máximo de turnos simultâneos por agente"
+        "label": "Execuções em segundo plano por agente",
+        "description": "Evita que um único agente ocupe todos os espaços de segundo plano. Padrão: 1.",
+        "aria": "Máximo de execuções em segundo plano por agente"
       },
       "queueLength": {
         "label": "Mensagens na fila por thread",

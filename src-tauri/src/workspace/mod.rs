@@ -12,6 +12,7 @@
 
 #![allow(dead_code)]
 
+pub mod access;
 pub mod docker;
 pub mod exec;
 pub mod git;

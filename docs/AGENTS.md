@@ -271,10 +271,24 @@ com erro — o fallback é de rota, não um retry infinito.
   thread, um toast in-app avisa (respeita `notificationsEnabled`).
 - O erro visível (`error`/`errorCode`/`errorHint`) é da thread ativa: uma falha
   em segundo plano não pinta o banner por cima de outra conversa.
-- O backend aplica `ConcurrencyGovernor`: `maxConcurrentTurns` global (padrão
-  10, faixa 1–32) e `maxConcurrentTurnsPerAgent` por agente (padrão 1, faixa
-  1–4) em turnos manuais, tarefas, canais e rotinas; turnos além do limite
-  aguardam com o token de cancelamento (Stop/Cancelar libera).
+- **Sessões paralelas.** Turnos interativos (envio, regenerar, retomar e rodada de
+  objetivo via `run_turn`) **não têm limite de slots**: qualquer número de
+  conversas roda ao mesmo tempo no mesmo workspace, inclusive várias threads da
+  mesma persona. A única barreira é por conversa: `register_turn_if_idle` recusa
+  um segundo turno na mesma thread com `TURN_BUSY`, e a fila de mensagens é FIFO
+  por conversa. O backend emite `accepted` (e não `queued`) na admissão, então a
+  UI nunca mostra espera por slot em turno interativo.
+- Escritas concorrentes no mesmo workspace são coordenadas **por operação**
+  (`src-tauri/src/workspace/access.rs`): `write_file`/`edit_file` seguram o lock
+  da raiz apenas durante ler → validar → gravar → journal, e o mesmo lock cobre
+  revert e as mutações de Git (stage/commit/discard). A versão observada de cada
+  arquivo é **por conversa**, então duas sessões não autorizam a escrita uma da
+  outra: quem chega depois recebe `FS_STALE_VERSION` e relê.
+- O backend aplica `ConcurrencyGovernor` apenas nas **execuções não assistidas**:
+  `maxConcurrentTurns` global (padrão 10, faixa 1–32) e
+  `maxConcurrentTurnsPerAgent` por agente (padrão 1, faixa 1–4) em tarefas,
+  canais, inbox e rotinas. Execuções além do limite aguardam com o token de
+  cancelamento (Stop/Cancelar libera); conversas não passam por esse gate.
 - `agentDailyCostLimitUsd` é aplicado no harness por **dia local** (todas as
   threads do agente) e bloqueia novos turnos com `BUDGET_EXCEEDED`; canais e
   rotinas passam pelo mesmo gate.
@@ -291,7 +305,9 @@ com erro — o fallback é de rota, não um retry infinito.
 - Cada evento de turno é persistido em `turn_events` com `seq` e espelhado em
   `zylara:turn-event`. Ao recarregar o webview, `reattachTurns()` reconstrói o
   stream ativo sem duplicar mensagens; turnos de outra instância são aplicados
-  pelo barramento global.
+  pelo barramento global. Um turno admitido que ainda não persistiu mensagem
+  aparece como `accepted`: não cria bolha nem stream fantasma, mas mantém a
+  conversa ocupada (envio enfileira, Stop cancela por id).
 
 ## 7. Rotinas
 

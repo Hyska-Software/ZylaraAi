@@ -31,7 +31,7 @@ use crate::harness::code::{goal, observed::ObservationState, session};
 use crate::policy::{decide, CallFacts, PolicyContext, PolicyDecision};
 use crate::tools::registry::{ToolCtx, ToolExec};
 use crate::tools::ToolOutcome;
-use crate::workspace::{exec, git, journal, safe_path};
+use crate::workspace::{access, exec, git, journal, safe_path};
 
 /// Limite de texto que volta ao modelo antes de ir para spill.
 pub const MAX_INLINE_CHARS: usize = 24_000;
@@ -919,7 +919,7 @@ async fn read_file(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
     }
     let (text, encoding) = decode_text(&bytes);
     if let Some(observed) = &ctx.observed {
-        observed.record(&path, &bytes);
+        observed.record(&ctx.conversation_id, &path, &bytes);
     }
 
     let lines: Vec<&str> = text.lines().collect();
@@ -1456,7 +1456,7 @@ fn ensure_observed(ctx: &ToolCtx, path: &Path, relative: &str, current: &[u8]) -
     let Some(observed) = &ctx.observed else {
         return Ok(());
     };
-    match observed.check(path, current) {
+    match observed.check(&ctx.conversation_id, path, current) {
         ObservationState::Fresh => Ok(()),
         ObservationState::Missing => Err(err(
             "FS_NOT_OBSERVED",
@@ -1465,6 +1465,25 @@ fn ensure_observed(ctx: &ToolCtx, path: &Path, relative: &str, current: &[u8]) -
         ObservationState::Stale => Err(err(
             "FS_STALE_VERSION",
             crate::i18n::t_args("tools.exec.observe.stale", &[("relative", relative)]),
+        )),
+    }
+}
+
+fn mutation_cancelled() -> ToolOutcome {
+    err("TURN_CANCELLED", crate::i18n::t("tools.exec.fs.cancelled"))
+}
+
+/// Lê o estado atual do arquivo distinguindo ausência de falha de I/O.
+fn read_optional(path: &Path, relative: &str) -> Result<Option<Vec<u8>>, ToolOutcome> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(err(
+            "FS_NOT_FOUND",
+            crate::i18n::t_args(
+                "tools.exec.fs.readFailed",
+                &[("relative", relative), ("error", &error.to_string())],
+            ),
         )),
     }
 }
@@ -1529,8 +1548,21 @@ fn commit_mutation(
         ));
     }
     let store = journal::ObjectStore::new(ctx.data_dir.join("checkpoints").join("objects"));
+    // Sem o checkpoint não existe reversão: falhar antes da troca evita um
+    // journal apontando para um objeto ausente.
     let before_hash = match before {
-        Some(bytes) => store.put_bytes(bytes).ok(),
+        Some(bytes) => match store.put_bytes(bytes) {
+            Ok(hash) => Some(hash),
+            Err(error) => {
+                return Err(err(
+                    "FS_CHECKPOINT_FAILED",
+                    crate::i18n::t_args(
+                        "tools.exec.fs.checkpointFailed",
+                        &[("relative", relative), ("error", &error.to_string())],
+                    ),
+                ))
+            }
+        },
         None => None,
     };
     if let Err(error) = atomic_write(path, after) {
@@ -1543,7 +1575,6 @@ fn commit_mutation(
         ));
     }
     let after_hash = observed_hash(after);
-    let before_hash = before_hash.or_else(|| before.map(observed_hash));
     let (added, removed) = journal::line_stats(before, Some(after));
     let before_text = before
         .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
@@ -1564,14 +1595,35 @@ fn commit_mutation(
     )
     .with_hashes(before_hash.as_deref(), Some(after_hash.as_str()))
     .with_line_counts(added, removed);
-    ctx.db.append_file_journal(&entry).map_err(|error| {
-        err(
-            "JOURNAL_FAILED",
-            crate::i18n::t_args("tools.exec.fs.journalFailed", &[("error", &error.to_string())]),
-        )
-    })?;
+    if let Err(error) = ctx.db.append_file_journal(&entry) {
+        // A troca já está no disco: compensa sob o mesmo lock para não deixar
+        // uma escrita sem journal (revert ficaria impossível).
+        let rollback = match before {
+            Some(bytes) => atomic_write(path, bytes),
+            None => match std::fs::remove_file(path) {
+                Ok(()) => Ok(()),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+                Err(error) => Err(error),
+            },
+        };
+        let mut message = crate::i18n::t_args(
+            "tools.exec.fs.journalFailed",
+            &[("error", &error.to_string())],
+        );
+        if let Err(rollback_error) = rollback {
+            message.push(' ');
+            message.push_str(&crate::i18n::t_args(
+                "tools.exec.fs.journalRollbackFailed",
+                &[
+                    ("relative", relative),
+                    ("error", &rollback_error.to_string()),
+                ],
+            ));
+        }
+        return Err(err("JOURNAL_FAILED", message));
+    }
     if let Some(observed) = &ctx.observed {
-        observed.record(path, after);
+        observed.record(&ctx.conversation_id, path, after);
     }
     ctx.emit_event(crate::events::TurnEvent::FileChanged {
         change: FileChange {
@@ -1766,17 +1818,12 @@ async fn write_file(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
     if let Err(outcome) = writable_root(ctx) {
         return outcome;
     }
-    let path = match resolve_path(ctx, &requested, safe_path::Access::Write) {
-        Ok(path) => path,
+    let relative = match resolve_path(ctx, &requested, safe_path::Access::Write) {
+        Ok(path) => relative_path(ctx, &path),
         Err(outcome) => return outcome,
     };
-    let relative = relative_path(ctx, &path);
-    let existing = std::fs::read(&path).ok();
-    let kind = if existing.is_some() {
-        FileChangeKind::Modified
-    } else {
-        FileChangeKind::Created
-    };
+    // A política (e a espera por aprovação humana) roda antes de qualquer lock:
+    // o turno pode ficar minutos parado aqui e não deve bloquear outra sessão.
     if let Err(outcome) = policy_check(
         ctx,
         "write_file",
@@ -1792,6 +1839,31 @@ async fn write_file(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
     {
         return outcome;
     }
+    // A aprovação pode ter levado minutos: re-resolve e relê sob o lock de
+    // mutação, senão um arquivo criado/alterado nesse intervalo seria
+    // sobrescrito a partir de um snapshot velho.
+    let path = match resolve_path(ctx, &requested, safe_path::Access::Write) {
+        Ok(path) => path,
+        Err(outcome) => return outcome,
+    };
+    let relative = relative_path(ctx, &path);
+    let root = match workspace_root(ctx) {
+        Ok(root) => root,
+        Err(outcome) => return outcome,
+    };
+    let guard = match access::acquire_mutation(&root, &ctx.cancel).await {
+        Ok(guard) => guard,
+        Err(_) => return mutation_cancelled(),
+    };
+    let existing = match read_optional(&path, &relative) {
+        Ok(bytes) => bytes,
+        Err(outcome) => return outcome,
+    };
+    let kind = if existing.is_some() {
+        FileChangeKind::Modified
+    } else {
+        FileChangeKind::Created
+    };
     if let Some(before) = &existing {
         if let Err(outcome) = ensure_observed(ctx, &path, &relative, before) {
             return outcome;
@@ -1799,7 +1871,11 @@ async fn write_file(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
     }
     let normalized = preserve_bom(&normalize_eol(&content, existing.as_deref()), existing.as_deref());
     let after = normalized.into_bytes();
-    match commit_mutation(ctx, &path, &relative, existing.as_deref(), &after, kind) {
+    let committed = commit_mutation(ctx, &path, &relative, existing.as_deref(), &after, kind);
+    // Os hooks rodam shell arbitrário (formatador): o lock é solto antes para
+    // não bloquear as outras sessões do mesmo workspace.
+    drop(guard);
+    match committed {
         Ok((content, presentation)) => {
             let content = with_post_write_hooks(ctx, &relative, content).await;
             finish(
@@ -1872,6 +1948,21 @@ async fn edit_file(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
     {
         return outcome;
     }
+    // Re-resolve depois da aprovação e segura o lock do root durante
+    // ler → validar → gravar: outra sessão não troca o arquivo no meio.
+    let path = match resolve_path(ctx, &requested, safe_path::Access::Write) {
+        Ok(path) => path,
+        Err(outcome) => return outcome,
+    };
+    let relative = relative_path(ctx, &path);
+    let root = match workspace_root(ctx) {
+        Ok(root) => root,
+        Err(outcome) => return outcome,
+    };
+    let guard = match access::acquire_mutation(&root, &ctx.cancel).await {
+        Ok(guard) => guard,
+        Err(_) => return mutation_cancelled(),
+    };
     let before = match std::fs::read(&path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
@@ -1935,7 +2026,11 @@ async fn edit_file(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
     };
     let after_text = preserve_bom(&normalize_eol(&after_text, Some(&before)), Some(&before));
     let after = after_text.into_bytes();
-    match commit_mutation(ctx, &path, &relative, Some(&before), &after, FileChangeKind::Modified) {
+    let committed =
+        commit_mutation(ctx, &path, &relative, Some(&before), &after, FileChangeKind::Modified);
+    // Hooks pós-escrita rodam shell arbitrário: soltam o lock antes.
+    drop(guard);
+    match committed {
         Ok((content, presentation)) => {
             let content = with_post_write_hooks(ctx, &relative, content).await;
             finish(
@@ -3872,6 +3967,28 @@ mod tests {
             std::fs::write(&path, content).expect("escrever fixture");
             path
         }
+
+        /// Context of a second conversation in the same workspace: parallel
+        /// sessions share the directory but not the observed versions.
+        fn second_ctx(&self, title: &str) -> ToolCtx {
+            let conversation = self
+                .db
+                .create_conversation_with_mode(
+                    title,
+                    "opencode-go",
+                    "deepseek-v4.1-flash",
+                    crate::domain::CONVERSATION_MODE_CODE,
+                )
+                .expect("segunda conversa");
+            self.db
+                .set_conversation_permission_mode(&conversation.id, PermissionMode::Edit)
+                .expect("modo de permissão");
+            let mut ctx = self.ctx();
+            ctx.conversation_id = conversation.id;
+            ctx.turn_id = "turn-2".into();
+            ctx.tool_call_id = "call-2".into();
+            ctx
+        }
     }
 
     async fn call(ctx: &ToolCtx, name: &str, args: Value) -> ToolOutcome {
@@ -3948,7 +4065,9 @@ mod tests {
         assert!(outcome.content.contains("10│ linha 10"), "{}", outcome.content);
         assert_eq!(outcome.summary.as_deref(), Some("Ler a.txt:10-14"));
         assert_eq!(
-            fixture.observed.check(&path, &std::fs::read(&path).expect("ler")),
+            fixture
+                .observed
+                .check(fixture.conv(), &path, &std::fs::read(&path).expect("ler")),
             ObservationState::Fresh
         );
     }
@@ -4178,6 +4297,104 @@ mod tests {
                 "tools.exec.file.updated",
                 &[("path", "a.txt"), ("added", "1"), ("removed", "1")],
             )));
+    }
+
+    #[tokio::test]
+    async fn sessions_sharing_a_workspace_do_not_authorize_each_other() {
+        let fixture = Fixture::new();
+        fixture.write("a.txt", "original\n");
+        let ctx_a = fixture.ctx();
+        let ctx_b = fixture.second_ctx("Outra sessão");
+        // A observes the file.
+        let _ = call(&ctx_a, "read_file", json!({ "path": "a.txt" })).await;
+
+        // B never read it: A's observation must not authorize B's replacement.
+        let refused = call(
+            &ctx_b,
+            "write_file",
+            json!({ "path": "a.txt", "content": "de B\n" }),
+        )
+        .await;
+        assert_eq!(error_code(&refused), "FS_NOT_OBSERVED");
+
+        // B reads and writes. A's older snapshot must fail instead of
+        // overwriting B's content.
+        let _ = call(&ctx_b, "read_file", json!({ "path": "a.txt" })).await;
+        let written = call(
+            &ctx_b,
+            "write_file",
+            json!({ "path": "a.txt", "content": "de B\n" }),
+        )
+        .await;
+        assert!(!written.is_error, "{}", written.content);
+        let stale = call(
+            &ctx_a,
+            "write_file",
+            json!({ "path": "a.txt", "content": "de A\n" }),
+        )
+        .await;
+        assert_eq!(error_code(&stale), "FS_STALE_VERSION");
+        assert_eq!(
+            std::fs::read_to_string(fixture.root.join("a.txt")).expect("ler"),
+            "de B\n"
+        );
+
+        // Rereading in A is the documented recovery path.
+        let _ = call(&ctx_a, "read_file", json!({ "path": "a.txt" })).await;
+        let retried = call(
+            &ctx_a,
+            "write_file",
+            json!({ "path": "a.txt", "content": "de A\n" }),
+        )
+        .await;
+        assert!(!retried.is_error, "{}", retried.content);
+    }
+
+    #[tokio::test]
+    async fn write_file_rechecks_the_file_after_the_approval_window() {
+        let fixture = Fixture::new();
+        fixture.write("a.txt", "original\n");
+        // Review mode asks before every edit, which opens the window where the
+        // file can change behind the turn.
+        fixture.set_permission_mode(PermissionMode::Review);
+        let ctx = fixture.ctx();
+        let _ = call(&ctx, "read_file", json!({ "path": "a.txt" })).await;
+
+        let approvals = fixture.approvals.clone();
+        let writer = tokio::spawn(async move {
+            call(
+                &ctx,
+                "write_file",
+                json!({ "path": "a.txt", "content": "do agente\n" }),
+            )
+            .await
+        });
+
+        let mut approval_id = None;
+        for _ in 0..400 {
+            if let Some(id) = approvals.pending_ids().first().cloned() {
+                approval_id = Some(id);
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+        let approval_id = approval_id.expect("approval request registered");
+
+        // Another session (or the user) rewrites the file while the card is open.
+        fixture.write("a.txt", "outra sessão\n");
+        assert!(approvals.resolve(
+            &approval_id,
+            crate::policy::approval::ApprovalOutcome::approved(None)
+        ));
+
+        // Resuming must re-read: the approved snapshot is stale, so nothing is
+        // overwritten.
+        let outcome = writer.await.expect("join");
+        assert_eq!(error_code(&outcome), "FS_STALE_VERSION");
+        assert_eq!(
+            std::fs::read_to_string(fixture.root.join("a.txt")).expect("ler"),
+            "outra sessão\n"
+        );
     }
 
     #[tokio::test]

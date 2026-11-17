@@ -698,17 +698,17 @@
   "agents": {
     "intro": "Model, instructions, workspace, permissions and capabilities are defined per agent in the persona editor. This tab only gathers the global preferences of the Agents layout.",
     "queue": {
-      "title": "Execution and queue",
-      "description": "How many turns can run at the same time and each thread's queue size. Turns beyond the limit wait in their own conversation's queue.",
+      "title": "Background execution",
+      "description": "Limits for unattended runs (tasks, routines, inbox and channels). Your conversations start immediately and run in parallel, each with its own queue.",
       "global": {
-        "label": "Concurrent turns (global)",
-        "description": "Up to {{count}} turns running at the same time across the app. The backend enforces this limit too.",
-        "aria": "Maximum concurrent turns"
+        "label": "Concurrent background runs (global)",
+        "description": "Up to {{count}} unattended runs at the same time. Conversations are not affected by this limit.",
+        "aria": "Maximum concurrent background runs"
       },
       "perAgent": {
-        "label": "Concurrent turns per agent",
-        "description": "Prevents a single agent from taking every slot. Default: 1.",
-        "aria": "Maximum concurrent turns per agent"
+        "label": "Concurrent background runs per agent",
+        "description": "Prevents a single agent from taking every background slot. Default: 1.",
+        "aria": "Maximum concurrent background runs per agent"
       },
       "queueLength": {
         "label": "Queued messages per thread",

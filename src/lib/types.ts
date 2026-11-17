@@ -1954,6 +1954,7 @@ export interface TurnResult {
 }
 
 export type TurnEvent =
+  | { type: 'accepted' }
   | { type: 'queued' }
   | { type: 'turn_started'; turnId: string; userMessageId: string; assistantMessageId: string }
   | { type: 'step_started'; step: number }

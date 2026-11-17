@@ -32,7 +32,11 @@ export function AgentThreadHeader({
 }) {
   const { t } = useTranslation('agents');
   const providers = useAppStore((state) => state.providers);
-  const turnActive = useChatStore((state) => Boolean(state.streamsByConversation[conversation.id]));
+  const turnActive = useChatStore(
+    (state) =>
+      Boolean(state.streamsByConversation[conversation.id]) ||
+      Boolean(state.pendingTurnsByConversation[conversation.id]),
+  );
   const [taskStatus, setTaskStatus] = useState<AgentTaskStatus | null>(null);
   const taskId = conversation.taskId;
 

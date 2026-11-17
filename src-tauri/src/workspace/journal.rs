@@ -40,7 +40,13 @@ impl ObjectStore {
         }
         // Escrita atômica: temp no mesmo diretório e rename. Se outra thread ganhar a
         // corrida, o conteúdo é idêntico (hash), então basta descartar o temp.
-        let temp = path.with_file_name(format!(".tmp-{hash}-{}", std::process::id()));
+        // O nome precisa ser único por publicação: duas sessões paralelas
+        // podem tentar gravar o mesmo objeto ao mesmo tempo.
+        let temp = path.with_file_name(format!(
+            ".tmp-{hash}-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4().simple()
+        ));
         std::fs::write(&temp, bytes)?;
         match std::fs::rename(&temp, &path) {
             Ok(()) => Ok(hash),

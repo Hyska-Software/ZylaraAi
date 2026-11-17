@@ -775,7 +775,7 @@
   },
   "activityDialog": {
     "title": "Activity",
-    "description": "Turns running now, pending approvals/questions and tasks that need you. Stopping a turn frees the concurrency slot immediately.",
+    "description": "Turns running now, pending approvals/questions and tasks that need you. Stopping a turn ends it immediately.",
     "running": "In progress",
     "needsYou": "Needs you",
     "session": "Session",

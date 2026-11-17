@@ -254,6 +254,12 @@ pub async fn git_stage_all(
     workspace_id: String,
 ) -> Result<WorkspaceGitStatus, String> {
     let root = workspace_path(&state, &workspace_id)?;
+    let _guard = crate::workspace::access::acquire_mutation(
+        &root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .map_err(map_err)?;
     crate::workspace::git::stage_all(&root)
         .await
         .map_err(map_err)?;
@@ -267,6 +273,12 @@ pub async fn git_unstage_all(
     workspace_id: String,
 ) -> Result<WorkspaceGitStatus, String> {
     let root = workspace_path(&state, &workspace_id)?;
+    let _guard = crate::workspace::access::acquire_mutation(
+        &root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .map_err(map_err)?;
     crate::workspace::git::unstage_all(&root)
         .await
         .map_err(map_err)?;
@@ -284,6 +296,12 @@ pub async fn git_discard(
         return Err(crate::i18n::t("git.errors.noSelectedFiles"));
     }
     let root = workspace_path(&state, &workspace_id)?;
+    let _guard = crate::workspace::access::acquire_mutation(
+        &root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .map_err(map_err)?;
     let mut args = vec!["restore", "--"];
     for path in &paths {
         args.push(path.as_str());
@@ -312,6 +330,14 @@ pub async fn git_commit(
     }
     let target = parse_commit_target(target.as_deref())?;
     let root = workspace_path(&state, &workspace_id)?;
+    // Preparar o índice e commitar é uma transação única: sem o lock, um stage
+    // de outra sessão entraria no commit ou trocaria o alvo no meio.
+    let _guard = crate::workspace::access::acquire_mutation(
+        &root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .map_err(map_err)?;
     prepare_commit(&root, target, paths.as_deref()).await?;
     crate::workspace::git::commit(&root, trimmed)
         .await

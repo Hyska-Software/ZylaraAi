@@ -80,13 +80,26 @@ UI: send()
   └─ eventos chegam por Channel e atualizam o estado incrementalmente
 ```
 
-Eventos (`TurnEvent`): `turn_started`, `step_started`, `reasoning_delta`, `reasoning_done`,
+Eventos (`TurnEvent`): `accepted`, `turn_started`, `step_started`, `reasoning_delta`, `reasoning_done`,
 `text_delta`, `tool_call_started`, `tool_call_args`, `tool_call_finished` (com
 `presentation`), `artifact_created`, `usage`, `message_updated`, `title_updated`, `done`,
 `cancelled`, `error` e os eventos do harness de código: `approval_requested/resolved`,
 `tool_progress`, `file_changed`, `workspace_changes`, `todos_updated`, `plan_updated`,
 `goal_updated` (estado do objetivo persistente), `context_stats`, `cache_stats`, `compacted`,
 `job_updated`, `profile_changed`.
+
+**Admissão e paralelismo.** `run_turn` tem **uma** barreira por conversa
+(`state::TurnRegistry::register_turn_if_idle` responde `TURN_BUSY`): não existe
+slot global nem mutex por workspace para turnos interativos, então N conversas
+podem rodar ao mesmo tempo no mesmo projeto — inclusive várias threads da mesma
+persona. O evento `accepted` (journal em `turn_events`) prova que o turno foi
+registrado antes de persistir a mensagem; `queued` sobrou apenas para repositórios
+antigos e para as execuções não assistidas, que continuam passando pelo
+`ConcurrencyGovernor`. O diretório compartilhado é protegido **por operação**
+(`workspace/access.rs`): o lock da raiz cobre ler → validar → gravar → journal de
+`write_file`/`edit_file`, a reversão do journal e as mutações de Git, e cada
+conversa observa as próprias versões de arquivo — duas sessões no mesmo arquivo
+resultam em um vencedor e um `FS_STALE_VERSION`, nunca em sobrescrita silenciosa.
 
 **Perfis de turno.** `TurnPayload.profile` (`chat` | `code`, default `chat`) seleciona o perfil do
 mesmo loop: prompt, catálogo de tools, política e orçamentos. O perfil `code` é aceito em sessão

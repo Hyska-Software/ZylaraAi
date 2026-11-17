@@ -29,45 +29,6 @@ pub(crate) fn workspace_gate(conversation_id: &str) -> std::sync::Arc<tokio::syn
     gate
 }
 
-/// Serializes turns that share a task/workspace directory. The per-conversation
-/// gate above protects workspace selection; this mutex protects the directory
-/// contents when two task threads (e.g. before/after handoff) use the same root.
-pub(crate) fn workspace_execution_lock(key: &str) -> std::sync::Arc<tokio::sync::Mutex<()>> {
-    use std::collections::HashMap;
-    use std::sync::{Arc, LazyLock, Weak};
-    static LOCKS: LazyLock<parking_lot::Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>> =
-        LazyLock::new(Default::default);
-    let mut locks = LOCKS.lock();
-    if let Some(lock) = locks.get(key).and_then(Weak::upgrade) {
-        return lock;
-    }
-    let lock = Arc::new(tokio::sync::Mutex::new(()));
-    locks.insert(key.to_owned(), Arc::downgrade(&lock));
-    lock
-}
-
-/// Acquires the per-workspace turn mutex, aborting when the turn is cancelled
-/// while it waits behind another session.
-pub(crate) async fn acquire_workspace_execution(
-    key: &str,
-    cancel: &tokio_util::sync::CancellationToken,
-) -> anyhow::Result<tokio::sync::OwnedMutexGuard<()>> {
-    let lock = workspace_execution_lock(key);
-    // A free lock is taken even when the token is already cancelled: the turn
-    // loop owns cancellation once it can run (goal pause, persisted state).
-    if let Ok(guard) = lock.clone().try_lock_owned() {
-        return Ok(guard);
-    }
-    let acquire = lock.lock_owned();
-    tokio::pin!(acquire);
-    tokio::select! {
-        guard = &mut acquire => Ok(guard),
-        _ = cancel.cancelled() => Err(anyhow::anyhow!(
-            crate::i18n::t("turn.errors.cancelledBeforeStart")
-        )),
-    }
-}
-
 /// Upper bound for one stored memory. Keeps the volatile context block small
 /// and prevents a runaway model from dumping an entire transcript into memory.
 pub const AGENT_MEMORY_MAX_CHARS: usize = 4 * 1024;
@@ -1897,35 +1858,12 @@ mod tests {
     }
 
     #[test]
-    fn workspace_execution_locks_are_shared_per_key() {
-        let first = workspace_execution_lock("task:alpha");
-        let second = workspace_execution_lock("task:alpha");
-        let other = workspace_execution_lock("task:beta");
+    fn workspace_gates_are_shared_per_conversation() {
+        let first = super::workspace_gate("conv-alpha");
+        let second = super::workspace_gate("conv-alpha");
+        let other = super::workspace_gate("conv-beta");
         assert!(std::sync::Arc::ptr_eq(&first, &second));
         assert!(!std::sync::Arc::ptr_eq(&first, &other));
-    }
-
-    #[tokio::test]
-    async fn waiting_for_a_workspace_lock_can_be_cancelled() {
-        let held = workspace_execution_lock("task:cancel-wait")
-            .lock_owned()
-            .await;
-        let cancel = tokio_util::sync::CancellationToken::new();
-        let waiter = {
-            let cancel = cancel.clone();
-            tokio::spawn(async move {
-                acquire_workspace_execution("task:cancel-wait", &cancel).await
-            })
-        };
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-        assert!(!waiter.is_finished());
-        cancel.cancel();
-        let error = waiter
-            .await
-            .expect("join")
-            .expect_err("cancelled while waiting");
-        assert!(error.to_string().contains("TURN_CANCELLED"));
-        drop(held);
     }
 
     #[test]

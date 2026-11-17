@@ -144,11 +144,18 @@ Crash no meio: ao abrir a conversa, um turno sem `turn/ended` vira mensagem `sta
 
 ### 3.4 Concorrência entre sessões
 
-- Cada conversa tem no máximo 1 turno ativo (`AppState` já registra por turn_id; adicionar
-  verificação por conversation_id → erro `TURN_IN_PROGRESS`).
-- Duas sessões do mesmo workspace podem rodar em paralelo: o journal e o watcher são por sessão,
-  mas os paths podem conflitar → `PathLock` global por workspace (arquivo) + aviso na UI
-  ("outra sessão está editando src/app.ts").
+- Cada conversa tem no máximo 1 turno ativo (`TurnRegistry::register_if_idle` devolve
+  `TURN_BUSY`). **Não existe** limite de slots nem mutex por workspace para turnos
+  interativos: N conversas do mesmo projeto rodam ao mesmo tempo.
+- Duas sessões do mesmo workspace rodam em paralelo; o journal e as versões observadas são por
+  conversa (`ObservedFiles` indexa `(conversation_id, path)`), então uma sessão nunca autoriza a
+  escrita da outra. O conflito é resolvido no arquivo: o primeiro write vence e o segundo recebe
+  `FS_STALE_VERSION` com instrução de re-leitura.
+- Mutações geridas seguram o lock da raiz (`workspace/access.rs`) apenas durante
+  ler → validar → gravar → journal; aprovação humana e resposta do modelo acontecem **fora** do
+  lock. Revert do journal e mutações de Git (stage/commit/discard) usam o mesmo lock.
+- Shell, jobs promovidos e terminal integrado continuam sendo escritores externos: o hash detecta
+  a alteração concluída, mas o app não serializa processos arbitrários do usuário.
 - Aprovações são por turno (broker), nunca globais.
 
 ### 3.5 Completion gate (parada verificada)

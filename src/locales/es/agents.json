@@ -775,7 +775,7 @@
   },
   "activityDialog": {
     "title": "Actividad",
-    "description": "Turnos en ejecución, aprobaciones/preguntas pendientes y tareas que te necesitan. Detener un turno libera el slot de concurrencia de inmediato.",
+    "description": "Turnos en ejecución, aprobaciones/preguntas pendientes y tareas que te necesitan. Detener un turno lo termina de inmediato.",
     "running": "En curso",
     "needsYou": "Te necesita",
     "session": "Sesión",

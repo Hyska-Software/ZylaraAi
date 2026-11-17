@@ -70,18 +70,14 @@ pub async fn run_turn(
         );
     };
     let _turn_guard = state.turn_guard(&turn_id);
-    // The renderer paints the optimistic placeholder before invoking; this
-    // event proves the turn was accepted even if it still waits for a slot.
-    let emitter = Arc::new(PersistingEmitter {
-        db: state.db.clone(),
-        app: app.clone(),
-        turn_id: turn_id.clone(),
-        conversation_id: payload.conversation_id.clone(),
-        seq: AtomicU64::new(0),
-    });
-    EventEmitter::emit(emitter.as_ref(), TurnEvent::Queued);
+    // Interactive turns are admitted immediately: there is no global, per-agent
+    // or per-workspace slot to wait for. Parallelism is bounded per operation
+    // (`workspace::access`) and a conversation never overlaps itself
+    // (`register_turn_if_idle` above). Background runners keep the governor.
     let settings = crate::config::load_settings(&app);
-    let conversation = state
+    // Fail closed with a localized message before the renderer sees `accepted`
+    // for a conversation that does not exist.
+    state
         .db
         .get_conversation(&payload.conversation_id)
         .map_err(|error| format!("{error:#}"))?
@@ -91,22 +87,16 @@ pub async fn run_turn(
                 &[("conversation_id", &payload.conversation_id)],
             )
         })?;
-    let agent_key = conversation.agent_id.clone();
-    let limits = crate::concurrency::TurnLimits {
-        global: settings.max_concurrent_turns.max(1) as usize,
-        per_agent: settings.max_concurrent_turns_per_agent.max(1) as usize,
-    };
-    let _permit = match state
-        .governor
-        .acquire(agent_key, limits, &cancel)
-        .await
-    {
-        Ok(permit) => permit,
-        Err(_) => {
-            state.finish_turn(&turn_id);
-            return Err(crate::i18n::t("turn.errors.cancelledBeforeStart"));
-        }
-    };
+    // The renderer paints the optimistic placeholder before invoking; this
+    // event proves the turn was accepted and gives reattach a first record.
+    let emitter = Arc::new(PersistingEmitter {
+        db: state.db.clone(),
+        app: app.clone(),
+        turn_id: turn_id.clone(),
+        conversation_id: payload.conversation_id.clone(),
+        seq: AtomicU64::new(0),
+    });
+    EventEmitter::emit(emitter.as_ref(), TurnEvent::Accepted);
     let deps = HarnessDeps {
         app: Some(app.clone()),
         db: state.db.clone(),

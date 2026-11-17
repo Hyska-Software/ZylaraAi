@@ -775,7 +775,7 @@
   },
   "activityDialog": {
     "title": "Atividade",
-    "description": "Turnos rodando agora, aprovações/perguntas pendentes e tarefas que precisam de você. Parar um turno libera o slot de concorrência imediatamente.",
+    "description": "Turnos rodando agora, aprovações/perguntas pendentes e tarefas que precisam de você. Parar um turno o encerra imediatamente.",
     "running": "Em andamento",
     "needsYou": "Precisa de você",
     "session": "Sessão",

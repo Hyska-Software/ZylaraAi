@@ -130,11 +130,11 @@ function ThreadRow({
   const queued = useMessageQueueStore(
     (state) => state.byConversation[conversation.id]?.length ?? 0,
   );
-  const busy = useChatStore((state) =>
-    Boolean(
-      state.streamsByConversation[conversation.id] ??
-        (state.streaming?.conversationId === conversation.id ? state.streaming : null),
-    ),
+  const busy = useChatStore(
+    (state) =>
+      Boolean(state.streamsByConversation[conversation.id]) ||
+      Boolean(state.pendingTurnsByConversation[conversation.id]) ||
+      state.streaming?.conversationId === conversation.id,
   );
   const session = useCodeStore((state) => state.byConversation[conversation.id]);
   const awaitingApproval = (session?.approvals.length ?? 0) > 0;

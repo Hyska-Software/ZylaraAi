@@ -170,8 +170,12 @@ function SessionRow({
   onDelete,
 }: SessionRowProps) {
   const { t } = useTranslation('code');
+  // A turn admitted by Rust has no assistant row yet, so it has no stream. Both
+  // states mean "this session is working", never "waiting for a slot".
   const running = useChatStore(
-    (state) => selectConversationStream(state, conversation.id) !== null,
+    (state) =>
+      selectConversationStream(state, conversation.id) !== null ||
+      Boolean(state.pendingTurnsByConversation[conversation.id]),
   );
   return (
     <div

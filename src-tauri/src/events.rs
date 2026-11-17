@@ -16,8 +16,13 @@ use crate::domain::{
     rename_all_fields = "camelCase"
 )]
 pub enum TurnEvent {
-    /// The turn was accepted (registered) and may still be waiting for a
-    /// concurrency slot or the workspace lock. Emitted before any wait.
+    /// The turn was registered and is now visible to the renderer, before the
+    /// user message is persisted. Emitted exactly once at admission; it does
+    /// **not** mean the turn is waiting for anything.
+    Accepted,
+    /// Legacy journal event from the former slot queue. Interactive turns no
+    /// longer wait for a global/per-agent slot (`Accepted` replaced it); the
+    /// variant is kept so old `turn_events` rows still replay.
     Queued,
     /// The user message was persisted and the assistant placeholder created.
     TurnStarted {

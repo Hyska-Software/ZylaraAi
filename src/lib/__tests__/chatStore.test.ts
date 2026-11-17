@@ -2820,6 +2820,68 @@ describe('chatStore — reattach de turnos', () => {  it('reconstrói um turno a
   });
 });
 
+describe('chatStore — admissão imediata de sessões paralelas', () => {
+  it('um turno aceito sem mensagem mantém a conversa ocupada e cancelável', async () => {
+    const activeConversation = conversation({ id: 'conv-1', messageCount: 0 });
+    useChatStore.setState({
+      conversations: [activeConversation],
+      activeId: 'conv-1',
+      messagesByConversation: { 'conv-1': [] },
+      streamsByConversation: {},
+      streaming: null,
+      pendingTurnsByConversation: {},
+    });
+
+    // Another window admitted the turn: only the bus envelope exists.
+    useChatStore.getState().handleTurnEvent({
+      turnId: 'turn-accepted',
+      seq: 1,
+      conversationId: 'conv-1',
+      event: { type: 'accepted' },
+    });
+    await vi.waitFor(() => {
+      expect(
+        useChatStore.getState().pendingTurnsByConversation['conv-1']?.turnId,
+      ).toBe('turn-accepted');
+    });
+    // No phantom message and no phantom stream.
+    expect(useChatStore.getState().messagesByConversation['conv-1']).toEqual([]);
+    expect(useChatStore.getState().streamsByConversation['conv-1']).toBeUndefined();
+
+    // The conversation is busy: the new message is queued, not started.
+    expect(await useChatStore.getState().send('oi')).toBe(true);
+    expect(mocks.api.runTurn).not.toHaveBeenCalled();
+    expect(useMessageQueueStore.getState().count('conv-1')).toBe(1);
+
+    // Stop cancels the accepted turn by id and frees the conversation.
+    mocks.api.cancelTurn.mockResolvedValue(true);
+    await useChatStore.getState().stop();
+    expect(mocks.api.cancelTurn).toHaveBeenCalledWith('turn-accepted');
+    expect(useChatStore.getState().pendingTurnsByConversation['conv-1']).toBeUndefined();
+  });
+
+  it('mantém o perfil code de uma sessão nativa fora do layout Code', async () => {
+    const codeConversation = conversation({ id: 'conv-code', mode: 'code' });
+    useUiStore.setState({ layoutMode: 'chat' });
+    useChatStore.setState({
+      conversations: [codeConversation],
+      activeId: 'conv-code',
+      messagesByConversation: { 'conv-code': [] },
+      streamsByConversation: {},
+      streaming: null,
+      pendingTurnsByConversation: {},
+    });
+    let payload: TurnPayload | null = null;
+    mocks.api.runTurn.mockImplementation((seen: TurnPayload) => {
+      payload = seen;
+      return new Promise(() => {});
+    });
+
+    expect(await useChatStore.getState().send('oi')).toBe(true);
+    expect(payload!.profile).toBe('code');
+  });
+});
+
 describe('chatStore — resiliência do transporte de turno', () => {
   /** One watchdog tick plus a margin (the interval is 2.5 s). */
   const TURN_WATCHDOG_STEP_MS = 2_600;
@@ -2843,6 +2905,11 @@ describe('chatStore — resiliência do transporte de turno', () => {
     expect(await useChatStore.getState().send('oi')).toBe(true);
     expect(payload).not.toBeNull();
 
+    emitBus(payload!, { type: 'accepted' });
+    // Admission is immediate: `accepted` is not a wait, so the placeholder keeps
+    // its optimistic "starting" phase.
+    expect(useChatStore.getState().streaming?.phase).toBe('starting');
+    // Journal rows from the former slot queue still replay as a wait.
     emitBus(payload!, { type: 'queued' });
     expect(useChatStore.getState().streaming?.phase).toBe('queued');
     emitBus(payload!, {
@@ -2921,9 +2988,9 @@ describe('chatStore — resiliência do transporte de turno', () => {
 
       expect(await useChatStore.getState().send('oi')).toBe(true);
       expect(payload).not.toBeNull();
-      // `queued` is the evidence that Rust registered the turn; without any
+      // `accepted` is the evidence that Rust registered the turn; without any
       // journaled event the watchdog waits for its startup grace period.
-      emitBus(payload!, { type: 'queued' });
+      emitBus(payload!, { type: 'accepted' });
 
       await vi.advanceTimersByTimeAsync(TURN_WATCHDOG_STEP_MS);
       await vi.advanceTimersByTimeAsync(TURN_WATCHDOG_STEP_MS);
