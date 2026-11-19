@@ -38,6 +38,48 @@ describe('highlight — Prism estendido', () => {
       'scss',
       'sass',
       'less',
+      /* Shaders and GPU languages */
+      'hlsl',
+      'glsl',
+      'wgsl',
+      'opencl',
+      /* Systems and low-level languages */
+      'zig',
+      'nim',
+      'crystal',
+      'd',
+      'fortran',
+      'nasm',
+      'armasm',
+      /* Functional, academic and scientific languages */
+      'julia',
+      'matlab',
+      'erlang',
+      'fsharp',
+      'lisp',
+      'scheme',
+      'racket',
+      'prolog',
+      /* Templates */
+      'pug',
+      'haml',
+      'twig',
+      'liquid',
+      'ejs',
+      'handlebars',
+      /* Query and configuration */
+      'cypher',
+      'csv',
+      'bicep',
+      'nix',
+      'apacheconf',
+      /* Documentation */
+      'latex',
+      'asciidoc',
+      /* Miscellaneous */
+      'solidity',
+      'groovy',
+      'smalltalk',
     ]) {
       expect(prism.languages[id], `grammar ausente: ${id}`).toBeTruthy();
     }
@@ -49,13 +91,18 @@ describe('highlight — Prism estendido', () => {
     }
   });
 
-  it('tokeniza com as grammars novas (bash, java, ruby, toml, csharp)', () => {
+  it('tokeniza com as grammars novas (bash, java, ruby, toml, csharp, hlsl, glsl, zig, julia, solidity)', () => {
     const cases: Array<[string, string]> = [
       ['bash', 'echo "oi"'],
       ['java', 'public class Main {}'],
       ['ruby', 'def ola; puts "oi"; end'],
       ['toml', 'titulo = "Zylara"'],
       ['csharp', 'public int Soma(int a, int b) { return a + b; }'],
+      ['hlsl', 'struct GeometryOut { float4 position : SV_Position; };'],
+      ['glsl', 'void main() { gl_Position = vec4(0.0); }'],
+      ['zig', 'const valor: u32 = 42;'],
+      ['julia', 'function ola(n::Int) return n + 1 end'],
+      ['solidity', 'contract Exemplo { uint public valor; }'],
     ];
 
     for (const [language, code] of cases) {
@@ -170,6 +217,23 @@ describe('normalizeLanguage', () => {
     ['wat', 'wasm'],
     ['language-ts', 'typescript'],
     ['.py', 'python'],
+    ['hlsli', 'hlsl'],
+    ['fx', 'hlsl'],
+    ['vert', 'glsl'],
+    ['frag', 'glsl'],
+    ['wgsl', 'wgsl'],
+    ['jl', 'julia'],
+    ['fs', 'fsharp'],
+    ['rkt', 'racket'],
+    ['hbs', 'handlebars'],
+    ['jade', 'pug'],
+    ['cyp', 'cypher'],
+    ['tex', 'latex'],
+    ['adoc', 'asciidoc'],
+    ['sol', 'solidity'],
+    ['gradle', 'groovy'],
+    ['m', 'objectivec'],
+    ['mm', 'objectivec'],
   ])('%s → %s', (raw, expected) => {
     expect(normalizeLanguage(raw)).toBe(expected);
   });
@@ -201,6 +265,18 @@ describe('languageLabel', () => {
     ['wasm', 'WebAssembly'],
     ['makefile', 'Makefile'],
     ['markup', 'HTML'],
+    ['hlsl', 'HLSL'],
+    ['glsl', 'GLSL'],
+    ['wgsl', 'WGSL'],
+    ['jl', 'Julia'],
+    ['fs', 'F#'],
+    ['tex', 'LaTeX'],
+    ['adoc', 'AsciiDoc'],
+    ['sol', 'Solidity'],
+    ['gradle', 'Groovy'],
+    ['csv', 'CSV'],
+    ['jade', 'Pug'],
+    ['m', 'Objective-C'],
   ])('%s → %s', (raw, expected) => {
     expect(languageLabel(raw)).toBe(expected);
   });

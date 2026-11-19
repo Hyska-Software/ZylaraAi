@@ -147,6 +147,102 @@ const LANGUAGE_ALIASES: Record<string, string> = {
   sql: 'sql',
   mermaid: 'mermaid',
 
+  /* Shaders and GPU */
+  hlsl: 'hlsl',
+  hlsli: 'hlsl',
+  fx: 'hlsl',
+  fxh: 'hlsl',
+  glsl: 'glsl',
+  vert: 'glsl',
+  frag: 'glsl',
+  geom: 'glsl',
+  tesc: 'glsl',
+  tese: 'glsl',
+  comp: 'glsl',
+  shader: 'glsl',
+  wgsl: 'wgsl',
+  opencl: 'opencl',
+
+  /* Systems and low-level */
+  zig: 'zig',
+  nim: 'nim',
+  nims: 'nim',
+  crystal: 'crystal',
+  cr: 'crystal',
+  d: 'd',
+  fortran: 'fortran',
+  f: 'fortran',
+  f90: 'fortran',
+  f95: 'fortran',
+  f03: 'fortran',
+  f08: 'fortran',
+  for: 'fortran',
+  nasm: 'nasm',
+  asm: 'nasm',
+  armasm: 'armasm',
+
+  /* Functional, academic and scientific */
+  julia: 'julia',
+  jl: 'julia',
+  matlab: 'matlab',
+  erlang: 'erlang',
+  erl: 'erlang',
+  hrl: 'erlang',
+  fsharp: 'fsharp',
+  fs: 'fsharp',
+  fsi: 'fsharp',
+  fsx: 'fsharp',
+  fsscript: 'fsharp',
+  lisp: 'lisp',
+  lsp: 'lisp',
+  scheme: 'scheme',
+  scm: 'scheme',
+  ss: 'scheme',
+  racket: 'racket',
+  rkt: 'racket',
+  prolog: 'prolog',
+  pro: 'prolog',
+
+  /* Templates */
+  pug: 'pug',
+  jade: 'pug',
+  haml: 'haml',
+  twig: 'twig',
+  liquid: 'liquid',
+  ejs: 'ejs',
+  handlebars: 'handlebars',
+  hbs: 'handlebars',
+
+  /* Query and configuration */
+  cypher: 'cypher',
+  cyp: 'cypher',
+  csv: 'csv',
+  bicep: 'bicep',
+  nix: 'nix',
+  apacheconf: 'apacheconf',
+  apache: 'apacheconf',
+
+  /* Documentation */
+  latex: 'latex',
+  tex: 'latex',
+  sty: 'latex',
+  cls: 'latex',
+  asciidoc: 'asciidoc',
+  adoc: 'asciidoc',
+
+  /* Miscellaneous */
+  solidity: 'solidity',
+  sol: 'solidity',
+  groovy: 'groovy',
+  gradle: 'groovy',
+  gvy: 'groovy',
+  smalltalk: 'smalltalk',
+  st: 'smalltalk',
+
+  /* Bundled grammars without previous aliases */
+  m: 'objectivec',
+  mm: 'objectivec',
+
   /* Plain text */
   txt: 'text',
   text: 'text',
@@ -220,6 +316,55 @@ const LANGUAGE_LABELS: Record<string, string> = {
   wasm: 'WebAssembly',
   protobuf: 'Protobuf',
   mermaid: 'Mermaid',
+
+  /* Shaders and GPU */
+  hlsl: 'HLSL',
+  glsl: 'GLSL',
+  wgsl: 'WGSL',
+  opencl: 'OpenCL',
+
+  /* Systems and low-level */
+  zig: 'Zig',
+  nim: 'Nim',
+  crystal: 'Crystal',
+  d: 'D',
+  fortran: 'Fortran',
+  nasm: 'NASM',
+  armasm: 'ARM Assembly',
+
+  /* Functional, academic and scientific */
+  julia: 'Julia',
+  matlab: 'MATLAB',
+  erlang: 'Erlang',
+  fsharp: 'F#',
+  lisp: 'Lisp',
+  scheme: 'Scheme',
+  racket: 'Racket',
+  prolog: 'Prolog',
+
+  /* Templates */
+  pug: 'Pug',
+  haml: 'Haml',
+  twig: 'Twig',
+  liquid: 'Liquid',
+  ejs: 'EJS',
+  handlebars: 'Handlebars',
+
+  /* Query and configuration */
+  cypher: 'Cypher',
+  csv: 'CSV',
+  bicep: 'Bicep',
+  nix: 'Nix',
+  apacheconf: 'Apache',
+
+  /* Documentation */
+  latex: 'LaTeX',
+  asciidoc: 'AsciiDoc',
+
+  /* Miscellaneous */
+  solidity: 'Solidity',
+  groovy: 'Groovy',
+  smalltalk: 'Smalltalk',
 };
 
 /**

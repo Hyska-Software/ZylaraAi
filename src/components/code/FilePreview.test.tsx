@@ -79,6 +79,31 @@ describe('FilePreview', () => {
     expect(screen.getByText(/3 linhas/)).toBeTruthy();
   });
 
+  it('highlights shader files with their canonical language label', () => {
+    render(
+      <FilePreview
+        content={content({
+          path: 'shaders/Geometry.hlsl',
+          text: 'struct GeometryOut { float4 position : SV_Position; };\n',
+        })}
+      />,
+    );
+
+    expect(screen.getByText('HLSL')).toBeTruthy();
+    const pre = screen.getByLabelText('Conteúdo de shaders/Geometry.hlsl');
+    expect(pre.querySelector('.token.keyword')).toBeTruthy();
+  });
+
+  it('falls back to the plain text badge for unknown extensions', () => {
+    render(
+      <FilePreview
+        content={content({ path: 'notes/unknown.zzz', text: 'something\n' })}
+      />,
+    );
+
+    expect(screen.getByText('Texto')).toBeTruthy();
+  });
+
   it('renderiza marcas inline de alteração e a seta de remoção sem o texto antigo', () => {
     const diff = [
       '@@ -1,2 +1,2 @@',
@@ -597,5 +622,11 @@ describe('languageForPath', () => {
     expect(languageForPath('Dockerfile')).toBe('docker');
     expect(languageForPath('.env.local')).toBe('ini');
     expect(languageForPath('LICENSE')).toBe('text');
+    expect(languageForPath('shaders/Geometry.hlsl')).toBe('hlsl');
+    expect(languageForPath('shaders/main.vert')).toBe('glsl');
+    expect(languageForPath('shaders/main.wgsl')).toBe('wgsl');
+    expect(languageForPath('scripts/Main.jl')).toBe('julia');
+    expect(languageForPath('src/Main.m')).toBe('objectivec');
+    expect(languageForPath('notes/unknown.zzz')).toBe('zzz');
   });
 });

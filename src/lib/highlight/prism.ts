@@ -56,6 +56,55 @@ import 'prismjs/components/prism-elm';
 import 'prismjs/components/prism-protobuf';
 import 'prismjs/components/prism-wasm';
 
+/* Shaders and GPU languages (all extend the bundled c grammar) */
+import 'prismjs/components/prism-hlsl';
+import 'prismjs/components/prism-glsl';
+import 'prismjs/components/prism-wgsl';
+import 'prismjs/components/prism-opencl';
+
+/* Systems and low-level languages */
+import 'prismjs/components/prism-zig';
+import 'prismjs/components/prism-nim';
+import 'prismjs/components/prism-crystal'; // extends ruby, imported above
+import 'prismjs/components/prism-d';
+import 'prismjs/components/prism-fortran';
+import 'prismjs/components/prism-nasm';
+import 'prismjs/components/prism-armasm';
+
+/* Functional, academic and scientific languages */
+import 'prismjs/components/prism-julia';
+import 'prismjs/components/prism-matlab';
+import 'prismjs/components/prism-erlang';
+import 'prismjs/components/prism-fsharp';
+import 'prismjs/components/prism-lisp';
+import 'prismjs/components/prism-scheme';
+import 'prismjs/components/prism-racket'; // extends scheme, imported above
+import 'prismjs/components/prism-prolog';
+
+/* Templates (markup-templating is imported at the top) */
+import 'prismjs/components/prism-pug';
+import 'prismjs/components/prism-haml';
+import 'prismjs/components/prism-twig';
+import 'prismjs/components/prism-liquid';
+import 'prismjs/components/prism-ejs';
+import 'prismjs/components/prism-handlebars';
+
+/* Query and configuration */
+import 'prismjs/components/prism-cypher';
+import 'prismjs/components/prism-csv';
+import 'prismjs/components/prism-bicep';
+import 'prismjs/components/prism-nix';
+import 'prismjs/components/prism-apacheconf';
+
+/* Documentation */
+import 'prismjs/components/prism-latex';
+import 'prismjs/components/prism-asciidoc';
+
+/* Miscellaneous */
+import 'prismjs/components/prism-solidity';
+import 'prismjs/components/prism-groovy';
+import 'prismjs/components/prism-smalltalk';
+
 /* Diagrams (Mermaid fallback code cards) */
 import 'prismjs/components/prism-mermaid';
 

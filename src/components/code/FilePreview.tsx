@@ -112,7 +112,11 @@ export function FilePreview({
   }, [content?.path]);
 
   const path = content?.path ?? '';
-  const language = useMemo(() => languageForPath(path), [path]);
+  const language = useMemo(() => {
+    const detected = languageForPath(path);
+    // Missing grammar → plain text with an honest label (same rule as DiffView).
+    return prism.languages[detected] ? detected : 'text';
+  }, [path]);
   const lines = useMemo(() => {
     const text = content?.text ?? '';
     return text.length ? text.replace(/\r\n?/g, '\n').split('\n') : [];
