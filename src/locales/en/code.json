@@ -725,6 +725,17 @@
     },
     "aria": "Files and changes panel",
     "tablist": "Panel content",
+    "addTab": "Add panel tab",
+    "launcher": {
+      "aria": "Panel shortcuts",
+      "files": "Workspace files",
+      "changes": "Git changes",
+      "terminal": "New terminal",
+      "tasks": "Background tasks",
+      "browser": "Browser",
+      "moreTools": "More tools",
+      "browserNoAgent": "Select an agent to open the browser"
+    },
     "refresh": "Refresh panel",
     "refreshTooltip": "Refresh",
     "collapse": "Collapse panel",

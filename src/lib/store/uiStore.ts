@@ -212,6 +212,34 @@ export function normalizeCodePanelTabOrder(value: unknown): CodePanelTab[] {
   return order;
 }
 
+/** Keeps a stored open-tab subset valid, preserving order (empty is allowed). */
+export function normalizeCodePanelOpenTabs(value: unknown): CodePanelTab[] {
+  if (!Array.isArray(value)) return [...CODE_PANEL_TAB_ORDER_DEFAULT];
+  const valid = new Set<CodePanelTab>(CODE_PANEL_TAB_ORDER_DEFAULT);
+  const open: CodePanelTab[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string' || !valid.has(entry as CodePanelTab)) continue;
+    const tab = entry as CodePanelTab;
+    if (!open.includes(tab)) open.push(tab);
+  }
+  return open;
+}
+
+/** Neighbour of a closed tab, searched forward then backward in the strip order. */
+function neighbourCodePanelTab(
+  order: readonly CodePanelTab[],
+  wasOpen: readonly CodePanelTab[],
+  closed: CodePanelTab,
+): CodePanelTab | null {
+  const remaining = order.filter((tab) => wasOpen.includes(tab) && tab !== closed);
+  const index = order.indexOf(closed);
+  for (let step = 1; step <= order.length; step += 1) {
+    const candidate = order[(index + step) % order.length];
+    if (candidate && remaining.includes(candidate)) return candidate;
+  }
+  return remaining[0] ?? null;
+}
+
 /** Trims, drops empties and dedupes a persisted tab order list. */
 function normalizeTabOrder(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -343,8 +371,10 @@ interface UiState {
   codeCommitsTab: { workspaceId: string; revision: string | null } | null;
   /** Whether the Code layout shows its right panel (Arquivos/Alterações). */
   codePanelOpen: boolean;
-  /** Active tab of the Code right panel. */
+  /** Active tab of the Code right panel (last selected when all tabs are closed). */
   codePanelTab: CodePanelTab;
+  /** Subset of panel tabs currently open (middle click closes, "+" reopens). */
+  codePanelOpenTabs: CodePanelTab[];
   /** Persisted order of the Code right panel tabs (drag-and-drop). */
   codePanelTabOrder: CodePanelTab[];
   /** Persisted order of the movable center tabs (sessions + center terminals). */
@@ -470,6 +500,10 @@ interface UiState {
   setCodePanelOpen: (open: boolean) => void;
   toggleCodePanel: () => void;
   setCodePanelTab: (tab: CodePanelTab) => void;
+  /** Opens (or activates) a Code right panel tab. */
+  openCodePanelTab: (tab: CodePanelTab) => void;
+  /** Closes a Code right panel tab, activating a neighbour when needed. */
+  closeCodePanelTab: (tab: CodePanelTab) => void;
   /** Persists the drag-and-drop order of the Code right panel tabs. */
   setCodePanelTabOrder: (order: readonly CodePanelTab[]) => void;
   /** Persists the drag-and-drop order of the movable center tabs. */
@@ -609,6 +643,7 @@ export const useUiStore = create<UiState>()(
       codeCommitsTab: null,
       codePanelOpen: true,
       codePanelTab: 'changes',
+      codePanelOpenTabs: [...CODE_PANEL_TAB_ORDER_DEFAULT],
       codePanelTabOrder: [...CODE_PANEL_TAB_ORDER_DEFAULT],
       codeTabOrder: [],
       agentPanelOpen: true,
@@ -911,17 +946,36 @@ export const useUiStore = create<UiState>()(
         set((state) => ({ codeCommitsTab: null, ...keepCenterViewUnlessActive(state, 'commits') })),
       setCodePanelOpen: (codePanelOpen) => set({ codePanelOpen }),
       toggleCodePanel: () => set((state) => ({ codePanelOpen: !state.codePanelOpen })),
-      setCodePanelTab: (codePanelTab) =>
-        set((state) => ({
-          codePanelTab:
-            codePanelTab === 'files'
-              ? 'files'
-              : codePanelTab === 'terminal'
-                ? 'terminal'
-                : 'changes',
-          pluginDockTab: { ...state.pluginDockTab, code: null },
-          pluginPages: { ...state.pluginPages, code: null },
-        })),
+      setCodePanelTab: (tab) => get().openCodePanelTab(tab),
+      openCodePanelTab: (tab) =>
+        set((state) => {
+          const target: CodePanelTab =
+            tab === 'files' || tab === 'terminal' ? tab : 'changes';
+          const openTabs = state.codePanelOpenTabs.includes(target)
+            ? state.codePanelOpenTabs
+            : [...state.codePanelOpenTabs, target].sort(
+                (a, b) =>
+                  state.codePanelTabOrder.indexOf(a) - state.codePanelTabOrder.indexOf(b),
+              );
+          return {
+            codePanelOpenTabs: openTabs,
+            codePanelTab: target,
+            pluginDockTab: { ...state.pluginDockTab, code: null },
+            pluginPages: { ...state.pluginPages, code: null },
+          };
+        }),
+      closeCodePanelTab: (tab) =>
+        set((state) => {
+          const target: CodePanelTab =
+            tab === 'files' || tab === 'terminal' ? tab : 'changes';
+          const openTabs = state.codePanelOpenTabs.filter((entry) => entry !== target);
+          const active =
+            state.codePanelTab === target
+              ? neighbourCodePanelTab(state.codePanelTabOrder, state.codePanelOpenTabs, target) ??
+                state.codePanelTab
+              : state.codePanelTab;
+          return { codePanelOpenTabs: openTabs, codePanelTab: active };
+        }),
       setCodePanelTabOrder: (order) =>
         set({ codePanelTabOrder: normalizeCodePanelTabOrder(order) }),
       setCodeTabOrder: (order) => set({ codeTabOrder: normalizeTabOrder(order) }),
@@ -1114,6 +1168,7 @@ export const useUiStore = create<UiState>()(
         activeAgentId: state.activeAgentId,
         activeChannelId: state.activeChannelId,
         codePanelOpen: state.codePanelOpen,
+        codePanelOpenTabs: state.codePanelOpenTabs,
         codePanelTabOrder: state.codePanelTabOrder,
         codeTabOrder: state.codeTabOrder,
         agentPanelOpen: state.agentPanelOpen,
@@ -1149,6 +1204,11 @@ export const useUiStore = create<UiState>()(
           return mapped;
         };
         const enabledLayouts = sanitizeLayoutVisibility(stored.enabledLayouts);
+        const codePanelOpenTabs = normalizeCodePanelOpenTabs(stored.codePanelOpenTabs);
+        const codePanelTab =
+          codePanelOpenTabs.length > 0 && !codePanelOpenTabs.includes(current.codePanelTab)
+            ? codePanelOpenTabs[0] ?? current.codePanelTab
+            : current.codePanelTab;
         const storedLayoutMode: LayoutMode =
           stored.layoutMode === 'code'
             ? 'code'
@@ -1168,6 +1228,8 @@ export const useUiStore = create<UiState>()(
           activeChannelId: validWorkspaceId(stored.activeChannelId),
           codePanelOpen:
             typeof stored.codePanelOpen === 'boolean' ? stored.codePanelOpen : current.codePanelOpen,
+          codePanelTab,
+          codePanelOpenTabs,
           codePanelTabOrder: normalizeCodePanelTabOrder(stored.codePanelTabOrder),
           codeTabOrder: normalizeTabOrder(stored.codeTabOrder),
           agentPanelOpen:

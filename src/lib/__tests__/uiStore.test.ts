@@ -4,6 +4,7 @@ import {
   clampSidebarWidth,
   clampSidePanelWidth,
   CODE_PANEL_TAB_ORDER_DEFAULT,
+  normalizeCodePanelOpenTabs,
   normalizeCodePanelTabOrder,
   SIDEBAR_WIDTH_DEFAULT,
   SIDEBAR_WIDTH_MAX,
@@ -44,6 +45,7 @@ function resetUi(): void {
     codeView: 'session',
     codePanelOpen: true,
     codePanelTab: 'changes',
+    codePanelOpenTabs: [...CODE_PANEL_TAB_ORDER_DEFAULT],
     codePanelTabOrder: [...CODE_PANEL_TAB_ORDER_DEFAULT],
     codeTabOrder: [],
   });
@@ -439,6 +441,61 @@ describe('useUiStore — layouts Chat e Code', () => {
 
     useUiStore.getState().setCodePanelTab('bogus' as unknown as 'changes');
     expect(useUiStore.getState().codePanelTab).toBe('changes');
+  });
+
+  it('normalizes the open panel tabs (dedupe, drop invalid, allow empty)', () => {
+    expect(normalizeCodePanelOpenTabs(['terminal', 'files', 'terminal', 'bogus'])).toEqual([
+      'terminal',
+      'files',
+    ]);
+    expect(normalizeCodePanelOpenTabs([])).toEqual([]);
+    expect(normalizeCodePanelOpenTabs(undefined)).toEqual([...CODE_PANEL_TAB_ORDER_DEFAULT]);
+  });
+
+  it('closes panel tabs and activates a neighbour while any remains open', () => {
+    useUiStore.getState().closeCodePanelTab('changes');
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['files', 'terminal']);
+    expect(useUiStore.getState().codePanelTab).toBe('terminal');
+
+    useUiStore.getState().closeCodePanelTab('terminal');
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['files']);
+    expect(useUiStore.getState().codePanelTab).toBe('files');
+
+    useUiStore.getState().closeCodePanelTab('files');
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual([]);
+    expect(useUiStore.getState().codePanelTab).toBe('files');
+  });
+
+  it('reopens closed panel tabs from the dropdown and from other surfaces', () => {
+    useUiStore.setState({ codePanelOpenTabs: [] });
+
+    useUiStore.getState().openCodePanelTab('files');
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['files']);
+    expect(useUiStore.getState().codePanelTab).toBe('files');
+
+    useUiStore.getState().setCodePanelTab('changes');
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['files', 'changes']);
+    expect(useUiStore.getState().codePanelTab).toBe('changes');
+  });
+
+  it('persists and repairs the open panel tabs on rehydrate', async () => {
+    useUiStore.getState().closeCodePanelTab('changes');
+    const persisted = JSON.parse(window.localStorage.getItem('zylara.ui') as string) as {
+      state?: { codePanelOpenTabs?: string[] };
+    };
+    expect(persisted.state?.codePanelOpenTabs).toEqual(['files', 'terminal']);
+
+    window.localStorage.setItem(
+      'zylara.ui',
+      JSON.stringify({
+        version: 0,
+        state: { codePanelOpenTabs: ['terminal', 'bogus', 'terminal'] },
+      }),
+    );
+    await useUiStore.persist.rehydrate();
+
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['terminal']);
+    expect(useUiStore.getState().codePanelTab).toBe('terminal');
   });
 
   it('persists the layout mode and the Code panel state', () => {

@@ -1,19 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Check,
+  Compass,
   FileDiff,
   Files,
   FolderOpen,
   GitBranch,
+  Globe2,
   History,
+  LayoutGrid,
+  ListChecks,
   PanelRightClose,
+  Plus,
   RefreshCw,
   SquareTerminal,
   type LucideIcon,
 } from 'lucide-react';
 import {
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   IconButton,
+  Kbd,
   SortableList,
   Spinner,
   Tooltip,
@@ -33,6 +44,8 @@ import {
   SIDE_PANEL_WIDTH_DEFAULT,
   SIDE_PANEL_WIDTH_MIN,
   SIDE_PANEL_WIDTH_STEP,
+  selectActiveAgents,
+  useAgentStore,
   useAppStore,
   useChatStore,
   useCodeStore,
@@ -46,11 +59,13 @@ import type {
   WorkspaceTreeSnapshot,
 } from '@/lib/types';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, modShortcut } from '@/lib/utils';
+import { AgentTaskBoardDialog } from '@/components/agents/AgentTaskBoardDialog';
 import { ChangesPanel, countPendingChanges } from './ChangesPanel';
 import { BranchPicker } from './BranchPicker';
 import { FileTree } from './FileTree';
 import { GitActionsMenu } from './GitActionsMenu';
+import { openTerminal } from './terminalOpen';
 import { TerminalPanel } from './TerminalPanel';
 import { useWorkspacePanel } from './useWorkspacePanel';
 import { dirsAffectedBy, useWorkspaceWatch } from './useWorkspaceWatch';
@@ -125,6 +140,93 @@ function PanelEmptyState({ icon: Icon, title, description }: EmptyStateProps) {
   );
 }
 
+interface PanelLauncherProps {
+  onOpenTab: (tab: CodePanelTab) => void;
+  onNewTerminal: () => void;
+  onTasks: () => void;
+  onBrowser: () => void;
+  onMoreTools: () => void;
+}
+
+/** Shown when every panel tab is closed: a compact launcher of panel surfaces. */
+function PanelLauncher({
+  onOpenTab,
+  onNewTerminal,
+  onTasks,
+  onBrowser,
+  onMoreTools,
+}: PanelLauncherProps) {
+  const { t } = useTranslation('code');
+  const entries: ReadonlyArray<{
+    key: string;
+    label: string;
+    icon: LucideIcon;
+    shortcut?: string;
+    onClick: () => void;
+  }> = [
+    {
+      key: 'files',
+      label: t('code:panel.launcher.files'),
+      icon: FolderOpen,
+      onClick: () => onOpenTab('files'),
+    },
+    {
+      key: 'changes',
+      label: t('code:panel.launcher.changes'),
+      icon: FileDiff,
+      onClick: () => onOpenTab('changes'),
+    },
+    {
+      key: 'terminal',
+      label: t('code:panel.launcher.terminal'),
+      icon: SquareTerminal,
+      onClick: onNewTerminal,
+    },
+    {
+      key: 'tasks',
+      label: t('code:panel.launcher.tasks'),
+      icon: ListChecks,
+      onClick: onTasks,
+    },
+    {
+      key: 'browser',
+      label: t('code:panel.launcher.browser'),
+      icon: Globe2,
+      onClick: onBrowser,
+    },
+    {
+      key: 'tools',
+      label: t('code:panel.launcher.moreTools'),
+      icon: LayoutGrid,
+      shortcut: modShortcut('k'),
+      onClick: onMoreTools,
+    },
+  ];
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-8">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-hover text-foreground-subtle">
+        <Compass aria-hidden className="size-5" strokeWidth={1.75} />
+      </span>
+      <div className="flex w-full max-w-80 flex-col gap-2">
+        {entries.map(({ key, label, icon: Icon, shortcut, onClick }) => (
+          <button
+            key={key}
+            type="button"
+            aria-label={label}
+            onClick={onClick}
+            className="flex h-11 w-full items-center gap-2.5 rounded-xl bg-surface-hover/60 px-3 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            <Icon aria-hidden className="size-4 shrink-0 text-foreground-muted" strokeWidth={1.75} />
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            {shortcut ? <Kbd>{shortcut}</Kbd> : null}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Code right panel: real Arquivos/Alterações tabs for the active session's
  * workspace (`WORKBENCH.md` §7). Width shares the persisted right-panel width
@@ -139,6 +241,8 @@ export function CodePanel() {
   const setTab = useUiStore((state) => state.setCodePanelTab);
   const tabOrder = useUiStore((state) => state.codePanelTabOrder);
   const setTabOrder = useUiStore((state) => state.setCodePanelTabOrder);
+  const openTabs = useUiStore((state) => state.codePanelOpenTabs);
+  const closeTab = useUiStore((state) => state.closeCodePanelTab);
   const pluginDock = useUiStore((state) => state.pluginDockTab.code);
   const ui = usePluginUi();
   const disabledPluginUi = usePluginUiPrefs((state) => state.disabled);
@@ -195,7 +299,13 @@ export function CodePanel() {
 
   /** Width previewed while dragging; `null` means "use the persisted width". */
   const [previewWidth, setPreviewWidth] = useState<number | null>(null);
+  const [tasksOpen, setTasksOpen] = useState(false);
   const tabRefs = useRef(new Map<CodePanelTab, HTMLButtonElement>());
+  /** Order of the tabs that are actually open (closed tabs stay in `tabOrder`). */
+  const visibleTabIds = useMemo(
+    () => tabOrder.filter((id) => openTabs.includes(id)),
+    [openTabs, tabOrder],
+  );
   /**
    * Last known "this workspace is a git repo" flag. A reload can resolve the
    * status back to `null` (error or a superseded load) and a transient `null`
@@ -357,28 +467,52 @@ export function CodePanel() {
   };
 
   const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, current: CodePanelTab) => {
-    const index = tabOrder.findIndex((entry) => entry === current);
+    const index = visibleTabIds.indexOf(current);
     let nextIndex: number;
     switch (event.key) {
       case 'ArrowRight':
-        nextIndex = (index + 1) % tabOrder.length;
+        nextIndex = (index + 1) % visibleTabIds.length;
         break;
       case 'ArrowLeft':
-        nextIndex = (index - 1 + tabOrder.length) % tabOrder.length;
+        nextIndex = (index - 1 + visibleTabIds.length) % visibleTabIds.length;
         break;
       case 'Home':
         nextIndex = 0;
         break;
       case 'End':
-        nextIndex = tabOrder.length - 1;
+        nextIndex = visibleTabIds.length - 1;
         break;
       default:
         return;
     }
     event.preventDefault();
-    const next = tabOrder[nextIndex];
+    const next = visibleTabIds[nextIndex];
     if (next) selectTab(next);
   };
+
+  const handleLauncherTerminal = () => {
+    setTab('terminal');
+    void openTerminal('panel', activeId);
+  };
+
+  const handleLauncherBrowser = () => {
+    const state = useUiStore.getState();
+    const agentId =
+      state.activeAgentId ?? selectActiveAgents(useAgentStore.getState())[0]?.id ?? null;
+    if (!agentId) {
+      toast.error(t('code:panel.launcher.browserNoAgent'));
+      return;
+    }
+    state.setLayoutMode('agent');
+    state.setActiveAgentId(agentId);
+    state.setAgentRightPanel('agent');
+    state.setAgentPanelTab('browser');
+    state.setAgentPanelOpen(true);
+  };
+
+  /* Empty strip: the launcher replaces the body, but a plugin dock still owns
+     the panel while one of its tabs is active. */
+  const showLauncher = visibleTabIds.length === 0 && !activePluginDock;
 
   const branch = panel.gitStatus?.branch ?? workspace?.git?.branch ?? null;
   if (panel.gitStatus) repoKnownRef.current = panel.gitStatus.isRepo;
@@ -395,11 +529,13 @@ export function CodePanel() {
     >
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
         <SortableList
-          ids={tabOrder}
+          ids={visibleTabIds}
           label={t('code:panel.tablist')}
           itemLabel={(id) => t(PANEL_TAB_KEYS[id as CodePanelTab])}
           orientation="horizontal"
-          onReorder={(ids) => setTabOrder(ids as CodePanelTab[])}
+          onReorder={(ids) =>
+            setTabOrder([...ids, ...tabOrder.filter((id) => !ids.includes(id))] as CodePanelTab[])
+          }
         >
           {(sortable) => (
             <RecipeDiv
@@ -407,9 +543,13 @@ export function CodePanel() {
               ref={sortable.containerRef}
               role="tablist"
               aria-label={t('code:panel.tablist')}
+              onMouseDown={(event) => {
+                // Suppress WebView2 autoscroll on middle click.
+                if (event.button === 1) event.preventDefault();
+              }}
               className="flex min-w-0 flex-1 items-center gap-0.5"
             >
-              {tabOrder.map((id) => {
+              {visibleTabIds.map((id) => {
                 const selected = tab === id;
                 const Icon = TAB_ICONS[id];
                 const itemProps = sortable.itemProps(id);
@@ -418,6 +558,11 @@ export function CodePanel() {
                     key={id}
                     role="presentation"
                     {...sortable.dropProps(id)}
+                    onAuxClick={(event) => {
+                      if (event.button !== 1) return;
+                      event.preventDefault();
+                      closeTab(id);
+                    }}
                     className={cn('shrink-0', sortableDropClassHorizontal)}
                   >
                     <button
@@ -477,6 +622,35 @@ export function CodePanel() {
           )}
         </SortableList>
 
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton
+              label={t('code:panel.addTab')}
+              title={t('code:panel.addTab')}
+              size="sm"
+            >
+              <Plus aria-hidden className="size-4" />
+            </IconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-48">
+            {tabOrder.map((id) => {
+              const Icon = TAB_ICONS[id];
+              return (
+                <DropdownMenuItem
+                  key={id}
+                  icon={<Icon aria-hidden className="size-4" strokeWidth={1.75} />}
+                  checked={openTabs.includes(id)}
+                  onSelect={() => setTab(id)}
+                >
+                  {id === 'changes' && pendingChanges > 0
+                    ? t('code:panel.tabs.changesCount', { count: pendingChanges })
+                    : t(PANEL_TAB_KEYS[id])}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Slot
           name="code.panel.tabs"
           owner={{ layout: 'code' }}
@@ -504,11 +678,20 @@ export function CodePanel() {
       <div
         role="tabpanel"
         id={PANEL_BODY_ID}
-        aria-labelledby={`code-panel-tab-${tab}`}
+        aria-labelledby={showLauncher ? undefined : `code-panel-tab-${tab}`}
+        aria-label={showLauncher ? t('code:panel.launcher.aria') : undefined}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <Slot name="code.panel.body.frame" owner={{ layout: 'code' }}>
-        {activePluginDock ? (
+        {showLauncher ? (
+          <PanelLauncher
+            onOpenTab={setTab}
+            onNewTerminal={handleLauncherTerminal}
+            onTasks={() => setTasksOpen(true)}
+            onBrowser={handleLauncherBrowser}
+            onMoreTools={() => useUiStore.getState().setCommandPaletteOpen(true)}
+          />
+        ) : activePluginDock ? (
           <PluginDockTabHost layout="code" tabKey={activePluginDock} />
         ) : tab === 'changes' ? (
           <div className="flex min-h-0 flex-1 flex-col">
@@ -626,6 +809,8 @@ export function CodePanel() {
         )}
         </Slot>
       </div>
+
+      {tasksOpen ? <AgentTaskBoardDialog open onOpenChange={setTasksOpen} /> : null}
 
       <PanelResizer
         side="end"

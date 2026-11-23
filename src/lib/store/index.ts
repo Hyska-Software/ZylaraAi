@@ -55,6 +55,7 @@ export {
   codeSubagentTabKey,
   codeRepoItemTabKey,
   normalizeCodePanelTabOrder,
+  normalizeCodePanelOpenTabs,
   CODE_PANEL_TAB_ORDER_DEFAULT,
   clampSidebarWidth,
   SIDEBAR_WIDTH_MIN,

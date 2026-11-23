@@ -36,6 +36,13 @@ const watchEvents = vi.hoisted(() => ({
   handlers: [] as Array<(event: { payload: unknown }) => void>,
 }));
 
+const terminalOpen = vi.hoisted(() => ({ openTerminal: vi.fn() }));
+
+vi.mock('./terminalOpen', () => ({
+  openTerminal: terminalOpen.openTerminal,
+  openWorkspaceTerminal: vi.fn(),
+}));
+
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(
     async (_name: string, handler: (event: { payload: unknown }) => void) => {
@@ -83,6 +90,7 @@ function resetPanelState(): void {
   useUiStore.setState({
     codePanelOpen: true,
     codePanelTab: 'changes',
+    codePanelOpenTabs: [...CODE_PANEL_TAB_ORDER_DEFAULT],
     codePanelTabOrder: [...CODE_PANEL_TAB_ORDER_DEFAULT],
     sidePanelWidth: SIDE_PANEL_WIDTH_DEFAULT,
     sidebarOpen: true,
@@ -146,6 +154,7 @@ beforeEach(() => {
   apiMock.gitBranches.mockResolvedValue({ current: 'main', branches: ['main'], all: [] });
   apiMock.getWorkspace.mockResolvedValue(null);
   apiMock.listTerminals.mockResolvedValue([]);
+  terminalOpen.openTerminal.mockResolvedValue(null);
   setViewport(1440);
   resetPanelState();
   usePluginUiPrefs.setState({ ...EMPTY_PREFS });
@@ -1010,5 +1019,93 @@ describe('CodePanel — aba de plugin no dock', () => {
     expect(within(strip).getAllByRole('tab', { name: 'Insights' })).toHaveLength(1);
     // The redundant slot button (same plugin, same panel) is not rendered either.
     expect(screen.getAllByLabelText('Insights')).toHaveLength(1);
+  });
+});
+
+describe('CodePanel — fechar e reabrir abas', () => {
+  beforeEach(() => {
+    setPluginUiState({
+      slots: [],
+      replacements: [],
+      wraps: [],
+      pages: [],
+      panelTabs: [],
+      nav: [],
+      settingsTabs: [],
+      artifactViewers: [],
+      variants: [],
+      presets: [],
+      css: [],
+      genui: [],
+    });
+  });
+
+  function middleClickTab(name: string): void {
+    const strip = screen.getByRole('tablist', { name: 'Conteúdo do painel' });
+    const tab = within(strip).getByRole('tab', { name });
+    const wrapper = tab.parentElement as HTMLElement;
+    fireEvent.mouseDown(strip, { button: 1 });
+    fireEvent(
+      wrapper,
+      new MouseEvent('auxclick', { button: 1, bubbles: true, cancelable: true }),
+    );
+  }
+
+  it('fecha uma aba com o botão do meio e ativa a vizinha quando era a atual', () => {
+    render(<CodePanel />);
+
+    middleClickTab('Arquivos');
+    expect(screen.queryByRole('tab', { name: 'Arquivos' })).toBeNull();
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['changes', 'terminal']);
+    expect(useUiStore.getState().codePanelTab).toBe('changes');
+
+    middleClickTab('Alterações');
+    expect(screen.queryByRole('tab', { name: 'Alterações' })).toBeNull();
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['terminal']);
+    expect(useUiStore.getState().codePanelTab).toBe('terminal');
+  });
+
+  it('reabre uma aba fechada pelo menu +', async () => {
+    render(<CodePanel />);
+    middleClickTab('Arquivos');
+
+    const trigger = screen.getByRole('button', { name: 'Adicionar aba do painel' });
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Arquivos' }));
+
+    expect(screen.getByRole('tab', { name: 'Arquivos' })).toBeTruthy();
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['files', 'changes', 'terminal']);
+    expect(useUiStore.getState().codePanelTab).toBe('files');
+  });
+
+  it('mostra o launcher quando todas as abas são fechadas e abre arquivos a partir dele', () => {
+    useUiStore.setState({ codePanelOpenTabs: [] });
+    render(<CodePanel />);
+
+    const strip = screen.getByRole('tablist', { name: 'Conteúdo do painel' });
+    expect(within(strip).queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Arquivos do espaço de trabalho' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Alterações do Git' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Novo terminal' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Tarefas em segundo plano' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Navegador' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Mais ferramentas' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Arquivos do espaço de trabalho' }));
+    expect(screen.getByRole('tab', { name: 'Arquivos' })).toBeTruthy();
+    expect(useUiStore.getState().codePanelTab).toBe('files');
+  });
+
+  it('abre um terminal e a paleta de comandos pelo launcher', () => {
+    useUiStore.setState({ codePanelOpenTabs: [] });
+    render(<CodePanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Novo terminal' }));
+    expect(terminalOpen.openTerminal).toHaveBeenCalledWith('panel', null);
+    expect(screen.getByRole('tab', { name: 'Terminal' })).toBeTruthy();
+
+    act(() => useUiStore.setState({ codePanelOpenTabs: [] }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mais ferramentas' }));
+    expect(useUiStore.getState().commandPaletteOpen).toBe(true);
   });
 });
