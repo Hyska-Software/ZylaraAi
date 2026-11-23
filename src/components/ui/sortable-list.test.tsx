@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import { SortableList, sortableDropClass, sortableDropClassHorizontal } from './sortable-list';
@@ -324,5 +324,78 @@ describe('SortableList (horizontal)', () => {
     fireEvent.pointerUp(window, { clientX: 250, clientY: 10 });
 
     expect(onReorder).not.toHaveBeenCalled();
+  });
+});
+
+describe('SortableList motion', () => {
+  const originalAnimate = Element.prototype.animate;
+  let animateSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    animateSpy = vi.fn(
+      (_keyframes: Keyframe[], _options?: KeyframeAnimationOptions) =>
+        ({ cancel: vi.fn(), finished: Promise.resolve() }) as unknown as Animation,
+    );
+    Element.prototype.animate = animateSpy as unknown as typeof Element.prototype.animate;
+  });
+
+  afterEach(() => {
+    Element.prototype.animate = originalAnimate;
+    document.documentElement.classList.remove('reduce-motion');
+  });
+
+  it('lifts the dragged row, follows the pointer and clears the styles on drop', () => {
+    render(<Harness />);
+    stubLayout();
+    const item = screen.getByTestId('item-a');
+
+    fireEvent.pointerDown(item, { button: 0, clientX: 100, clientY: 5 });
+    fireEvent.pointerMove(window, { clientX: 112, clientY: 22 });
+
+    expect(item.style.translate).toBe('12px 17px');
+    expect(item.style.willChange).toContain('translate');
+    expect(animateSpy).toHaveBeenCalled();
+
+    fireEvent.pointerUp(window, { clientX: 112, clientY: 22 });
+    expect(item.style.translate).toBe('');
+    expect(item.style.willChange).toBe('');
+  });
+
+  it('interpolates the reflow after a keyboard reorder', () => {
+    const positions: Record<string, number> = { a: 0, b: 32, c: 64 };
+    render(
+      <Harness
+        onReorder={(next) => {
+          next.forEach((id, index) => {
+            positions[id] = index * 32;
+          });
+        }}
+      />,
+    );
+    screen.getByTestId('container').getBoundingClientRect = () => rect(0, 96, 0, 240);
+    for (const id of ['a', 'b', 'c']) {
+      const item = screen.getByTestId(`item-${id}`);
+      item.getBoundingClientRect = () => rect(positions[id]);
+    }
+
+    fireEvent.keyDown(screen.getByTestId('item-b'), { key: 'ArrowDown', altKey: true });
+
+    const frames = animateSpy.mock.calls.map((call) => call[0]);
+    expect(frames.some((frame) => JSON.stringify(frame).includes('translate3d'))).toBe(true);
+  });
+
+  it('skips lift and reflow animations when motion is reduced', () => {
+    document.documentElement.classList.add('reduce-motion');
+    render(<Harness />);
+    stubLayout();
+    const item = screen.getByTestId('item-a');
+
+    fireEvent.pointerDown(item, { button: 0, clientX: 100, clientY: 5 });
+    fireEvent.pointerMove(window, { clientX: 112, clientY: 22 });
+
+    expect(animateSpy).not.toHaveBeenCalled();
+    expect(item.style.translate).toBe('');
+
+    fireEvent.pointerUp(window, { clientX: 112, clientY: 22 });
   });
 });

@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -69,11 +70,39 @@ export interface SortableListProps {
 const DRAG_THRESHOLD = 5;
 const EDGE = 24;
 const SCROLL_STEP = 8;
+const LIFT_SCALE = 1.03;
+const LIFT_DURATION = 140;
+const SETTLE_DURATION = 180;
+const LIFT_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+/** Both the OS preference and the app setting (`html.reduce-motion`, App.tsx). */
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false;
+  const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  return query?.matches === true || document.documentElement.classList.contains('reduce-motion');
+}
+
+/** WAAPI is unavailable in jsdom; animation is purely decorative, so skip it. */
+function animateElement(
+  element: HTMLElement,
+  keyframes: Keyframe[],
+  options: KeyframeAnimationOptions,
+): Animation | null {
+  if (typeof element.animate !== 'function' || prefersReducedMotion()) return null;
+  try {
+    return element.animate(keyframes, options);
+  } catch {
+    return null;
+  }
+}
 
 /** Drop line + dimmed source row, applied to each row wrapper. */
 export const sortableDropClass = cn(
   'relative',
   'data-[dragging=true]:opacity-40',
+  'transition-opacity duration-150 motion-reduce:transition-none',
+  'before:opacity-0 after:opacity-0 before:transition-opacity after:transition-opacity before:duration-150 after:duration-150',
+  'data-[drop=before]:before:opacity-100 data-[drop=after]:after:opacity-100',
   'data-[drop=before]:before:pointer-events-none data-[drop=before]:before:absolute data-[drop=before]:before:inset-x-1 data-[drop=before]:before:-top-px data-[drop=before]:before:h-0.5 data-[drop=before]:before:rounded-full data-[drop=before]:before:bg-accent',
   'data-[drop=after]:after:pointer-events-none data-[drop=after]:after:absolute data-[drop=after]:after:inset-x-1 data-[drop=after]:after:-bottom-px data-[drop=after]:after:h-0.5 data-[drop=after]:after:rounded-full data-[drop=after]:after:bg-accent',
 );
@@ -82,6 +111,9 @@ export const sortableDropClass = cn(
 export const sortableDropClassHorizontal = cn(
   'relative',
   'data-[dragging=true]:opacity-40',
+  'transition-opacity duration-150 motion-reduce:transition-none',
+  'before:opacity-0 after:opacity-0 before:transition-opacity after:transition-opacity before:duration-150 after:duration-150',
+  'data-[drop=before]:before:opacity-100 data-[drop=after]:after:opacity-100',
   'data-[drop=before]:before:pointer-events-none data-[drop=before]:before:absolute data-[drop=before]:before:inset-y-1 data-[drop=before]:before:-left-0.5 data-[drop=before]:before:w-0.5 data-[drop=before]:before:rounded-full data-[drop=before]:before:bg-accent',
   'data-[drop=after]:after:pointer-events-none data-[drop=after]:after:absolute data-[drop=after]:after:inset-y-1 data-[drop=after]:after:-right-0.5 data-[drop=after]:after:w-0.5 data-[drop=after]:after:rounded-full data-[drop=after]:after:bg-accent',
 );
@@ -149,6 +181,8 @@ export function SortableList({
   const dropRef = useRef<DropTarget | null>(null);
   const suppressClickRef = useRef(false);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const animationsRef = useRef<Set<Animation>>(new Set());
+  const flipRectsRef = useRef<Map<string, DOMRect> | null>(null);
 
   idsRef.current = ids;
   lockedRef.current = lockedCount;
@@ -162,7 +196,72 @@ export function SortableList({
   const [drop, setDrop] = useState<DropTarget | null>(null);
   const [announcement, setAnnouncement] = useState('');
 
-  useEffect(() => () => cleanupRef.current?.(), []);
+  const trackAnimation = useCallback((animation: Animation) => {
+    animationsRef.current.add(animation);
+    void animation.finished
+      .catch(() => undefined)
+      .then(() => {
+        animationsRef.current.delete(animation);
+        try {
+          animation.cancel();
+        } catch {
+          /* already cancelled */
+        }
+      });
+  }, []);
+
+  const cancelAnimations = useCallback(() => {
+    for (const animation of animationsRef.current) {
+      try {
+        animation.cancel();
+      } catch {
+        /* already finished */
+      }
+    }
+    animationsRef.current.clear();
+  }, []);
+
+  useEffect(
+    () => () => {
+      cleanupRef.current?.();
+      cancelAnimations();
+    },
+    [cancelAnimations],
+  );
+
+  /** Snapshot visual positions before a reorder so the new layout can be
+   *  interpolated (FLIP) instead of jumping. */
+  const captureFlipRects = useCallback(() => {
+    if (prefersReducedMotion()) return;
+    const rects = new Map<string, DOMRect>();
+    for (const [id, element] of elementsRef.current) {
+      rects.set(id, element.getBoundingClientRect());
+    }
+    flipRectsRef.current = rects;
+  }, []);
+
+  useLayoutEffect(() => {
+    const previous = flipRectsRef.current;
+    flipRectsRef.current = null;
+    if (!previous || prefersReducedMotion()) return;
+    for (const [id, element] of elementsRef.current) {
+      const before = previous.get(id);
+      if (!before) continue;
+      const after = element.getBoundingClientRect();
+      const dx = before.left - after.left;
+      const dy = before.top - after.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+      const animation = animateElement(
+        element,
+        [
+          { transform: `translate3d(${dx}px, ${dy}px, 0)` },
+          { transform: 'translate3d(0, 0, 0)' },
+        ],
+        { duration: SETTLE_DURATION, easing: LIFT_EASE },
+      );
+      if (animation) trackAnimation(animation);
+    }
+  }, [ids, trackAnimation]);
 
   const register = useCallback((id: string, element: HTMLElement | null) => {
     if (element) elementsRef.current.set(id, element);
@@ -202,6 +301,8 @@ export function SortableList({
     let frame = 0;
     let rects: ItemRect[] = [];
     let scroller: HTMLElement | null = null;
+    let dragElement: HTMLElement | null = null;
+    let liftAnimation: Animation | null = null;
 
     try {
       element.setPointerCapture?.(pointerId);
@@ -214,6 +315,53 @@ export function SortableList({
       if (previous?.id === next?.id && previous?.position === next?.position) return;
       dropRef.current = next;
       setDrop(next);
+    };
+
+    const clearDragStyle = (target: HTMLElement) => {
+      target.style.translate = '';
+      target.style.zIndex = '';
+      target.style.willChange = '';
+    };
+
+    /** `translate` is independent of `transform`, so the WAAPI lift animation
+     *  and the pointer-follow offset compose without overwriting each other. */
+    const lift = () => {
+      if (prefersReducedMotion()) return;
+      dragElement = element;
+      element.style.willChange = 'translate, transform';
+      element.style.zIndex = '2';
+      element.style.translate = '0px 0px';
+      liftAnimation = animateElement(
+        element,
+        [
+          { transform: 'scale(1)' },
+          { transform: `scale(${LIFT_SCALE})` },
+        ],
+        { duration: LIFT_DURATION, easing: LIFT_EASE, fill: 'forwards' },
+      );
+    };
+
+    /** Return a dropped-in-place row to rest. A reordered row is handled by
+     *  the FLIP effect: its snapshot already includes the drag offset. */
+    const finishDrag = (reordered: boolean) => {
+      const target = dragElement;
+      dragElement = null;
+      liftAnimation?.cancel();
+      liftAnimation = null;
+      if (!target) return;
+      const translate = target.style.translate || '0px 0px';
+      const animation =
+        !reordered &&
+        animateElement(
+          target,
+          [
+            { translate, transform: `scale(${LIFT_SCALE})` },
+            { translate: '0px 0px', transform: 'scale(1)' },
+          ],
+          { duration: SETTLE_DURATION, easing: LIFT_EASE, fill: 'forwards' },
+        );
+      clearDragStyle(target);
+      if (animation) trackAnimation(animation);
     };
 
     const updateDrop = () => {
@@ -293,19 +441,20 @@ export function SortableList({
       frame = requestAnimationFrame(tick);
     };
 
-    const commit = () => {
+    const commit = (): boolean => {
       const target = dropRef.current;
-      if (!target) return;
+      if (!target) return false;
       const current = idsRef.current;
       const from = current.indexOf(id);
-      if (from < 0) return;
+      if (from < 0) return false;
       const remaining = current.filter((item) => item !== id);
       const targetIndex = remaining.indexOf(target.id);
-      if (targetIndex < 0) return;
+      if (targetIndex < 0) return false;
       let insertAt = targetIndex + (target.position === 'after' ? 1 : 0);
       insertAt = Math.max(lockedRef.current, Math.min(insertAt, remaining.length));
       const next = [...remaining.slice(0, insertAt), id, ...remaining.slice(insertAt)];
-      if (next.every((item, itemIndex) => item === current[itemIndex])) return;
+      if (next.every((item, itemIndex) => item === current[itemIndex])) return false;
+      captureFlipRects();
       onReorderRef.current(next);
       setAnnouncement(
         t('common:sortable.moved', {
@@ -315,6 +464,7 @@ export function SortableList({
           total: next.length,
         }),
       );
+      return true;
     };
 
     const cleanup = () => {
@@ -343,7 +493,11 @@ export function SortableList({
         scroller = findDragScroller(containerRef.current, orientationRef.current);
         document.body.classList.add('zylara-sortable-dragging');
         setDraggingId(id);
+        lift();
         frame = requestAnimationFrame(tick);
+      }
+      if (dragElement) {
+        dragElement.style.translate = `${pointerX - startX}px ${pointerY - startY}px`;
       }
       moveEvent.preventDefault();
       updateDrop();
@@ -353,12 +507,14 @@ export function SortableList({
       pointerX = upEvent.clientX;
       pointerY = upEvent.clientY;
       const wasStarted = started;
+      let reordered = false;
       if (wasStarted) {
         updateDrop();
         suppressClickRef.current = true;
       }
       cleanup();
-      if (wasStarted) commit();
+      if (wasStarted) reordered = commit();
+      finishDrag(reordered);
       setDraggingId(null);
       setDropState(null);
     };
@@ -366,6 +522,7 @@ export function SortableList({
     const onCancel = () => {
       if (started) suppressClickRef.current = true;
       cleanup();
+      finishDrag(false);
       setDraggingId(null);
       setDropState(null);
     };
@@ -399,6 +556,7 @@ export function SortableList({
     event.stopPropagation();
     const next = [...current];
     [next[index], next[target]] = [next[target], next[index]];
+    captureFlipRects();
     onReorderRef.current(next);
     setAnnouncement(
       t('common:sortable.moved', {

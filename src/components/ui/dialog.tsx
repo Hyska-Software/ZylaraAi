@@ -18,7 +18,7 @@ export const DialogOverlay = React.forwardRef<
       ref={ref}
       className={cn(
         'fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]',
-        'data-[state=open]:animate-fade-in motion-reduce:animate-none',
+        'data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out motion-reduce:animate-none',
         className,
       )}
       {...props}
@@ -55,7 +55,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
           className={cn(
             'pointer-events-auto relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden',
             'rounded-2xl bg-surface-raised text-foreground shadow-2xl outline-none',
-            'data-[state=open]:animate-scale-in motion-reduce:animate-none',
+            'data-[state=open]:animate-scale-in data-[state=closed]:animate-scale-out motion-reduce:animate-none',
             SIZES[size],
             className,
           )}

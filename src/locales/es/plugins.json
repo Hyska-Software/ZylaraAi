@@ -13,6 +13,10 @@
     "installedCount": "{{count}} instalados",
     "searchPlaceholder": "Buscar plugins"
   },
+  "experimental": {
+    "label": "Experimental",
+    "body": "El sistema de plugins aún es experimental. Las interfaces y los permisos pueden cambiar, y los plugins de terceros no son revisados por Zylara — instala solo paquetes en los que confíes."
+  },
   "tabs": {
     "installed": "Instalados",
     "discover": "Descubrir",

@@ -59,6 +59,7 @@ import {
   type PluginConsentData,
 } from './PluginConsentDialog';
 import { PluginAvatar, PluginDetailDialog, SignaturePill } from './PluginDetailDialog';
+import { PluginExperimentalNotice } from './PluginExperimentalNotice';
 
 type ConsentTarget =
   | { kind: 'file'; path: string; inspection: PluginPackageInspection; mode: 'install' | 'update' }
@@ -540,6 +541,8 @@ export function PluginsView() {
           </Button>
         </div>
       </header>
+
+      <PluginExperimentalNotice />
 
       {snapshot.safeMode ? (
         <div className="mx-5 mt-3 flex items-start gap-2 rounded-xl bg-warning-soft/30 px-3 py-2 text-[12px] text-warning">

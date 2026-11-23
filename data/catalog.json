@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-17T13:46:31.483Z",
+ "generatedAt": "2026-11-23T13:52:03.747Z",
  "sources": {
   "docs": [
    "https://opencode.ai/v2/docs/console/go/",
@@ -203,9 +203,9 @@
      "contextWindow": 1000000,
      "maxOutput": 384000,
      "cost": {
-      "input": 0.3,
-      "output": 1.2,
-      "cache_read": 0.006
+      "input": 0.12,
+      "output": 0.48,
+      "cache_read": 0.0024
      },
      "releaseDate": "2026-10-17",
      "knowledge": "2025-05",
@@ -590,9 +590,9 @@
      "contextWindow": 1000000,
      "maxOutput": 131072,
      "cost": {
-      "input": 1.4,
-      "output": 4.4,
-      "cache_read": 0.26
+      "input": 0.56,
+      "output": 1.76,
+      "cache_read": 0.104
      },
      "releaseDate": "2026-08-14",
      "knowledge": null,
@@ -3043,9 +3043,9 @@
      "contextWindow": 1000000,
      "maxOutput": 384000,
      "cost": {
-      "input": 0.3,
-      "output": 1.2,
-      "cache_read": 0.006
+      "input": 0.12,
+      "output": 0.48,
+      "cache_read": 0.0024
      },
      "releaseDate": "2026-10-17",
      "knowledge": "2025-05",
@@ -3367,6 +3367,53 @@
       "free",
       "reasoning",
       "vision"
+     ],
+     "status": "free"
+    },
+    {
+     "id": "tidepool-alpha-free",
+     "name": "Tidepool Alpha Free",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": false,
+     "modalities": {
+      "input": [
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 131072,
+     "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0
+     },
+     "releaseDate": "2026-11-18",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Stealth reasoning model, free for a limited time",
+     "tags": [
+      "free",
+      "reasoning"
      ],
      "status": "free"
     },
@@ -3889,6 +3936,99 @@
      "status": "stable"
     },
     {
+     "id": "gemini-4-neon",
+     "name": "Gemini 4 Neon",
+     "family": "gemini",
+     "protocols": [
+      "google"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video",
+       "audio",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 3,
+      "output": 15,
+      "cache_read": 0.15,
+      "input_audio": 3
+     },
+     "releaseDate": "2026-11-18",
+     "knowledge": "2026-03",
+     "openWeights": false,
+     "description": "Google's Gemini 4 model for fast, frontier-level coding, knowledge work and science workflows, with four thinking levels and a 1M-token context window",
+     "tags": [
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "gemini-nano-banana-2.1",
+     "name": "Nano Banana 2.1",
+     "family": "gemini",
+     "protocols": [
+      "google"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
+     "cost": null,
+     "releaseDate": null,
+     "knowledge": null,
+     "openWeights": false,
+     "description": null,
+     "tags": [
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "glm-5",
      "name": "GLM 5",
      "family": "glm",
@@ -4039,9 +4179,9 @@
      "contextWindow": 1000000,
      "maxOutput": 131072,
      "cost": {
-      "input": 1.4,
-      "output": 4.4,
-      "cache_read": 0.26
+      "input": 0.56,
+      "output": 1.76,
+      "cache_read": 0.104
      },
      "releaseDate": "2026-08-14",
      "knowledge": null,
@@ -5445,6 +5585,140 @@
      "knowledge": "2026-04-30",
      "openWeights": false,
      "description": "Near-Astra performance for complex coding, computer use, and professional work at a lower cost.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "gpt-6.2-astra",
+     "name": "GPT 6.2 Astra",
+     "family": "gpt",
+     "protocols": [
+      "openai-responses"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "cache_write": 10,
+      "tiers": [
+       {
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "cache_write": 20,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8,
+       "cache_write": 20
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-05-18",
+     "openWeights": false,
+     "description": "A frontier reasoning model for coding, computer use, and professional work such as slides, spreadsheets, and documents.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "gpt-6.2-sol",
+     "name": "GPT 6.2 Sol",
+     "family": "gpt",
+     "protocols": [
+      "openai-responses"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "cache_write": 2.5,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "cache_write": 5,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2,
+       "cache_write": 5
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-06-01",
+     "openWeights": false,
+     "description": "An efficient reasoning model for everyday work, multistep agentic workflows, and coding.",
      "tags": [
       "reasoning",
       "vision"
@@ -8188,6 +8462,140 @@
      "status": "stable"
     },
     {
+     "id": "gpt-6.2-astra",
+     "name": "GPT-6.2 Astra",
+     "family": "gpt",
+     "protocols": [
+      "openai-responses"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "cache_write": 10,
+      "tiers": [
+       {
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "cache_write": 20,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8,
+       "cache_write": 20
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-05-18",
+     "openWeights": false,
+     "description": "A frontier reasoning model for coding, computer use, and professional work such as slides, spreadsheets, and documents.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "gpt-6.2-sol",
+     "name": "GPT-6.2 Sol",
+     "family": "gpt",
+     "protocols": [
+      "openai-responses"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "cache_write": 2.5,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "cache_write": 5,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2,
+       "cache_write": 5
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-06-01",
+     "openWeights": false,
+     "description": "An efficient reasoning model for everyday work, multistep agentic workflows, and coding.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "o3",
      "name": "o3",
      "family": "gpt",
@@ -10025,58 +10433,6 @@
      "description": "xAI's frontier model for long-running agents, coding, knowledge work, and visual projects",
      "tags": [
       "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "grok-build-0.1",
-     "name": "Grok Build 0.1",
-     "family": "grok",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "pdf"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 256000,
-     "maxOutput": 256000,
-     "cost": {
-      "input": 1,
-      "output": 2,
-      "cache_read": 0.2,
-      "tiers": [
-       {
-        "input": 2,
-        "output": 4,
-        "cache_read": 0.4,
-        "tier": {
-         "type": "context",
-         "size": 200000
-        }
-       }
-      ],
-      "context_over_200k": {
-       "input": 2,
-       "output": 4,
-       "cache_read": 0.4
-      }
-     },
-     "releaseDate": "2026-04-16",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Fast Grok coding model tuned for agentic engineering and iterative edits",
-     "tags": [
       "vision"
      ],
      "status": "stable"
@@ -12718,7 +13074,7 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "OPENROUTER_API_KEY",
-   "defaultModelId": "qwen/qwen4-max",
+   "defaultModelId": "radixark/daisyrose-27b",
    "models": [
     {
      "id": "anthropic/claude-fable-5.2",
@@ -12763,6 +13119,52 @@
      "knowledge": "2026-06",
      "openWeights": false,
      "description": "Claude model for creative writing, analysis, and controlled agent workflows",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "radixark/daisyrose-27b",
+     "name": "DaisyRose 27B",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "low",
+        "medium",
+        "xhigh"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 262144,
+     "maxOutput": 235929,
+     "cost": {
+      "input": 0.15,
+      "output": 1.875,
+      "cache_read": 0.0375
+     },
+     "releaseDate": "2026-11-21",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
      "tags": [
       "reasoning",
       "vision"
@@ -12856,8 +13258,8 @@
      "status": "stable"
     },
     {
-     "id": "thinkingmachines/inkling-2-small",
-     "name": "Inkling 2 Small",
+     "id": "thinkingmachines/inkling-2-mini",
+     "name": "Inkling 2 Mini",
      "family": "default",
      "protocols": [
       "openai-chat"
@@ -12867,6 +13269,7 @@
       {
        "type": "effort",
        "values": [
+        "none",
         "minimal",
         "low",
         "medium",
@@ -12886,68 +13289,22 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 943718,
+     "maxOutput": 65536,
      "cost": {
-      "input": 0.3,
-      "output": 1,
-      "cache_read": 0.03
+      "input": 0.075,
+      "output": 0.3,
+      "cache_read": 0.015
      },
-     "releaseDate": "2026-11-05",
+     "releaseDate": "2026-11-21",
      "knowledge": null,
      "openWeights": true,
      "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
      "tags": [
+      "fast",
       "reasoning",
       "vision"
      ],
      "status": "stable"
-    },
-    {
-     "id": "thinkingmachines/inkling-2-small:free",
-     "name": "Inkling 2 Small (free)",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "minimal",
-        "low",
-        "medium",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 0,
-      "output": 0
-     },
-     "releaseDate": "2026-11-05",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
-     "tags": [
-      "free",
-      "reasoning",
-      "vision"
-     ],
-     "status": "free"
     },
     {
      "id": "liquid/lfm-3-1.7b",
@@ -13056,82 +13413,6 @@
      "status": "free"
     },
     {
-     "id": "kt/midm-k-3.0-pro",
-     "name": "Mi:dm K 3.0 Pro",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 261795,
-     "maxOutput": 235615,
-     "cost": {
-      "input": 0.2,
-      "output": 0.8,
-      "cache_read": 0.04
-     },
-     "releaseDate": "2026-11-05",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Flagship model for demanding analysis, coding, and production agent workflows",
-     "tags": [
-      "reasoning"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "motif-technologies/motif-3",
-     "name": "Motif 3",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 262144,
-     "maxOutput": 235929,
-     "cost": {
-      "input": 0.3,
-      "output": 1.2,
-      "cache_read": 0.06
-     },
-     "releaseDate": "2026-11-02",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Reasoning model for deliberate analysis, multi-step problem solving, and tool use",
-     "tags": [
-      "reasoning"
-     ],
-     "status": "stable"
-    },
-    {
      "id": "nex-agi/nex-n2.6",
      "name": "Nex-N2.6",
      "family": "default",
@@ -13174,44 +13455,6 @@
       "vision"
      ],
      "status": "stable"
-    },
-    {
-     "id": "ricursiveai/ripple-65b-preview",
-     "name": "Ripple 65B Preview",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 0.1,
-      "output": 0.3,
-      "cache_read": 0.025
-     },
-     "releaseDate": "2026-11-04",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Preview model for early access evaluation, prototyping, and compatibility testing",
-     "tags": [
-      "reasoning"
-     ],
-     "status": "beta"
     },
     {
      "id": "google/gemini-4-carbon",
@@ -13319,6 +13562,59 @@
      "status": "stable"
     },
     {
+     "id": "google/gemini-4-neon",
+     "name": "Gemini 4 Neon",
+     "family": "gemini",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video",
+       "audio",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 943718,
+     "cost": {
+      "input": 3,
+      "output": 15,
+      "reasoning": 15,
+      "cache_read": 0.15,
+      "cache_write": 0.083333,
+      "input_audio": 3
+     },
+     "releaseDate": "2026-11-18",
+     "knowledge": "2026-03",
+     "openWeights": false,
+     "description": "Gemini multimodal model for text, image, audio, video, and document tasks",
+     "tags": [
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "google/gemini-omni-1.2-flash",
      "name": "Gemini Omni 1.2 Flash",
      "family": "gemini",
@@ -13365,9 +13661,9 @@
      "status": "stable"
     },
     {
-     "id": "z-ai/glm-5.3-flashx-legal",
-     "name": "GLM 5.3 FlashX Legal",
-     "family": "glm",
+     "id": "openai/gpt-6.2-astra",
+     "name": "GPT-6.2 Astra",
+     "family": "gpt",
      "protocols": [
       "openai-chat"
      ],
@@ -13377,7 +13673,9 @@
        "type": "effort",
        "values": [
         "low",
+        "medium",
         "high",
+        "xhigh",
         "max"
        ]
       }
@@ -13387,35 +13685,52 @@
       "input": [
        "text",
        "image",
-       "video"
+       "pdf"
       ],
       "output": [
        "text"
       ]
      },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
      "cost": {
-      "input": 0.37,
-      "output": 1.25,
-      "cache_read": 0.075
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "cache_write": 10,
+      "tiers": [
+       {
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "cache_write": 20,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8,
+       "cache_write": 20
+      }
      },
-     "releaseDate": "2026-11-02",
-     "knowledge": null,
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-05-18",
      "openWeights": false,
-     "description": "GLM vision model for visual reasoning, documents, and multimodal agents",
+     "description": "GPT model for general reasoning, writing, coding, and tool-assisted tasks",
      "tags": [
-      "open-weights",
-      "fast",
       "reasoning",
       "vision"
      ],
      "status": "stable"
     },
     {
-     "id": "tencent/hy4",
-     "name": "Hy4",
-     "family": "hy",
+     "id": "openai/gpt-6.2-astra-pro",
+     "name": "GPT-6.2 Astra Pro",
+     "family": "gpt",
      "protocols": [
       "openai-chat"
      ],
@@ -13424,9 +13739,78 @@
       {
        "type": "effort",
        "values": [
-        "none",
         "low",
-        "high"
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "pdf",
+       "image",
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "cache_write": 10,
+      "tiers": [
+       {
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "cache_write": 20,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8,
+       "cache_write": 20
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Frontier GPT model for professional reasoning, coding, and multimodal work",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai/gpt-6.2-sol",
+     "name": "GPT-6.2 Sol",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
        ]
       }
      ],
@@ -13434,23 +13818,110 @@
      "modalities": {
       "input": [
        "text",
-       "image"
+       "image",
+       "pdf"
       ],
       "output": [
        "text"
       ]
      },
-     "contextWindow": 1048576,
-     "maxOutput": 65536,
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
      "cost": {
-      "input": 0.417,
-      "output": 1.2505,
-      "cache_read": 0.021
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "cache_write": 2.5,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "cache_write": 5,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2,
+       "cache_write": 5
+      }
      },
-     "releaseDate": "2026-11-04",
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-06-01",
+     "openWeights": false,
+     "description": "GPT model for general reasoning, writing, coding, and tool-assisted tasks",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai/gpt-6.2-sol-pro",
+     "name": "GPT-6.2 Sol Pro",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "pdf",
+       "image",
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "cache_write": 2.5,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "cache_write": 5,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2,
+       "cache_write": 5
+      }
+     },
+     "releaseDate": "2026-11-17",
      "knowledge": null,
      "openWeights": false,
-     "description": "Tencent Hy reasoning model for coding, instruction following, and agent tasks",
+     "description": "Frontier GPT model for professional reasoning, coding, and multimodal work",
      "tags": [
       "reasoning",
       "vision"
@@ -13616,7 +14087,7 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "AI_GATEWAY_API_KEY",
-   "defaultModelId": "alibaba/qwen4-max",
+   "defaultModelId": "google/gemini-4-neon",
    "models": [
     {
      "id": "anthropic/claude-fable-5.2",
@@ -13819,7 +14290,6 @@
       {
        "type": "effort",
        "values": [
-        "none",
         "low",
         "medium",
         "high"
@@ -13900,97 +14370,6 @@
      "status": "stable"
     },
     {
-     "id": "inclusionai/ling-3.1-flash-1019",
-     "name": "Ling 3.1 Flash 1019",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "none",
-        "low",
-        "medium",
-        "high"
-       ]
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1000000,
-     "maxOutput": 262144,
-     "cost": {
-      "input": 0.3,
-      "output": 0.9,
-      "cache_read": 0.06
-     },
-     "releaseDate": "2026-10-30",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Efficient model for low-latency assistance, extraction, and routine automation",
-     "tags": [
-      "fast",
-      "reasoning"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "particle/particle-1",
-     "name": "Particle-1",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "none",
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 0.125,
-      "output": 0.5,
-      "cache_read": 0.015
-     },
-     "releaseDate": "2026-10-28",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
-     "tags": [
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
      "id": "paperinstruments/ultramarine-1-flash",
      "name": "Ultramarine 1 Flash",
      "family": "default",
@@ -14032,7 +14411,7 @@
      "releaseDate": "2026-11-12",
      "knowledge": null,
      "openWeights": false,
-     "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
+     "description": "Paper Instruments' agentic model for professional knowledge work, RL-trained on GLM-5.3 Flash",
      "tags": [
       "fast",
       "reasoning",
@@ -14136,6 +14515,54 @@
      "status": "stable"
     },
     {
+     "id": "google/gemini-4-neon",
+     "name": "Gemini 4 Neon",
+     "family": "gemini",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1000000,
+     "maxOutput": 1000000,
+     "cost": {
+      "input": 3,
+      "output": 15,
+      "cache_read": 0.15
+     },
+     "releaseDate": "2026-11-18",
+     "knowledge": "2026-03",
+     "openWeights": false,
+     "description": "Google's Gemini 4 model for fast, frontier-level coding, knowledge work and science workflows, with four thinking levels and a 1M-token context window",
+     "tags": [
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "zai/glm-5.3-flashx-legal",
      "name": "GLM 5.3 FlashX Legal",
      "family": "glm",
@@ -14183,8 +14610,8 @@
      "status": "stable"
     },
     {
-     "id": "openai/gpt-6.1-terra",
-     "name": "GPT-6.1 Terra",
+     "id": "openai/gpt-6.2-astra",
+     "name": "GPT-6.2 Astra",
      "family": "gpt",
      "protocols": [
       "openai-chat"
@@ -14194,7 +14621,6 @@
       {
        "type": "effort",
        "values": [
-        "none",
         "low",
         "medium",
         "high",
@@ -14217,16 +14643,16 @@
      "contextWindow": 1050000,
      "maxOutput": 128000,
      "cost": {
-      "input": 1,
-      "output": 5,
-      "cache_read": 0.05,
-      "cache_write": 1.25,
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "cache_write": 10,
       "tiers": [
        {
-        "input": 2,
-        "output": 7.5,
-        "cache_read": 0.1,
-        "cache_write": 2.5,
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "cache_write": 20,
         "tier": {
          "type": "context",
          "size": 272001
@@ -14234,16 +14660,16 @@
        }
       ],
       "context_over_200k": {
-       "input": 2,
-       "output": 7.5,
-       "cache_read": 0.1,
-       "cache_write": 2.5
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8,
+       "cache_write": 20
       }
      },
-     "releaseDate": "2026-10-26",
-     "knowledge": "2026-06-01",
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-05-18",
      "openWeights": false,
-     "description": "GPT model for general reasoning, writing, coding, and tool-assisted tasks",
+     "description": "A frontier reasoning model for coding, computer use, and professional work such as slides, spreadsheets, and documents.",
      "tags": [
       "reasoning",
       "vision"
@@ -14251,8 +14677,8 @@
      "status": "stable"
     },
     {
-     "id": "openai/gpt-6.1-terra-fast",
-     "name": "GPT-6.1 Terra (Fast)",
+     "id": "openai/gpt-6.2-astra-fast",
+     "name": "GPT-6.2 Astra (Fast)",
      "family": "gpt",
      "protocols": [
       "openai-chat"
@@ -14262,7 +14688,73 @@
       {
        "type": "effort",
        "values": [
-        "none",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 16,
+      "output": 80,
+      "cache_read": 0.8,
+      "cache_write": 20,
+      "tiers": [
+       {
+        "input": 32,
+        "output": 120,
+        "cache_read": 1.6,
+        "cache_write": 40,
+        "tier": {
+         "type": "context",
+         "size": 272001
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 32,
+       "output": 120,
+       "cache_read": 1.6,
+       "cache_write": 40
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-05-18",
+     "openWeights": false,
+     "description": "A frontier reasoning model for coding, computer use, and professional work such as slides, spreadsheets, and documents.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai/gpt-6.2-sol",
+     "name": "GPT-6.2 Sol",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
         "low",
         "medium",
         "high",
@@ -14308,10 +14800,77 @@
        "cache_write": 5
       }
      },
-     "releaseDate": "2026-10-26",
+     "releaseDate": "2026-11-17",
      "knowledge": "2026-06-01",
      "openWeights": false,
-     "description": "Compact GPT model for low-latency assistance and high-volume workloads",
+     "description": "An efficient reasoning model for everyday work, multistep agentic workflows, and coding.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai/gpt-6.2-sol-fast",
+     "name": "GPT-6.2 Sol (Fast)",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 4,
+      "output": 20,
+      "cache_read": 0.2,
+      "cache_write": 5,
+      "tiers": [
+       {
+        "input": 8,
+        "output": 30,
+        "cache_read": 0.4,
+        "cache_write": 10,
+        "tier": {
+         "type": "context",
+         "size": 272001
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 8,
+       "output": 30,
+       "cache_read": 0.4,
+       "cache_write": 10
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-06-01",
+     "openWeights": false,
+     "description": "An efficient reasoning model for everyday work, multistep agentic workflows, and coding.",
      "tags": [
       "reasoning",
       "vision"
@@ -14402,52 +14961,6 @@
      "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
      "tags": [
       "fast",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "moonshotai/kimi-k3.1-pro",
-     "name": "Kimi K3.1 Pro",
-     "family": "kimi",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1000000,
-     "maxOutput": 262144,
-     "cost": {
-      "input": 2,
-      "output": 10,
-      "cache_read": 0.2
-     },
-     "releaseDate": "2026-10-23",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Kimi multimodal agent model for visual understanding, coding, and planning",
-     "tags": [
-      "open-weights",
       "reasoning",
       "vision"
      ],
@@ -15965,9 +16478,9 @@
      "contextWindow": 1000000,
      "maxOutput": 384000,
      "cost": {
-      "input": 0.21,
-      "output": 0.84,
-      "cache_read": 0.0042
+      "input": 0.15,
+      "output": 0.6,
+      "cache_read": 0.003
      },
      "releaseDate": "2026-10-17",
      "knowledge": "2025-05",
@@ -16015,9 +16528,9 @@
      "contextWindow": 1000000,
      "maxOutput": 384000,
      "cost": {
-      "input": 2.4,
-      "output": 9.6,
-      "cache_read": 0.048
+      "input": 1.2,
+      "output": 4.8,
+      "cache_read": 0.024
      },
      "releaseDate": "2026-10-17",
      "knowledge": "2025-05",
@@ -16065,9 +16578,9 @@
      "contextWindow": 1000000,
      "maxOutput": 384000,
      "cost": {
-      "input": 0.21,
-      "output": 0.84,
-      "cache_read": 0.0042
+      "input": 0.15,
+      "output": 0.6,
+      "cache_read": 0.003
      },
      "releaseDate": "2026-09-10",
      "knowledge": "2025-05",
@@ -16339,9 +16852,9 @@
      "contextWindow": 1048573,
      "maxOutput": 262144,
      "cost": {
-      "input": 0.98,
-      "output": 3.08,
-      "cache_read": 0.182
+      "input": 0.7,
+      "output": 2.2,
+      "cache_read": 0.13
      },
      "releaseDate": "2026-08-14",
      "knowledge": null,
@@ -18130,6 +18643,50 @@
      "status": "stable"
     },
     {
+     "id": "tencent/Hy4",
+     "name": "Hy4",
+     "family": "hy",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "high"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 0.834,
+      "output": 2.501,
+      "cache_read": 0.042
+     },
+     "releaseDate": "2026-11-04",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "A next-generation multimodal productivity model with significantly enhanced Agent and complex task execution capabilities.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "tencent/Hy4-preview",
      "name": "Hy4 preview",
      "family": "hy",
@@ -18170,53 +18727,6 @@
       "reasoning"
      ],
      "status": "beta"
-    },
-    {
-     "id": "moonshotai/Kimi-K3",
-     "name": "Kimi K3",
-     "family": "kimi",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 1048576,
-     "cost": {
-      "input": 2.85,
-      "output": 14.25,
-      "cache_read": 0.285,
-      "cache_write": 3.5625
-     },
-     "releaseDate": "2026-07-16",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Multimodal Kimi model with 1M context and toggleable max-effort thinking for long-horizon agent work",
-     "tags": [
-      "open-weights",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
     },
     {
      "id": "moonshotai/Kimi-K3.1-Pro",
@@ -19543,37 +20053,6 @@
      "status": "stable"
     },
     {
-     "id": "Meta-Llama-3.3-70B-Instruct",
-     "name": "Llama-3.3-70B-Instruct",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": false,
-     "reasoningOptions": [],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 131072,
-     "maxOutput": 3072,
-     "cost": {
-      "input": 0.6,
-      "output": 1.2
-     },
-     "releaseDate": "2024-12-06",
-     "knowledge": "2023-12",
-     "openWeights": true,
-     "description": "Popular open Llama workhorse for multilingual chat, coding, and self-hosting",
-     "tags": [],
-     "status": "stable"
-    },
-    {
      "id": "GLM-5.3",
      "name": "GLM-5.3",
      "family": "glm",
@@ -20375,7 +20854,7 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "NOVITA_API_KEY",
-   "defaultModelId": "qwen/qwen4-max",
+   "defaultModelId": "openai/gpt-6.2-astra",
    "models": [
     {
      "id": "deepseek/deepseek-v4.1-flash",
@@ -20474,44 +20953,6 @@
       "fast",
       "reasoning",
       "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "apodex/apodex-1.1-mini",
-     "name": "Apodex 1.1 Mini",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 262144,
-     "maxOutput": 262144,
-     "cost": {
-      "input": 0,
-      "output": 0
-     },
-     "releaseDate": "2026-08-24",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Open-weight 35B MoE model for long-horizon research, forecasting, and tool-assisted work",
-     "tags": [
-      "fast",
-      "reasoning"
      ],
      "status": "stable"
     },
@@ -20675,9 +21116,9 @@
      "status": "stable"
     },
     {
-     "id": "zai-org/glm-5.3-flashX",
-     "name": "GLM 5.3 FlashX",
-     "family": "glm",
+     "id": "openai/gpt-6.1-terra",
+     "name": "GPT-6.1 Terra",
+     "family": "gpt",
      "protocols": [
       "openai-chat"
      ],
@@ -20686,9 +21127,11 @@
       {
        "type": "effort",
        "values": [
+        "none",
         "low",
+        "medium",
         "high",
-        "max"
+        "xhigh"
        ]
       }
      ],
@@ -20697,35 +21140,49 @@
       "input": [
        "text",
        "image",
-       "video"
+       "pdf"
       ],
       "output": [
        "text"
       ]
      },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
      "cost": {
-      "input": 0.37,
-      "output": 1.25,
-      "cache_read": 0.075
+      "input": 1,
+      "output": 5,
+      "cache_read": 0.05,
+      "tiers": [
+       {
+        "input": 2,
+        "output": 10,
+        "cache_read": 0.1,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 2,
+       "output": 10,
+       "cache_read": 0.1
+      }
      },
-     "releaseDate": "2026-08-26",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Native multimodal GLM model for efficient coding and long-horizon agent tasks",
+     "releaseDate": "2026-10-26",
+     "knowledge": "2026-06-01",
+     "openWeights": false,
+     "description": "Fast, efficient model for visual reasoning, precise computer use, and clear, natural writing.",
      "tags": [
-      "open-weights",
-      "fast",
       "reasoning",
       "vision"
      ],
      "status": "stable"
     },
     {
-     "id": "zai-org/glm-5.3-flash",
-     "name": "GLM-5.3-Flash",
-     "family": "glm",
+     "id": "openai/gpt-6.2-astra",
+     "name": "GPT-6.2 Astra",
+     "family": "gpt",
      "protocols": [
       "openai-chat"
      ],
@@ -20735,8 +21192,9 @@
        "type": "effort",
        "values": [
         "low",
+        "medium",
         "high",
-        "max"
+        "xhigh"
        ]
       }
      ],
@@ -20745,26 +21203,103 @@
       "input": [
        "text",
        "image",
-       "video"
+       "pdf"
       ],
       "output": [
        "text"
       ]
      },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
      "cost": {
-      "input": 0.15,
-      "output": 0.5,
-      "cache_read": 0.03
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "tiers": [
+       {
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8
+      }
      },
-     "releaseDate": "2026-08-26",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Native multimodal GLM model for efficient coding and long-horizon agent tasks",
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-05-18",
+     "openWeights": false,
+     "description": "A frontier reasoning model for coding, computer use, and professional work such as slides, spreadsheets, and documents.",
      "tags": [
-      "open-weights",
-      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai/gpt-6.2-sol",
+     "name": "GPT-6.2 Sol",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-06-01",
+     "openWeights": false,
+     "description": "An efficient reasoning model for everyday work, multistep agentic workflows, and coding.",
+     "tags": [
       "reasoning",
       "vision"
      ],
@@ -20844,9 +21379,9 @@
      "contextWindow": 1000000,
      "maxOutput": 64000,
      "cost": {
-      "input": 0.07,
-      "output": 0.281,
-      "cache_read": 0.003
+      "input": 0.035,
+      "output": 0.1405,
+      "cache_read": 0.0015
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
@@ -21225,7 +21760,7 @@
       ]
      },
      "contextWindow": 1000000,
-     "maxOutput": 131000,
+     "maxOutput": 262000,
      "cost": {
       "input": 1.413,
       "output": 4.24,
@@ -21306,7 +21841,7 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "VENICE_API_KEY",
-   "defaultModelId": "qwen-4-max",
+   "defaultModelId": "gemini-4-neon",
    "models": [
     {
      "id": "claude-fable-5-2",
@@ -21350,67 +21885,6 @@
      "knowledge": "2026-06",
      "openWeights": false,
      "description": "Claude model for creative writing, analysis, and controlled agent workflows",
-     "tags": [
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "claude-haiku-5-5",
-     "name": "Claude Haiku 5.5",
-     "family": "claude",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "none",
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1000000,
-     "maxOutput": 128000,
-     "cost": {
-      "input": 0.1,
-      "output": 0.5,
-      "cache_read": 0.01,
-      "cache_write": 0.125,
-      "tiers": [
-       {
-        "input": 0.5,
-        "output": 2.5,
-        "cache_read": 0.05,
-        "cache_write": 0.625,
-        "tier": {
-         "type": "context",
-         "size": 100000
-        }
-       }
-      ]
-     },
-     "releaseDate": "2026-10-07",
-     "knowledge": "2026-06",
-     "openWeights": false,
-     "description": "Fast Claude model for responsive assistance, classification, and lightweight agents",
      "tags": [
       "reasoning",
       "vision"
@@ -21497,9 +21971,9 @@
      "contextWindow": 1000000,
      "maxOutput": 131072,
      "cost": {
-      "input": 3,
-      "output": 12,
-      "cache_read": 0.06
+      "input": 1.5,
+      "output": 6,
+      "cache_read": 0.03
      },
      "releaseDate": "2026-10-23",
      "knowledge": null,
@@ -21646,76 +22120,6 @@
      "status": "stable"
     },
     {
-     "id": "abliteration-abliterated-model-large-v2",
-     "name": "Abliterated Large V2",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1000000,
-     "maxOutput": 32768,
-     "cost": {
-      "input": 3,
-      "output": 5,
-      "cache_read": 0.3
-     },
-     "releaseDate": "2026-10-01",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Flagship model for demanding analysis, coding, and production agent workflows",
-     "tags": [],
-     "status": "stable"
-    },
-    {
-     "id": "gemini-4-argon",
-     "name": "Gemini 4 Argon",
-     "family": "gemini",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "audio",
-       "video"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1000000,
-     "maxOutput": 65536,
-     "cost": {
-      "input": 2.5,
-      "output": 12.5,
-      "cache_read": 0.125
-     },
-     "releaseDate": "2026-10-13",
-     "knowledge": "2026-03",
-     "openWeights": false,
-     "description": "Gemini multimodal model for text, image, audio, video, and document tasks",
-     "tags": [
-      "fast",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
      "id": "gemini-4-carbon",
      "name": "Gemini 4 Carbon",
      "family": "gemini",
@@ -21723,7 +22127,16 @@
       "openai-chat"
      ],
      "reasoning": true,
-     "reasoningOptions": [],
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high"
+       ]
+      }
+     ],
      "attachment": true,
      "modalities": {
       "input": [
@@ -21749,6 +22162,7 @@
      "description": "Google's most capable reasoning model for complex software engineering, deep math and science, high factual accuracy, and long-horizon autonomous agents",
      "tags": [
       "fast",
+      "reasoning",
       "vision"
      ],
      "status": "stable"
@@ -21761,7 +22175,17 @@
       "openai-chat"
      ],
      "reasoning": true,
-     "reasoningOptions": [],
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      }
+     ],
      "attachment": true,
      "modalities": {
       "input": [
@@ -21787,6 +22211,56 @@
      "description": "Google's Gemini 4 model for everyday coding and agentic workflows, with four thinking levels and a 1M-token context window",
      "tags": [
       "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "gemini-4-neon",
+     "name": "Gemini 4 Neon",
+     "family": "gemini",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "audio",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1000000,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 3.75,
+      "output": 18.75,
+      "cache_read": 0.1875
+     },
+     "releaseDate": "2026-11-18",
+     "knowledge": "2026-03",
+     "openWeights": false,
+     "description": "Google's Gemini 4 model for fast, frontier-level coding, knowledge work and science workflows, with four thinking levels and a 1M-token context window",
+     "tags": [
+      "fast",
+      "reasoning",
       "vision"
      ],
      "status": "stable"
@@ -21899,6 +22373,270 @@
      "knowledge": "2026-06-01",
      "openWeights": false,
      "description": "Fast, efficient model for visual reasoning, precise computer use, and clear, natural writing.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai-gpt-62-astra",
+     "name": "GPT-6.2 Astra",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "cache_write": 10,
+      "tiers": [
+       {
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "cache_write": 20,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8,
+       "cache_write": 20
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-05-18",
+     "openWeights": false,
+     "description": "A frontier reasoning model for coding, computer use, and professional work such as slides, spreadsheets, and documents.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai-gpt-62-astra-pro",
+     "name": "GPT-6.2 Astra Pro",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "cache_write": 10,
+      "tiers": [
+       {
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "cache_write": 20,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8,
+       "cache_write": 20
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Frontier GPT model for professional reasoning, coding, and multimodal work",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai-gpt-62-sol",
+     "name": "GPT-6.2 Sol",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "cache_write": 2.5,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "cache_write": 5,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2,
+       "cache_write": 5
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": "2026-06-01",
+     "openWeights": false,
+     "description": "An efficient reasoning model for everyday work, multistep agentic workflows, and coding.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "openai-gpt-62-sol-pro",
+     "name": "GPT-6.2 Sol Pro",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "cache_write": 2.5,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "cache_write": 5,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2,
+       "cache_write": 5
+      }
+     },
+     "releaseDate": "2026-11-17",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Frontier GPT model for professional reasoning, coding, and multimodal work",
      "tags": [
       "reasoning",
       "vision"
@@ -22078,91 +22816,6 @@
      "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
      "tags": [
       "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "muse-wonder",
-     "name": "Muse Wonder",
-     "family": "muse",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "none",
-        "low",
-        "medium",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "audio",
-       "video"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 5,
-      "output": 25,
-      "cache_read": 0.25
-     },
-     "releaseDate": "2026-10-12",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
-     "tags": [
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "nvidia-nemotron-3-5-super-vl-120b-a12b",
-     "name": "NVIDIA Nemotron 3.5 Super VL 120B",
-     "family": "nemotron",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "video"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 262144,
-     "maxOutput": 102400,
-     "cost": {
-      "input": 0.2,
-      "output": 0.5,
-      "cache_read": 0.04
-     },
-     "releaseDate": "2026-10-15",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Nemotron multimodal model for visual reasoning and agentic AI workflows",
-     "tags": [
       "vision"
      ],
      "status": "stable"

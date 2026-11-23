@@ -54,7 +54,7 @@ export function Tooltip({
             className={cn(
               'z-[70] max-w-64 select-none rounded-lg bg-surface-raised px-2.5 py-1.5',
               'text-xs leading-relaxed text-foreground shadow-lg',
-              'data-[state=delayed-open]:animate-fade-in data-[state=instant-open]:animate-fade-in motion-reduce:animate-none',
+              'data-[state=delayed-open]:animate-fade-in data-[state=instant-open]:animate-fade-in data-[state=closed]:animate-fade-out motion-reduce:animate-none',
               className,
             )}
           >

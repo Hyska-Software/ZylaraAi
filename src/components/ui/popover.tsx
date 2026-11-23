@@ -83,7 +83,7 @@ export const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentPro
           onKeyDownCapture={handleKeyDownCapture}
           className={cn(
             'z-[65] overflow-hidden rounded-xl bg-surface-raised p-0 text-foreground shadow-xl outline-none',
-            'data-[state=open]:animate-scale-in motion-reduce:animate-none',
+            'data-[state=open]:animate-scale-in data-[state=closed]:animate-scale-out motion-reduce:animate-none',
             className,
           )}
           {...props}

@@ -45,7 +45,7 @@ import {
   clipboardText,
   pickAttachmentPaths,
 } from './attachmentFiles';
-import { CacheMeterChip } from './CacheMeterChip';
+import { ChatContextMeterChip } from './ChatContextMeterChip';
 import { CodeSessionControls } from './CodeSessionControls';
 import { CreatorModeChip } from './CreatorModeChip';
 import { filterSlashCommands, type SlashCommand, type SlashCommandView } from './commands';
@@ -1000,7 +1000,7 @@ export function Composer() {
               }}
             />
             {layoutMode === 'chat' && activeConversationId ? (
-              <CacheMeterChip conversationId={activeConversationId} />
+              <ChatContextMeterChip conversationId={activeConversationId} />
             ) : null}
             {isAgentLayout ? (
               agentSelection ? (

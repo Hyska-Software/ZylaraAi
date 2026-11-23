@@ -1,16 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type {
   Agent,
   AttachmentInfo,
-  CacheStats,
+  ContextStats,
   Conversation,
   ProviderAuthStatus,
   ProviderInfo,
   ProviderKeyStatus,
 } from '@/lib/types';
-import type { CacheConversationUi } from '@/lib/store/cacheStore';
 import type { StreamingState } from '@/lib/store/chatStore';
 
 const mocks = vi.hoisted(() => ({
@@ -46,8 +45,7 @@ vi.mock('@/components/models/ModelPill', () => ({
 
 // Imported after the mocks above.
 import { api } from '@/lib/api';
-import { useAgentStore, useAppStore, useChatStore, useUiStore } from '@/lib/store';
-import { useCacheStore } from '@/lib/store/cacheStore';
+import { emptyCodeSession, useAgentStore, useAppStore, useChatStore, useCodeStore, useUiStore } from '@/lib/store';
 import { Composer } from './Composer';
 
 function openAiProvider(overrides: Partial<ProviderInfo> = {}): ProviderInfo {
@@ -179,53 +177,24 @@ function agentRecord(overrides: Partial<Agent> = {}): Agent {
   };
 }
 
-function cacheStats(overrides: Partial<CacheStats> = {}): CacheStats {
+function contextStats(overrides: Partial<ContextStats> = {}): ContextStats {
   return {
-    hitPercent: 98,
-    sessionHitPercent: 97,
-    steadyHitPercent: 98.2,
-    ceilingPercent: 98.6,
-    inputTotal: 250_000,
-    cacheRead: 240_000,
-    cacheWrite: 6_000,
-    uncached: 4_000,
-    eligible: true,
-    state: 'stable',
-    epoch: 1,
-    samples: 12,
-    ttlSeconds: 3600,
-    at: Date.now(),
+    used: 42_000,
+    window: 200_000,
+    outputCap: 32_000,
+    percent: 21,
+    messages: 12,
+    breakdown: { systemPrompt: 10_000, toolDefinitions: 2_000, messages: 30_000 },
     ...overrides,
   };
 }
 
-function cacheUi(): CacheConversationUi {
-  return {
-    current: cacheStats(),
-    session: cacheStats(),
-    epoch: 1,
-    samples: [
-      {
-        turnId: 'turn-1',
-        step: 4,
-        providerId: 'openai',
-        modelId: 'gpt-6.1-sol',
-        protocol: 'openai-responses',
-        epoch: 1,
-        inputTotal: 250_000,
-        cacheRead: 240_000,
-        cacheWrite: 6_000,
-        uncached: 4_000,
-        hitPercent: 98,
-        ceilingPercent: 98.6,
-        eligible: true,
-        state: 'stable',
-        at: Date.now(),
-      },
-    ],
-    lastBreak: null,
-    restored: true,
-  };
+function seedChatContext(conversationId = 'conv-chat', stats: ContextStats | null = contextStats()): void {
+  useCodeStore.setState({
+    byConversation: {
+      [conversationId]: { ...emptyCodeSession(conversationId), context: stats },
+    },
+  });
 }
 
 function seedActiveChat(conversationId = 'conv-chat'): void {
@@ -253,19 +222,6 @@ function composerActivity(): HTMLElement {
   return screen.getByTestId('composer-activity');
 }
 
-function setShowCacheIndicator(showIndicator: boolean): void {
-  useAppStore.setState((state) => ({
-    settings: {
-      ...state.settings,
-      cache: {
-        showIndicator,
-        anthropicTtl: state.settings.cache?.anthropicTtl ?? '1h',
-        openaiRetention: state.settings.cache?.openaiRetention ?? null,
-      },
-    },
-  }));
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   useChatStore.setState({
@@ -276,7 +232,7 @@ beforeEach(() => {
     errorHint: null,
     activeId: null,
   });
-  useCacheStore.getState().reset();
+  useCodeStore.setState({ byConversation: {} });
   useAgentStore.setState({
     agentsById: {},
     orderedIds: [],
@@ -294,8 +250,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   seedApp({ provider: null, auth: null });
   useChatStore.setState({ activeId: null, conversations: [] });
-  useCacheStore.getState().reset();
-  setShowCacheIndicator(true);
+  useCodeStore.setState({ byConversation: {} });
   useAppStore.setState((state) => ({
     settings: { ...state.settings, reduceMotion: false },
   }));
@@ -418,7 +373,7 @@ describe('Composer — variant por layoutMode (Chat | Code)', () => {
     expect(pill.getAttribute('data-reasoning')).toBe(JSON.stringify({ mode: 'effort', effort: 'max' }));
   });
 
-  it('no modo Agentes esconde o chip de cache e usa a rota congelada da thread', () => {
+  it('no modo Agentes esconde o indicador de contexto e usa a rota congelada da thread', () => {
     useAgentStore.setState({
       agentsById: { 'agent-1': agentRecord() },
       orderedIds: ['agent-1'],
@@ -430,74 +385,66 @@ describe('Composer — variant por layoutMode (Chat | Code)', () => {
       modelId: 'gpt-6.1-sol',
     };
     useChatStore.setState({ activeId: thread.id, conversations: [thread] });
-    useCacheStore.setState({ byConversation: { [thread.id]: cacheUi() } });
+    seedChatContext(thread.id);
 
     render(<Composer />);
 
-    expect(screen.queryByRole('button', { name: /^Cache de prompt:/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Contexto usado:/ })).toBeNull();
     const pill = screen.getByRole('button', { name: 'Modelo' });
     expect(pill.getAttribute('data-provider')).toBe('openai');
     expect(pill.getAttribute('data-model')).toBe('gpt-6.1-sol');
   });
 });
 
-describe('Composer — chip de cache no Chat', () => {
-  it('mostra o chip cache-first antes do ModelPill quando a conversa ativa tem amostras', () => {
+describe('Composer — indicador de contexto no Chat', () => {
+  it('mostra o anel de contexto antes do ModelPill quando a conversa ativa tem stats', () => {
     seedActiveChat();
-    useCacheStore.setState({ byConversation: { 'conv-chat': cacheUi() } });
+    seedChatContext();
     render(<Composer />);
 
-    const chip = screen.getByRole('button', { name: 'Cache de prompt: 98% de acerto' });
+    const chip = screen.getByRole('button', { name: 'Contexto usado: 21%' });
     const modelPill = screen.getByRole('button', { name: 'Modelo' });
-    // O chip fica antes do ModelPill na fileira de controles.
+    // O indicador fica antes do ModelPill na fileira de controles.
     expect(
       chip.compareDocumentPosition(modelPill) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(chip.className).toContain('h-8');
-  });
-
-  it('não mostra o chip sem conversa ativa', () => {
-    useCacheStore.setState({ byConversation: { 'conv-chat': cacheUi() } });
-    render(<Composer />);
-
     expect(screen.queryByRole('button', { name: /^Cache de prompt:/ })).toBeNull();
   });
 
-  it('não mostra o chip no layout Code (o header já hospeda o medidor)', () => {
+  it('não mostra o indicador sem conversa ativa', () => {
+    seedChatContext();
+    render(<Composer />);
+
+    expect(screen.queryByRole('button', { name: /^Contexto usado:/ })).toBeNull();
+  });
+
+  it('não mostra o indicador no layout Code (o header já hospeda o medidor)', () => {
     seedActiveChat();
-    useCacheStore.setState({ byConversation: { 'conv-chat': cacheUi() } });
+    seedChatContext();
     useUiStore.setState({ layoutMode: 'code' });
     render(<Composer />);
 
-    expect(screen.queryByRole('button', { name: /^Cache de prompt:/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Contexto usado:/ })).toBeNull();
   });
 
-  it('respeita Settings.cache.showIndicator = false', () => {
+  it('não mostra o indicador antes de existir estatística de contexto', () => {
     seedActiveChat();
-    useCacheStore.setState({ byConversation: { 'conv-chat': cacheUi() } });
-    setShowCacheIndicator(false);
+    seedChatContext('conv-chat', null);
     render(<Composer />);
 
-    expect(screen.queryByRole('button', { name: /^Cache de prompt:/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Contexto usado:/ })).toBeNull();
   });
 
-  it('não mostra o chip antes de existir amostra/restauração', () => {
+  it('abre os detalhes do contexto ao clicar no ícone circular', async () => {
     seedActiveChat();
-    useCacheStore.setState({
-      byConversation: {
-        'conv-chat': {
-          current: null,
-          session: null,
-          epoch: 0,
-          samples: [],
-          lastBreak: null,
-          restored: true,
-        },
-      },
-    });
+    seedChatContext();
     render(<Composer />);
 
-    expect(screen.queryByRole('button', { name: /^Cache de prompt:/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Contexto usado: 21%' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Detalhes do contexto' });
+    expect(within(dialog).getByText('21% do contexto usado')).toBeTruthy();
   });
 });
 

@@ -210,8 +210,10 @@ Tabs à esquerda (180px), conteúdo à direita (520px):
 | Elemento | Animação |
 | --- | --- |
 | Mensagem nova | fade-in-up 260ms |
-| Diálogos | fade + scale 0.97→1 (180ms) |
-| Popover do seletor de modelo | fade + scale 0.97→1 (180ms) |
+| Diálogos | entrada fade + scale 0.97→1 (180ms) e saída fade + scale 1→0.97 (150ms) |
+| Popover do seletor de modelo | entrada fade + scale 0.97→1 (180ms) e saída scale-out (150ms) |
+| Menus dropdown e tooltips | fade-in na abertura e fade-out no fechamento (160ms) |
+| Views centrais (Biblioteca, Skills, Code diff/arquivo/terminal etc.) | fade + deslocamento vertical de 6px na entrada (180ms) e saída em fade; a conversa permanece montada |
 | Sidebar | width/translate 220ms ease-out-soft |
 | Seletor Chat/Code | a pílula ativa desliza entre os segmentos em 180ms ease-out-soft; com reduceMotion só troca de cor |
 | Redimensionamento da sidebar | sem transição enquanto arrasta (a largura acompanha o cursor); abertura/colapso mantêm 220ms |
@@ -222,10 +224,11 @@ Tabs à esquerda (180px), conteúdo à direita (520px):
 | Passos do agente | shimmer no header durante o streaming; timeline expande/recolhe |
 | Execução do agente (composer) | cometa de luz orbita o perímetro do composer em 5.6s chamando a atenção para o estado ativo; com reduceMotion o perímetro fica com um traço accent estático |
 | Timeline de passos | linha de atividade entra com fade, spinner enquanto executa |
+| Reordenação por arrasto (listas e abas) | item elevado (scale 1.03) segue o cursor; linha de destino faz fade; vizinhos e item solto interpolam a nova posição em 180ms ease-out-soft |
 | Caret de streaming | blink 1.1s |
 | Hover de botões | 120ms |
 
-Com `reduceMotion` (config ou media query), remover transformações e shimmer; manter apenas fade.
+Com `reduceMotion` (config ou media query), remover transformações e shimmer; manter apenas fade. A config adiciona `html.reduce-motion`, que desliga também as animações CSS; em conjunto com a media query `prefers-reduced-motion`, cobre diálogos, painéis e reordenação.
 
 ## 12. Acessibilidade
 

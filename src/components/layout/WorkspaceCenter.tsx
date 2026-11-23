@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
+import { forwardRef } from 'react';
+import { AnimatePresence, motion, useIsPresent } from 'motion/react';
+import { useReduceMotion } from './hooks';
 import { AgentAvatarDialog } from '@/components/agents/AgentAvatarDialog';
 import { AgentWorkspace } from '@/components/agents/AgentWorkspace';
 import { ChatView } from '@/components/chat/ChatView';
@@ -35,6 +38,44 @@ import { cn } from '@/lib/utils';
 function CodeWorkbenchFallback({ children }: { children?: ReactNode }) {
   return <>{children}</>;
 }
+
+const PANEL_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+/**
+ * Animated wrapper for the mutually exclusive center views. The chat region
+ * stays mounted outside the `AnimatePresence` (draft/scroll/`aria-controls`).
+ * On exit the surface is taken out of flow so the next view (or the chat) can
+ * occupy its space while the old one fades on top.
+ */
+const AnimatedPanel = forwardRef<
+  HTMLDivElement,
+  {
+    /** Optional inner key; AnimatePresence tracks the React `key` on this wrapper. */
+    viewKey?: string;
+    reduceMotion: boolean;
+    className?: string;
+    children: ReactNode;
+  }
+>(function AnimatedPanel({ viewKey, reduceMotion, className, children }, ref) {
+  const isPresent = useIsPresent();
+  return (
+    <motion.div
+      ref={ref}
+      key={viewKey}
+      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+      transition={{ duration: reduceMotion ? 0 : 0.18, ease: PANEL_EASE }}
+      className={cn(
+        'flex min-h-0 flex-1 flex-col',
+        !isPresent && 'pointer-events-none',
+        className,
+      )}
+    >
+      {children}
+    </motion.div>
+  );
+});
 
 /**
  * Center column of the application shell.
@@ -75,6 +116,7 @@ export function WorkspaceCenter() {
   const pluginUiEnabled = usePluginUiPrefs((state) => state.enabled);
   const rawPluginPage = useUiStore((state) => state.pluginPages[state.layoutMode]);
   const pluginPage = pluginUiEnabled ? rawPluginPage : null;
+  const reduceMotion = useReduceMotion();
   usePluginRegistry();
 
   const codePluginPage = layoutMode === 'code' ? pluginPage : null;
@@ -194,154 +236,193 @@ export function WorkspaceCenter() {
         />
       </div>
 
-      {codePluginPage ? (
-        <div className="min-h-0 flex-1">
-          <PluginPageHost layout="code" target={codePluginPage} />
-        </div>
-      ) : null}
+      {/* Mutually exclusive center views. The chat region above stays mounted;
+          only these surfaces animate in/out; the outgoing one is popped out of
+          layout so the next view mounts without waiting. */}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {codePluginPage ? (
+          <AnimatedPanel key="plugin-page" reduceMotion={reduceMotion}>
+            <PluginPageHost layout="code" target={codePluginPage} />
+          </AnimatedPanel>
+        ) : null}
 
-      {showTerminal ? (
-        <div
-          id="code-terminal-panel"
-          role="region"
-          aria-label={t('shell.workspace.terminalRegion')}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <TerminalPanel
-            conversationId={activeId}
-            surface="center"
-            showTabStrip={false}
-            autoFocus
-            className="min-h-0 flex-1"
-          />
-        </div>
-      ) : null}
+        {showTerminal ? (
+          <AnimatedPanel key="terminal" reduceMotion={reduceMotion}>
+            <div
+              id="code-terminal-panel"
+              role="region"
+              aria-label={t('shell.workspace.terminalRegion')}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <TerminalPanel
+                conversationId={activeId}
+                surface="center"
+                showTabStrip={false}
+                autoFocus
+                className="min-h-0 flex-1"
+              />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showSubagent && codeSubagentTab ? (
-        <div
-          id="code-subagent-panel"
-          role="region"
-          aria-label={t('shell.workspace.subagentRegion', { description: codeSubagentTab.description })}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <SubagentChatView target={codeSubagentTab} />
-        </div>
-      ) : null}
+        {showSubagent && codeSubagentTab ? (
+          <AnimatedPanel key="subagent" reduceMotion={reduceMotion}>
+            <div
+              id="code-subagent-panel"
+              role="region"
+              aria-label={t('shell.workspace.subagentRegion', { description: codeSubagentTab.description })}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <SubagentChatView target={codeSubagentTab} />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showCommits && codeCommitsTab ? (
-        <div
-          id="code-commits-panel"
-          role="region"
-          aria-label={t('shell.workspace.commitsRegion')}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <CodeCommitHistoryView target={codeCommitsTab} onSelect={selectCodeCommit} />
-        </div>
-      ) : null}
+        {showCommits && codeCommitsTab ? (
+          <AnimatedPanel key="commits" reduceMotion={reduceMotion}>
+            <div
+              id="code-commits-panel"
+              role="region"
+              aria-label={t('shell.workspace.commitsRegion')}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <CodeCommitHistoryView target={codeCommitsTab} onSelect={selectCodeCommit} />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showDiff && codeDiffTab ? (
-        <div
-          id="code-diff-panel"
-          role="region"
-          aria-label={t('shell.workspace.diffRegion', { path: codeDiffTab.path })}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <CodeDiffView target={codeDiffTab} className="flex min-h-0 flex-1 flex-col" />
-        </div>
-      ) : null}
+        {showDiff && codeDiffTab ? (
+          <AnimatedPanel key={`diff:${codeDiffTab.path}`} reduceMotion={reduceMotion}>
+            <div
+              id="code-diff-panel"
+              role="region"
+              aria-label={t('shell.workspace.diffRegion', { path: codeDiffTab.path })}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <CodeDiffView target={codeDiffTab} className="flex min-h-0 flex-1 flex-col" />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showFile && codeFileTab ? (
-        <div
-          id="code-file-panel"
-          role="region"
-          aria-label={t('shell.workspace.fileRegion', { path: codeFileTab.path })}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <CodeFileView target={codeFileTab} className="flex min-h-0 flex-1 flex-col" />
-        </div>
-      ) : null}
+        {showFile && codeFileTab ? (
+          <AnimatedPanel key={`file:${codeFileTab.path}`} reduceMotion={reduceMotion}>
+            <div
+              id="code-file-panel"
+              role="region"
+              aria-label={t('shell.workspace.fileRegion', { path: codeFileTab.path })}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <CodeFileView target={codeFileTab} className="flex min-h-0 flex-1 flex-col" />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showPlan && codePlanTab ? (
-        <div
-          id="code-plan-panel"
-          role="region"
-          aria-label={t('shell.workspace.planRegion')}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <CodePlanView tab={codePlanTab} className="flex min-h-0 flex-1 flex-col" />
-        </div>
-      ) : null}
+        {showPlan && codePlanTab ? (
+          <AnimatedPanel key={`plan:${codePlanTab.title}`} reduceMotion={reduceMotion}>
+            <div
+              id="code-plan-panel"
+              role="region"
+              aria-label={t('shell.workspace.planRegion')}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <CodePlanView tab={codePlanTab} className="flex min-h-0 flex-1 flex-col" />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {/* Objetivo persistente da sessão (docs/goals/code-goals/PLAN.md §10.3):
-          o `GoalPanel` é dono da region/id (`code-goal-panel`) e do scroll; aqui
-          ele só ocupa o centro no lugar da conversa. */}
-      {showGoal && activeId ? <GoalPanel conversationId={activeId} /> : null}
+        {/* Persistent session goal (docs/goals/code-goals/PLAN.md §10.3):
+            `GoalPanel` owns the region/id (`code-goal-panel`) and scrolling. */}
+        {showGoal && activeId ? (
+          <AnimatedPanel key={`goal:${activeId}`} reduceMotion={reduceMotion}>
+            <GoalPanel conversationId={activeId} />
+          </AnimatedPanel>
+        ) : null}
 
-      {showPullRequests && codePullRequestsTab ? (
-        <div
-          id="code-prs-panel"
-          role="region"
-          aria-label={t('code:github.prs.title')}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <GitHubPullRequestsView key={codePullRequestsTab.workspaceId} tab={codePullRequestsTab} />
-        </div>
-      ) : null}
+        {showPullRequests && codePullRequestsTab ? (
+          <AnimatedPanel key={`prs:${codePullRequestsTab.workspaceId}`} reduceMotion={reduceMotion}>
+            <div
+              id="code-prs-panel"
+              role="region"
+              aria-label={t('code:github.prs.title')}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <GitHubPullRequestsView key={codePullRequestsTab.workspaceId} tab={codePullRequestsTab} />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showPullRequest && codePullRequestTab ? (
-        <div
-          id="code-pr-panel"
-          role="region"
-          aria-label={t('code:github.pr.aria', { number: codePullRequestTab.number })}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <GitHubPullRequestView
-            key={`${codePullRequestTab.workspaceId}:${codePullRequestTab.number}`}
-            tab={codePullRequestTab}
-          />
-        </div>
-      ) : null}
+        {showPullRequest && codePullRequestTab ? (
+          <AnimatedPanel
+            key={`pr:${codePullRequestTab.workspaceId}:${codePullRequestTab.number}`}
+            reduceMotion={reduceMotion}
+          >
+            <div
+              id="code-pr-panel"
+              role="region"
+              aria-label={t('code:github.pr.aria', { number: codePullRequestTab.number })}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <GitHubPullRequestView
+                key={`${codePullRequestTab.workspaceId}:${codePullRequestTab.number}`}
+                tab={codePullRequestTab}
+              />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showIssues && codeIssuesTab ? (
-        <div
-          id="code-issues-panel"
-          role="region"
-          aria-label={t('code:github.issues.title')}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <GitHubIssuesView key={codeIssuesTab.workspaceId} tab={codeIssuesTab} />
-        </div>
-      ) : null}
+        {showIssues && codeIssuesTab ? (
+          <AnimatedPanel key={`issues:${codeIssuesTab.workspaceId}`} reduceMotion={reduceMotion}>
+            <div
+              id="code-issues-panel"
+              role="region"
+              aria-label={t('code:github.issues.title')}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <GitHubIssuesView key={codeIssuesTab.workspaceId} tab={codeIssuesTab} />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showIssue && codeIssueTab ? (
-        <div
-          id="code-issue-panel"
-          role="region"
-          aria-label={t('code:github.issue.aria', { number: codeIssueTab.number })}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <GitHubIssueView
-            key={`${codeIssueTab.workspaceId}:${codeIssueTab.number}`}
-            tab={codeIssueTab}
-          />
-        </div>
-      ) : null}
+        {showIssue && codeIssueTab ? (
+          <AnimatedPanel key={`issue:${codeIssueTab.workspaceId}:${codeIssueTab.number}`} reduceMotion={reduceMotion}>
+            <div
+              id="code-issue-panel"
+              role="region"
+              aria-label={t('code:github.issue.aria', { number: codeIssueTab.number })}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <GitHubIssueView
+                key={`${codeIssueTab.workspaceId}:${codeIssueTab.number}`}
+                tab={codeIssueTab}
+              />
+            </div>
+          </AnimatedPanel>
+        ) : null}
 
-      {showPlugins ? (
-        <ComponentSlot
-          name="plugins.view"
-          fallback={PluginsView as unknown as PluginComponent}
-        />
-      ) : null}
+        {showPlugins ? (
+          <AnimatedPanel key="plugins" reduceMotion={reduceMotion}>
+            <ComponentSlot
+              name="plugins.view"
+              fallback={PluginsView as unknown as PluginComponent}
+            />
+          </AnimatedPanel>
+        ) : null}
 
-      {showSkills ? (
-        <SkillsView
-          onBack={() => (isCode ? setCodeView('session') : setActiveView('chat'))}
-          backLabel={isCode ? t('shell.workspace.backToSession') : t('shell.workspace.backToChat')}
-        />
-      ) : null}
+        {showSkills ? (
+          <AnimatedPanel key="skills" reduceMotion={reduceMotion}>
+            <SkillsView
+              onBack={() => (isCode ? setCodeView('session') : setActiveView('chat'))}
+              backLabel={isCode ? t('shell.workspace.backToSession') : t('shell.workspace.backToChat')}
+            />
+          </AnimatedPanel>
+        ) : null}
 
-      {showLibrary ? <LibraryView /> : null}
+        {showLibrary ? (
+          <AnimatedPanel key="library" reduceMotion={reduceMotion}>
+            <LibraryView />
+          </AnimatedPanel>
+        ) : null}
+      </AnimatePresence>
 
       {/* Diálogo de criação/edição do objetivo, aberto pelo pill do composer,
           pelo card de atenção, pelo `/goal` ou pelo painel central. */}
@@ -356,7 +437,7 @@ export function WorkspaceCenter() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col">
       {/* `code.workbench` only matches in the Code layout (contract `layouts`),
           so keeping the slot mounted in every layout preserves the chat
           instance across layout switches. */}

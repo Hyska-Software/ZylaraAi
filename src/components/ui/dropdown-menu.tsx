@@ -26,7 +26,7 @@ export const DropdownMenuContent = React.forwardRef<HTMLDivElement, DropdownMenu
           collisionPadding={8}
           className={cn(
             'z-[65] min-w-44 overflow-hidden rounded-xl bg-surface-raised p-1 text-foreground shadow-xl',
-            'data-[state=open]:animate-fade-in motion-reduce:animate-none',
+            'data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out motion-reduce:animate-none',
             className,
           )}
           {...props}
@@ -102,7 +102,7 @@ export const DropdownMenuSubContent = React.forwardRef<
         collisionPadding={8}
         className={cn(
           'z-[65] min-w-44 overflow-hidden rounded-xl bg-surface-raised p-1 text-foreground shadow-xl',
-          'data-[state=open]:animate-fade-in motion-reduce:animate-none',
+          'data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out motion-reduce:animate-none',
           className,
         )}
         {...props}

@@ -2969,13 +2969,13 @@ pub async fn run_turn(
         _ => None,
     };
 
-    // Medidor de contexto (HARNESS.md §10.1): o perfil Code emite/persiste uma
+    // Medidor de contexto (HARNESS.md §10.1): todo perfil emite/persiste uma
     // estimativa logo no início do turno e a recalibra com o uso real a cada
-    // passo. `compacted_messages` vem da projeção (`context/compacted`) e é
+    // passo. O Chat usa o mesmo medidor do composer; o Code/Agents já o tinham
+    // no header. `compacted_messages` vem da projeção (`context/compacted`) e é
     // atualizado quando a compactação automática roda.
-    let mut compacted_messages = 0u32;
-    if profile == TurnProfile::Code {
-        compacted_messages = code::session::compacted_messages(&deps.db, &conversation.id);
+    let mut compacted_messages = code::session::compacted_messages(&deps.db, &conversation.id);
+    {
         let stats = context_stats_estimate(
             &history,
             &system_prompt,
@@ -3306,7 +3306,6 @@ pub async fn run_turn(
 
         // Estimativa do request prestes a rodar: a UI recebe o medidor em tempo
         // real a cada passo e a calibração usa o `usage.input_tokens` real.
-        // O Chat também estima (para pressão/calibração), mas não emite o card.
         let step_context_stats = Some(context_stats_estimate(
             &history,
             &step_system_prompt,
@@ -3314,16 +3313,14 @@ pub async fn run_turn(
             &model,
             compacted_messages,
         ));
-        if profile == TurnProfile::Code {
-            if let Some(stats) = step_context_stats.clone() {
-                emit_context_stats(
-                    &deps.db,
-                    &on_event,
-                    &conversation.id,
-                    &tool_turn_id,
-                    stats,
-                );
-            }
+        if let Some(stats) = step_context_stats.clone() {
+            emit_context_stats(
+                &deps.db,
+                &on_event,
+                &conversation.id,
+                &tool_turn_id,
+                stats,
+            );
         }
 
         let retry_policy = providers::retry::RetryPolicy::from_settings(&settings);
@@ -3577,15 +3574,13 @@ pub async fn run_turn(
             if input_tokens > 0 {
                 let calibrated = code::session::calibrate_context(&estimate, input_tokens);
                 pressure_floor = Some(calibrated.used);
-                if profile == TurnProfile::Code {
-                    emit_context_stats(
-                        &deps.db,
-                        &on_event,
-                        &conversation.id,
-                        &tool_turn_id,
-                        calibrated,
-                    );
-                }
+                emit_context_stats(
+                    &deps.db,
+                    &on_event,
+                    &conversation.id,
+                    &tool_turn_id,
+                    calibrated,
+                );
             }
         }
         // Custo em tempo real: o `usage` acumulado do turno (passos + subagentes
@@ -4271,7 +4266,21 @@ pub async fn run_turn(
         conversation: updated_conversation,
     };
 
-    // Fecho do turno Code: alterações do turno, medidor de contexto e auditoria.
+    // Fecho do medidor de contexto: estimativa final do histórico efetivamente
+    // enviado ao modelo (o cálculo antigo baseado em `messages`/`all_tool_calls`
+    // não refletia o request real). Vale para Chat e Code; o restante do fecho
+    // (alterações/auditoria/objetivo) permanece específico do perfil Code.
+    let final_system_prompt = system_prompt.clone();
+    let final_context_stats = context_stats_estimate(
+        &history,
+        &final_system_prompt,
+        &tool_definitions,
+        &model,
+        compacted_messages,
+    );
+    emit_context_stats(&deps.db, &on_event, &conversation.id, &tool_turn_id, final_context_stats);
+
+    // Fecho do turno Code: alterações do turno e auditoria.
     if profile == TurnProfile::Code {
         let turn_changes =
             code::session::turn_changes(&deps.db, &conversation.id, &tool_turn_id);
@@ -4282,18 +4291,6 @@ pub async fn run_turn(
         if let Some(summary) = turn_changes {
             emit(&on_event, TurnEvent::WorkspaceChanges { summary });
         }
-        // Fecho: estimativa final do histórico efetivamente enviado ao modelo
-        // (substitui o cálculo antigo baseado em `messages`/`all_tool_calls`,
-        // que não refletia o request real).
-        let final_system_prompt = system_prompt.clone();
-        let stats = context_stats_estimate(
-            &history,
-            &final_system_prompt,
-            &tool_definitions,
-            &model,
-            compacted_messages,
-        );
-        emit_context_stats(&deps.db, &on_event, &conversation.id, &tool_turn_id, stats);
         let turn_status = if cancelled {
             "cancelled"
         } else if turn_failure.is_some() {
@@ -10790,6 +10787,93 @@ mod agent_loop_tests {
             .contains("\"Receita do trimestre\""));
     }
 
+    /// O indicador circular do composer do Chat precisa dos mesmos eventos do
+    /// medidor do Code: um turno Chat emite/persiste `context_stats` (início,
+    /// passo, calibração pelo uso real e fecho), mesmo sem o perfil Code.
+    #[tokio::test]
+    async fn chat_turn_emits_and_persists_context_stats() {
+        let temp = TempDb::new();
+        let conversation = temp
+            .db
+            .create_conversation_with_mode(
+                "Conversa do Chat",
+                "opencode-go",
+                "deepseek-v4.1-flash",
+                crate::domain::CONVERSATION_MODE_CHAT,
+            )
+            .expect("conversa chat");
+
+        const REAL_INPUT_TOKENS: u32 = 3_000;
+        let streamer: ProviderStreamer = Arc::new(move |_request, sink| {
+            Box::pin(async move {
+                emit(
+                    &sink,
+                    ProviderEvent::Usage(UsageInfo {
+                        input_tokens: Some(REAL_INPUT_TOKENS),
+                        output_tokens: Some(80),
+                        ..Default::default()
+                    }),
+                );
+                text_stream(&sink, "Resposta do Chat.");
+                Ok(())
+            })
+        });
+        let (channel, events) = channel();
+        let mut turn = payload(&conversation, 4);
+        turn.profile = TurnProfile::Chat;
+        turn.content = "Diga oi.".to_string();
+        run_turn(
+            deps(temp.db.clone(), streamer),
+            turn,
+            Settings::default(),
+            channel,
+            CancellationToken::new(),
+        )
+        .await
+        .expect("turno chat");
+
+        let raw = events.lock().expect("events lock").clone();
+        let parsed: Vec<Value> = raw
+            .iter()
+            .map(|json| serde_json::from_str::<Value>(json).expect("evento JSON"))
+            .collect();
+        let stats_events: Vec<&Value> = parsed
+            .iter()
+            .filter(|event| event["type"] == "context_stats")
+            .collect();
+        assert!(
+            stats_events.len() >= 2,
+            "o Chat deve emitir context_stats em tempo real (eventos: {})",
+            stats_events.len()
+        );
+        assert!(
+            stats_events
+                .iter()
+                .any(|stats| stats["stats"]["used"] == REAL_INPUT_TOKENS),
+            "a calibração pelo uso real deve chegar ao Chat"
+        );
+        let done_index = parsed
+            .iter()
+            .position(|event| event["type"] == "done")
+            .expect("evento done");
+        let last_stats = parsed
+            .iter()
+            .rposition(|event| event["type"] == "context_stats")
+            .expect("último context_stats");
+        assert!(last_stats < done_index, "o último stats precede o done");
+
+        let stats = code::session::context_stats(&temp.db, &conversation.id)
+            .expect("medidor de contexto persistido");
+        assert!(stats.used > 0 && stats.window > 0, "stats válidos: {stats:?}");
+        assert_eq!(
+            stats.breakdown.system_prompt
+                + stats.breakdown.tool_definitions
+                + stats.breakdown.messages,
+            stats.used,
+            "breakdown soma `used`: {stats:?}"
+        );
+    }
+
     /// Medidor **em tempo real**: um turno Code com provider falso que reporta
     /// `Usage.input_tokens` deve emitir `context_stats` várias vezes (início,
     /// passo, pós-uso calibrado, fecho), com `used` calibrado pelo input real, e
@@ -13679,7 +13763,8 @@ mod agent_loop_tests {
                 .lock()
                 .expect("events")
                 .iter()
-                .any(|event| event.contains("compacted")),
+                .any(|event| event.contains("\"type\":\"compacted\"")
+                    || event.contains("\"type\":\"compaction_started\"")),
             "sem evento de compactação"
         );
     }
@@ -13981,7 +14066,9 @@ mod agent_loop_tests {
         assert!(events
             .iter()
             .any(|event| event.contains("compaction_started") && event.contains("overflow")));
-        assert!(events.iter().any(|event| event.contains("compacted")));
+        assert!(events
+            .iter()
+            .any(|event| event.contains("\"type\":\"compacted\"")));
     }
 
     /* ---------------------------------------------------------------- */
