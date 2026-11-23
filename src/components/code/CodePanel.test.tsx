@@ -1012,6 +1012,27 @@ describe('CodePanel — aba de plugin no dock', () => {
     // The redundant slot button (same plugin, same panel) is not rendered either.
     expect(screen.getAllByLabelText('Insights')).toHaveLength(1);
   });
+
+  it('mantém a aba do plugin visível quando todas as abas nativas são fechadas', () => {
+    setPluginUiState({ ...emptyUi(), panelTabs: [panelTab()] });
+    useUiStore.setState({ codePanelOpenTabs: [] });
+
+    render(<CodePanel />);
+
+    const strip = screen.getByRole('tablist', { name: 'Conteúdo do painel' });
+    const pluginTabButton = within(strip).getByRole('tab', { name: 'Insights' });
+    const launcher = screen.getByRole('tabpanel', { name: 'Atalhos do painel' });
+    // The new launcher only reopens host tabs; plugin tabs stay in the strip.
+    expect(within(launcher).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Arquivos',
+      'Alterações',
+      'Terminal',
+    ]);
+
+    fireEvent.click(pluginTabButton);
+    expect(screen.getByText('insights-body')).toBeTruthy();
+    expect(screen.queryByRole('tabpanel', { name: 'Atalhos do painel' })).toBeNull();
+  });
 });
 
 describe('CodePanel — fechar e reabrir abas', () => {
