@@ -333,11 +333,13 @@ describe('Composer — variant por layoutMode (Chat | Code)', () => {
     expect(sendButton().disabled).toBe(false);
   });
 
-  it('no modo Chat mantém os pills de ferramentas e não mostra os controles da sessão', () => {
+  it('no modo Chat mostra os toggles de ferramentas somente com ícone', () => {
     render(<Composer />);
 
-    expect(screen.getByRole('button', { name: 'Busca web' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Criar arquivos' })).toBeTruthy();
+    const webSearch = screen.getByRole('button', { name: 'Busca web' });
+    const fileCreation = screen.getByRole('button', { name: 'Criar arquivos' });
+    expect(webSearch.textContent?.trim()).toBe('');
+    expect(fileCreation.textContent?.trim()).toBe('');
     expect(screen.queryByRole('button', { name: /Modo de permissão/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Modo Plano' })).toBeNull();
   });

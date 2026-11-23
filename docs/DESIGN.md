@@ -128,14 +128,14 @@ Regras: nunca usar hex solto em componentes — sempre `bg-background`, `text-fo
 │ [chip anexo ×] [chip anexo ×]                                │
 │ Textarea “Pergunte alguma coisa…”                       (⏎)  │
 │ ──────────────────────────────────────────────────────────── │
-│ [+] anexar   [🌐 Busca] [📄 Arquivos]        [modelo ▾] [→]  │
+│ [+] anexar   [🌐] [📄]                       [modelo ▾] [→]  │
 └──────────────────────────────────────────────────────────────┘
 ```
 - Enter envia / Shift+Enter quebra linha (configurável; Ctrl+Enter alternativo).
 - Botão enviar: círculo 32px, `bg-foreground` (light) / `bg-foreground` (dark), ícone `ArrowUp`; desabilitado quando vazio; vira `Square` (parar) durante streaming.
 - Anexar: seletor de arquivos nativo (`@tauri-apps/plugin-dialog`), também drag & drop na janela.
-- **Pills de ferramentas (Chat)**: `Busca web` e `Criar arquivos` com estado on/off (accent-soft quando ligado). No layout Code esses dois pills dão lugar aos **controles da sessão** (logo abaixo).
-- **Variante do Code**: a mesma faixa de controles troca os pills de ferramentas pelos **controles da sessão** — **chip de modo de permissão** (`Leitura`/`Revisar`/`Editar`/`Autônomo`; o modo inicial das novas sessões vem de Configurações → Ferramentas → Sessões de código, padrão Autônomo; menu com a descrição de cada modo e atualização otimista com rollback) e **toggle Plano somente ícone** (`aria-pressed`; accent-soft quando ativo). Com o Plano ativo, o campo mostra um **badge accent com o ícone e o rótulo “Plano”** (`aria-label="Desativar modo Plano"` e tooltip) na área de chips, ao lado do `/goal`; clicar nele desativa o modo. O **botão de objetivo** da barra segue o mesmo padrão: alterna o chip `/goal` (accent e `aria-pressed` quando armado; clicar no chip desativa a intenção) e, com objetivo persistente, abre o popover do objetivo. Ficam ao lado do botão de anexar, antes do seletor de modelo; `Busca web`/`Criar arquivos` continuam existindo no composer do Chat e em Configurações › Ferramentas.
+- **Toggles de ferramentas (Chat)**: `Busca web` e `Criar arquivos` com estado on/off (accent-soft quando ligado), **somente ícone**; `aria-label`/`title` mantêm o rótulo completo. No layout Code esses dois controles dão lugar aos **controles da sessão** (logo abaixo).
+- **Variante do Code**: a mesma faixa de controles troca os toggles de ferramentas pelos **controles da sessão** — **chip de modo de permissão** (`Leitura`/`Revisar`/`Editar`/`Autônomo`; o modo inicial das novas sessões vem de Configurações → Ferramentas → Sessões de código, padrão Autônomo; menu com a descrição de cada modo e atualização otimista com rollback) e **toggle Plano somente ícone** (`aria-pressed`; accent-soft quando ativo). Com o Plano ativo, o campo mostra um **badge accent com o ícone e o rótulo “Plano”** (`aria-label="Desativar modo Plano"` e tooltip) na área de chips, ao lado do `/goal`; clicar nele desativa o modo. O **botão de objetivo** da barra segue o mesmo padrão: alterna o chip `/goal` (accent e `aria-pressed` quando armado; clicar no chip desativa a intenção) e, com objetivo persistente, abre o popover do objetivo. Ficam ao lado do botão de anexar, antes do seletor de modelo; `Busca web`/`Criar arquivos` continuam existindo no composer do Chat e em Configurações › Ferramentas.
 - **No layout Agentes** o pill do composer mostra a rota da persona/thread e abre
   o mesmo popover. Antes da primeira mensagem ele edita o modelo da persona e
   sincroniza a thread vazia; depois do primeiro envio o cadeado trava o modelo
@@ -246,7 +246,7 @@ Com `reduceMotion` (config ou media query), remover transformações e shimmer; 
 ## 13. Responsivo
 
 - < 1024px: sidebar vira overlay (drawer) com backdrop.
-- < 768px: composer mais compacto, pills de ferramentas viram ícones.
+- < 768px: composer mais compacto; os toggles de ferramentas são somente ícone em qualquer largura.
 - Composer com **container queries** (largura da própria fileira de controles, não a da janela): abaixo de **42rem**, o nome do modelo e o rótulo de pensamento do pill somem (ficam glifo + ✦) e o chip de permissão do Code fica só com o escudo; `aria-label`/`title` preservam o texto completo. Assim o layout reage também quando o painel direito ou o painel de artefatos estreitam a conversa.
 - Artifact panel: no modo sobreposto ocupa até `92vw` em telas pequenas (sheet); o modo fixo só entra em janelas ≥1120px.
 - Painel lateral direito: largura máxima é re-clampada em tempo real (modo sobreposto ≤ `92vw`; modo fixo ≤ janela − sidebar − 480px de chat). Abaixo de 1120px de janela o modo fixo degrada automaticamente para sobreposto (a preferência fica salva e volta a valer quando a janela cresce); a alça de redimensionamento usa esse limite dinâmico e a janela pode ser redimensionada com o painel aberto sem overflow.

@@ -9,7 +9,7 @@ export interface ToolsToggleProps {
   className?: string;
 }
 
-/** On/off tool pill used in the composer toolbar (DESIGN §7). */
+/** Icon-only on/off tool toggle used in the chat composer toolbar (DESIGN §7). */
 export function ToolsToggle({ icon: Icon, label, active, onToggle, className }: ToolsToggleProps) {
   return (
     <button
@@ -19,7 +19,7 @@ export function ToolsToggle({ icon: Icon, label, active, onToggle, className }: 
       aria-pressed={active}
       title={label}
       className={cn(
-        'flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12.5px] font-medium',
+        'flex size-8 shrink-0 items-center justify-center rounded-full',
         'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
         active
           ? 'bg-accent-soft text-accent hover:bg-accent-soft/80'
@@ -27,8 +27,7 @@ export function ToolsToggle({ icon: Icon, label, active, onToggle, className }: 
         className,
       )}
     >
-      <Icon className="size-3.5" />
-      <span className="hidden md:inline">{label}</span>
+      <Icon className="size-3.5" aria-hidden />
     </button>
   );
 }
