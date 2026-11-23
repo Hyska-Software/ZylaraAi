@@ -2,15 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent a
 import { useTranslation } from 'react-i18next';
 import {
   Check,
-  Compass,
   FileDiff,
   Files,
   FolderOpen,
   GitBranch,
-  Globe2,
   History,
-  LayoutGrid,
-  ListChecks,
   PanelRightClose,
   Plus,
   RefreshCw,
@@ -24,7 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
-  Kbd,
   SortableList,
   Spinner,
   Tooltip,
@@ -41,11 +36,10 @@ import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { api } from '@/lib/api';
 import {
+  CODE_PANEL_TAB_ORDER_DEFAULT,
   SIDE_PANEL_WIDTH_DEFAULT,
   SIDE_PANEL_WIDTH_MIN,
   SIDE_PANEL_WIDTH_STEP,
-  selectActiveAgents,
-  useAgentStore,
   useAppStore,
   useChatStore,
   useCodeStore,
@@ -59,13 +53,11 @@ import type {
   WorkspaceTreeSnapshot,
 } from '@/lib/types';
 import { toast } from 'sonner';
-import { cn, modShortcut } from '@/lib/utils';
-import { AgentTaskBoardDialog } from '@/components/agents/AgentTaskBoardDialog';
+import { cn } from '@/lib/utils';
 import { ChangesPanel, countPendingChanges } from './ChangesPanel';
 import { BranchPicker } from './BranchPicker';
 import { FileTree } from './FileTree';
 import { GitActionsMenu } from './GitActionsMenu';
-import { openTerminal } from './terminalOpen';
 import { TerminalPanel } from './TerminalPanel';
 import { useWorkspacePanel } from './useWorkspacePanel';
 import { dirsAffectedBy, useWorkspaceWatch } from './useWorkspaceWatch';
@@ -142,86 +134,33 @@ function PanelEmptyState({ icon: Icon, title, description }: EmptyStateProps) {
 
 interface PanelLauncherProps {
   onOpenTab: (tab: CodePanelTab) => void;
-  onNewTerminal: () => void;
-  onTasks: () => void;
-  onBrowser: () => void;
-  onMoreTools: () => void;
 }
 
-/** Shown when every panel tab is closed: a compact launcher of panel surfaces. */
-function PanelLauncher({
-  onOpenTab,
-  onNewTerminal,
-  onTasks,
-  onBrowser,
-  onMoreTools,
-}: PanelLauncherProps) {
+/** Shown when every panel tab is closed: reopens one of the real panel tabs. */
+function PanelLauncher({ onOpenTab }: PanelLauncherProps) {
   const { t } = useTranslation('code');
-  const entries: ReadonlyArray<{
-    key: string;
-    label: string;
-    icon: LucideIcon;
-    shortcut?: string;
-    onClick: () => void;
-  }> = [
-    {
-      key: 'files',
-      label: t('code:panel.launcher.files'),
-      icon: FolderOpen,
-      onClick: () => onOpenTab('files'),
-    },
-    {
-      key: 'changes',
-      label: t('code:panel.launcher.changes'),
-      icon: FileDiff,
-      onClick: () => onOpenTab('changes'),
-    },
-    {
-      key: 'terminal',
-      label: t('code:panel.launcher.terminal'),
-      icon: SquareTerminal,
-      onClick: onNewTerminal,
-    },
-    {
-      key: 'tasks',
-      label: t('code:panel.launcher.tasks'),
-      icon: ListChecks,
-      onClick: onTasks,
-    },
-    {
-      key: 'browser',
-      label: t('code:panel.launcher.browser'),
-      icon: Globe2,
-      onClick: onBrowser,
-    },
-    {
-      key: 'tools',
-      label: t('code:panel.launcher.moreTools'),
-      icon: LayoutGrid,
-      shortcut: modShortcut('k'),
-      onClick: onMoreTools,
-    },
-  ];
-
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-8">
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-hover text-foreground-subtle">
-        <Compass aria-hidden className="size-5" strokeWidth={1.75} />
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground-muted">
+        <Plus aria-hidden className="size-5" strokeWidth={1.75} />
       </span>
       <div className="flex w-full max-w-80 flex-col gap-2">
-        {entries.map(({ key, label, icon: Icon, shortcut, onClick }) => (
-          <button
-            key={key}
-            type="button"
-            aria-label={label}
-            onClick={onClick}
-            className="flex h-11 w-full items-center gap-2.5 rounded-xl bg-surface-hover/60 px-3 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-          >
-            <Icon aria-hidden className="size-4 shrink-0 text-foreground-muted" strokeWidth={1.75} />
-            <span className="min-w-0 flex-1 truncate">{label}</span>
-            {shortcut ? <Kbd>{shortcut}</Kbd> : null}
-          </button>
-        ))}
+        {CODE_PANEL_TAB_ORDER_DEFAULT.map((id) => {
+          const Icon = TAB_ICONS[id];
+          const label = t(PANEL_TAB_KEYS[id]);
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-label={label}
+              onClick={() => onOpenTab(id)}
+              className="flex h-11 w-full items-center gap-2.5 rounded-xl bg-surface-hover/60 px-3 text-left text-[12px] font-medium text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              <Icon aria-hidden className="size-4 shrink-0 text-foreground-muted" strokeWidth={1.75} />
+              <span className="min-w-0 flex-1 truncate">{label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -299,7 +238,8 @@ export function CodePanel() {
 
   /** Width previewed while dragging; `null` means "use the persisted width". */
   const [previewWidth, setPreviewWidth] = useState<number | null>(null);
-  const [tasksOpen, setTasksOpen] = useState(false);
+  /** The "+" dropdown is also opened by right-clicking the tab strip. */
+  const [tabMenuOpen, setTabMenuOpen] = useState(false);
   const tabRefs = useRef(new Map<CodePanelTab, HTMLButtonElement>());
   /** Order of the tabs that are actually open (closed tabs stay in `tabOrder`). */
   const visibleTabIds = useMemo(
@@ -490,26 +430,6 @@ export function CodePanel() {
     if (next) selectTab(next);
   };
 
-  const handleLauncherTerminal = () => {
-    setTab('terminal');
-    void openTerminal('panel', activeId);
-  };
-
-  const handleLauncherBrowser = () => {
-    const state = useUiStore.getState();
-    const agentId =
-      state.activeAgentId ?? selectActiveAgents(useAgentStore.getState())[0]?.id ?? null;
-    if (!agentId) {
-      toast.error(t('code:panel.launcher.browserNoAgent'));
-      return;
-    }
-    state.setLayoutMode('agent');
-    state.setActiveAgentId(agentId);
-    state.setAgentRightPanel('agent');
-    state.setAgentPanelTab('browser');
-    state.setAgentPanelOpen(true);
-  };
-
   /* Empty strip: the launcher replaces the body, but a plugin dock still owns
      the panel while one of its tabs is active. */
   const showLauncher = visibleTabIds.length === 0 && !activePluginDock;
@@ -546,6 +466,10 @@ export function CodePanel() {
               onMouseDown={(event) => {
                 // Suppress WebView2 autoscroll on middle click.
                 if (event.button === 1) event.preventDefault();
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setTabMenuOpen(true);
               }}
               className="flex min-w-0 flex-1 items-center gap-0.5"
             >
@@ -622,7 +546,7 @@ export function CodePanel() {
           )}
         </SortableList>
 
-        <DropdownMenu>
+        <DropdownMenu open={tabMenuOpen} onOpenChange={setTabMenuOpen}>
           <DropdownMenuTrigger asChild>
             <IconButton
               label={t('code:panel.addTab')}
@@ -684,13 +608,7 @@ export function CodePanel() {
       >
         <Slot name="code.panel.body.frame" owner={{ layout: 'code' }}>
         {showLauncher ? (
-          <PanelLauncher
-            onOpenTab={setTab}
-            onNewTerminal={handleLauncherTerminal}
-            onTasks={() => setTasksOpen(true)}
-            onBrowser={handleLauncherBrowser}
-            onMoreTools={() => useUiStore.getState().setCommandPaletteOpen(true)}
-          />
+          <PanelLauncher onOpenTab={setTab} />
         ) : activePluginDock ? (
           <PluginDockTabHost layout="code" tabKey={activePluginDock} />
         ) : tab === 'changes' ? (
@@ -809,8 +727,6 @@ export function CodePanel() {
         )}
         </Slot>
       </div>
-
-      {tasksOpen ? <AgentTaskBoardDialog open onOpenChange={setTasksOpen} /> : null}
 
       <PanelResizer
         side="end"

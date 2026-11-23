@@ -36,13 +36,6 @@ const watchEvents = vi.hoisted(() => ({
   handlers: [] as Array<(event: { payload: unknown }) => void>,
 }));
 
-const terminalOpen = vi.hoisted(() => ({ openTerminal: vi.fn() }));
-
-vi.mock('./terminalOpen', () => ({
-  openTerminal: terminalOpen.openTerminal,
-  openWorkspaceTerminal: vi.fn(),
-}));
-
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(
     async (_name: string, handler: (event: { payload: unknown }) => void) => {
@@ -154,7 +147,6 @@ beforeEach(() => {
   apiMock.gitBranches.mockResolvedValue({ current: 'main', branches: ['main'], all: [] });
   apiMock.getWorkspace.mockResolvedValue(null);
   apiMock.listTerminals.mockResolvedValue([]);
-  terminalOpen.openTerminal.mockResolvedValue(null);
   setViewport(1440);
   resetPanelState();
   usePluginUiPrefs.setState({ ...EMPTY_PREFS });
@@ -1078,34 +1070,35 @@ describe('CodePanel — fechar e reabrir abas', () => {
     expect(useUiStore.getState().codePanelTab).toBe('files');
   });
 
-  it('mostra o launcher quando todas as abas são fechadas e abre arquivos a partir dele', () => {
+  it('abre o menu de abas com o botão direito na faixa de abas', async () => {
+    render(<CodePanel />);
+    middleClickTab('Arquivos');
+
+    const strip = screen.getByRole('tablist', { name: 'Conteúdo do painel' });
+    fireEvent.contextMenu(strip);
+
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Arquivos' }));
+    expect(screen.getByRole('tab', { name: 'Arquivos' })).toBeTruthy();
+    expect(useUiStore.getState().codePanelOpenTabs).toEqual(['files', 'changes', 'terminal']);
+  });
+
+  it('mostra no estado vazio apenas as abas que existem no painel e reabre uma delas', () => {
     useUiStore.setState({ codePanelOpenTabs: [] });
     render(<CodePanel />);
 
     const strip = screen.getByRole('tablist', { name: 'Conteúdo do painel' });
     expect(within(strip).queryAllByRole('tab')).toHaveLength(0);
-    expect(screen.getByRole('button', { name: 'Arquivos do espaço de trabalho' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Alterações do Git' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Novo terminal' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Tarefas em segundo plano' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Navegador' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Mais ferramentas' })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Arquivos do espaço de trabalho' }));
+    const launcher = screen.getByRole('tabpanel', { name: 'Atalhos do painel' });
+    expect(within(launcher).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Arquivos',
+      'Alterações',
+      'Terminal',
+    ]);
+    expect(screen.queryByRole('button', { name: 'Mais ferramentas' })).toBeNull();
+
+    fireEvent.click(within(launcher).getByRole('button', { name: 'Arquivos' }));
     expect(screen.getByRole('tab', { name: 'Arquivos' })).toBeTruthy();
     expect(useUiStore.getState().codePanelTab).toBe('files');
-  });
-
-  it('abre um terminal e a paleta de comandos pelo launcher', () => {
-    useUiStore.setState({ codePanelOpenTabs: [] });
-    render(<CodePanel />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Novo terminal' }));
-    expect(terminalOpen.openTerminal).toHaveBeenCalledWith('panel', null);
-    expect(screen.getByRole('tab', { name: 'Terminal' })).toBeTruthy();
-
-    act(() => useUiStore.setState({ codePanelOpenTabs: [] }));
-    fireEvent.click(screen.getByRole('button', { name: 'Mais ferramentas' }));
-    expect(useUiStore.getState().commandPaletteOpen).toBe(true);
   });
 });

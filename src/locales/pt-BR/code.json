@@ -727,14 +727,7 @@
     "tablist": "Conteúdo do painel",
     "addTab": "Adicionar aba do painel",
     "launcher": {
-      "aria": "Atalhos do painel",
-      "files": "Arquivos do espaço de trabalho",
-      "changes": "Alterações do Git",
-      "terminal": "Novo terminal",
-      "tasks": "Tarefas em segundo plano",
-      "browser": "Navegador",
-      "moreTools": "Mais ferramentas",
-      "browserNoAgent": "Selecione um agente para abrir o navegador"
+      "aria": "Atalhos do painel"
     },
     "refresh": "Atualizar painel",
     "refreshTooltip": "Atualizar",

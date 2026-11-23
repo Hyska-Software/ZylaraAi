@@ -727,14 +727,7 @@
     "tablist": "Panel content",
     "addTab": "Add panel tab",
     "launcher": {
-      "aria": "Panel shortcuts",
-      "files": "Workspace files",
-      "changes": "Git changes",
-      "terminal": "New terminal",
-      "tasks": "Background tasks",
-      "browser": "Browser",
-      "moreTools": "More tools",
-      "browserNoAgent": "Select an agent to open the browser"
+      "aria": "Panel shortcuts"
     },
     "refresh": "Refresh panel",
     "refreshTooltip": "Refresh",

@@ -727,14 +727,7 @@
     "tablist": "Contenido del panel",
     "addTab": "Añadir pestaña del panel",
     "launcher": {
-      "aria": "Atajos del panel",
-      "files": "Archivos del espacio de trabajo",
-      "changes": "Cambios de Git",
-      "terminal": "Nueva terminal",
-      "tasks": "Tareas en segundo plano",
-      "browser": "Navegador",
-      "moreTools": "Más herramientas",
-      "browserNoAgent": "Selecciona un agente para abrir el navegador"
+      "aria": "Atajos del panel"
     },
     "refresh": "Actualizar panel",
     "refreshTooltip": "Actualizar",
