@@ -627,13 +627,15 @@ pub async fn log(root: &Path, limit: u32) -> Result<Vec<GitCommit>, ExecError> {
     let limit = limit.clamp(1, 500);
     let count = format!("-n{limit}");
     // Campos separados por \x1f (não aparece em assunto/autor de commit realista).
+    // `%aI` keeps date, time and offset (ISO 8601). The renderer uses `new Date(...)`:
+    // a date-only string is parsed as UTC midnight and shows up as the previous
+    // day at 21:00 in UTC-3 timezones.
     let output = run_git_checked(
         root,
         &[
             "log",
             &count,
-            "--date=short",
-            "--pretty=format:%H\x1f%s\x1f%an\x1f%ad",
+            "--pretty=format:%H\x1f%s\x1f%an\x1f%aI",
         ],
         TEXT_CAP,
     )
@@ -1860,6 +1862,25 @@ mod tests {
 
         let branches = branches(temp.path()).await.expect("branches");
         assert!(branches.contains(&"main".to_string()), "branches: {branches:?}");
+    }
+
+    #[tokio::test]
+    async fn log_returns_full_iso_dates() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        if setup_repo(temp.path()).is_none() {
+            return;
+        }
+
+        let commits = log(temp.path(), 10).await.expect("log");
+        let date = &commits[0].date;
+        // `YYYY-MM-DDTHH:MM:SS+HH:MM`. A date-only value is parsed as UTC
+        // midnight by the renderer, showing the previous day at 21:00 in UTC-3.
+        assert_eq!(date.len(), 25, "date: {date}");
+        assert_eq!(date.as_bytes().get(10), Some(&b'T'), "date: {date}");
+        assert!(
+            matches!(date.as_bytes().get(19), Some(b'+' | b'-')),
+            "date: {date}"
+        );
     }
 
     #[tokio::test]
