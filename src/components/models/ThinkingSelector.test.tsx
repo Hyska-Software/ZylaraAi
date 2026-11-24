@@ -72,6 +72,9 @@ describe('ThinkingSelector — opt-in slider', () => {
     expect(screen.queryByRole('radiogroup')).toBeNull();
 
     fireEvent.change(slider, { target: { value: '4' } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(slider);
     expect(onChange).toHaveBeenCalledWith({ mode: 'effort', effort: 'max' });
   });
 });

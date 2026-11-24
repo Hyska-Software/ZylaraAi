@@ -1,3 +1,4 @@
+import { useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, RotateCcw } from 'lucide-react';
 import { defaultReasoningFor } from '@/lib/catalog';
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils';
 export interface ThinkingLevelSliderProps {
   model: ModelInfo;
   value: ReasoningSelection | null;
+  /** Called once per commit (pointer release or keyboard release). */
   onSelect: (option: ThinkingOption) => void;
   /** Renders a back button (used by the compact model popover). */
   onBack?: () => void;
@@ -19,6 +21,11 @@ export interface ThinkingLevelSliderProps {
   autoFocus?: boolean;
   className?: string;
 }
+
+const THUMB_SIZE = 40;
+/** The track starts/ends half a thumb inside the wrapper so the thumb never clips. */
+const TRACK_INSET = THUMB_SIZE / 2;
+const DOTS = 6;
 
 /**
  * Theme-token color for a thinking level. Medium stays violet to match the
@@ -46,7 +53,24 @@ export function reasoningLevelColor(option: ThinkingOption): string {
   }
 }
 
-/** Sliding replacement for the segmented thinking-level selector. */
+/** Centers the thumb on the track, inset by half a thumb at both ends. */
+function thumbLeft(fraction: number): string {
+  const offset = TRACK_INSET - fraction * THUMB_SIZE;
+  return `calc(${fraction * 100}% + ${offset}px)`;
+}
+
+/** Keeps the level dots fully visible inside the rounded track. */
+function dotLeft(fraction: number): string {
+  return `calc(${fraction * 100}% + ${DOTS / 2 - fraction * DOTS}px)`;
+}
+
+/**
+ * Sliding replacement for the segmented thinking-level selector.
+ *
+ * The native range only previews while the pointer is down; the selection is
+ * committed on pointer/keyboard release. That keeps a popover open during a
+ * drag and avoids saving one value per intermediate step.
+ */
 export function ThinkingLevelSlider({
   model,
   value,
@@ -57,32 +81,63 @@ export function ThinkingLevelSlider({
   className,
 }: ThinkingLevelSliderProps) {
   const { t } = useTranslation('models');
+  const [preview, setPreview] = useState<number | null>(null);
   const options = thinkingOptions(model, value);
   const currentId = currentThinkingId(value);
-  const selectedIndex = Math.max(
-    0,
-    options.findIndex((option) => option.current || option.id === currentId),
-  );
-  const selected = options[selectedIndex];
-  if (!selected) return null;
-
-  const color = reasoningLevelColor(selected);
+  const matchedIndex = options.findIndex((option) => option.current || option.id === currentId);
+  const selectedIndex = Math.max(0, matchedIndex);
+  const hasSelection = matchedIndex >= 0;
   const last = options.length - 1;
-  const percent = last > 0 ? (selectedIndex / last) * 100 : 0;
+  const activeIndex = Math.min(Math.max(preview ?? selectedIndex, 0), last);
+  const active = options[activeIndex];
+
+  if (!active) return null;
+
+  const color = reasoningLevelColor(active);
+  const fraction = last > 0 ? activeIndex / last : 0;
+  const percent = fraction * 100;
+
+  const commit = (index: number) => {
+    const option = options[Math.min(Math.max(index, 0), last)];
+    setPreview(null);
+    if (option) onSelect(option);
+  };
+
+  /** A plain click on the current stop must not close the popover. */
+  const commitIfChanged = (index: number) => {
+    const next = Math.min(Math.max(index, 0), last);
+    if (hasSelection && next === selectedIndex) {
+      setPreview(null);
+      return;
+    }
+    commit(next);
+  };
 
   const handleReset = () => {
     const fallback = defaultReasoningFor(model);
     const fallbackId = currentThinkingId(fallback);
     const option = options.find((entry) => entry.id === fallbackId);
+    setPreview(null);
     if (option) onSelect(option);
   };
 
+  const handleKeyUp = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (
+      event.key === 'ArrowLeft' ||
+      event.key === 'ArrowRight' ||
+      event.key === 'ArrowUp' ||
+      event.key === 'ArrowDown' ||
+      event.key === 'Home' ||
+      event.key === 'End' ||
+      event.key === 'PageUp' ||
+      event.key === 'PageDown'
+    ) {
+      commitIfChanged(Number(event.currentTarget.value));
+    }
+  };
+
   return (
-    <div
-      className={cn('flex flex-col gap-3 rounded-2xl p-4', className)}
-      style={{ background: `color-mix(in oklab, ${color} 10%, var(--surface))` }}
-      data-level-color={color}
-    >
+    <div className={cn('flex flex-col gap-3 rounded-xl bg-background p-4', className)}>
       <div className="flex items-start justify-between gap-2">
         {onBack ? (
           <button
@@ -97,9 +152,9 @@ export function ThinkingLevelSlider({
         ) : (
           <span aria-hidden className="size-6 shrink-0" />
         )}
-        <div className="flex min-w-0 flex-1 flex-col items-center text-center">
-          <span className="max-w-full truncate text-[13px] font-semibold" style={{ color }}>
-            {selected.label}
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5 text-center">
+          <span className="max-w-full truncate text-sm font-semibold text-foreground">
+            {active.label}
           </span>
           <span className="max-w-full truncate text-[11px] text-foreground-muted">
             {t('thinking.sliderModel', { model: model.name })}
@@ -116,48 +171,54 @@ export function ThinkingLevelSlider({
         </button>
       </div>
 
-      <div className="relative flex h-5 items-center">
-        {options.map((option, index) => (
-          <span
-            key={option.id}
-            aria-hidden
-            className={cn(
-              'pointer-events-none absolute size-1.5 -translate-x-1/2 rounded-full',
-              index > selectedIndex ? 'bg-border-strong' : 'bg-accent',
-            )}
-            style={{ left: `${last > 0 ? (index / last) * 100 : 0}%` }}
-          />
-        ))}
+      <div
+        className="relative h-12 rounded-full focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-background"
+        data-level-color={color}
+      >
+        <div className="absolute inset-x-5 top-1/2 h-8 -translate-y-1/2 overflow-hidden rounded-full bg-surface-active">
+          <div className="h-full rounded-full" style={{ width: `${percent}%`, background: color }} />
+          {options.map((option, index) => {
+            const dotFraction = last > 0 ? index / last : 0;
+            return (
+              <span
+                key={option.id}
+                aria-hidden
+                className={cn(
+                  'pointer-events-none absolute top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full',
+                  index <= activeIndex ? 'bg-foreground/70' : 'bg-foreground-subtle/60',
+                )}
+                style={{ left: dotLeft(dotFraction) }}
+              />
+            );
+          })}
+        </div>
+
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 z-10 size-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
+          style={{ left: thumbLeft(fraction), boxShadow: `0 0 0 3px ${color}` }}
+        />
+
         <input
           type="range"
           min={0}
           max={last}
           step={1}
-          value={selectedIndex}
+          value={activeIndex}
           disabled={disabled}
           autoFocus={autoFocus}
           aria-label={t('thinking.sliderAria')}
-          aria-valuetext={selected.label}
-          onChange={(event) => {
-            const option = options[Number(event.currentTarget.value)];
-            if (option) onSelect(option);
-          }}
+          aria-valuetext={active.label}
+          onChange={(event) => setPreview(Number(event.currentTarget.value))}
+          onPointerUp={(event) => commitIfChanged(Number(event.currentTarget.value))}
+          onPointerCancel={() => setPreview(null)}
+          onKeyUp={handleKeyUp}
           className={cn(
-            'relative z-10 h-1.5 w-full cursor-pointer appearance-none rounded-full outline-none',
-            'focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            '[&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:ring-2 [&::-webkit-slider-thumb]:ring-accent [&::-webkit-slider-thumb]:bg-surface-raised [&::-webkit-slider-thumb]:shadow-md',
-            '[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:ring-2 [&::-moz-range-thumb]:ring-accent [&::-moz-range-thumb]:bg-surface-raised',
+            'absolute left-5 top-1/2 z-20 h-12 w-[calc(100%-2.5rem)] -translate-y-1/2 cursor-pointer appearance-none bg-transparent opacity-0',
+            'disabled:cursor-not-allowed',
           )}
-          style={{
-            background: `linear-gradient(to right, ${color} 0%, ${color} ${percent}%, var(--border-strong) ${percent}%, var(--border-strong) 100%)`,
-          }}
         />
       </div>
-
-      <p className="text-center text-[11px] leading-relaxed text-foreground-muted">
-        {selected.description}
-      </p>
     </div>
   );
 }

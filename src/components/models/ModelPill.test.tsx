@@ -716,7 +716,7 @@ describe('ModelPill (thinking step)', () => {
     });
   });
 
-  it('uses the sliding level selector in the thinking step when enabled', async () => {
+  it('keeps the popover open while dragging and commits on release', async () => {
     useAppStore.setState({
       settings: { ...useAppStore.getState().settings, reasoningSliderEnabled: true },
     });
@@ -729,6 +729,14 @@ describe('ModelPill (thinking step)', () => {
     const slider = screen.getByRole('slider', { name: 'Nível de pensamento' });
     fireEvent.change(slider, { target: { value: '3' } });
 
+    // Dragging only previews: the popover stays open and the selection is untouched.
+    expect(screen.getByRole('dialog', { name: 'Selecionar modelo' })).toBeTruthy();
+    expect(useAppStore.getState().selection.reasoning).toEqual({
+      mode: 'effort',
+      effort: 'high',
+    });
+
+    fireEvent.pointerUp(slider);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(useAppStore.getState().selection.reasoning).toEqual({
       mode: 'effort',

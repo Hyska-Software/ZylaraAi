@@ -36,29 +36,43 @@ function optionFor(selection: ReasoningSelection, effort?: string): ThinkingOpti
 }
 
 describe('ThinkingLevelSlider', () => {
-  it('renders the current level and changes color when another level is selected', () => {
+  it('previews while dragging and commits only on release', () => {
     const onSelect = vi.fn();
-    const { container } = render(
+    const { container, rerender } = render(
       <ThinkingLevelSlider model={model} value={medium} onSelect={onSelect} />,
     );
 
     const slider = screen.getByRole('slider', { name: 'Nível de pensamento' });
     expect(slider).toHaveProperty('value', '2');
     expect(slider.getAttribute('aria-valuetext')).toBe('Médio');
-    expect(container.firstElementChild?.getAttribute('data-level-color')).toBe('var(--accent)');
+
+    // Only the track carries the level color; the card and title keep their tokens.
+    const track = container.querySelector('[data-level-color]');
+    expect(track?.getAttribute('data-level-color')).toBe('var(--accent)');
+    expect(container.firstElementChild?.getAttribute('style')).toBeNull();
+    expect(screen.getByText('Médio').getAttribute('style')).toBeNull();
+    expect(screen.getByText('Médio').className).toContain('text-foreground');
 
     fireEvent.change(slider, { target: { value: '4' } });
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(slider.getAttribute('aria-valuetext')).toBe('Máximo');
 
+    fireEvent.pointerUp(slider);
+    expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'effort:max' }));
+
     // The parent re-renders with the new selection; verify the new ramp color.
-    const { container: updated } = render(
+    rerender(
       <ThinkingLevelSlider
         model={model}
         value={{ mode: 'effort', effort: 'max' }}
         onSelect={onSelect}
       />,
     );
-    expect(updated.firstElementChild?.getAttribute('data-level-color')).toBe('var(--danger)');
+    expect(container.querySelector('[data-level-color]')?.getAttribute('data-level-color')).toBe(
+      'var(--danger)',
+    );
+    expect(container.firstElementChild?.getAttribute('style')).toBeNull();
   });
 
   it('resets to the model default', () => {

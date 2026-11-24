@@ -807,7 +807,7 @@ export function ModelPill({
         className={cn(
           'p-0',
           showingThinking
-            ? 'w-auto min-w-[15rem] max-w-[19rem]'
+            ? 'w-auto min-w-[16rem] max-w-[20rem]'
             : 'w-[22rem] max-w-[calc(100vw-2rem)] overflow-visible',
         )}
         onInteractOutside={handleInteractOutside}
@@ -823,7 +823,7 @@ export function ModelPill({
               onSelect={handleThinkingPick}
               onBack={locked ? undefined : backToModelStage}
               autoFocus={open}
-              className="w-[17rem]"
+              className="w-[18rem]"
             />
           ) : (
             <div className="flex max-h-[min(24rem,calc(100dvh-6rem))] w-full flex-col">
