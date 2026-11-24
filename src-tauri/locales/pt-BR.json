@@ -305,6 +305,8 @@
   "git.errors.noSelectedFiles": "nenhum arquivo selecionado",
   "git.errors.notRepo": "não é um repositório Git",
   "git.errors.nothingStaged": "nenhum arquivo preparado",
+  "git.errors.suggestModelMismatch": "modelo `{model_id}` não está disponível no provedor `{provider_id}`",
+  "git.errors.suggestProviderMissing": "provedor `{provider_id}` não está no catálogo",
   "git.errors.unknownBranch": "a branch `{name}` não existe neste repositório",
   "git.errors.unknownStartPoint": "`{name}` não é uma referência deste repositório",
   "git.heuristic.adds": "adiciona",

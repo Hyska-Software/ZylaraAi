@@ -592,6 +592,7 @@ pub async fn suggest_agent(
             user_text: &user,
             max_output_tokens: 2_048,
             temperature: Some(0.4),
+            reasoning: crate::providers::ReasoningRequest::Auto,
         },
     )
     .await
@@ -764,6 +765,7 @@ pub async fn revise_agent(
             user_text: &user,
             max_output_tokens: 2_048,
             temperature: Some(0.3),
+            reasoning: crate::providers::ReasoningRequest::Auto,
         },
     )
     .await

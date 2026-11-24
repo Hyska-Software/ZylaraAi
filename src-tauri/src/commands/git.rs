@@ -58,6 +58,56 @@ fn map_err(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
 
+/// Resolves the route used for a commit suggestion. The renderer sends the
+/// active selection (which can differ from the persisted defaults for a started
+/// session); defaults are only a compatibility fallback for older callers.
+fn suggestion_route_ids(
+    settings: &crate::domain::Settings,
+    provider_id: Option<String>,
+    model_id: Option<String>,
+) -> (String, String) {
+    let provider_id = provider_id
+        .map(|id| id.trim().to_string())
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| settings.default_provider.trim().to_string());
+    let model_id = model_id
+        .map(|id| id.trim().to_string())
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| settings.default_model.trim().to_string());
+    (provider_id, model_id)
+}
+
+fn validate_suggestion_route(
+    state: &AppState,
+    provider_id: &str,
+    model_id: &str,
+) -> Result<(), String> {
+    if state.provider(provider_id).is_none() {
+        return Err(crate::i18n::t_args(
+            "git.errors.suggestProviderMissing",
+            &[("provider_id", provider_id)],
+        ));
+    }
+    if state.model(provider_id, model_id).is_none() {
+        return Err(crate::i18n::t_args(
+            "git.errors.suggestModelMismatch",
+            &[("model_id", model_id), ("provider_id", provider_id)],
+        ));
+    }
+    Ok(())
+}
+
+fn resolve_suggestion_route(
+    state: &AppState,
+    settings: &crate::domain::Settings,
+    provider_id: Option<String>,
+    model_id: Option<String>,
+) -> Result<(String, String), String> {
+    let (provider_id, model_id) = suggestion_route_ids(settings, provider_id, model_id);
+    validate_suggestion_route(state, &provider_id, &model_id)?;
+    Ok((provider_id, model_id))
+}
+
 /// Roda um comando git no workspace e devolve o stdout.
 async fn run_git(root: &PathBuf, args: &[&str]) -> Result<String, String> {
     let request = ExecRequest {
@@ -885,7 +935,7 @@ fn sanitize_commit_message(raw: &str) -> Option<String> {
 
 /// Sugestão de mensagem de commit.
 ///
-/// Usa o modelo padrão configurado (request curto, não-streaming) com o status e
+/// Usa o modelo selecionado no app (request curto, não-streaming) com o status e
 /// o diff do alvo escolhido. Se o provedor falhar, cai numa heurística local
 /// honesta — sugerir nunca bloqueia o commit do usuário (`HARNESS.md` §9).
 #[tauri::command]
@@ -895,6 +945,8 @@ pub async fn suggest_commit_message(
     workspace_id: String,
     target: Option<String>,
     paths: Option<Vec<String>>,
+    provider_id: Option<String>,
+    model_id: Option<String>,
 ) -> Result<String, String> {
     let target = parse_commit_target(target.as_deref())?;
     let root = workspace_path(&state, &workspace_id)?;
@@ -924,6 +976,8 @@ pub async fn suggest_commit_message(
         });
     let user_text = build_commit_user_text(&entries, &diff, target);
     let settings = crate::config::load_settings(&app);
+    let (provider_id, model_id) =
+        resolve_suggestion_route(&state, &settings, provider_id, model_id)?;
     let system_prompt = format!(
         "You write one-line Git commit messages in {language}. \
          Use Conventional Commits: type(scope): description. \
@@ -954,13 +1008,15 @@ pub async fn suggest_commit_message(
         mcp: None,
     };
     let request = crate::harness::batch::BatchRequest {
-        provider_id: &settings.default_provider,
-        model_id: &settings.default_model,
+        provider_id: &provider_id,
+        model_id: &model_id,
         timeouts: crate::providers::StreamTimeouts::from_settings(&settings),
         system_prompt: &system_prompt,
         user_text: &user_text,
-        max_output_tokens: 200,
+        max_output_tokens: 1_024,
         temperature: Some(0.2),
+        // A short commit subject must not be swallowed by server-side thinking.
+        reasoning: crate::providers::ReasoningRequest::Off,
     };
     match crate::harness::batch::complete_text(&deps, request).await {
         Ok(text) => Ok(sanitize_commit_message(&text)
@@ -1016,6 +1072,28 @@ mod tests {
             CommitTarget::Selection
         );
         assert!(parse_commit_target(Some("index")).is_err());
+    }
+
+    #[test]
+    fn suggestion_route_prefers_the_renderer_selection_over_settings_defaults() {
+        let settings = crate::domain::Settings::default();
+
+        assert_eq!(
+            suggestion_route_ids(&settings, None, None),
+            (settings.default_provider.clone(), settings.default_model.clone())
+        );
+        assert_eq!(
+            suggestion_route_ids(
+                &settings,
+                Some("  anthropic ".into()),
+                Some(" claude-haiku-5-5 ".into()),
+            ),
+            ("anthropic".to_string(), "claude-haiku-5-5".to_string())
+        );
+        assert_eq!(
+            suggestion_route_ids(&settings, Some(" ".into()), Some(String::new())),
+            (settings.default_provider.clone(), settings.default_model.clone())
+        );
     }
 
     #[test]

@@ -1121,13 +1121,19 @@ export const useUiStore = create<UiState>()(
           if (!active) return { artifactPanelView: 'list' };
           return { artifactPanelView: 'preview', activeArtifactId: active.id };
         }),
-      setActiveArtifact: (activeArtifactId) =>
-        set((state) => {
-          if (!activeArtifactId) {
-            return { activeArtifactId: null, artifactPanelView: 'list', artifactPanelOpen: state.artifactPanelOpen };
-          }
-          return { activeArtifactId, artifactPanelOpen: true, artifactPanelView: 'preview', sourcesPanelOpen: false };
-        }),
+      setActiveArtifact: (activeArtifactId) => {
+        if (!activeArtifactId) {
+          set((state) => ({
+            activeArtifactId: null,
+            artifactPanelView: 'list',
+            artifactPanelOpen: state.artifactPanelOpen,
+          }));
+          return;
+        }
+        // Single canonical artifact-open path: also clears the Sources panel
+        // and any plugin dock tab occupying the same right-hand surface.
+        get().openArtifactPanel(activeArtifactId);
+      },
       setArtifacts: (artifacts) =>
         set((state) => {
           const next = sortArtifacts(artifacts);
@@ -1218,6 +1224,10 @@ export const useUiStore = create<UiState>()(
         return {
           ...current,
           ...stored,
+          // Both panels are volatile (not in `partialize`). A legacy snapshot
+          // must never restore Sources over an artifact preview on startup.
+          artifactPanelOpen: false,
+          sourcesPanelOpen: false,
           layoutMode: enabledLayouts[storedLayoutMode]
             ? storedLayoutMode
             : firstEnabledLayout(enabledLayouts),
@@ -1262,11 +1272,17 @@ export const useUiStore = create<UiState>()(
  * and squeezes the chat between them. Every store action already closes the
  * sibling panel; this guard keeps the invariant even if the state is mutated
  * from somewhere else (stale HMR module, devtools, a future action that forgets
- * the rule). Keep whichever panel was opened last, or close the artifact panel
- * when both were already open.
+ * the rule). An active artifact preview always wins; otherwise keep whichever
+ * panel was opened last, or close the artifact panel when both were already open.
  */
 useUiStore.subscribe((state, previous) => {
   if (!state.artifactPanelOpen || !state.sourcesPanelOpen) return;
+  // An active artifact preview owns the chat right dock: Sources must never
+  // remain visible beside it, regardless of which flag was flipped last.
+  if (state.activeArtifactId) {
+    useUiStore.setState({ sourcesPanelOpen: false });
+    return;
+  }
   const sourcesJustOpened = !previous.sourcesPanelOpen;
   useUiStore.setState(
     sourcesJustOpened ? { artifactPanelOpen: false } : { sourcesPanelOpen: false },

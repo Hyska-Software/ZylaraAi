@@ -305,6 +305,8 @@
   "git.errors.noSelectedFiles": "ningún archivo seleccionado",
   "git.errors.notRepo": "no es un repositorio Git",
   "git.errors.nothingStaged": "ningún archivo preparado",
+  "git.errors.suggestModelMismatch": "el modelo `{model_id}` no está disponible en el proveedor `{provider_id}`",
+  "git.errors.suggestProviderMissing": "el proveedor `{provider_id}` no está en el catálogo",
   "git.errors.unknownBranch": "la rama `{name}` no existe en este repositorio",
   "git.errors.unknownStartPoint": "`{name}` no es una referencia de este repositorio",
   "git.heuristic.adds": "añade",

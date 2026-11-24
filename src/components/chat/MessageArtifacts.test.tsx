@@ -40,6 +40,7 @@ function resetUi(): void {
   useUiStore.setState({
     artifactPanelOpen: false,
     artifactPanelView: 'list',
+    sourcesPanelOpen: false,
     activeArtifactId: null,
     artifacts: [],
   });
@@ -81,6 +82,21 @@ describe('MessageArtifacts', () => {
 
     expect(useUiStore.getState().artifactPanelOpen).toBe(true);
     expect(useUiStore.getState().artifactPanelView).toBe('list');
+  });
+
+  it('opens the preview and closes the sources panel when a card is clicked', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ sourcesPanelOpen: true });
+    render(<MessageArtifacts artifacts={[artifact(1)]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Abrir' }));
+
+    expect(useUiStore.getState()).toMatchObject({
+      artifactPanelOpen: true,
+      artifactPanelView: 'preview',
+      activeArtifactId: 'artifact-1',
+      sourcesPanelOpen: false,
+    });
   });
 
   it('orders defensively by createdAt and then id before cutting the inline list', () => {

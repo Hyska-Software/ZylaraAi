@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { WorkspaceGitStatus } from '@/lib/types';
+import { useAppStore } from '@/lib/store';
 
 const mocks = vi.hoisted(() => ({
   gitLog: vi.fn(),
@@ -40,6 +41,9 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useAppStore.setState({
+    selection: { providerId: 'opencode-go', modelId: 'hy4-flash-free', reasoning: null },
+  });
   mocks.gitLog.mockResolvedValue([]);
   mocks.suggestCommitMessage.mockResolvedValue('Mensagem sugerida pela IA');
   mocks.gitCommit.mockResolvedValue(status());
@@ -137,7 +141,30 @@ describe('CommitBar', () => {
     render(<CommitBar workspaceId="ws-1" hasChanges />);
     fireEvent.click(screen.getByRole('button', { name: 'Sugerir mensagem' }));
     await waitFor(() => expect(message().value).toBe('Mensagem sugerida pela IA'));
-    expect(mocks.suggestCommitMessage).toHaveBeenCalledWith('ws-1', 'all', undefined);
+    expect(mocks.suggestCommitMessage).toHaveBeenCalledWith(
+      'ws-1',
+      'all',
+      undefined,
+      'opencode-go',
+      'hy4-flash-free',
+    );
+  });
+
+  it('follows the active model selection when suggesting', async () => {
+    useAppStore.setState({
+      selection: { providerId: 'anthropic', modelId: 'claude-haiku-5-5', reasoning: null },
+    });
+    render(<CommitBar workspaceId="ws-1" hasChanges />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sugerir mensagem' }));
+    await waitFor(() =>
+      expect(mocks.suggestCommitMessage).toHaveBeenCalledWith(
+        'ws-1',
+        'all',
+        undefined,
+        'anthropic',
+        'claude-haiku-5-5',
+      ),
+    );
   });
 
   it('suggests using the staged target', async () => {
@@ -147,7 +174,13 @@ describe('CommitBar', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Sugerir mensagem' }));
     await waitFor(() =>
-      expect(mocks.suggestCommitMessage).toHaveBeenCalledWith('ws-1', 'staged', undefined),
+      expect(mocks.suggestCommitMessage).toHaveBeenCalledWith(
+        'ws-1',
+        'staged',
+        undefined,
+        'opencode-go',
+        'hy4-flash-free',
+      ),
     );
     expect(message().value).toBe('Mensagem sugerida pela IA');
   });
@@ -159,9 +192,13 @@ describe('CommitBar', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Sugerir mensagem' }));
     await waitFor(() =>
-      expect(mocks.suggestCommitMessage).toHaveBeenCalledWith('ws-1', 'selection', [
-        'src/b.ts',
-      ]),
+      expect(mocks.suggestCommitMessage).toHaveBeenCalledWith(
+        'ws-1',
+        'selection',
+        ['src/b.ts'],
+        'opencode-go',
+        'hy4-flash-free',
+      ),
     );
   });
 

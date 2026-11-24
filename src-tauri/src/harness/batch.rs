@@ -11,7 +11,8 @@ use parking_lot::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use crate::providers::{
-    self, CompletionRequest, HistoryMessage, ProviderError, ProviderEvent, StreamTimeouts,
+    self, CompletionRequest, HistoryMessage, ProviderError, ProviderEvent, ReasoningRequest,
+    StreamTimeouts,
 };
 
 use super::{provider_config, resolve_credential, resolve_model, resolve_protocols, HarnessDeps};
@@ -25,6 +26,8 @@ pub struct BatchRequest<'a> {
     pub user_text: &'a str,
     pub max_output_tokens: u32,
     pub temperature: Option<f32>,
+    /// Reasoning policy for this auxiliary request (short outputs may need it off).
+    pub reasoning: ReasoningRequest,
 }
 
 /// Executa uma completion não-streaming e devolve o texto final.
@@ -58,8 +61,8 @@ pub async fn complete_text(
         history: vec![HistoryMessage::user(request.user_text.to_string())],
         system_prompt: request.system_prompt.to_string(),
         tools: Vec::new(),
-        reasoning: crate::providers::ReasoningRequest::Auto,
-        max_output_tokens: Some(request.max_output_tokens.clamp(256, 4_096)),
+        reasoning: request.reasoning,
+        max_output_tokens: Some(request.max_output_tokens.clamp(512, 4_096)),
         temperature: request.temperature,
         cancel: cancel.clone(),
         // F4b: plano de cache explícito preenchido no wiring da F4.
@@ -223,6 +226,7 @@ mod tests {
                 user_text: "conteúdo",
                 max_output_tokens: 256,
                 temperature: None,
+                reasoning: ReasoningRequest::Auto,
             },
         )
         .await
@@ -246,10 +250,47 @@ mod tests {
                 user_text: "conteúdo",
                 max_output_tokens: 256,
                 temperature: None,
+                reasoning: ReasoningRequest::Auto,
             },
         )
         .await
         .expect_err("vazio é erro");
         assert!(format!("{error}").contains("não devolveu texto"));
+    }
+
+    #[tokio::test]
+    async fn forwards_the_requested_reasoning_policy_to_the_provider() {
+        let seen = Arc::new(Mutex::new(None::<ReasoningRequest>));
+        let seen_for_streamer = seen.clone();
+        let streamer: super::super::ProviderStreamer = Arc::new(move |request, sink| {
+            let seen = seen_for_streamer.clone();
+            Box::pin(async move {
+                *seen.lock() = Some(request.reasoning);
+                let _ = sink.send(ProviderEvent::TextDelta("feat(git): describe change".into()));
+                Ok(())
+            })
+        });
+        let deps = deps_with_streamer(streamer);
+        let text = complete_text(
+            &deps,
+            BatchRequest {
+                provider_id: "opencode-go",
+                model_id: "deepseek-v4.1-flash",
+                timeouts: StreamTimeouts::default(),
+                system_prompt: "Commit subject.",
+                user_text: "diff",
+                max_output_tokens: 1_024,
+                temperature: Some(0.2),
+                reasoning: ReasoningRequest::Off,
+            },
+        )
+        .await
+        .expect("texto coletado");
+
+        assert_eq!(text, "feat(git): describe change");
+        assert!(seen
+            .lock()
+            .as_ref()
+            .is_some_and(|reasoning| reasoning.is_off()));
     }
 }

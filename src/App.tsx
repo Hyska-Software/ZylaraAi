@@ -639,7 +639,9 @@ export default function App() {
                   name="artifact.panel"
                   fallback={ArtifactPanel as unknown as PluginComponent}
                 />
-                <SourcesPanel />
+                {/* Mount Sources only when it owns the dock: a stale flag must
+                    never render a second visible column beside an artifact. */}
+                {sourcesPanelOpen && !artifactPanelOpen ? <SourcesPanel /> : null}
               </>
             ),
             rightPanelOpen:

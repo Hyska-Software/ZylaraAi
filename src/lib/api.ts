@@ -702,11 +702,19 @@ export const api = {
     invoke<WorkspaceGitCommit[]>('git_log', { workspaceId, limit }),
   gitCommitDetail: (workspaceId: string, revision: string) =>
     invoke<WorkspaceCommitDetail>('git_commit_detail', { workspaceId, revision }),
-  suggestCommitMessage: (workspaceId: string, target: CommitTarget, paths?: string[]) =>
+  suggestCommitMessage: (
+    workspaceId: string,
+    target: CommitTarget,
+    paths?: string[],
+    providerId?: string,
+    modelId?: string,
+  ) =>
     invoke<string>('suggest_commit_message', {
       workspaceId,
       target,
       paths: paths ?? null,
+      providerId: providerId ?? null,
+      modelId: modelId ?? null,
     }),
 
   /* -------- GitHub (pull requests e issues) -------- */

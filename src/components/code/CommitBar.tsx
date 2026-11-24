@@ -4,6 +4,7 @@ import { ChevronRight, CircleAlert, GitCommitHorizontal, Sparkles } from 'lucide
 import { Button, NativeSelect, Spinner, Textarea, Tooltip } from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/i18n/format';
+import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { CommitTarget, WorkspaceGitCommit, WorkspaceGitStatus } from '@/lib/types';
@@ -75,6 +76,9 @@ export function CommitBar({
   className,
 }: CommitBarProps) {
   const { t } = useTranslation('code');
+  // The active route can differ from the persisted defaults (a started session
+  // owns its model), so the suggestion must follow what the user sees selected.
+  const selection = useAppStore((state) => state.selection);
   const [localTarget, setLocalTarget] = useState<CommitTarget>('all');
   /* Controlled when the container passes `target` (the panel needs the same set
      for the footer counters); uncontrolled otherwise. */
@@ -173,7 +177,13 @@ export function CommitBar({
     setSuggesting(true);
     setSuggestError(null);
     try {
-      const suggestion = await api.suggestCommitMessage(workspaceId, target, targetPaths);
+      const suggestion = await api.suggestCommitMessage(
+        workspaceId,
+        target,
+        targetPaths,
+        selection.providerId,
+        selection.modelId,
+      );
       if (run !== suggestRun.current) return;
       if (suggestion?.trim()) {
         setMessage((current) => (current === requestedMessage ? suggestion.trim() : current));

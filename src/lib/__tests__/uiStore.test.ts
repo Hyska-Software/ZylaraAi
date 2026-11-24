@@ -178,6 +178,24 @@ describe('useUiStore sources panel', () => {
     expect(useUiStore.getState().sourcesPanelOpen).toBe(false);
   });
 
+  it('setActiveArtifact clears the plugin dock tab together with the sources panel', () => {
+    useUiStore.setState({
+      sourcesPanelOpen: true,
+      pluginDockTab: { ...useUiStore.getState().pluginDockTab, chat: 'demo-tab' },
+      artifacts: [artifact()],
+    });
+
+    useUiStore.getState().setActiveArtifact('artifact-1');
+
+    expect(useUiStore.getState()).toMatchObject({
+      artifactPanelOpen: true,
+      artifactPanelView: 'preview',
+      activeArtifactId: 'artifact-1',
+      sourcesPanelOpen: false,
+      pluginDockTab: { chat: null },
+    });
+  });
+
   it('closeAllOverlays also closes the sources panel', () => {
     useUiStore.setState({ sourcesPanelOpen: true });
     useUiStore.getState().closeAllOverlays();
@@ -363,6 +381,24 @@ describe('useUiStore — painéis laterais mutuamente exclusivos', () => {
     expect(
       useUiStore.getState().artifactPanelOpen && useUiStore.getState().sourcesPanelOpen,
     ).toBe(false);
+  });
+
+  it('does not restore stale panel flags from a legacy persisted snapshot', async () => {
+    useUiStore.setState({ artifactPanelOpen: true, sourcesPanelOpen: false });
+    window.localStorage.setItem(
+      'zylara.ui',
+      JSON.stringify({
+        version: 0,
+        state: { artifactPanelOpen: true, sourcesPanelOpen: true },
+      }),
+    );
+
+    await useUiStore.persist.rehydrate();
+
+    expect(useUiStore.getState()).toMatchObject({
+      artifactPanelOpen: false,
+      sourcesPanelOpen: false,
+    });
   });
 });
 
