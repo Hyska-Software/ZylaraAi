@@ -4,8 +4,9 @@
 > compatíveis com **Agent Client Protocol** dentro do Zylara, integrados a Chat,
 > Code e Agentes, sem alterar o funcionamento dos provedores HTTP atuais.
 >
-> **Status**: planejamento revisado; nenhuma implementação ACP foi feita neste
-> documento. Pesquisa e baseline em `RESEARCH.md`.
+> **Status**: planejamento revisado e **READY para implementação**; nenhuma
+> implementação ACP foi feita neste documento. Pesquisa/baseline em `RESEARCH.md`
+> e trilha de revisão em `REVIEW.md`.
 >
 > **Data**: 2026-11-24.
 
@@ -345,12 +346,15 @@ AcpAuthMethod { id, name, description, r#type, args, env: Map<String,String> }
 AcpSessionSummary { session_id, cwd, title?, updated_at?: String, additional_directories? }
 AcpSessionPage { sessions, next_cursor? }
 AcpSessionEvent { seq, kind, payload, created_at }
+AcpSessionEventPage { items, next_seq? }
+AcpEntityPage { items, next_cursor? }
+AcpEntityChunk { entity, payload_text?, data_base64?, done }
 AcpContentBlock {
   content_id, owner_kind, owner_id, seq, r#type, mime?, text?,
   artifact_id?, uri?, size?, thumbnail_data_url?
 }
 AcpSessionState {
-    session_id, cwd, protocol_version, agent_version,
+    session_id, cwd, approved_roots, protocol_version, agent_version,
     config_options, modes, available_commands, context_usage, reported_cost,
     title, auth_state, children, plans, compactions, session_messages
 }
@@ -361,15 +365,15 @@ AcpConfigOption {
 }
 AcpPermissionRequest { request_id, session_id, tool_call, options }
 AcpElicitationRequest {
-    request_id, session_id?, acp_request_id?, mode, message,
+    request_id, session_id?, tool_call_id?, acp_request_id?, mode, message,
     requested_schema?, elicitation_id?, url?
 }
 AcpContentPage { items, next_cursor? }
 AcpContentChunk { block: AcpContentBlock, offset, text?, data_base64?, done }
 AcpReportedCost { amount, currency, cumulative, session_id, updated_at }
 AcpConsentPreview { agent_id, version, manifest_digest, launch_digest, command, args, env_preview, scopes }
-#[serde(tag = "kind", rename_all = "camelCase")]
 AcpCustomAgentInput { name, command, args, env, version? }
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 AcpConsentCandidate =
   | Installed { agent_id }
   | Registry { agent_id, distribution, channel, target?, version? }
@@ -384,7 +388,7 @@ AcpRuntimeStatus {
     state: connecting|ready|running|waiting_action|idle|auth_required|disconnected|error,
     agent_id, protocol_version, agent_version
 }
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 RuntimeSelection =
     | Native { provider_id, model_id, reasoning }
     | Acp { agent_id, config_fingerprint? }
@@ -424,7 +428,8 @@ existe:
 }
 ```
 
-`terminal` só é anunciado em execução local; demais capabilities só são anunciadas
+`terminal` só é anunciado em execução local; `auth.terminal` só é anunciado quando
+o launch reproduz argv com segurança. Demais capabilities só são anunciadas
 quando handlers completos existem.
 
 Prompt capabilities do agente (`text`/`resource_link` baseline; `image`, `audio`,
@@ -470,6 +475,7 @@ CREATE TABLE acp_sessions (
   agent_id TEXT NOT NULL,
   session_id TEXT NOT NULL,
   cwd TEXT NOT NULL,
+  approved_roots_json TEXT NOT NULL,
   protocol_version INTEGER NOT NULL,
   agent_version TEXT NOT NULL,
   config_fingerprint TEXT NOT NULL,
@@ -487,6 +493,7 @@ CREATE TABLE acp_session_events (
   seq INTEGER NOT NULL,
   kind TEXT NOT NULL,
   payload_json TEXT NOT NULL,
+  spill_path TEXT,
   created_at INTEGER NOT NULL,
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );
@@ -610,7 +617,9 @@ acp_list_sessions(agent_id, cwd?, cursor?) -> AcpSessionPage
 acp_import_session(agent_id, session_id, title?, cwd, challenge_id) -> Conversation
 acp_delete_session(agent_id, session_id) -> ()
 acp_get_session_state(conversation_id) -> AcpSessionState
-acp_list_session_events(conversation_id, after_seq?) -> AcpSessionEvent[]
+acp_list_session_events(conversation_id, after_seq?, limit?) -> AcpSessionEventPage
+acp_list_entities(conversation_id, kind?, cursor?) -> AcpEntityPage
+acp_get_entity(conversation_id, kind, entity_id) -> AcpEntityChunk
 acp_get_content_blocks(owner_kind, owner_id, cursor?) -> AcpContentPage
 acp_get_content_block(content_id, offset?, max_bytes?) -> AcpContentChunk
 acp_continue_turn(conversation_id, assistant_message_id) -> TurnResult
@@ -769,7 +778,7 @@ Modificações compartilhadas:
 | `src-tauri/src/policy/mod.rs` | Fatos ACP de terminal com programa/argv/env, sem alterar matching nativo |
 | `src-tauri/src/process_guard.rs` | Job Object/kill de árvore compartilhado |
 | `src-tauri/src/workspace/exec.rs` | API `spawn_interactive`; `run()` existente continua igual |
-| `src-tauri/src/Cargo.toml` / `Cargo.lock` | SDK ACP, `agent-client-protocol-rmcp = "=5.6.0"`, `futures`, `jsonschema` (draft-07), `tar`, `flate2`, `bzip2`; feature `stdio` do SDK para o helper MCP |
+| `src-tauri/src/Cargo.toml` / `Cargo.lock` | SDK ACP; `agent-client-protocol-rmcp = { version = "=5.6.0", features = ["rmcp_3"] }`; `rmcp = { version = "3.4", features = ["macros", "server", "schemars"] }`; `futures`, `jsonschema` (draft-07), `tar`, `flate2`, `bzip2`; feature `stdio` do SDK |
 | `package.json` | Script `acp:registry:sync` e teste do snapshot |
 | `.github/workflows/acp.yml` | Matrix Windows/macOS/Linux para codec, processo, archive, paths e shims |
 | `src/lib/types.ts` | espelhos dos contratos/eventos |
@@ -980,9 +989,10 @@ Autenticação:
 ### 8.4 Criação/resumo de sessão
 
 1. Resolver `cwd`: workspace explícito ou pasta interna isolada.
-2. Root set: `[cwd, ...additionalDirectories]` somente se capability anunciada;
+2. Root set: `[cwd, ...approved_roots]` somente se capability anunciada;
    load/resume reenviam a lista completa pretendida, nunca dependem de estado
-   armazenado.
+   armazenado. Roots relatadas pelo agente/import são propostas display-only e só
+   entram no set autorizado via challenge `AdditionalRoots`.
 3. System prompt em modo `append` somente se capability anunciada; conteúdo
    confiável e estável (idioma, Markdown, privacidade, instruções da persona e
    `Settings.systemPrompt`), nunca override. Sem capability, o contexto confiável
@@ -997,7 +1007,7 @@ Autenticação:
    - senão `session/load` se suportado, bufferizando/reconciliando replay;
    - senão criar uma sessão nova **sem injetar histórico automaticamente**.
 7. Se `agent_version` ou fingerprint mudou, não reutilizar sessão silenciosamente.
-8. Persistir `session_id`, versão, capabilities e estado.
+8. Persistir `session_id`, versão, capabilities, approved roots e estado.
 
 `session/close` e `session/delete` em sessão inexistente são tratados como
 sucesso idempotente; `-32002` não apaga a conversa Zylara.
@@ -1083,10 +1093,21 @@ quando `session/prompt` responde.
   para a sessão antiga como se fosse idempotente.
 - O contexto injetado é claramente delimitado, limitado pelo orçamento de prompt e
   não reivindica ser o histórico nativo do agente.
-- Excluir conversa chama `session/close` antes do cascade.
+- Excluir conversa chama `session/close` apenas se houver conexão/sessão ativa e
+  launch disponível/consentido; sem instalação, marca mapping stale e remove o
+  transcript local. Nunca spawna um agente só para excluir histórico.
 - Adicionar uma sessão ACP do Chat ao Code não muda seu `cwd` nem reduz o modo de
   permissão para Autônomo silenciosamente; mantém Review ou pede escolha explícita.
   Trocar workspace exige nova sessão ACP com consentimento.
+
+### 8.5.3 Admissão e reattach
+
+`acp_continue_turn`, `acp_regenerate` e `acp_restart_with_history` não são atalhos
+que burlam o turno: passam por `runtime::preflight_turn`,
+`register_turn_if_idle`, `PersistingEmitter` e `finish_turn` como qualquer turno.
+Chamadas duplicadas/enquanto ativo recebem `TURN_BUSY`; após reload, o renderer
+reattacha por `turn_events`/`zylara:acp-event` sem reenviar o prompt. Comandos sem
+`turnId` recebem um id backend e são canceláveis por `cancel_turn`.
 
 ### 8.6 Mapeamento de tools
 
@@ -1113,7 +1134,8 @@ Todo `ContentBlock` é persistido em `acp_content_blocks` e referenciado por
 | --- | --- |
 | `text` | Delta de texto/thought ou texto de tool; limite 1 MiB |
 | `image` | Artefato `Image` + thumbnail inline ≤ 256 KiB; original abre no painel |
-| `audio`/`video` | Artefato `Audio`/`Video`; player existente, sem inline |
+| `audio` | Artefato `Audio`; player existente, sem inline |
+| `resource` blob de vídeo | Artefato `Video`; ACP v1 não tem bloco `video` direto |
 | `resource` texto | Texto delimitado ou artefato textual se > 1 MiB |
 | `resource` blob | Artefato pelo MIME/tamanho; sem IPC inline |
 | `resource_link` | Metadado/URI persistido; nenhum fetch automático |
@@ -1565,6 +1587,9 @@ Checklist obrigatório:
 | Estado ACP folded | ≤ 1 MiB por sessão; excedente poda entidades antigas/spill |
 | `_meta`/erro | ≤ 16 KiB/8 KiB; allowlist + redaction, nunca persistir bruto |
 | Updates | 200 eventos/s por sessão; payload IPC ≤ 1 MiB, maior usa spill/referência |
+| Journal/session list | ≤ 100 itens e ≤ 1 MiB por página; cursors opacos |
+| Estado ACP resumido | ≤ 256 KiB; entidades paginadas separadamente |
+| Entidades/conteúdo duráveis | 100 mil itens/2 GiB por conversa; excedente falha visível, sem poda silenciosa |
 | Deltas de texto/thought | Coalescer até 50 ms/16 KiB sem perder conteúdo |
 | Anexos | 25 MiB cada / 100 MiB por turno; inline binário ≤ 8 MiB |
 | Texto/resource | 1 MiB por bloco; maior vira artefato/spill |
@@ -1576,6 +1601,11 @@ payloads grandes usam spill/referência. `_meta` desconhecido é descartado apó
 allowlist/limite, e erros são redigidos antes de persistir/emitir. Acima de 200
 updates/s, deltas são coalescidos sem perda; se a fila bounded estourar, a conexão
 falha fechado com `ACP_UPDATE_OVERFLOW`, nunca descarta silenciosamente.
+`acp_get_session_state` devolve apenas resumo; entidades/conteúdo são paginados.
+`acp_list_entities` devolve metadados, nunca payload completo; `acp_get_entity`
+entrega chunks bounded. `acp_list_session_events` inclui payload inline só até
+64 KiB; maiores usam referência de spill. Resposta `session/list` acima do limite
+é rejeitada com erro estável, nunca retornada inteira por IPC.
 
 ## 12. Estratégia de testes
 
@@ -1593,7 +1623,8 @@ falha fechado com `ACP_UPDATE_OVERFLOW`, nunca descarta silenciosamente.
 - DNS rebinding, IP privado/link-local/metadata e redirect host hopping.
 - Windows `.cmd` launcher com espaços, aspas, `&`, `|`, `%`, Unicode.
 - Consentimento persistido por digest/version/scope; challenge one-time correto,
-  velho/reaproveitado/divergente falha; IPC direto sem consentimento não spawna;
+  velho/reaproveitado/divergente ou com escopo ampliado falha; histórico/import/
+  roots usam o mesmo challenge; IPC direto sem consentimento não spawna;
   revogação/update invalida.
 - Cache offline, ETag, falha de rede e Registry inválido.
 - `acp_enabled=false` não faz refresh automático; manual explícito funciona.
@@ -1649,17 +1680,20 @@ O fixture nunca exige rede ou credencial.
 - Replay com/sem `messageId`, múltiplas mensagens e falha no meio do buffer.
 - Colisão de `call_001` entre pai/filho; load histórico vs resume current.
 - Root filha fora do workspace não amplia autoridade sem consentimento.
+- Import/load/resume persistem e reenviam approved roots; roots relatadas não
+  expandem o set automaticamente.
 - Mudança de versão/config invalida sessão.
 - Anexos texto/imagem/áudio/binary conforme capabilities e roots.
 - Custo cumulativo, moeda e delta sem double-count de filhos.
 - `updatedAt` RFC3339, contexto checked/saturating e filhos não somados.
 - Workspace ACP exige trust/consentimento; `fs/write_text_file` usa lock/CAS e
-  retorna `FS_STALE_VERSION` em escrita concorrente; escrita sem leitura retorna
-  `FS_NOT_OBSERVED`.
+  retorna `FS_STALE_VERSION` em escrita concorrente; arquivo existente sem leitura
+  pede aprovação com before-capture, e `FS_NOT_OBSERVED` só bloqueia quando não há
+  como capturar/aprovar.
 - Workspace changes, diff display-only e revert limits.
 - Órfão com PID reutilizado não é morto; boot id/start time conferem.
-- 9º pending request, frame 16 MiB, chunk 768 KiB + envelope ≤ 1 MiB, `_meta`/erro
-  redigidos e poda de journal/estado.
+- 9º pending request, frame 16 MiB, chunk 768 KiB + envelope ≤ 1 MiB, journal/
+  session list/entidades paginados, `_meta`/erro redigidos e poda de estado.
 - Shutdown em menos de 2 s com kill da árvore.
 
 ### 12.4 Testes de renderer
@@ -1669,6 +1703,8 @@ O fixture nunca exige rede ou credencial.
 - `RuntimeSelection` Rust↔TypeScript round-trip com tag `kind`.
 - Lock de agente no Chat e troca no Code; config ACP durante streaming.
 - Import exige cwd igual/capability; replay falho rollback; delete ativo fecha antes.
+- Continue/regenerate/restart ACP passam por admissão/reattach e chamadas duplicadas
+  recebem `TURN_BUSY`.
 - Regenerate/edit/truncate criam nova sessão só com consentimento de contexto.
 - `set_conversation_runtime` recusa turno ativo, invalida sessão/fila e preserva lock.
 - Logout com sessão ativa bloqueia/fecha; Chat→Code ACP não vira Autônomo.
@@ -1683,7 +1719,7 @@ O fixture nunca exige rede ou credencial.
 - Atividade/notificações/sidebar com pendências ACP.
 - Sessão ociosa com filho ativo oferece Cancelar/Fechar e limpa descendentes.
 - ACP desligado/removido durante sessão.
-- Conversa histórica sem instalação ainda abre/renomeia/exporta/exclui.
+- Conversa histórica sem instalação ainda abre/renomeia/exporta/exclui sem spawn.
 - Persona importada com ACP ausente fica indisponível e não executa.
 - Acessibilidade: foco, labels, teclado, `aria-live`.
 
@@ -1797,15 +1833,16 @@ Saída: paridade com as capacidades estáveis do ACP v1.
 
 | # | Tarefa | Dono | Depende de |
 | --- | --- | --- | --- |
-| T6.1 | Helper MCP stdio do próprio binário + IPC local one-time token | harness-dev + Lead | T3.2 |
+| T6.1 | Helper MCP stdio (`rmcp_3` + `rmcp` 3.4) do próprio binário + IPC local one-time token | harness-dev + Lead | T3.2 |
 | T6.2 | Expor web/fetch/artifacts/skills/validate_ui/memory/colaboração filtrados | harness-dev | T6.1 |
 | T6.3 | Opt-in, capabilities, auditoria e cleanup | Lead + harness-dev | T6.2 |
 | T6.4 | Testes com fake agent e MCP | harness-dev | T6.3 |
 | T6.5 | Runner ACP de tasks, budget e líder de canal | Lead + harness-dev | T6.2 |
 
-O helper usa a API MCP stdio estável do SDK + `agent-client-protocol-rmcp` e o
-entrypoint `acp::mcp_bridge::helper_main()` em `lib.rs::run`, antes do plugin
-single-instance. `session/new.mcpServers` aponta para `current_exe()` com o modo
+O helper usa a API MCP stdio estável do SDK + `agent-client-protocol-rmcp` com a
+feature obrigatória `rmcp_3` (o crate não tem default features) e `rmcp` 3.4 para
+macros/tools. O entrypoint é `acp::mcp_bridge::helper_main()` em `lib.rs::run`,
+antes do plugin single-instance. `session/new.mcpServers` aponta para `current_exe()` com o modo
 helper/token. Não usa `unstable_mcp_over_acp`. O token é de uso único, vinculado
 à conversa/sessão e ao boot, com expiração curta; o socket/named pipe tem ACL local
 e cada request revalida sessão/admission. Shell/FS não são expostos.

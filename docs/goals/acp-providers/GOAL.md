@@ -34,3 +34,7 @@ além dos provedores atuais, usando a documentação oficial e o **ACP Registry*
 ## Pesquisa e baseline
 
 `RESEARCH.md`
+
+## Revisão
+
+`REVIEW.md`
