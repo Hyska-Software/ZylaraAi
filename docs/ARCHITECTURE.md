@@ -231,12 +231,13 @@ capturas por turno (hash antes/depois) que dão o diff e o "reverter turno/arqui
 
 `scripts/build-catalog.mjs` gera `data/catalog.json` combinando:
 
-1. **Tabelas oficiais** de [OpenCode Go](https://opencode.ai/v2/docs/console/go) e [Zen](https://opencode.ai/v2/docs/console/models/) — ids, nomes e protocolo de wire por modelo;
-2. **models.dev** — `reasoning_options`, visão/anexos, limites de contexto, preço, família (Go/Zen/OpenAI/**Anthropic**);
-3. **Docs oficiais da Anthropic** ([platform.claude.com](https://platform.claude.com/docs/en/api/overview)) — modelo Claude do provedor direto (IDs dateless, limites, preços) e o header obrigatório `anthropic-version`, que entra no catálogo como header estático;
-4. **Sondagens reais** (`scripts/probe-models.mjs`) — quais protocolos o gateway aceita para cada modelo (há modelos multi-protocolo); artefato local opcional, ausente em CI;
-5. **Heurísticas por família** para modelos novos que ainda não estão no models.dev;
-6. **Atualização no build** — `scripts/sync-catalog.mjs` roda antes de `pnpm build`, `pnpm build:fast` (usado pelo `beforeBuildCommand` do Tauri) e `pnpm app:build`: baixa as fontes públicas (docs Go/Zen + models.dev), regrava `.research/` e regenera todos os provedores possíveis. Falhas de rede mantêm o catálogo commitado; `--strict` falha o build. Entradas de Go/Zen já presentes são preservadas (esses provedores não têm refresh da lista viva em runtime); OpenAI/Anthropic também mesclam `GET /v1/models` da conta em runtime.
+1. **Tabelas oficiais** de [OpenCode Go](https://opencode.ai/v2/docs/console/go) e [Zen](https://opencode.ai/v2/docs/console/models/) — ids e nomes (a tabela Go atual é de preços, sem coluna de endpoint);
+2. **Listas públicas `GET /v1/models`** de [Go](https://opencode.ai/inference/go/v1/models) e [Zen](https://opencode.ai/inference/v1/models) — disponibilidade autoritativa, protocolo de wire e metadados ao vivo, sem credencial; entradas não-chat (embeddings, imagem, vídeo, realtime, decision) ficam fora do seletor;
+3. **models.dev** — `reasoning_options`, visão/anexos, limites de contexto, preço, família (Go/Zen/OpenAI/**Anthropic**);
+4. **Docs oficiais da Anthropic** ([platform.claude.com](https://platform.claude.com/docs/en/api/overview)) — modelo Claude do provedor direto (IDs dateless, limites, preços) e o header obrigatório `anthropic-version`, que entra no catálogo como header estático;
+5. **Sondagens reais** (`scripts/probe-models.mjs`) — quais protocolos o gateway aceita para cada modelo (há modelos multi-protocolo); artefato local opcional, ausente em CI;
+6. **Heurísticas por família** para modelos novos que ainda não estão no models.dev;
+7. **Atualização no build** — `scripts/sync-catalog.mjs` roda antes de `pnpm build`, `pnpm build:fast` (usado pelo `beforeBuildCommand` do Tauri) e `pnpm app:build`: baixa as fontes públicas (docs Go/Zen, listas vivas dos gateways e models.dev), regrava `.research/` e regenera todos os provedores possíveis. Falhas de rede mantêm o catálogo commitado; `--strict` falha o build. Entradas de Go/Zen já presentes são preservadas; OpenAI/Anthropic também mesclam `GET /v1/models` da conta em runtime.
 
 Formato (resumo):
 

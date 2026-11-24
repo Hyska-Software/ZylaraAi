@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-23T22:41:55.585Z",
+ "generatedAt": "2026-11-24T16:32:07.637Z",
  "sources": {
   "docs": [
    "https://opencode.ai/v2/docs/console/go/",
@@ -17,6 +17,10 @@
    "https://ai.google.dev/api/generate-content"
   ],
   "models": "https://models.dev/api.json",
+  "live": {
+   "go": "https://opencode.ai/inference/go/v1/models",
+   "zen": "https://opencode.ai/inference/v1/models"
+  },
   "probe": "scripts/probe-models.mjs",
   "providers": {
    "deepseek": "https://api-docs.deepseek.com",
@@ -312,6 +316,43 @@
      "tags": [
       "free",
       "reasoning",
+      "vision"
+     ],
+     "status": "free"
+    },
+    {
+     "id": "hungerg-free",
+     "name": "HungerG Free",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1000000,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0
+     },
+     "releaseDate": "2026-11-24",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Stealth reasoning model, free for a limited time",
+     "tags": [
+      "free",
       "vision"
      ],
      "status": "free"
@@ -1391,6 +1432,47 @@
      "status": "stable"
     },
     {
+     "id": "longcat-2.5",
+     "name": "LongCat-2.5",
+     "family": "longcat",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1000000,
+     "maxOutput": 262144,
+     "cost": {
+      "input": 0.3,
+      "output": 1.2,
+      "cache_read": 0.006,
+      "cache_write": 0
+     },
+     "releaseDate": "2026-11-02",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Meituan's multimodal reasoning model for long-horizon coding and agent tasks, with visual understanding and a 1M-token context window",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "mimo-v2.5",
      "name": "MiMo-V2.5",
      "family": "mimo",
@@ -1572,7 +1654,7 @@
       "cache_read": 0.06
      },
      "releaseDate": "2026-06-01",
-     "knowledge": null,
+     "knowledge": "2025-01",
      "openWeights": true,
      "description": "MiniMax multimodal model for long-context coding, perception, and agent planning",
      "tags": [
@@ -6159,6 +6241,55 @@
      "knowledge": null,
      "openWeights": true,
      "description": "Multimodal Kimi model with 1M context and toggleable max-effort thinking for long-horizon agent work",
+     "tags": [
+      "open-weights",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "kimi-k3.1-pro",
+     "name": "Kimi K3.1 Pro",
+     "family": "kimi",
+     "protocols": [
+      "anthropic",
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 1048576,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.2,
+      "cache_write": 2
+     },
+     "releaseDate": "2026-10-23",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Multimodal Kimi model with a 1M-token context window and always-on reasoning, for coding, 3D creation and financial research",
      "tags": [
       "open-weights",
       "reasoning",
@@ -18175,56 +18306,8 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "DEEPINFRA_API_KEY",
-   "defaultModelId": "Qwen/Qwen4-Max",
+   "defaultModelId": "thinkingmachines/Inkling-2-Mini",
    "models": [
-    {
-     "id": "deepseek-ai/DeepSeek-V4-Flash-0731",
-     "name": "DeepSeek V4 Flash 0731",
-     "family": "deepseek",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      },
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 384000,
-     "cost": {
-      "input": 0.06,
-      "output": 0.18,
-      "cache_read": 0.015
-     },
-     "releaseDate": "2026-07-31",
-     "knowledge": "2025-05",
-     "openWeights": true,
-     "description": "Official DeepSeek V4 Flash release with enhanced agentic capabilities and integrated DSpark speculative decoding",
-     "tags": [
-      "open-weights",
-      "fast",
-      "reasoning"
-     ],
-     "status": "stable"
-    },
     {
      "id": "deepseek-ai/DeepSeek-V4-Flash-Vision-Exp",
      "name": "DeepSeek V4 Flash Vision Exp",
@@ -18418,6 +18501,55 @@
      "status": "stable"
     },
     {
+     "id": "thinkingmachines/Inkling-2-Mini",
+     "name": "Inkling 2 Mini",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 0.075,
+      "output": 0.3,
+      "cache_read": 0.015
+     },
+     "releaseDate": "2026-11-20",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Looped MoE reasoning model (26.4B total, 3.4B active) for agentic coding, vision, and knowledge work",
+     "tags": [
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "thinkingmachines/Inkling-2-Small",
      "name": "Inkling 2 Small",
      "family": "default",
@@ -18461,42 +18593,6 @@
      "description": "Multimodal MoE reasoning model (594B total, 17B active) for agentic coding, vision, and knowledge work",
      "tags": [
       "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "thinkingmachines/Inkling-Small",
-     "name": "Inkling Small",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "audio"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 524288,
-     "maxOutput": 524288,
-     "cost": {
-      "input": 0.45,
-      "output": 1.2,
-      "cache_read": 0.1
-     },
-     "releaseDate": "2026-07-30",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Multimodal MoE reasoning model (276B total, 12B active) for text, image, and audio",
-     "tags": [
       "vision"
      ],
      "status": "stable"
@@ -18633,6 +18729,51 @@
      "openWeights": false,
      "description": "A next-generation multimodal productivity model with significantly enhanced Agent and complex task execution capabilities.",
      "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "tencent/Hy4-flash",
+     "name": "Hy4 flash",
+     "family": "hy",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "high"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 0.07,
+      "output": 0.281,
+      "cache_read": 0.003
+     },
+     "releaseDate": "2026-11-16",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
+     "tags": [
+      "fast",
       "reasoning",
       "vision"
      ],
@@ -22795,10 +22936,10 @@
      "contextWindow": 1000000,
      "maxOutput": 393216,
      "cost": {
-      "input": 1.5,
-      "output": 4.5,
-      "cache_read": 0.07500000000000001,
-      "cache_write": 1.875
+      "input": 1.875,
+      "output": 5.625,
+      "cache_read": 0.09375,
+      "cache_write": 2.34375
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,

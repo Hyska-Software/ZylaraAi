@@ -5,11 +5,12 @@
  * Runs automatically before every app/renderer build (`pnpm build`,
  * `pnpm build:fast` used by `tauri build`, and `pnpm app:build`). It covers
  * every provider that can be refreshed without credentials:
- *  - OpenCode Go / Zen: official docs tables (ids, names, wire protocol)
+ *  - OpenCode Go / Zen: official docs tables and the public `/v1/models` lists
+ *    (ids, names, wire protocol, live capabilities and pricing)
  *  - OpenAI / Anthropic / Google: models.dev (capabilities, limits, pricing, families)
  *
- * Live account lists (`GET /v1/models`) stay a runtime concern: they need the
- * user's credential and are merged by the app after sign-in/key save.
+ * Account-specific model lists (OpenAI/Anthropic) stay a runtime concern: they
+ * need the user's credential and are merged by the app after sign-in/key save.
  *
  * Network or parse failures are non-fatal by default: the working `.research`
  * inputs and the committed catalog stay untouched, so builds work offline.
@@ -22,9 +23,12 @@ import process from 'node:process';
 
 import {
   assertDocsModels,
+  assertLiveModels,
   DOC_SOURCES,
+  LIVE_MODEL_SOURCES,
   MODELS_DEV_URL,
   parseDocsModels,
+  parseLiveModels,
 } from './catalog-sources.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -117,6 +121,20 @@ async function refreshInputs() {
       log(`${source.provider}: ${models.length} modelos`);
     } catch (error) {
       failures.push(`${source.label}: ${error.message}`);
+    }
+  }
+
+  for (const source of LIVE_MODEL_SOURCES) {
+    try {
+      const raw = await fetchText(source.url, 'application/json', 60_000);
+      const models = assertLiveModels(parseLiveModels(JSON.parse(raw)), source.provider);
+      writeIfChanged(
+        path.join(research, `${source.provider}-models-live.json`),
+        `${JSON.stringify(models.map((model) => model.raw), null, 1)}\n`,
+      );
+      log(`${source.provider} live: ${models.length} modelos`);
+    } catch (error) {
+      failures.push(`${source.provider} live: ${error.message}`);
     }
   }
 

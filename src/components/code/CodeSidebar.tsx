@@ -13,7 +13,6 @@ import {
   FolderPlus,
   GitBranch,
   MessageSquare,
-  MessageSquarePlus,
   Pencil,
   Pin,
   PinOff,

@@ -3,7 +3,8 @@
  * Builds the bundled model catalog used by both the Rust backend and the React UI.
  *
  * Data sources (regenerate with `pnpm catalog:sync`, which downloads them):
- *  - OpenCode Go / Zen official docs tables      -> model ids, display names, wire protocol
+ *  - OpenCode Go / Zen official docs tables      -> model ids and display names
+ *  - OpenCode Go / Zen public `/v1/models` lists -> authoritative availability, protocol and live metadata
  *  - models.dev catalog (providers opencode/...) -> capabilities, reasoning options, limits, cost
  *  - live protocol verification (probe scripts)  -> which wire protocols each model accepts
  *
@@ -12,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { LIVE_MODEL_SOURCES, parseLiveModels } from './catalog-sources.mjs';
 import {
   DEFAULT_MODEL_CAP,
   endpointsFor,
@@ -71,6 +73,17 @@ const byId = (list) => Object.fromEntries(list.map((m) => [m.id, m]));
 const docsGoById = byId(docsGo);
 const docsZenById = byId(docsZen);
 const verifiedById = Object.fromEntries(goProtocols.map((r) => [r.id, r]));
+// The public gateway lists are optional locally so offline builds keep working;
+// when present they are the authoritative source of model availability.
+const readOptionalJson = (p) => {
+  try {
+    return readJson(p);
+  } catch {
+    return null;
+  }
+};
+const liveGoById = byId(parseLiveModels(readOptionalJson('go-models-live.json')));
+const liveZenById = byId(parseLiveModels(readOptionalJson('zen-models-live.json')));
 
 /* ------------------------------------------------------------------ */
 /* Heuristics for models missing from models.dev                       */
@@ -233,12 +246,13 @@ const PROTOCOL_OVERRIDES = {
   'kimi-k3.1-pro': ['anthropic', 'openai-chat'],
 };
 
-function protocolsFor(id, docProtocol, verifiedProtocol) {
+function protocolsFor(id, docProtocol, verifiedProtocol, liveProtocols = []) {
   const set = new Set();
   const add = (p) => p && set.add(p);
   for (const p of PROTOCOL_OVERRIDES[id] ?? []) add(p);
   add(verifiedProtocol);
   add(docProtocol);
+  for (const p of liveProtocols) add(p);
   if (id.startsWith('claude')) add('anthropic');
   if (id.startsWith('gemini')) add('google');
   if (id.startsWith('gpt') || id.startsWith('grok') || id.startsWith('muse')) add('openai-responses');
@@ -251,11 +265,63 @@ function protocolsFor(id, docProtocol, verifiedProtocol) {
 /* Model assembly                                                      */
 /* ------------------------------------------------------------------ */
 
-function buildModel(id, { docsEntry, verified, md, providerKind }) {
+/** Normalizes MIME-style live modalities to the catalog's short labels. */
+function canonicalModality(value) {
+  if (typeof value !== 'string') return null;
+  if (value === 'text') return 'text';
+  if (value === 'application/pdf') return 'pdf';
+  if (value.startsWith('image/')) return 'image';
+  if (value.startsWith('video/')) return 'video';
+  if (value.startsWith('audio/')) return 'audio';
+  return value;
+}
+
+/**
+ * Converts a live `/v1/models` entry to the metadata shape used by buildModel.
+ * models.dev entries are merged on top, so live data only fills gaps (models
+ * released today often exist in the API before models.dev indexes them).
+ */
+function liveMetadata(entry) {
+  if (!entry) return {};
+  const raw = entry.raw;
+  const input = Array.isArray(raw.modalities?.input) ? raw.modalities.input : [];
+  const output = Array.isArray(raw.modalities?.output) ? raw.modalities.output : [];
+  const textCost = raw.cost?.text;
+  const cost =
+    typeof textCost?.input?.price === 'number' && typeof textCost.output?.price === 'number'
+      ? {
+          input: textCost.input.price,
+          output: textCost.output.price,
+          cache_read: textCost.input.cache?.read?.price,
+          cache_write: textCost.input.cache?.write?.price,
+        }
+      : null;
+  return {
+    name: raw.name,
+    description: raw.description,
+    family: raw.family,
+    reasoning: raw.capabilities?.reasoning?.supported,
+    modalities: {
+      input: [...new Set(input.map(canonicalModality).filter(Boolean))],
+      output: [...new Set(output.map(canonicalModality).filter(Boolean))],
+    },
+    attachment: input.some((value) => /^(image|video)\//.test(value) || value === 'application/pdf'),
+    limit: { context: raw.limit?.context, output: raw.limit?.output },
+    cost,
+    release_date: raw.release_date,
+    knowledge: raw.knowledge,
+    open_weights: raw.open_weights,
+  };
+}
+
+function buildModel(id, { docsEntry, verified, md, providerKind, liveProtocols = [], fallbackProtocols = [], previousName }) {
   const family = familyOf(id, md?.family);
   const defaults = FAMILY_DEFAULTS[family] ?? FAMILY_DEFAULTS.default;
 
-  const protocols = protocolsFor(id, docsEntry?.protocol, verified?.detected);
+  const protocols = protocolsFor(id, docsEntry?.protocol, verified?.detected, liveProtocols);
+  // A known-unavailable model may leave the docs table; keep its last known
+  // protocol so the catalog does not lose that metadata while it is retained.
+  if (!protocols.length && fallbackProtocols.length) protocols.push(...fallbackProtocols);
   const reasoningOptions = md?.reasoning_options ?? defaults.reasoningOptions;
   const attachment = md?.attachment ?? defaults.attachment;
   const modalities =
@@ -279,7 +345,7 @@ function buildModel(id, { docsEntry, verified, md, providerKind }) {
 
   return {
     id,
-    name: docsEntry?.name ?? md?.name ?? prettifyId(id),
+    name: docsEntry?.name ?? previousName ?? md?.name ?? prettifyId(id),
     family,
     protocols,
     reasoning: md?.reasoning ?? reasoningOptions.length > 0,
@@ -352,15 +418,24 @@ function cacheDefaults(kind) {
   return undefined;
 }
 
-function buildProvider({ id, name, shortName, description, baseUrl, defaultModelId, docsById, mdSource, kind, notes, keepModels = [] }) {
-  const ids = new Set(Object.keys(docsById));
+function buildProvider({ id, name, shortName, description, baseUrl, defaultModelId, docsById, mdSource, liveById = {}, kind, notes, keepModels = [] }) {
+  // Docs rows without an endpoint (the new pricing tables) are not proof of a
+  // chat route: only the live list or a protocol probe can establish one.
+  const ids = new Set(Object.keys(liveById));
+  for (const [modelId, entry] of Object.entries(docsById)) {
+    if (entry.protocol || liveById[modelId] || verifiedById[modelId]) ids.add(modelId);
+  }
   if (kind === 'go') for (const id of Object.keys(verifiedById)) ids.add(id);
+  const keepById = byId(keepModels);
   const models = [...ids].map((modelId) =>
     buildModel(modelId, {
       docsEntry: docsById[modelId],
       verified: verifiedById[modelId],
-      md: mdSource[modelId],
+      md: { ...liveMetadata(liveById[modelId]), ...mdSource[modelId] },
       providerKind: kind,
+      liveProtocols: liveById[modelId]?.protocols,
+      fallbackProtocols: keepById[modelId]?.protocols,
+      previousName: keepById[modelId]?.name,
     }),
   );
   // Keep entries that were already bundled but are absent from this build's
@@ -751,6 +826,7 @@ const catalog = {
       ...GEMINI_DOCS,
     ],
     models: 'https://models.dev/api.json',
+    live: Object.fromEntries(LIVE_MODEL_SOURCES.map((source) => [source.provider, source.url])),
     probe: 'scripts/probe-models.mjs',
     // Provenance of the API-key providers: their public API docs.
     providers: Object.fromEntries(EXTRA_PROVIDERS.map((spec) => [spec.id, spec.docsUrl])),
@@ -765,6 +841,7 @@ const catalog = {
       defaultModelId: 'deepseek-v4.1-flash',
       docsById: docsGoById,
       mdSource: { ...mdGo, ...mdOpencode },
+      liveById: liveGoById,
       kind: 'go',
       keepModels: previousGoModels,
       notes: [
@@ -781,6 +858,7 @@ const catalog = {
       defaultModelId: 'gpt-6-luna',
       docsById: docsZenById,
       mdSource: mdOpencode,
+      liveById: liveZenById,
       kind: 'zen',
       keepModels: previousZenModels,
       notes: ['Funciona com créditos do OpenCode Console.', 'Modelos gratuitos exigem o cliente OpenCode.'],

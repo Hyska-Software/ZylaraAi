@@ -21,6 +21,19 @@ export const DOC_SOURCES = [
 
 export const MODELS_DEV_URL = 'https://models.dev/api.json';
 
+export const LIVE_MODEL_SOURCES = [
+  {
+    provider: 'go',
+    url: 'https://opencode.ai/inference/go/v1/models',
+  },
+  {
+    provider: 'zen',
+    url: 'https://opencode.ai/inference/v1/models',
+  },
+];
+
+const MODEL_ID = /^[a-z0-9][a-z0-9.\-]*$/;
+
 const NAMED_ENTITIES = {
   amp: '&',
   apos: "'",
@@ -54,22 +67,22 @@ function plainText(html) {
   return decodeEntities(html.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
 }
 
-function tableRows(html) {
-  const rows = [];
-  const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  let row;
-  while ((row = rowPattern.exec(html))) {
-    const cells = [];
-    const cellPattern = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    let cell;
-    while ((cell = cellPattern.exec(row[1]))) {
-      const text = cell[1];
-      const withCode = text.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
-      cells.push(plainText(withCode));
+/** Splits the HTML into per-table row lists so headers can drive parsing. */
+function tableBlocks(html) {
+  const blocks = [];
+  for (const table of html.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)) {
+    const rows = [];
+    for (const row of table[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const cells = [];
+      for (const cell of row[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)) {
+        const withCode = cell[1].replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`');
+        cells.push(plainText(withCode));
+      }
+      if (cells.length) rows.push(cells);
     }
-    if (cells.length) rows.push(cells);
+    if (rows.length) blocks.push(rows);
   }
-  return rows;
+  return blocks;
 }
 
 export function protocolForEndpoint(endpoint) {
@@ -82,34 +95,91 @@ export function protocolForEndpoint(endpoint) {
 }
 
 /**
- * Extracts the `Model | Model ID | Endpoint | AI SDK Package` table.
+ * Extracts model rows from any current docs table: the original
+ * `Model | Model ID | Endpoint | AI SDK Package` layout and the newer
+ * `Model | Model ID | Input | Output | ...` pricing layout. The endpoint is
+ * optional because the live model lists carry the authoritative wire protocol.
  * Returns `{ id, name, endpoint, protocol }` in page order, deduplicated by id.
  */
 export function parseDocsModels(html) {
   const models = [];
   const seen = new Set();
-  for (const cells of tableRows(html)) {
-    if (cells.length < 4) continue;
-    const name = cells[0];
-    const id = cells[1].replaceAll('`', '').trim();
-    const endpoint = cells[2].replaceAll('`', '').trim();
-    if (!id || /^model id$/i.test(id)) continue;
-    if (!/^[a-z0-9][a-z0-9.\-]*$/.test(id)) continue;
-    const protocol = protocolForEndpoint(endpoint);
-    if (!protocol || seen.has(id)) continue;
-    seen.add(id);
-    models.push({ id, name, endpoint, protocol });
+  for (const rows of tableBlocks(html)) {
+    const header = rows[0] ?? [];
+    const idIndex = header.findIndex((cell) => /^model\s*id$/i.test(cell));
+    if (idIndex < 0) continue;
+    const nameIndex = header.findIndex((cell) => /^model(?!\s*id)/i.test(cell));
+    const endpointIndex = header.findIndex((cell) => /endpoint/i.test(cell));
+    for (const cells of rows.slice(1)) {
+      if (cells.length !== header.length) continue;
+      const id = (cells[idIndex] ?? '').replaceAll('`', '').trim();
+      if (!MODEL_ID.test(id) || seen.has(id)) continue;
+      const endpoint = endpointIndex >= 0 ? cells[endpointIndex].replaceAll('`', '').trim() : '';
+      const protocol = endpointIndex >= 0 ? protocolForEndpoint(endpoint) : null;
+      // A present but unknown endpoint is a broken row; an absent endpoint is
+      // valid in the pricing tables and is resolved from the live list.
+      if (endpointIndex >= 0 && !protocol) continue;
+      seen.add(id);
+      models.push({
+        id,
+        name: nameIndex >= 0 ? cells[nameIndex] : '',
+        endpoint: endpoint || null,
+        protocol,
+      });
+    }
   }
   return models;
 }
 
 /**
  * A docs page must look like a model table, not an error page or a redesign.
- * The smallest table in this project currently has more than ten rows.
+ * Go now publishes a short pricing table, so the floor is small; a genuine
+ * gateway table still has dozens of rows.
  */
 export function assertDocsModels(models, label) {
-  if (!Array.isArray(models) || models.length < 10) {
+  if (!Array.isArray(models) || models.length < 2) {
     throw new Error(`${label}: tabela de modelos inesperada (${models?.length ?? 0} linhas)`);
+  }
+  return models;
+}
+
+const LIVE_API_PROTOCOLS = [
+  ['chat-completions', 'openai-chat'],
+  ['responses', 'openai-responses'],
+  ['messages', 'anthropic'],
+  ['generate-content', 'google'],
+];
+
+/** Maps a live `/v1/models` API key to the wire protocol the app can speak. */
+export function protocolForLiveApi(apiName) {
+  return LIVE_API_PROTOCOLS.find(([key]) => key === apiName)?.[1] ?? null;
+}
+
+/**
+ * Reads a public OpenCode `GET /v1/models` response. Only chat models with at
+ * least one supported protocol are selectable: decision, embedding, image,
+ * video and realtime entries use APIs this app does not implement.
+ */
+export function parseLiveModels(payload) {
+  const rows = Array.isArray(payload) ? payload : payload?.data;
+  if (!Array.isArray(rows)) return [];
+  const models = [];
+  const seen = new Set();
+  for (const row of rows) {
+    if (!row || row.type !== 'chat') continue;
+    const id = String(row.id ?? '');
+    if (!MODEL_ID.test(id) || seen.has(id)) continue;
+    const protocols = LIVE_API_PROTOCOLS.filter(([key]) => row.api?.[key]).map(([, protocol]) => protocol);
+    if (!protocols.length) continue;
+    seen.add(id);
+    models.push({ id, name: String(row.name ?? ''), protocols, raw: row });
+  }
+  return models;
+}
+
+export function assertLiveModels(models, label) {
+  if (!Array.isArray(models) || models.length < 10) {
+    throw new Error(`${label}: lista de modelos inesperada (${models?.length ?? 0} linhas)`);
   }
   return models;
 }

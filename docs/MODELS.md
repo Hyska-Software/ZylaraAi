@@ -354,9 +354,10 @@ pnpm app:build    # instalador; sincroniza antes de typecheck/testes
 ```
 
 `scripts/sync-catalog.mjs` baixa as fontes públicas que não exigem credencial —
-as tabelas oficiais de Go/Zen e o catálogo do models.dev (OpenAI/Anthropic) —,
-regrava os inputs em `.research/` e chama `scripts/build-catalog.mjs`, que
-reconstrói **todos os provedores possíveis**. Sem rede, ou se o parse falhar, o
+as tabelas oficiais de Go/Zen, as listas vivas `GET /v1/models` dos dois
+gateways e o catálogo do models.dev (OpenAI/Anthropic) —, regrava os inputs em
+`.research/` e chama `scripts/build-catalog.mjs`, que reconstrói
+**todos os provedores possíveis**. Sem rede, ou se o parse falhar, o
 script mantém os inputs e o `data/catalog.json` existentes e o build continua;
 `--strict` transforma a falha em erro.
 
@@ -375,8 +376,9 @@ script não reescreve o arquivo quando só `generatedAt` mudaria, então builds
 repetidos não sujam a árvore.
 
 O catálogo é monotônico para os gateways: modelos de Go/Zen que já estavam no
-catálogo são preservados mesmo quando saem das tabelas oficiais, porque esses
-provedores não têm refresh da lista viva em runtime. Modelos novos entram pelo
-build; OpenAI e Anthropic seguem o models.dev no seed e continuam mesclando a
-lista da conta (`GET /v1/models`) em runtime, porque ela depende da credencial
-do usuário.
+catálogo são preservados mesmo quando saem das tabelas oficiais ou da lista
+viva, porque esses provedores não têm refresh da lista viva em runtime. Modelos
+novos entram pela lista pública `GET /v1/models` (apenas modelos de chat com um
+protocolo suportado) ou pela tabela oficial; OpenAI e Anthropic seguem o
+models.dev no seed e continuam mesclando a lista da conta (`GET /v1/models`) em
+runtime, porque ela depende da credencial do usuário.
