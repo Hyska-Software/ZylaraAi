@@ -31,6 +31,7 @@ import {
 import { api } from '@/lib/api';
 import {
   agentSelectionForLayout,
+  selectActiveMessages,
   selectAgent,
   useAgentStore,
   useAppStore,
@@ -85,6 +86,15 @@ type ComposerMenu =
   | { kind: 'mention'; query: string; start: number; end: number; active: number }
   | { kind: 'slash'; query: string; start: number; end: number; active: number };
 
+/** Snapshot taken before browsing sent messages so the unsent draft can return. */
+interface SentHistoryCursor {
+  conversationId: string;
+  /** Index into the chronological list of sent messages. */
+  index: number;
+  draft: string;
+  mentions: MentionedFile[];
+}
+
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
@@ -94,6 +104,8 @@ function describeError(error: unknown): string {
 export function Composer() {
   const { t, i18n } = useTranslation('composer');
   const [value, setValue] = useState('');
+  /** `null` means the textarea holds the user's own draft, not a sent message. */
+  const [sentHistory, setSentHistory] = useState<SentHistoryCursor | null>(null);
   const [attaching, setAttaching] = useState(false);
   const [mentioned, setMentioned] = useState<MentionedFile[]>([]);
   const [menu, setMenu] = useState<ComposerMenu | null>(null);
@@ -109,6 +121,18 @@ export function Composer() {
   const pendingAttachments = useChatStore((state) => state.pendingAttachments);
   const activeConversationId = useChatStore((state) => state.activeId);
   const conversations = useChatStore((state) => state.conversations);
+  const activeMessages = useChatStore(selectActiveMessages);
+  /** Chronological prompts the user can recall with the arrow keys. */
+  const sentMessages = useMemo(
+    () =>
+      activeMessages.filter(
+        (message) =>
+          message.role === 'user' &&
+          message.content.trim().length > 0 &&
+          message.origin !== 'goal_round',
+      ),
+    [activeMessages],
+  );
   const sendKey = useAppStore((state) => state.settings.sendKey);
   const webSearchEnabled = useAppStore((state) => state.settings.webSearchEnabled);
   const fileCreationEnabled = useAppStore((state) => state.settings.fileCreationEnabled);
@@ -355,6 +379,70 @@ export function Composer() {
     [resizeTextarea, t],
   );
 
+  /** Leaves history mode and puts the unsent draft back in the textarea. */
+  const exitSentHistory = useCallback(() => {
+    if (!sentHistory) return;
+    setValue(sentHistory.draft);
+    setMentioned(sentHistory.mentions);
+    setSentHistory(null);
+    focusTextareaAt(sentHistory.draft.length);
+  }, [focusTextareaAt, sentHistory]);
+
+  /** Recalls the next/previous sent message, snapshotting the draft on entry. */
+  const navigateSentHistory = useCallback(
+    (delta: 1 | -1) => {
+      if (sentMessages.length === 0) return;
+      if (!sentHistory) {
+        if (delta !== -1 || !activeConversationId) return;
+        const index = sentMessages.length - 1;
+        const content = sentMessages[index]?.content ?? '';
+        setSentHistory({
+          conversationId: activeConversationId,
+          index,
+          draft: value,
+          mentions: mentioned,
+        });
+        setValue(content);
+        setMentioned([]);
+        setMenu(null);
+        focusTextareaAt(content.length);
+        return;
+      }
+      const index = sentHistory.index + delta;
+      if (index < 0) {
+        focusTextareaAt(value.length);
+        return;
+      }
+      if (index >= sentMessages.length) {
+        exitSentHistory();
+        return;
+      }
+      const content = sentMessages[index]?.content ?? '';
+      setSentHistory({ ...sentHistory, index });
+      setValue(content);
+      setMentioned([]);
+      setMenu(null);
+      focusTextareaAt(content.length);
+    },
+    [
+      activeConversationId,
+      exitSentHistory,
+      focusTextareaAt,
+      mentioned,
+      sentHistory,
+      sentMessages,
+      value,
+    ],
+  );
+
+  /** A draft snapshot belongs to one conversation; never reuse it in another. */
+  const previousConversationRef = useRef(activeConversationId);
+  useEffect(() => {
+    if (previousConversationRef.current === activeConversationId) return;
+    previousConversationRef.current = activeConversationId;
+    if (sentHistory) exitSentHistory();
+  }, [activeConversationId, exitSentHistory, sentHistory]);
+
   /** Detecta `@arquivo` ou `/comando` na posição do cursor. */
   const analyzeTrigger = useCallback(
     (next: string, caret: number) => {
@@ -466,6 +554,7 @@ export function Composer() {
         case 'limpar': {
           setValue('');
           setMentioned([]);
+          setSentHistory(null);
           requestAnimationFrame(resizeTextarea);
           textareaRef.current?.focus();
           return;
@@ -619,6 +708,7 @@ export function Composer() {
       if (!accepted) return;
       setValue('');
       setMentioned([]);
+      setSentHistory(null);
       setMenu(null);
       setGoalIntent(false);
       requestAnimationFrame(resizeTextarea);
@@ -651,6 +741,34 @@ export function Composer() {
       if (event.key === 'Enter' || event.key === 'Tab') {
         event.preventDefault();
         selectActiveOption();
+        return;
+      }
+    }
+
+    /* Sent-message history: arrows navigate only when no `@`/`/` menu is open
+       and no modifier is held. Outside history mode, `Up` recalls only from the
+       first line of the draft so multiline caret movement keeps working. */
+    if (event.key === 'Escape' && sentHistory) {
+      event.preventDefault();
+      exitSentHistory();
+      return;
+    }
+    if (
+      (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey
+    ) {
+      const delta = event.key === 'ArrowUp' ? -1 : 1;
+      const start = event.currentTarget.selectionStart ?? 0;
+      const end = event.currentTarget.selectionEnd ?? 0;
+      // Only recall from the first line; lower lines keep native caret movement.
+      const onFirstLine = !event.currentTarget.value.slice(0, start).includes('\n');
+      const canRecall = delta === -1 && start === end && onFirstLine;
+      if (sentHistory || canRecall) {
+        event.preventDefault();
+        navigateSentHistory(delta);
         return;
       }
     }
@@ -778,6 +896,14 @@ export function Composer() {
         >
           <PopoverAnchor asChild>
             <div className="px-3 pb-1 pt-3">
+              {sentHistory && sentHistory.conversationId === activeConversationId ? (
+                <p aria-live="polite" className="mb-2 text-[11px] text-foreground-muted">
+                  {t('history.status', {
+                    index: sentMessages.length - sentHistory.index,
+                    total: sentMessages.length,
+                  })}
+                </p>
+              ) : null}
               {showComposerChips ? (
                 <div className="mb-2 flex flex-wrap items-center gap-1.5">
                   {goalIntent ? (

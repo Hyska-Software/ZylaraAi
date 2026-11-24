@@ -3,6 +3,9 @@
   "plan": {
     "title": "Plan"
   },
+  "history": {
+    "status": "Sent message {{index}} of {{total}} — Esc restores your draft"
+  },
   "placeholder": {
     "goal": "Describe the goal and the work to do…",
     "agent": "Chat with {{name}}…",

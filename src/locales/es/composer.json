@@ -3,6 +3,9 @@
   "plan": {
     "title": "Plan"
   },
+  "history": {
+    "status": "Mensaje enviado {{index}} de {{total}} — Esc restaura el borrador"
+  },
   "placeholder": {
     "goal": "Describe el objetivo y el trabajo por hacer…",
     "agent": "Conversa con {{name}}…",

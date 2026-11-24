@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import type {
   Agent,
   AttachmentInfo,
+  ChatMessage,
   ContextStats,
   Conversation,
   ProviderAuthStatus,
@@ -565,5 +566,181 @@ describe('Composer — colar arquivos com Ctrl+V', () => {
     });
 
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('Composer — navegação pelas mensagens enviadas', () => {
+  function sentMessage(
+    id: string,
+    content: string,
+    overrides: Partial<ChatMessage> = {},
+  ): ChatMessage {
+    return {
+      id,
+      conversationId: 'conv-chat',
+      role: 'user',
+      content,
+      status: 'complete',
+      toolCalls: [],
+      citations: [],
+      attachments: [],
+      createdAt: 1,
+      ...overrides,
+    };
+  }
+
+  function seedSentMessages(messages: ChatMessage[]): void {
+    seedActiveChat();
+    useChatStore.setState((state) => ({
+      messagesByConversation: {
+        ...state.messagesByConversation,
+        'conv-chat': messages.map((message) => ({ ...message, conversationId: 'conv-chat' })),
+      },
+    }));
+  }
+
+  const textarea = () =>
+    screen.getByRole('textbox', { name: 'Mensagem para o Zylara' }) as HTMLTextAreaElement;
+
+  const historyStatus = () => screen.queryByText(/Mensagem enviada \d+ de \d+/);
+
+  function seedTypicalHistory(): void {
+    seedSentMessages([
+      sentMessage('u1', 'Primeira pergunta'),
+      sentMessage('a1', 'Resposta', { role: 'assistant' }),
+      sentMessage('u2', 'Segunda pergunta'),
+    ]);
+  }
+
+  it('seta para cima carrega a mensagem enviada mais recente', () => {
+    seedTypicalHistory();
+    render(<Composer />);
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+
+    expect(textarea().value).toBe('Segunda pergunta');
+    expect(historyStatus()?.textContent).toContain('Mensagem enviada 1 de 2');
+  });
+
+  it('repete a seta para cima para a anterior e a seta para baixo volta', () => {
+    seedTypicalHistory();
+    render(<Composer />);
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+    expect(textarea().value).toBe('Primeira pergunta');
+    expect(historyStatus()?.textContent).toContain('Mensagem enviada 2 de 2');
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowDown' });
+    expect(textarea().value).toBe('Segunda pergunta');
+    expect(historyStatus()?.textContent).toContain('Mensagem enviada 1 de 2');
+  });
+
+  it('a seta para baixo após a mais recente restaura o rascunho digitado', () => {
+    seedTypicalHistory();
+    render(<Composer />);
+    typeMessage('Rascunho atual');
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+    expect(textarea().value).toBe('Segunda pergunta');
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowDown' });
+    expect(textarea().value).toBe('Rascunho atual');
+    expect(historyStatus()).toBeNull();
+  });
+
+  it('Escape restaura o rascunho e encerra a navegação', () => {
+    seedTypicalHistory();
+    render(<Composer />);
+    typeMessage('Rascunho atual');
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+    fireEvent.keyDown(textarea(), { key: 'Escape' });
+
+    expect(textarea().value).toBe('Rascunho atual');
+    expect(historyStatus()).toBeNull();
+  });
+
+  it('ignora respostas do assistente e rodadas automáticas de objetivo', () => {
+    seedSentMessages([
+      sentMessage('u1', 'Primeira pergunta'),
+      sentMessage('a1', 'Resposta', { role: 'assistant' }),
+      sentMessage('u2', 'Rodada automática', { origin: 'goal_round' }),
+      sentMessage('u3', 'Segunda pergunta'),
+    ]);
+    render(<Composer />);
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+
+    expect(textarea().value).toBe('Primeira pergunta');
+    expect(historyStatus()?.textContent).toContain('de 2');
+  });
+
+  it('não intercepta a seta para cima quando o cursor não está no início', () => {
+    seedTypicalHistory();
+    render(<Composer />);
+    typeMessage('linha 1\nlinha 2');
+    textarea().setSelectionRange(8, 8);
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+
+    expect(textarea().value).toBe('linha 1\nlinha 2');
+    expect(historyStatus()).toBeNull();
+  });
+
+  it('não intercepta as setas com modificadores nem a seta para baixo no rascunho', () => {
+    seedTypicalHistory();
+    render(<Composer />);
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp', shiftKey: true });
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp', metaKey: true });
+    fireEvent.keyDown(textarea(), { key: 'ArrowDown' });
+
+    expect(textarea().value).toBe('');
+    expect(historyStatus()).toBeNull();
+  });
+
+  it('mantém a navegação do menu de comandos com as setas', () => {
+    seedTypicalHistory();
+    render(<Composer />);
+    typeMessage('/');
+
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+    fireEvent.keyDown(textarea(), { key: 'ArrowDown' });
+
+    expect(textarea().value).toBe('/');
+    expect(historyStatus()).toBeNull();
+  });
+
+  it('trocar de conversa restaura o rascunho e encerra a navegação', () => {
+    seedTypicalHistory();
+    render(<Composer />);
+    typeMessage('Rascunho atual');
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+    expect(textarea().value).toBe('Segunda pergunta');
+
+    act(() => {
+      useChatStore.setState({
+        activeId: 'conv-other',
+        conversations: [chatConversation('conv-other')],
+      });
+    });
+
+    expect(textarea().value).toBe('Rascunho atual');
+    expect(historyStatus()).toBeNull();
+  });
+
+  it('limpa a navegação depois de enviar a mensagem recuperada', async () => {
+    seedTypicalHistory();
+    const send = vi.spyOn(useChatStore.getState(), 'send').mockResolvedValue(true);
+    render(<Composer />);
+    fireEvent.keyDown(textarea(), { key: 'ArrowUp' });
+
+    fireEvent.click(sendButton());
+    await waitFor(() => expect(send).toHaveBeenCalledWith('Segunda pergunta', undefined));
+
+    expect(textarea().value).toBe('');
+    expect(historyStatus()).toBeNull();
   });
 });

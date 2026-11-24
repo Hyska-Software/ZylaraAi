@@ -3,6 +3,9 @@
   "plan": {
     "title": "Plano"
   },
+  "history": {
+    "status": "Mensagem enviada {{index}} de {{total}} — Esc restaura o rascunho"
+  },
   "placeholder": {
     "goal": "Descreva o objetivo e o trabalho a fazer…",
     "agent": "Converse com {{name}}…",
