@@ -231,31 +231,20 @@ describe('CodeSidebar — chrome e ações', () => {
     expect(aside.className).not.toContain('border-r');
   });
 
-  it('oferece Novo agente, Abrir pasta, Adicionar sessão do Chat, Buscar, Plugins e Skills, na ordem', async () => {
+  it('oferece Novo agente, Plugins e Skills na ordem, sem as ações removidas', async () => {
     renderSidebar();
 
     const newAgent = screen.getByRole('button', { name: /Nova sess/i });
-    const openFolder = screen.getByRole('button', { name: 'Abrir pasta' });
-    const addSession = screen.getByRole('button', { name: 'Adicionar sessão do Chat' });
-    const search = screen.getByRole('button', { name: /Buscar/ });
     const plugins = screen.getByRole('button', { name: 'Plugins' });
     const skills = screen.getByRole('button', { name: 'Skills' });
 
     expect(
-      newAgent.compareDocumentPosition(openFolder) & Node.DOCUMENT_POSITION_FOLLOWING,
+      newAgent.compareDocumentPosition(plugins) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(
-      openFolder.compareDocumentPosition(addSession) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      addSession.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      search.compareDocumentPosition(plugins) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      plugins.compareDocumentPosition(skills) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(plugins.compareDocumentPosition(skills) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Abrir pasta' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Adicionar sessão do Chat' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Buscar$/ })).toBeNull();
     await waitFor(() => expect(mocks.listWorkspaces).toHaveBeenCalled());
   });
 
@@ -290,14 +279,6 @@ describe('CodeSidebar — chrome e ações', () => {
     await waitFor(() => expect(useUiStore.getState().activeWorkspaceId).toBe('ws-1'));
   });
 
-  it('Buscar abre a paleta de comandos', () => {
-    renderSidebar();
-
-    fireEvent.click(screen.getByRole('button', { name: /Buscar/ }));
-
-    expect(useUiStore.getState().commandPaletteOpen).toBe(true);
-  });
-
   it('Skills abre a página de Skills e marca o item como atual', () => {
     renderSidebar();
 
@@ -329,52 +310,9 @@ describe('CodeSidebar — chrome e ações', () => {
     expect(screen.queryByRole('button', { name: 'Skills' })).toBeNull();
     // O resto das ações continua disponível.
     expect(screen.getByRole('button', { name: /Nova sess/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Buscar/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Adicionar sessão do Chat' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy();
   });
 
-  it('Adicionar sessão do Chat abre o diálogo com as sessões do Chat disponíveis', () => {
-    useChatStore.setState({
-      conversations: [
-        conversation({ id: 'chat-1', title: 'Conversa do Chat', mode: 'chat' }),
-        conversation({ id: 'code-1', title: 'Sessão do Code' }),
-      ],
-    });
-    renderSidebar();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Adicionar sessão do Chat' }));
-
-    const dialog = screen.getByRole('dialog');
-    expect(dialog).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Adicionar sessão do Chat' })).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Adicionar Conversa do Chat ao Code' }),
-    ).toBeTruthy();
-    // O diálogo lista só o Chat; a sessão do Code continua só na sidebar.
-    expect(within(dialog).queryByText('Sessão do Code')).toBeNull();
-  });
-
-  it('ao adicionar, compartilha a sessão, abre no Code e fecha o drawer compacto', async () => {
-    window.matchMedia = matchMediaReturning(true);
-    const onClose = vi.fn();
-    useChatStore.setState({
-      conversations: [conversation({ id: 'chat-1', title: 'Conversa do Chat', mode: 'chat' })],
-    });
-
-    renderSidebar(onClose);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Adicionar sessão do Chat' }));
-    // Abrir o diálogo não fecha o drawer: o diálogo vive na sidebar.
-    expect(onClose).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Adicionar Conversa do Chat ao Code' }));
-
-    await waitFor(() =>
-      expect(mocks.setConversationCodeLinked).toHaveBeenCalledWith('chat-1', true),
-    );
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(useChatStore.getState().activeId).toBe('chat-1'));
-  });
 });
 
 describe('CodeSidebar — Workspaces reais', () => {

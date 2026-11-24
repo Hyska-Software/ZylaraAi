@@ -46,7 +46,6 @@ import {
   DropdownMenuTrigger,
   IconButton,
   Input,
-  Kbd,
   SortableList,
   Spinner,
   sortableDropClass,
@@ -71,9 +70,8 @@ import {
 } from '@/lib/store';
 import { filterConversationsForLayout } from '@/lib/conversations';
 import type { Conversation, Workspace } from '@/lib/types';
-import { cn, compareConversationPosition, copyText, modKey } from '@/lib/utils';
+import { cn, compareConversationPosition, copyText } from '@/lib/utils';
 import { useIsCompact } from '@/components/layout/hooks';
-import { AddChatSessionDialog } from './AddChatSessionDialog';
 import { terminalManager } from './terminalManager';
 import { openWorkspaceTerminal } from './terminalOpen';
 import { NO_WORKSPACE_KEY, useWorkspaces } from './useWorkspaces';
@@ -760,7 +758,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
   const activeId = useChatStore((state) => state.activeId);
   const codeView = useUiStore((state) => state.codeView);
   const setCodeView = useUiStore((state) => state.setCodeView);
-  const setCommandPaletteOpen = useUiStore((state) => state.setCommandPaletteOpen);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const activeWorkspaceId = useUiStore((state) => state.activeWorkspaceId);
   const setActiveWorkspace = useUiStore((state) => state.setActiveWorkspace);
@@ -792,7 +789,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     refreshContext,
   } = useWorkspaces();
 
-  const [addSessionOpen, setAddSessionOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [unassignedCollapsed, setUnassignedCollapsed] = useState(false);
   const [openingFolder, setOpeningFolder] = useState(false);
@@ -1092,14 +1088,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     }
   };
 
-  const handleAddSession = () => {
-    setAddSessionOpen(true);
-  };
-
-  const handleSearch = () => {
-    setCommandPaletteOpen(true);
-  };
-
   const handleOpenSettings = () => {
     setSettingsOpen(true);
     if (isCompact) onClose?.();
@@ -1129,29 +1117,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
       </div>
 
       <Slot name="code.sidebar.header" owner={{ layout: 'code' }} />
-      <SidebarAction
-        icon={<FolderPlus className="size-4" />}
-        label={t('code:sidebar.openFolder')}
-        disabled={openingFolder}
-        onSelect={() => void handleOpenFolder()}
-      />
-      <SidebarAction
-        icon={<MessageSquarePlus className="size-4" />}
-        label={t('code:sidebar.addChat')}
-        ariaLabel={t('code:sidebar.addChat')}
-        onSelect={handleAddSession}
-      />
-      <SidebarAction
-        icon={<Search className="size-4" />}
-        label={t('code:sidebar.searchAction')}
-        trailing={
-          <>
-            <Kbd>{modKey}</Kbd>
-            <Kbd>K</Kbd>
-          </>
-        }
-        onSelect={handleSearch}
-      />
       <Slot name="sidebar.nav.before" owner={{ layout: 'code' }} />
       {codeNav.map((entry) => {
         const Icon = pluginIcon(entry.icon);
@@ -1512,15 +1477,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
         </button>
         <Slot name="code.sidebar.footer" owner={{ layout: 'code' }} />
       </div>
-
-      <AddChatSessionDialog
-        open={addSessionOpen}
-        onOpenChange={setAddSessionOpen}
-        onAdded={() => {
-          // The compact drawer must reveal the session it just opened.
-          if (isCompact) onClose?.();
-        }}
-      />
 
       <RenameWorkspaceDialog
         workspace={renameTarget}
