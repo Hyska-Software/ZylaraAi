@@ -454,15 +454,15 @@ export function ModelPill({
     const fromOutside = closedByOutsideRef.current;
     closedByOutsideRef.current = false;
     setOpen(false);
-    resetTransientState();
+    // Keep the stage until the next open: PopoverContent stays mounted for its
+    // scale-out animation, and switching to `model` here flashes the model list.
+    hideDetails();
     if (!fromOutside) focusOpener();
   };
 
   const openModelStage = () => {
     if (locked) return;
-    hideDetails();
-    setQuery('');
-    setStage('model');
+    resetTransientState();
     setListProviderId(pid);
     setActiveKey(currentKey);
     openerRef.current = 'model';
@@ -520,6 +520,7 @@ export function ModelPill({
   const handleThinkingSegment = () => {
     if (disabled || !reasoningSupported) return;
     if (!open) {
+      resetTransientState();
       prepareThinking();
       setStage('thinking');
       openerRef.current = 'thinking';
@@ -601,8 +602,16 @@ export function ModelPill({
     }
   };
 
-  const handleThinkingPick = (option: ThinkingOption) => {
-    setReasoning(thinkingSelectionFor(option));
+  const handleThinkingPick = (option: ThinkingOption, keepOpen = false) => {
+    const reasoning = thinkingSelectionFor(option);
+    setReasoning(reasoning);
+    if (keepOpen) {
+      // The slider commits while the popover stays open; keep its local value
+      // in sync so the thumb and label reflect the committed level.
+      setThinkingValue(reasoning);
+      setActiveThinkingId(currentThinkingId(reasoning));
+      return;
+    }
     handleOpenChange(false);
   };
 
@@ -820,7 +829,7 @@ export function ModelPill({
             <ThinkingLevelSlider
               model={thinkingModel}
               value={thinkingValue}
-              onSelect={handleThinkingPick}
+              onSelect={(option) => handleThinkingPick(option, true)}
               onBack={locked ? undefined : backToModelStage}
               autoFocus={open}
               className="w-[18rem]"

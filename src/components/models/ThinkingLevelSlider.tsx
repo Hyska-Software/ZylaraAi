@@ -137,7 +137,13 @@ export function ThinkingLevelSlider({
   };
 
   return (
-    <div className={cn('flex flex-col gap-3 rounded-xl bg-background p-4', className)}>
+    <div
+      className={cn(
+        'flex flex-col gap-3 rounded-xl bg-background p-4',
+        'focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-background',
+        className,
+      )}
+    >
       <div className="flex items-start justify-between gap-2">
         {onBack ? (
           <button
@@ -171,12 +177,12 @@ export function ThinkingLevelSlider({
         </button>
       </div>
 
-      <div
-        className="relative h-12 rounded-full focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-background"
-        data-level-color={color}
-      >
+      <div className="relative h-12 rounded-full" data-level-color={color}>
         <div className="absolute inset-x-5 top-1/2 h-8 -translate-y-1/2 overflow-hidden rounded-full bg-surface-active">
-          <div className="h-full rounded-full" style={{ width: `${percent}%`, background: color }} />
+          <div
+            className="h-full rounded-full transition-[width,background-color] duration-150 ease-out motion-reduce:transition-none"
+            style={{ width: `${percent}%`, background: color }}
+          />
           {options.map((option, index) => {
             const dotFraction = last > 0 ? index / last : 0;
             return (
@@ -184,7 +190,7 @@ export function ThinkingLevelSlider({
                 key={option.id}
                 aria-hidden
                 className={cn(
-                  'pointer-events-none absolute top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full',
+                  'pointer-events-none absolute top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-150 motion-reduce:transition-none',
                   index <= activeIndex ? 'bg-foreground/70' : 'bg-foreground-subtle/60',
                 )}
                 style={{ left: dotLeft(dotFraction) }}
@@ -195,7 +201,7 @@ export function ThinkingLevelSlider({
 
         <span
           aria-hidden
-          className="pointer-events-none absolute top-1/2 z-10 size-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
+          className="pointer-events-none absolute top-1/2 z-10 size-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground transition-[left,box-shadow] duration-150 ease-out motion-reduce:transition-none"
           style={{ left: thumbLeft(fraction), boxShadow: `0 0 0 3px ${color}` }}
         />
 

@@ -75,6 +75,32 @@ describe('ThinkingLevelSlider', () => {
     expect(container.firstElementChild?.getAttribute('style')).toBeNull();
   });
 
+  it('puts the focus ring on the card and animates level changes', () => {
+    const { container } = render(
+      <ThinkingLevelSlider model={model} value={medium} onSelect={vi.fn()} />,
+    );
+
+    const card = container.firstElementChild as HTMLElement;
+    const track = container.querySelector('[data-level-color]') as HTMLElement;
+    expect(card.className).toContain('bg-background');
+    expect(card.className).toContain('focus-within:ring-2');
+    expect(card.className).toContain('focus-within:ring-accent/40');
+    expect(card.className).toContain('focus-within:ring-offset-background');
+    expect(track.className).not.toContain('focus-within:ring');
+
+    const fill = track.firstElementChild?.firstElementChild as HTMLElement;
+    expect(fill.className).toContain('transition-[width,background-color]');
+    expect(fill.className).toContain('motion-reduce:transition-none');
+
+    const thumb = container.querySelector('.z-10') as HTMLElement;
+    expect(thumb.className).toContain('transition-[left,box-shadow]');
+    expect(thumb.className).toContain('motion-reduce:transition-none');
+
+    const dots = track.querySelectorAll('span[aria-hidden]');
+    expect(dots.length).toBeGreaterThan(0);
+    expect(dots[0].className).toContain('transition-colors');
+  });
+
   it('resets to the model default', () => {
     const onSelect = vi.fn();
     render(

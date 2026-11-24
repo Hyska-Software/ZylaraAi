@@ -716,7 +716,7 @@ describe('ModelPill (thinking step)', () => {
     });
   });
 
-  it('keeps the popover open while dragging and commits on release', async () => {
+  it('keeps the popover open on a slider commit and updates the level', async () => {
     useAppStore.setState({
       settings: { ...useAppStore.getState().settings, reasoningSliderEnabled: true },
     });
@@ -737,11 +737,37 @@ describe('ModelPill (thinking step)', () => {
     });
 
     fireEvent.pointerUp(slider);
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // A commit must not close the picker or flip back to the model stage.
+    expect(screen.getByRole('dialog', { name: 'Selecionar modelo' })).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: 'Buscar modelos' })).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole('slider', { name: 'Nível de pensamento' }).getAttribute('aria-valuetext')).toBe('Máximo'),
+    );
     expect(useAppStore.getState().selection.reasoning).toEqual({
       mode: 'effort',
       effort: 'max',
     });
+  });
+
+  it('resets the transient stage when the picker is reopened', async () => {
+    const user = userEvent.setup();
+    renderPill();
+
+    await openThinkingStage(user);
+    expect(screen.getByRole('listbox', { name: 'Modo de pensamento' })).toBeTruthy();
+
+    // Closing from the thinking step must not leave the model stage behind.
+    await user.click(thinkingTrigger());
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    await openThinkingStage(user);
+    expect(screen.getByRole('listbox', { name: 'Modo de pensamento' })).toBeTruthy();
+    await user.click(thinkingTrigger());
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    const dialog = await openModelStage(user);
+    expect(within(dialog).getByRole('combobox', { name: 'Buscar modelos' })).toBeTruthy();
+    expect(screen.queryByRole('listbox', { name: 'Modo de pensamento' })).toBeNull();
   });
 });
 
