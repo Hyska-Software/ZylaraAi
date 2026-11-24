@@ -173,4 +173,22 @@ describe('ModelTab — started conversation', () => {
       expect(useAppStore.getState().selection.modelId).toBe('claude-haiku-5-5');
     });
   });
+
+  it('persists the sliding level selector toggle', async () => {
+    const user = userEvent.setup();
+    render(<ModelTab />);
+
+    const toggle = screen.getByRole('switch', {
+      name: 'Ativar seletor deslizante de nível de pensamento',
+    });
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+
+    await user.click(toggle);
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ reasoningSliderEnabled: true }),
+      );
+    });
+  });
 });

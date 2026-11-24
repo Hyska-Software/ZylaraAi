@@ -2251,6 +2251,27 @@ mod tests {
     }
 
     #[test]
+    fn reasoning_slider_setting_round_trips_and_defaults_to_off() {
+        let parsed: Settings = serde_json::from_str(r#"{"reasoningSliderEnabled":true}"#)
+            .expect("deserialize settings from renderer");
+        assert!(parsed.reasoning_slider_enabled);
+
+        let normalized = normalize_settings(parsed);
+        assert!(normalized.reasoning_slider_enabled);
+
+        let value = serde_json::to_value(&normalized).expect("serialize settings");
+        assert_eq!(value["reasoningSliderEnabled"], true);
+        assert!(value.get("reasoning_slider_enabled").is_none());
+
+        let reparsed: Settings = serde_json::from_value(value).expect("reread saved settings");
+        assert!(reparsed.reasoning_slider_enabled);
+
+        // Older settings files do not carry the key; it must stay opt-in.
+        let legacy: Settings = serde_json::from_str(r#"{}"#).expect("parse legacy settings");
+        assert!(!legacy.reasoning_slider_enabled);
+    }
+
+    #[test]
     fn normalizes_disabled_skills_list() {
         let settings = Settings {
             disabled_skills: vec![

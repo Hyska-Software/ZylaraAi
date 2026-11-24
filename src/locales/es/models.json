@@ -123,7 +123,10 @@
     "budgetSliderAria": "Presupuesto de razonamiento en tokens",
     "budgetSliderLabel": "Presupuesto de razonamiento",
     "budgetRange": "De {{min}} a {{max}} tokens reservados para el razonamiento.",
-    "tokens": "{{value}} tokens"
+    "tokens": "{{value}} tokens",
+    "sliderAria": "Nivel de razonamiento",
+    "resetAria": "Restablecer el nivel de razonamiento al valor predeterminado del modelo",
+    "sliderModel": "{{model}}"
   },
   "details": {
     "context": "Contexto",

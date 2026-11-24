@@ -488,6 +488,11 @@
     "context": "{{window}} context",
     "includedInPlan": "Included in the ChatGPT plan",
     "reasoningNote": "The reasoning default applies to the chosen model; models without support ignore this setting.",
+    "slider": {
+      "label": "Sliding level selector",
+      "description": "Shows reasoning strength as a slider with a different color per level. Applies to every thinking selector in the app.",
+      "aria": "Enable sliding thinking level selector"
+    },
     "missingModel": "The saved model ({{model}}) is not in the current catalog.",
     "tip": "Tip",
     "tipBody": "You can also switch models from the selector at the top of the window or from the composer, without changing the default for upcoming conversations."

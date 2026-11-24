@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { effortLabel, reasoningUi } from '@/lib/catalog';
 import { formatNumber } from '@/lib/i18n/format';
+import { thinkingOptions, thinkingSelectionFor } from '@/lib/modelMenu';
+import { useAppStore } from '@/lib/store';
 import type { ModelInfo, ReasoningSelection } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { SegmentedControl, Slider, type SegmentedOption } from '@/components/ui';
+import { ThinkingLevelSlider } from './ThinkingLevelSlider';
 
 export interface ThinkingSelectorProps {
   model?: ModelInfo | null;
@@ -36,6 +39,7 @@ export function ThinkingSelector({
   className,
 }: ThinkingSelectorProps) {
   const { t } = useTranslation('models');
+  const sliderEnabled = useAppStore((state) => state.settings.reasoningSliderEnabled ?? false);
   const ui = reasoningUi(model);
 
   if (!model || !ui.supported) {
@@ -60,6 +64,10 @@ export function ThinkingSelector({
   );
 
   const options: SegmentedOption[] = [];
+  // The opt-in slider consumes the same level list as the segmented control,
+  // so both surfaces offer identical reasoning modes.
+  const levelOptions = sliderEnabled ? thinkingOptions(model, value) : [];
+  const showLevelSlider = levelOptions.length > 1;
   if (!budgetOnly) {
     if (ui.canDisable) options.push({ value: 'off', label: t('thinking.offLabel') });
     for (const effort of efforts) {
@@ -112,7 +120,14 @@ export function ThinkingSelector({
         </div>
       ) : null}
 
-      {options.length > 1 ? (
+      {showLevelSlider ? (
+        <ThinkingLevelSlider
+          model={model}
+          value={value}
+          disabled={disabled}
+          onSelect={(option) => onChange(thinkingSelectionFor(option))}
+        />
+      ) : options.length > 1 ? (
         <SegmentedControl
           options={options}
           value={selected}

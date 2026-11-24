@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS: Settings = {
   defaultProvider: 'opencode-go',
   defaultModel: 'deepseek-v4.1-flash',
   reasoningDefault: 'max',
+  reasoningSliderEnabled: false,
   systemPrompt: '',
   webSearchEnabled: true,
   fileCreationEnabled: true,

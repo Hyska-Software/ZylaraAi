@@ -488,6 +488,11 @@
     "context": "{{window}} de contexto",
     "includedInPlan": "Incluido en el plan de ChatGPT",
     "reasoningNote": "El valor predeterminado de razonamiento se aplica al modelo elegido; los modelos sin compatibilidad ignoran esta configuración.",
+    "slider": {
+      "label": "Selector deslizante de nivel",
+      "description": "Muestra la intensidad del razonamiento como un deslizador con un color distinto por nivel. Se aplica a todos los selectores de razonamiento.",
+      "aria": "Activar selector deslizante de nivel de razonamiento"
+    },
     "missingModel": "El modelo guardado ({{model}}) no está en el catálogo actual.",
     "tip": "Consejo",
     "tipBody": "También puedes cambiar de modelo desde el selector de la parte superior de la ventana o desde el compositor, sin cambiar el valor predeterminado de las próximas conversaciones."

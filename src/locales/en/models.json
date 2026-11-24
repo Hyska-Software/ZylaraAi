@@ -123,7 +123,10 @@
     "budgetSliderAria": "Reasoning budget in tokens",
     "budgetSliderLabel": "Reasoning budget",
     "budgetRange": "From {{min}} to {{max}} tokens reserved for reasoning.",
-    "tokens": "{{value}} tokens"
+    "tokens": "{{value}} tokens",
+    "sliderAria": "Thinking level",
+    "resetAria": "Reset thinking level to the model default",
+    "sliderModel": "{{model}}"
   },
   "details": {
     "context": "Context",

@@ -488,6 +488,11 @@
     "context": "{{window}} contexto",
     "includedInPlan": "Incluído no plano ChatGPT",
     "reasoningNote": "O padrão de raciocínio é aplicado ao modelo escolhido; modelos sem suporte ignoram essa configuração.",
+    "slider": {
+      "label": "Seletor deslizante de nível",
+      "description": "Mostra a força do raciocínio como um deslizante com uma cor diferente por nível. Aplica-se a todos os seletores de pensamento.",
+      "aria": "Ativar seletor deslizante de nível de pensamento"
+    },
     "missingModel": "O modelo salvo ({{model}}) não está no catálogo atual.",
     "tip": "Dica",
     "tipBody": "Você também pode trocar de modelo pelo seletor no topo da janela ou pelo composer, sem alterar o padrão das próximas conversas."

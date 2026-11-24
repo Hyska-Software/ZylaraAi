@@ -1460,6 +1460,8 @@ pub struct Settings {
     /// Mantém o bloco de raciocínio/passos do assistente recolhido por padrão
     /// (não abre sozinho durante o streaming; o usuário pode expandir).
     pub thinking_collapsed_by_default: bool,
+    /// Opt-in: replaces the reasoning selector with a sliding level control.
+    pub reasoning_slider_enabled: bool,
     pub font_scale: f32,
     /// Custom font stack for the integrated terminal (CSS font-family list).
     /// Empty means the bundled JetBrains Mono stack.
@@ -1648,6 +1650,7 @@ impl Default for Settings {
             show_token_usage: true,
             reduce_motion: false,
             thinking_collapsed_by_default: false,
+            reasoning_slider_enabled: false,
             font_scale: 1.0,
             terminal_font_family: String::new(),
             terminal_font_size: default_terminal_font_size(),

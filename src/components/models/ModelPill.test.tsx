@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { toast } from 'sonner';
@@ -207,6 +207,7 @@ beforeEach(() => {
       ...useAppStore.getState().settings,
       defaultProvider: GO,
       defaultModel: CURRENT_MODEL,
+      reasoningSliderEnabled: false,
     },
   });
   useUiStore.setState({ modelPickerOpen: false, settingsOpen: false, layoutMode: 'chat' });
@@ -708,6 +709,26 @@ describe('ModelPill (thinking step)', () => {
     );
 
     await user.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(useAppStore.getState().selection.reasoning).toEqual({
+      mode: 'effort',
+      effort: 'max',
+    });
+  });
+
+  it('uses the sliding level selector in the thinking step when enabled', async () => {
+    useAppStore.setState({
+      settings: { ...useAppStore.getState().settings, reasoningSliderEnabled: true },
+    });
+    const user = userEvent.setup();
+    renderPill();
+
+    await openThinkingStage(user);
+
+    expect(screen.queryByRole('listbox', { name: 'Modo de pensamento' })).toBeNull();
+    const slider = screen.getByRole('slider', { name: 'Nível de pensamento' });
+    fireEvent.change(slider, { target: { value: '3' } });
+
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(useAppStore.getState().selection.reasoning).toEqual({
       mode: 'effort',

@@ -25,6 +25,7 @@ import {
   selectionKey,
   selectorProviders,
   thinkingHeadline,
+  thinkingOptions,
   thinkingSelectionFor,
   type ModelListEntry,
   type ThinkingOption,
@@ -53,6 +54,7 @@ import { ModelList } from './ModelList';
 import { ModelSearchField } from './ModelSearchField';
 import { modelOptionId } from './ModelRow';
 import { ThinkingOptions } from './ThinkingOptions';
+import { ThinkingLevelSlider } from './ThinkingLevelSlider';
 
 export interface ModelPillProps {
   /** Overrides the store selection (useful for previews/secondary surfaces). */
@@ -218,6 +220,7 @@ export function ModelPill({
   const keys = useAppStore((state) => state.keys);
   const auth = useAppStore((state) => state.auth);
   const storeProviders = useAppStore((state) => state.providers);
+  const sliderEnabled = useAppStore((state) => state.settings.reasoningSliderEnabled ?? false);
   const toggleFavorite = useAppStore((state) => state.toggleFavorite);
   const setReasoning = useChatStore((state) => state.setReasoning);
   // Chat locks the model once the conversation starts; a Code session keeps it
@@ -360,6 +363,8 @@ export function ModelPill({
   // The thinking menu is a compact surface: it sizes to its content instead of
   // inheriting the wide two-pane layout of the model step.
   const showingThinking = stage === 'thinking' && Boolean(thinkingModel);
+  const thinkingLevels =
+    sliderEnabled && thinkingModel ? thinkingOptions(thinkingModel, thinkingValue) : [];
 
   const panelReasoning = activeEntry
     ? reasoningForModel(activeEntry.model, effectiveReasoning)
@@ -811,23 +816,34 @@ export function ModelPill({
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
         {showingThinking && thinkingModel ? (
-          <div className="flex max-h-[min(24rem,calc(100dvh-6rem))] w-full flex-col">
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 pb-1">
-              <ThinkingOptions
-                model={thinkingModel}
-                value={thinkingValue}
-                activeId={activeThinkingId}
-                onActiveChange={setActiveThinkingId}
-                onSelect={handleThinkingPick}
-                listId={thinkingListId}
-                onBack={locked ? undefined : backToModelStage}
-                autoFocus={open}
-              />
+          thinkingLevels.length > 1 ? (
+            <ThinkingLevelSlider
+              model={thinkingModel}
+              value={thinkingValue}
+              onSelect={handleThinkingPick}
+              onBack={locked ? undefined : backToModelStage}
+              autoFocus={open}
+              className="w-[17rem]"
+            />
+          ) : (
+            <div className="flex max-h-[min(24rem,calc(100dvh-6rem))] w-full flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 pb-1">
+                <ThinkingOptions
+                  model={thinkingModel}
+                  value={thinkingValue}
+                  activeId={activeThinkingId}
+                  onActiveChange={setActiveThinkingId}
+                  onSelect={handleThinkingPick}
+                  listId={thinkingListId}
+                  onBack={locked ? undefined : backToModelStage}
+                  autoFocus={open}
+                />
+              </div>
+              <div className="flex shrink-0 items-center justify-end border-t border-border px-2 py-1">
+                <KeyboardHint commitLabel={t('picker.thinkingStep')} dense />
+              </div>
             </div>
-            <div className="flex shrink-0 items-center justify-end border-t border-border px-2 py-1">
-              <KeyboardHint commitLabel={t('picker.thinkingStep')} dense />
-            </div>
-          </div>
+          )
         ) : (
           <div className="flex flex-col">
             <div className="flex shrink-0 flex-col gap-2 border-b border-border p-2.5">

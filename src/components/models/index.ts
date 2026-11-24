@@ -11,3 +11,6 @@ export type { ModelPillProps } from './ModelPill';
 
 export { ThinkingSelector } from './ThinkingSelector';
 export type { ThinkingSelectorProps } from './ThinkingSelector';
+
+export { ThinkingLevelSlider, reasoningLevelColor } from './ThinkingLevelSlider';
+export type { ThinkingLevelSliderProps } from './ThinkingLevelSlider';

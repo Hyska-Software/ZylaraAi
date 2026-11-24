@@ -2272,6 +2272,8 @@ export interface Settings {
   defaultProvider: string;
   defaultModel: string;
   reasoningDefault: 'auto' | 'off' | 'low' | 'medium' | 'high' | 'max';
+  /** Opt-in: replaces the reasoning selector with a sliding level control. */
+  reasoningSliderEnabled?: boolean;
   systemPrompt: string;
   webSearchEnabled: boolean;
   fileCreationEnabled: boolean;

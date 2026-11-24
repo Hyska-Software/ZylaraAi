@@ -10,7 +10,7 @@ import {
 } from '@/lib/catalog';
 import type { ProviderInfo, ReasoningSelection, Settings } from '@/lib/types';
 import { selectActiveConversationStarted, useAppStore, useChatStore } from '@/lib/store';
-import { Badge, NativeSelect } from '@/components/ui';
+import { Badge, NativeSelect, Switch } from '@/components/ui';
 import { CapabilityBadges } from '@/components/models';
 import { ThinkingSelector } from '@/components/models/ThinkingSelector';
 import { SettingRow, SettingsBlock, SettingsSection } from './shared';
@@ -166,6 +166,19 @@ export function ModelTab() {
               </option>
             ))}
           </NativeSelect>
+        </SettingRow>
+
+        <SettingRow
+          label={t('model.slider.label')}
+          description={t('model.slider.description')}
+        >
+          <Switch
+            checked={settings.reasoningSliderEnabled ?? false}
+            onCheckedChange={(checked) =>
+              void saveSettings({ reasoningSliderEnabled: checked })
+            }
+            aria-label={t('model.slider.aria')}
+          />
         </SettingRow>
 
         {model ? (

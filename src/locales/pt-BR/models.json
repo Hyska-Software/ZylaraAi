@@ -123,7 +123,10 @@
     "budgetSliderAria": "Orçamento de raciocínio em tokens",
     "budgetSliderLabel": "Orçamento de raciocínio",
     "budgetRange": "De {{min}} a {{max}} tokens reservados para o raciocínio.",
-    "tokens": "{{value}} tokens"
+    "tokens": "{{value}} tokens",
+    "sliderAria": "Nível de pensamento",
+    "resetAria": "Redefinir o nível de pensamento para o padrão do modelo",
+    "sliderModel": "{{model}}"
   },
   "details": {
     "context": "Contexto",
