@@ -2268,6 +2268,8 @@ export interface Settings {
   theme: ThemeMode;
   /** Installed theme id; independent of the light/dark/system mode. */
   themeId: string;
+  /** False disables every corner radius app-wide, regardless of theme tokens. */
+  borderRadiusEnabled: boolean;
   locale: AppLocale;
   defaultProvider: string;
   defaultModel: string;

@@ -1447,6 +1447,8 @@ pub struct Settings {
     pub theme: String,
     /// Installed/built-in theme id; independent of the light/dark/system mode.
     pub theme_id: String,
+    /// When false, every corner is square regardless of the active theme radii.
+    pub border_radius_enabled: bool,
     pub locale: String,
     pub default_provider: String,
     pub default_model: String,
@@ -1639,6 +1641,7 @@ impl Default for Settings {
         Self {
             theme: "system".into(),
             theme_id: crate::themes::BUILTIN_THEME_ID.into(),
+            border_radius_enabled: true,
             locale: "en".into(),
             default_provider: "opencode-go".into(),
             default_model: "deepseek-v4.1-flash".into(),
@@ -3032,6 +3035,19 @@ mod tests {
         let json = serde_json::to_string(&options).expect("serialize TurnOptions");
         assert!(!json.contains("wireSessionId"), "{json}");
         assert!(!json.contains("wire_session_id"), "{json}");
+    }
+
+    #[test]
+    fn settings_border_radius_enabled_defaults_to_true_and_uses_camel_case() {
+        let settings: Settings = serde_json::from_str("{}").expect("Settings com defaults");
+        assert!(settings.border_radius_enabled);
+
+        let disabled: Settings =
+            serde_json::from_str(r#"{"borderRadiusEnabled":false}"#).expect("disable radius");
+        assert!(!disabled.border_radius_enabled);
+
+        let json = serde_json::to_value(&disabled).expect("serialize settings");
+        assert_eq!(json["borderRadiusEnabled"], false);
     }
 
     /// Auth-status DTOs are renderer-facing: they may carry account labels and

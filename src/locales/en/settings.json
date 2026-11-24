@@ -96,6 +96,12 @@
       "label": "Mode",
       "aria": "Theme mode"
     },
+    "radius": {
+      "title": "Corner radius",
+      "description": "Turn off to make every corner square, regardless of the active theme.",
+      "label": "Rounded corners",
+      "aria": "Toggle rounded corners"
+    },
     "library": {
       "title": "Installed themes",
       "description": "Themes carry their own palette, radii, fonts and wallpaper. Install a .zip package with a theme.json manifest."

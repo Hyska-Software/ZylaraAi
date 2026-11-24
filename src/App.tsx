@@ -28,6 +28,7 @@ import { TooltipProvider } from '@/components/ui';
 import { useAgentStore, useAppStore, useChatStore, useThemeStore, useUiStore } from '@/lib/store';
 import { t } from '@/lib/i18n';
 import { api } from '@/lib/api';
+import { applyBorderRadius } from '@/lib/theme/apply';
 import { SIDE_PANEL_DOCK_MIN_VIEWPORT, useViewportWidth } from '@/lib/sidePanel';
 import { resolveHotkey, type HotkeyCommand } from '@/lib/hotkeys';
 import { ComputerControlBanner } from '@/components/computer/ComputerControlBanner';
@@ -213,6 +214,7 @@ export default function App() {
   const settingsTheme = useAppStore((state) => state.settings.theme);
   const fontScale = useAppStore((state) => state.settings.fontScale);
   const reduceMotion = useAppStore((state) => state.settings.reduceMotion);
+  const borderRadiusEnabled = useAppStore((state) => state.settings.borderRadiusEnabled);
   const bootstrapped = useRef(false);
 
   useEffect(() => {
@@ -468,6 +470,10 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('reduce-motion', reduceMotion);
   }, [reduceMotion]);
+
+  useEffect(() => {
+    applyBorderRadius(borderRadiusEnabled);
+  }, [borderRadiusEnabled]);
 
   useEffect(() => {
     if (!error) return;

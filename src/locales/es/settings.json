@@ -96,6 +96,12 @@
       "label": "Modo",
       "aria": "Modo del tema"
     },
+    "radius": {
+      "title": "Radio de los bordes",
+      "description": "Desactívalo para que todos los bordes sean rectos, independientemente del tema activo.",
+      "label": "Bordes redondeados",
+      "aria": "Alternar bordes redondeados"
+    },
     "library": {
       "title": "Temas instalados",
       "description": "Cada tema aporta su propia paleta, radios, fuentes y fondo de pantalla. Instala un paquete .zip con un manifiesto theme.json."

@@ -55,6 +55,16 @@ export function applyThemeMode(dark: boolean): void {
   root.style.colorScheme = dark ? 'dark' : 'light';
 }
 
+/**
+ * Flattens every corner through the `flat-borders` class in globals.css. The
+ * CSS rule also overrides inline theme radii, so no theme re-apply is needed.
+ */
+export function applyBorderRadius(enabled: boolean): void {
+  const root = documentRoot();
+  if (!root) return;
+  root.classList.toggle('flat-borders', !enabled);
+}
+
 /** Reads a computed CSS token from `<html>` with a defensive fallback. */
 export function readCssToken(name: string, fallback: string): string {
   if (typeof window === 'undefined' || typeof document === 'undefined') return fallback;

@@ -178,6 +178,19 @@ describe('ThemesTab', () => {
     );
   });
 
+  it('disables border radius and persists the preference', async () => {
+    const user = userEvent.setup();
+    render(<ThemesTab />);
+
+    const control = screen.getByRole('switch', { name: 'Alternar bordas arredondadas' });
+    expect(control.getAttribute('aria-checked')).toBe('true');
+    await user.click(control);
+
+    expect(mocks.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ borderRadiusEnabled: false }),
+    );
+  });
+
   it('installs a package through the file dialog', async () => {
     const user = userEvent.setup();
     mocks.open.mockResolvedValue('C:/tmp/ocean.zip');

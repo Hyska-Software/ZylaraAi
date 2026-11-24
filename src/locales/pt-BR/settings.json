@@ -96,6 +96,12 @@
       "label": "Modo",
       "aria": "Modo do tema"
     },
+    "radius": {
+      "title": "Raio das bordas",
+      "description": "Desative para deixar todas as bordas retas, independentemente do tema ativo.",
+      "label": "Bordas arredondadas",
+      "aria": "Alternar bordas arredondadas"
+    },
     "library": {
       "title": "Temas instalados",
       "description": "Cada tema traz paleta, raios, fontes e papel de parede próprios. Instale um pacote .zip com um manifesto theme.json."

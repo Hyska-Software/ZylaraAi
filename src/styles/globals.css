@@ -45,13 +45,13 @@
   --shadow-color: 220 20% 20%;
   /* Radius scale consumed by the Tailwind utilities (`--theme-radius-*` is
      overridable by an installed theme without rebuilding the CSS). */
-  --theme-radius-xs: 0.375rem;
-  --theme-radius-sm: 0.5rem;
-  --theme-radius-md: 0.75rem;
-  --theme-radius-lg: 1rem;
-  --theme-radius-xl: 1.25rem;
-  --theme-radius-2xl: 1.5rem;
-  --theme-radius-3xl: 2rem;
+  --theme-radius-xs: 2px;
+  --theme-radius-sm: 2px;
+  --theme-radius-md: 4px;
+  --theme-radius-lg: 6px;
+  --theme-radius-xl: 8px;
+  --theme-radius-2xl: 10px;
+  --theme-radius-3xl: 12px;
   /* Terminal ANSI palette (light): readable on the app background. */
   --terminal-selection: #6b4eff33;
   --terminal-ansi-black: #383a42;
@@ -1200,4 +1200,23 @@ html.reduce-motion *::after {
 .zylara-toaster [data-sonner-toast][data-styled='true'] [data-button] {
   border-radius: var(--theme-radius-sm);
   font-weight: 500;
+}
+
+/* Flat-corners mode from Settings → Themes: overrides token radii (even inline
+   ones), Tailwind's `rounded-full` and hard-coded radii, pseudo-elements too. */
+html.flat-borders,
+html.flat-borders *,
+html.flat-borders *::before,
+html.flat-borders *::after {
+  border-radius: 0 !important;
+}
+
+html.flat-borders {
+  --theme-radius-xs: 0 !important;
+  --theme-radius-sm: 0 !important;
+  --theme-radius-md: 0 !important;
+  --theme-radius-lg: 0 !important;
+  --theme-radius-xl: 0 !important;
+  --theme-radius-2xl: 0 !important;
+  --theme-radius-3xl: 0 !important;
 }

@@ -120,6 +120,7 @@ Opcionais:
 
 - Cores: `accent-ring`, `context-system`, `context-tools`, `context-messages`, `assistant-bubble`, `terminal-ansi-{black,red,green,yellow,blue,magenta,cyan,white}` e `terminal-ansi-bright-{black,red,green,yellow,blue,magenta,cyan,white}`.
 - Raios (comprimentos `px`, `rem` ou `em`): `radius-xs`, `radius-sm`, `radius-md`, `radius-lg`, `radius-xl`, `radius-2xl`, `radius-3xl`. O app os consome via `--theme-radius-*`, o que permite trocar o arredondamento sem rebuildar o CSS.
+- O interruptor **Configurações → Temas → Bordas arredondadas** desliga todos os raios da interface, inclusive os definidos pelo tema; ao religá-lo, os raios do tema voltam sem reiniciar o app. A preferência fica em `settings.json` como `borderRadiusEnabled`.
 
 Formatos de cor aceitos: `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `transparent` e funções `rgb()`, `rgba()`, `hsl()`, `hsla()`, `oklch()`, `oklab()`, `lab()`, `lch()`, `color(...)`.
 

@@ -1167,6 +1167,40 @@ mod tests {
     }
 
     #[test]
+    fn bundled_themes_share_the_radius_scale() {
+        // The bundled themes must use the same scale as the built-in Zylara
+        // defaults in `src/styles/globals.css`.
+        let expected = [
+            ("radius-xs", "2px"),
+            ("radius-sm", "2px"),
+            ("radius-md", "4px"),
+            ("radius-lg", "6px"),
+            ("radius-xl", "8px"),
+            ("radius-2xl", "10px"),
+            ("radius-3xl", "12px"),
+        ];
+        let dir = temp_dir();
+        let listed = list_themes(dir.path());
+        assert!(listed.iter().any(|theme| theme.id == BUILTIN_THEME_ID));
+        for theme in listed.iter().filter(|theme| theme.id != BUILTIN_THEME_ID) {
+            for variant in [&theme.light, &theme.dark] {
+                for &(token, value) in &expected {
+                    assert_eq!(
+                        variant.tokens.get(token).map(String::as_str),
+                        Some(value),
+                        "{} {} differs from the shared scale",
+                        theme.id,
+                        token
+                    );
+                }
+            }
+        }
+        let builtin = builtin_theme();
+        assert!(builtin.light.tokens.is_empty());
+        assert!(builtin.dark.tokens.is_empty());
+    }
+
+    #[test]
     fn install_rejects_every_reserved_builtin_id() {
         let dir = temp_dir();
         for id in [BUILTIN_THEME_ID, "aurora", "ember", "grove", "nebula", "nocturne"] {

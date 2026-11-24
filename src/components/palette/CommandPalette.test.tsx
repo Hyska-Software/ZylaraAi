@@ -40,6 +40,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
   return {
     theme: 'light',
     themeId: 'zylara',
+    borderRadiusEnabled: true,
     locale: 'pt-BR',
     defaultProvider: 'opencode-go',
     defaultModel: 'deepseek-v4.1-flash',

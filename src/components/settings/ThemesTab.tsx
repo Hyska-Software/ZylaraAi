@@ -5,7 +5,7 @@ import { FolderOpen, Plus, Puzzle, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { BrandMark } from '@/components/chat/BrandMark';
-import { Button, IconButton, SegmentedControl, Spinner } from '@/components/ui';
+import { Button, IconButton, SegmentedControl, Spinner, Switch } from '@/components/ui';
 import { BUILTIN_THEME_ID, useAppStore, useThemeStore, useUiStore } from '@/lib/store';
 import type { ThemeInfo, ThemeMode } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -32,6 +32,7 @@ export function ThemesTab() {
   const theme = useUiStore((state) => state.theme);
   const setTheme = useUiStore((state) => state.setTheme);
   const saveSettings = useAppStore((state) => state.saveSettings);
+  const borderRadiusEnabled = useAppStore((state) => state.settings.borderRadiusEnabled);
   const [installing, setInstalling] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -135,6 +136,19 @@ export function ThemesTab() {
             value={theme}
             onChange={handleMode}
             ariaLabel={t('themes.mode.aria')}
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('themes.radius.title')}
+        description={t('themes.radius.description')}
+      >
+        <SettingRow label={t('themes.radius.label')}>
+          <Switch
+            checked={borderRadiusEnabled}
+            onCheckedChange={(checked) => void saveSettings({ borderRadiusEnabled: checked })}
+            aria-label={t('themes.radius.aria')}
           />
         </SettingRow>
       </SettingsSection>

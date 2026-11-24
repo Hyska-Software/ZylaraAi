@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  applyBorderRadius,
   applyThemeAssets,
   applyThemeTokens,
   BUILTIN_THEME_ID,
@@ -102,6 +103,19 @@ describe('applyThemeTokens', () => {
 
     const cached = JSON.parse(localStorage.getItem(THEME_CACHE_KEY) ?? 'null');
     expect(cached.dark.accent).toBe('#2dd4bf');
+  });
+});
+
+describe('applyBorderRadius', () => {
+  it('toggles the flat-borders class without disturbing theme tokens', () => {
+    applyThemeTokens(theme(), false);
+
+    applyBorderRadius(false);
+    expect(document.documentElement.classList.contains('flat-borders')).toBe(true);
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#2563eb');
+
+    applyBorderRadius(true);
+    expect(document.documentElement.classList.contains('flat-borders')).toBe(false);
   });
 });
 

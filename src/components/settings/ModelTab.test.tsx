@@ -26,6 +26,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
   return {
     theme: 'system',
     themeId: 'zylara',
+    borderRadiusEnabled: true,
     locale: 'pt-BR',
     defaultProvider: GO,
     defaultModel: 'glm-5.3-flash',
