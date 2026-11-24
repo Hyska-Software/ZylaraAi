@@ -67,6 +67,7 @@
   },
   "card": {
     "open": "Abrir",
+    "openExternalNamed": "Abrir {{name}} en la aplicación predeterminada",
     "saveAs": "Guardar como…",
     "saveNamed": "Guardar {{name}} como…",
     "saveSuccess": "Archivo guardado",

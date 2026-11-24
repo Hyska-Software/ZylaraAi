@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react';
+import { Download, ExternalLink } from 'lucide-react';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -32,9 +32,21 @@ async function saveArtifact(artifact: Artifact) {
   }
 }
 
+async function openArtifactExternally(artifact: Artifact) {
+  try {
+    // The command delegates to tauri-plugin-opener (ShellExecute on Windows,
+    // open on macOS, xdg-open on Linux) using the stored artifact path.
+    await api.openArtifact(artifact.id);
+  } catch (error) {
+    toast.error(translate('artifacts:card.openError'), {
+      description: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 /**
  * Compact artifact card (DESIGN §6.3/§11): kind icon on a colored tile, name
- * (13px), "kind · size" subtitle (11px) and the "Abrir" / "Salvar como…"
+ * (13px), "kind · size" subtitle (11px) and the preview / default-app / save
  * actions. Used inline in the chat flow and in the panel list (`compact`).
  */
 export function ArtifactCard({
@@ -59,6 +71,11 @@ export function ArtifactCard({
   const handleSave = (event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     void saveArtifact(artifact);
+  };
+
+  const handleOpenExternal = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    void openArtifactExternally(artifact);
   };
 
   return (
@@ -104,6 +121,15 @@ export function ArtifactCard({
         <Button size="sm" variant="secondary" onClick={open}>
           {t('artifacts:card.open')}
         </Button>
+        <Tooltip content={t('artifacts:panel.openExternal')} side="top">
+          <IconButton
+            label={t('artifacts:card.openExternalNamed', { name: artifact.name })}
+            size="sm"
+            onClick={handleOpenExternal}
+          >
+            <ExternalLink className="size-3.5" />
+          </IconButton>
+        </Tooltip>
         <Tooltip content={t('artifacts:card.saveAs')} side="top">
           <IconButton
             label={t('artifacts:card.saveNamed', { name: artifact.name })}

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Artifact } from '@/lib/types';
 
 const mocks = vi.hoisted(() => ({
   saveArtifact: vi.fn(),
+  openArtifact: vi.fn(),
 }));
 
 const toastMocks = vi.hoisted(() => ({
@@ -13,7 +14,7 @@ const toastMocks = vi.hoisted(() => ({
   info: vi.fn(),
 }));
 
-vi.mock('@/lib/api', () => ({ api: { saveArtifact: mocks.saveArtifact } }));
+vi.mock('@/lib/api', () => ({ api: { saveArtifact: mocks.saveArtifact, openArtifact: mocks.openArtifact } }));
 vi.mock('sonner', () => ({ toast: toastMocks }));
 
 // Imported after the mocks above.
@@ -25,6 +26,7 @@ afterEach(() => cleanup());
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.saveArtifact.mockResolvedValue('/tmp/relatorio.md');
+  mocks.openArtifact.mockResolvedValue(undefined);
   useUiStore.setState({
     artifactPanelOpen: false,
     artifactPanelView: 'list',
@@ -57,8 +59,11 @@ describe('ArtifactCard — small card', () => {
     expect(name.className).toContain('text-[13px]');
     expect(screen.getByText(/Markdown · 2 KB/)).toBeTruthy();
 
-    // Os mesmos dois botões de antes: "Abrir" e "Salvar como…".
+    // As actions do card: prévia, aplicativo padrão e "Salvar como…".
     expect(screen.getByRole('button', { name: 'Abrir' })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Abrir relatorio.md no aplicativo padrão' }),
+    ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Salvar relatorio.md como…' })).toBeTruthy();
   });
 
@@ -91,6 +96,32 @@ describe('ArtifactCard — small card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvar relatorio.md como…' }));
 
     expect(mocks.saveArtifact).toHaveBeenCalledWith('a-1', 'relatorio.md');
+  });
+
+  it('abre o artefato no aplicativo padrão pelo comando cross-platform', () => {
+    render(<ArtifactCard artifact={artifact()} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Abrir relatorio.md no aplicativo padrão' }),
+    );
+
+    expect(mocks.openArtifact).toHaveBeenCalledWith('a-1');
+    expect(useUiStore.getState().activeArtifactId).toBeNull();
+  });
+
+  it('mostra erro quando o aplicativo padrão não consegue abrir o artefato', async () => {
+    mocks.openArtifact.mockRejectedValueOnce(new Error('sem associacao de arquivo'));
+    render(<ArtifactCard artifact={artifact()} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Abrir relatorio.md no aplicativo padrão' }),
+    );
+
+    await waitFor(() =>
+      expect(toastMocks.error).toHaveBeenCalledWith('Não foi possível abrir o arquivo', {
+        description: 'sem associacao de arquivo',
+      }),
+    );
   });
 
   it('destaca o artefato ativo quando active é verdadeiro', () => {
