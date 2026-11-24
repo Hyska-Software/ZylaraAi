@@ -27,6 +27,14 @@ afterEach(() => {
 });
 
 describe('SettingsDialog — aba controlada pelo uiStore (deep-link da paleta)', () => {
+  it('renders a larger dialog clamped to the window', () => {
+    render(<SettingsDialog />);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.className).toContain('w-[min(1120px,calc(100vw-2rem))]');
+    expect(dialog.className).toContain('h-[min(780px,calc(100dvh-2rem))]');
+  });
+
   it('opens on the tab requested by the store', () => {
     render(<SettingsDialog />);
 

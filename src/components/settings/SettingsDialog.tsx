@@ -37,8 +37,9 @@ import { DesignTab } from './DesignTab';
 import { ToolsTab } from './ToolsTab';
 
 /**
- * Settings dialog (DESIGN §9): 860×600, vertical tabs on the left and a
- * scrollable content column on the right. Every change is saved automatically.
+ * Settings dialog (DESIGN §9): up to 1120×780, clamped to the window,
+ * with vertical tabs on the left and a scrollable content column on the
+ * right. Every change is saved automatically.
  *
  * The active tab lives in `useUiStore` so the command palette can open the
  * dialog straight on "Configurações › Ferramentas" (docs/COMMAND_PALETTE.md).
@@ -87,7 +88,7 @@ function SettingsPageFallback({
   tab?: string;
   children?: ReactNode;
 }) {
-  return <div className="px-6 py-5">{children}</div>;
+  return <div className="px-8 py-6">{children}</div>;
 }
 
 export function SettingsDialog() {
@@ -119,7 +120,7 @@ export function SettingsDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         showClose={false}
-        className="h-[600px] w-[860px] max-w-[calc(100vw-2rem)] gap-0 p-0"
+        className="h-[min(780px,calc(100dvh-2rem))] w-[min(1120px,calc(100vw-2rem))] max-w-none gap-0 p-0"
         aria-describedby={undefined}
       >
         <Tabs
@@ -130,7 +131,7 @@ export function SettingsDialog() {
           orientation="vertical"
           className="flex min-h-0 flex-1"
         >
-          <div className="flex w-48 shrink-0 flex-col border-r border-border bg-surface">
+          <div className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
             <div className="px-4 pb-3 pt-5">
               <DialogTitle className="text-[15px]">{t('dialog.title')}</DialogTitle>
               <DialogDescription className="mt-0.5 text-[11px]">
@@ -150,7 +151,7 @@ export function SettingsDialog() {
           </div>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-3">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-8 py-4">
               <span className="text-[13px] font-semibold tracking-tight text-foreground">
                 {headerLabel}
               </span>
