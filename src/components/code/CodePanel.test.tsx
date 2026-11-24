@@ -417,18 +417,29 @@ describe('CodePanel — abas Arquivos / Alterações', () => {
     expect(useUiStore.getState().codePanelTab).toBe('files');
   });
 
-  it('recolhe o painel e persiste o estado', () => {
+  it('recolhe o painel e persiste o estado', async () => {
     render(<CodePanel />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Recolher painel' }));
 
     expect(useUiStore.getState().codePanelOpen).toBe(false);
+    await waitFor(() => expect(panel()).toBeNull());
+  });
+
+  it('reabre animando da largura zero até a largura persistida', async () => {
+    useUiStore.setState({ codePanelOpen: false });
+    render(<CodePanel />);
     expect(panel()).toBeNull();
+
+    act(() => useUiStore.setState({ codePanelOpen: true }));
+
+    expect(panel()).toBeTruthy();
+    await waitFor(() => expect(requiredPanel().style.width).toBe(`${SIDE_PANEL_WIDTH_DEFAULT}px`));
   });
 });
 
 describe('CodePanel — redimensionamento', () => {
-  it('usa a largura persistida e o mesmo divisor acessível dos painéis direitos', () => {
+  it('usa a largura persistida e o mesmo divisor acessível dos painéis direitos', async () => {
     useUiStore.setState({ sidePanelWidth: 520 });
 
     render(<CodePanel />);
@@ -442,10 +453,12 @@ describe('CodePanel — redimensionamento', () => {
     fireEvent.keyDown(handle, { key: 'ArrowLeft' });
 
     expect(useUiStore.getState().sidePanelWidth).toBe(520 + SIDE_PANEL_WIDTH_STEP);
-    expect(requiredPanel().style.width).toBe(`${520 + SIDE_PANEL_WIDTH_STEP}px`);
+    await waitFor(() =>
+      expect(requiredPanel().style.width).toBe(`${520 + SIDE_PANEL_WIDTH_STEP}px`),
+    );
   });
 
-  it('não deixa o painel espremer a conversa abaixo de 480px (limite do viewport)', () => {
+  it('não deixa o painel espremer a conversa abaixo de 480px (limite do viewport)', async () => {
     render(<CodePanel />);
 
     const handle = screen.getByRole('separator', { name: 'Redimensionar painel de arquivos' });
@@ -453,10 +466,10 @@ describe('CodePanel — redimensionamento', () => {
 
     // 1440 - sidebar 272 - 480 de conversa = 688px máximo no modo fixo.
     expect(useUiStore.getState().sidePanelWidth).toBe(688);
-    expect(requiredPanel().style.width).toBe('688px');
+    await waitFor(() => expect(requiredPanel().style.width).toBe('688px'));
   });
 
-  it('duplo clique no divisor restaura a largura padrão', () => {
+  it('duplo clique no divisor restaura a largura padrão', async () => {
     useUiStore.setState({ sidePanelWidth: 600 });
 
     render(<CodePanel />);
@@ -464,7 +477,9 @@ describe('CodePanel — redimensionamento', () => {
     fireEvent.doubleClick(screen.getByRole('separator', { name: 'Redimensionar painel de arquivos' }));
 
     expect(useUiStore.getState().sidePanelWidth).toBe(SIDE_PANEL_WIDTH_DEFAULT);
-    expect(requiredPanel().style.width).toBe(`${SIDE_PANEL_WIDTH_DEFAULT}px`);
+    await waitFor(() =>
+      expect(requiredPanel().style.width).toBe(`${SIDE_PANEL_WIDTH_DEFAULT}px`),
+    );
   });
 
   it('persiste sempre dentro dos limites globais dos painéis direitos', () => {

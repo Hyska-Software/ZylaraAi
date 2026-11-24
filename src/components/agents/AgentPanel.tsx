@@ -17,6 +17,7 @@ import { AgentPanelRoutines } from './AgentPanelRoutines';
 import { AgentPanelScreen } from './AgentPanelScreen';
 import { AgentActivityDialog } from './AgentActivityDialog';
 import { PanelResizer } from '@/components/layout/PanelResizer';
+import { AnimatedSidePanel } from '@/components/layout/AnimatedSidePanel';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
 import { PluginDockTabStrip } from '@/components/plugins/ui/PluginDockTabStrip';
@@ -165,8 +166,8 @@ export function AgentPanel() {
     return () => window.removeEventListener('keydown', onKey);
   }, [overlay, open, setOpen]);
 
-  if (!open) return null;
-  if (!agent && !channel) return null;
+  /* All hooks above run unconditionally; the animated wrapper decides whether
+     the panel is mounted so close can play the same exit as the left sidebar. */
 
   const clampWidth = (next: number) =>
     Math.min(layout.maxWidth, Math.max(SIDE_PANEL_WIDTH_MIN, Math.round(next)));
@@ -231,24 +232,14 @@ export function AgentPanel() {
     : null;
 
   return (
-    <>
-      {overlay ? (
-        <div
-          aria-hidden
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm"
-        />
-      ) : null}
-      <aside
-        aria-label={t('panel.aria')}
-        style={{ width: panelWidth }}
-        className={cn(
-          'z-50 flex h-full shrink-0 flex-col bg-surface',
-          overlay
-            ? 'fixed inset-y-0 right-0 shadow-2xl'
-            : 'relative z-10',
-        )}
-      >
+    <AnimatedSidePanel
+      open={open && Boolean(agent || channel)}
+      width={panelWidth}
+      label={t('panel.aria')}
+      overlay={overlay}
+      resizing={previewWidth !== null}
+      onDismiss={() => setOpen(false)}
+    >
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
         <div
           role="tablist"
@@ -377,7 +368,6 @@ export function AgentPanel() {
         />
       ) : null}
       <AgentActivityDialog open={activityOpen} onOpenChange={setActivityOpen} />
-    </aside>
-    </>
+    </AnimatedSidePanel>
   );
 }

@@ -26,6 +26,7 @@ import {
   sortableDropClassHorizontal,
 } from '@/components/ui';
 import { PanelResizer } from '@/components/layout/PanelResizer';
+import { AnimatedSidePanel } from '@/components/layout/AnimatedSidePanel';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
@@ -383,8 +384,8 @@ export function CodePanel() {
      edits (and use the real ± counters). */
   const sessionChanges = sessionChangeFiles;
 
-  /* All hooks above run unconditionally; visibility is decided afterwards. */
-  if (!open || !layout.canDock) return null;
+  /* All hooks above run unconditionally; visibility is decided by the
+     animated wrapper so closing can play the same exit as the left sidebar. */
 
   const clampWidth = (next: number) =>
     Math.min(layout.maxWidth, Math.max(SIDE_PANEL_WIDTH_MIN, Math.round(next)));
@@ -442,10 +443,11 @@ export function CodePanel() {
   const compactTabs = layout.width < 430;
 
   return (
-    <aside
-      aria-label={t('code:panel.aria')}
-      style={{ width: layout.width }}
-      className="relative z-10 flex h-full shrink-0 flex-col bg-surface"
+    <AnimatedSidePanel
+      open={open && layout.canDock}
+      width={layout.width}
+      label={t('code:panel.aria')}
+      resizing={previewWidth !== null}
     >
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
         <SortableList
@@ -740,7 +742,7 @@ export function CodePanel() {
         onResizeEnd={handleResizeEnd}
         onReset={handleReset}
       />
-    </aside>
+    </AnimatedSidePanel>
   );
 }
 

@@ -34,8 +34,9 @@ vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
 
-import { useAgentStore, useUiStore } from '@/lib/store';
+import { useAgentStore, useAppStore, useUiStore, SIDE_PANEL_WIDTH_DEFAULT } from '@/lib/store';
 import type { Agent, AgentInput } from '@/lib/types';
+import { AgentPanel } from './AgentPanel';
 import { AgentPanelBrowser } from './AgentPanelBrowser';
 import { AgentPanelData } from './AgentPanelData';
 import { AgentPanelScreen } from './AgentPanelScreen';
@@ -408,5 +409,63 @@ describe('AgentPanel — Dados', () => {
     expect(screen.getAllByText('Tarefas').length).toBeGreaterThan(0);
     expect(await screen.findByText('1 aberta(s) de 1')).toBeTruthy();
     expect(screen.getByText('Computador')).toBeTruthy();
+  });
+});
+
+describe('AgentPanel — animação do painel lateral', () => {
+  const originalInnerWidth = window.innerWidth;
+  const panel = () => screen.queryByRole('complementary', { name: 'Painel do agente' });
+  const backdrop = () => document.querySelector('[data-side-panel="backdrop"]');
+
+  function setViewport(width: number): void {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: width });
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  beforeEach(() => {
+    useAppStore.setState((state) => ({ settings: { ...state.settings, reduceMotion: false } }));
+    setViewport(1440);
+    useUiStore.setState({
+      activeAgentId: agent.id,
+      activeChannelId: 'channel-1',
+      agentPanelOpen: true,
+      agentRightPanel: 'agent',
+      sidebarOpen: true,
+      sidebarWidth: 272,
+      sidePanelWidth: SIDE_PANEL_WIDTH_DEFAULT,
+      pluginDockTab: { chat: null, code: null, agent: null },
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: originalInnerWidth,
+    });
+  });
+
+  it('recolhe o painel fixo com animação de saída', async () => {
+    render(<AgentPanel />);
+    expect(panel()).toBeTruthy();
+    expect(backdrop()).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recolher painel' }));
+
+    await waitFor(() => expect(panel()).toBeNull());
+  });
+
+  it('usa o drawer sobreposto com backdrop em janelas estreitas', async () => {
+    setViewport(800);
+    render(<AgentPanel />);
+    expect(panel()).toBeTruthy();
+    expect(backdrop()).toBeTruthy();
+
+    fireEvent.click(backdrop() as Element);
+
+    await waitFor(() => {
+      expect(panel()).toBeNull();
+      expect(backdrop()).toBeNull();
+    });
   });
 });
