@@ -289,6 +289,7 @@
     "fetchSuccess": "Actualizaciones buscadas",
     "pullSuccess": "Pull completado",
     "pushSuccess": "Push completado",
+    "syncSuccess": "Sincronización completada",
     "fetchError": "No se pudieron buscar actualizaciones",
     "pullError": "No se pudo hacer pull",
     "pushError": "No se pudo hacer push",
@@ -875,6 +876,21 @@
     "suggest": "Sugerir",
     "suggestAria": "Sugerir mensaje",
     "suggestTooltip": "Sugerir mensaje con IA",
+    "scope": {
+      "staged": "Preparados ({{count}})",
+      "selection": "Selección ({{count}})",
+      "all": "Todo"
+    },
+    "menuAria": "Más opciones de commit",
+    "menu": {
+      "commit": "Commit",
+      "staged": "Confirmar preparados",
+      "all": "Confirmar todo",
+      "selection": "Confirmar selección",
+      "amend": "Commit (modificar)",
+      "push": "Commit y subir",
+      "sync": "Commit y sincronizar"
+    },
     "button": "Commit",
     "recent": "Commits recientes",
     "recentWithCount": "Commits recientes ({{count}})",
@@ -894,12 +910,15 @@
       "noChanges": "Ningún cambio para confirmar",
       "noStaged": "Ningún archivo preparado",
       "noSelection": "Selecciona archivos en la lista",
-      "noMessage": "Escribe el mensaje del commit"
+      "noMessage": "Escribe el mensaje del commit",
+      "noHead": "Todavía no hay ningún commit que modificar"
     },
     "suggestEmpty": "La sugerencia llegó vacía — escribe el mensaje del commit.",
     "suggestError": "No se pudo sugerir un mensaje.",
     "success": "Commit creado",
     "successWithHash": "Commit creado ({{hash}})",
+    "successAmend": "Commit modificado",
+    "successAmendWithHash": "Commit modificado ({{hash}})",
     "recentListAria": "Commits recientes"
   },
   "changesFilter": {

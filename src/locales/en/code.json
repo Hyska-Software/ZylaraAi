@@ -289,6 +289,7 @@
     "fetchSuccess": "Updates fetched",
     "pullSuccess": "Pull complete",
     "pushSuccess": "Push complete",
+    "syncSuccess": "Sync complete",
     "fetchError": "Could not fetch updates",
     "pullError": "Could not pull",
     "pushError": "Could not push",
@@ -875,6 +876,21 @@
     "suggest": "Suggest",
     "suggestAria": "Suggest message",
     "suggestTooltip": "Suggest message with AI",
+    "scope": {
+      "staged": "Staged ({{count}})",
+      "selection": "Selection ({{count}})",
+      "all": "All"
+    },
+    "menuAria": "More commit options",
+    "menu": {
+      "commit": "Commit",
+      "staged": "Commit Staged",
+      "all": "Commit All",
+      "selection": "Commit Selection",
+      "amend": "Commit (Amend)",
+      "push": "Commit & Push",
+      "sync": "Commit & Sync"
+    },
     "button": "Commit",
     "recent": "Recent commits",
     "recentWithCount": "Recent commits ({{count}})",
@@ -894,12 +910,15 @@
       "noChanges": "No changes to commit",
       "noStaged": "No staged files",
       "noSelection": "Select files in the list",
-      "noMessage": "Write the commit message"
+      "noMessage": "Write the commit message",
+      "noHead": "No commit to amend yet"
     },
     "suggestEmpty": "The suggestion came back empty — write the commit message.",
     "suggestError": "Could not suggest a message.",
     "success": "Commit created",
     "successWithHash": "Commit created ({{hash}})",
+    "successAmend": "Commit amended",
+    "successAmendWithHash": "Commit amended ({{hash}})",
     "recentListAria": "Recent commits"
   },
   "changesFilter": {

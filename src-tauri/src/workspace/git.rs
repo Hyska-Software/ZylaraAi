@@ -691,13 +691,24 @@ pub async fn unstage(root: &Path, paths: &[String]) -> Result<(), ExecError> {
     Ok(())
 }
 
-/// `git commit -m <message>` (hooks do usuário rodam; não commita vazio).
-pub async fn commit(root: &Path, message: &str) -> Result<(), ExecError> {
+/// Builds the argv for a commit. `amend` rewrites the current HEAD instead of
+/// creating a new commit; the caller must verify that HEAD exists.
+fn commit_args(message: &str, amend: bool) -> Vec<&str> {
+    if amend {
+        vec!["commit", "--amend", "-m", message]
+    } else {
+        vec!["commit", "-m", message]
+    }
+}
+
+/// `git commit -m <message>`, optionally with `--amend` (user hooks run; empty
+/// commits are rejected).
+pub async fn commit(root: &Path, message: &str, amend: bool) -> Result<(), ExecError> {
     let message = message.trim();
     if message.is_empty() {
         return Err(ExecError::failed("mensagem de commit obrigatória", None));
     }
-    run_git_checked(root, &["commit", "-m", message], TEXT_CAP).await?;
+    run_git_checked(root, &commit_args(message, amend), TEXT_CAP).await?;
     Ok(())
 }
 
@@ -1855,7 +1866,9 @@ mod tests {
         assert!(status.staged.iter().any(|file| file.path == "a.txt"));
         assert!(status.untracked.iter().any(|path| path == "b.txt"));
 
-        commit(temp.path(), "test: altera a").await.expect("commit");
+        commit(temp.path(), "test: altera a", false)
+            .await
+            .expect("commit");
         let commits = log(temp.path(), 10).await.expect("log");
         assert_eq!(commits.len(), 2);
         assert_eq!(commits[0].subject, "test: altera a");
@@ -2007,10 +2020,38 @@ mod tests {
         assert_eq!(log(&root, 10).await.expect("log").len(), 2);
     }
 
+    #[test]
+    fn commit_args_include_amend_only_when_requested() {
+        assert_eq!(commit_args("subject", false), vec!["commit", "-m", "subject"]);
+        assert_eq!(
+            commit_args("subject", true),
+            vec!["commit", "--amend", "-m", "subject"]
+        );
+    }
+
+    #[tokio::test]
+    async fn amend_replaces_the_tip_without_adding_a_commit() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        if setup_repo(temp.path()).is_none() {
+            return;
+        }
+        fs::write(temp.path().join("a.txt"), "linha1\nlinha2\n").expect("modify a");
+        stage(temp.path(), &["a.txt".to_string()])
+            .await
+            .expect("stage");
+        commit(temp.path(), "amended subject", true)
+            .await
+            .expect("amend");
+
+        let commits = log(temp.path(), 10).await.expect("log");
+        assert_eq!(commits.len(), 1, "amend must not create a second commit");
+        assert_eq!(commits[0].subject, "amended subject");
+    }
+
     #[tokio::test]
     async fn empty_message_is_rejected() {
         let temp = tempfile::tempdir().expect("tempdir");
-        let error = commit(temp.path(), "   ").await.expect_err("deve falhar");
+        let error = commit(temp.path(), "   ", false).await.expect_err("deve falhar");
         assert!(error.message.contains("mensagem"));
     }
 

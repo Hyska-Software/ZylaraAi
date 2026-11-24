@@ -345,12 +345,17 @@ merge, "Preparar tudo" fica bloqueado para não marcar conflitos como resolvidos
 - toggle lado-a-lado; "abrir arquivo"; "copiar patch"; "reverter hunk"? (não na v1 — ver §16);
 - binário/grande: cartão com tipo/tamanho + "abrir" (sem diff).
 
-Rodapé: **barra de commit** — alvo (tudo/staged/seleção), `+N −M`, campo de mensagem (com
-**sugestão de IA** via botão `✨` → `suggest_commit_message`), botão **Commit** (desabilitado se
-nada selecionado; tooltip explica), e **Commits recentes** colapsável (hash curto, mensagem, autor,
-tempo; clique mostra o commit no painel). **Tudo** roda `git add -A` antes do commit, incluindo
-arquivos modificados, novos e deletados; **Preparados** usa o índice existente; **Seleção** prepara
-apenas os caminhos marcados.
+Rodapé: **barra de commit** — escopo efetivo (Preparados com fallback para Tudo quando o índice
+está vazio), `+N −M`, campo de mensagem (com **sugestão de IA** via botão `✨` →
+`suggest_commit_message`), botão **Commit** à direita com menu dividido (seta): **Commit** (usa o
+escopo efetivo), **Commit Staged**, **Commit All**, **Commit Selection**, **Commit (Amend)**,
+**Commit & Push** e **Commit & Sync**. O botão é desabilitado sem mensagem/alterações (tooltip
+explica); o menu desabilita variantes sem alvo. Há ainda **Commits recentes** colapsável (hash curto,
+mensagem, autor, tempo; clique mostra o commit no painel). **Tudo** roda `git add -A` antes do
+commit, incluindo arquivos modificados, novos e deletados; **Preparados** usa o índice existente;
+**Seleção** prepara apenas os caminhos marcados. **Amend** reescreve o HEAD atual e exige um commit
+anterior; **Push** roda `git push` depois do commit e **Sync** roda `git pull --no-edit` seguido de
+`git push`. Falha de rede depois do commit gera um aviso separado — o commit já foi criado.
 
 A barra workspace · branch tem o menu **Git** com **fetch**, **pull** e **push** (ações explícitas
 do usuário, nunca tools do modelo): fetch é `git fetch --all --prune`; pull é `git pull --no-edit`
@@ -544,7 +549,7 @@ Microcopy-chave:
 | `ChangesPanel` | agrupamentos, origem, contadores, diff, reverter arquivo/turno (com confirmação), preparar/desmarcar tudo, conflitos bloqueiam o stage em lote, commit desabilitado/habilitado |
 | `GitActionsMenu` | fetch/pull/push via api, estados de loading/erro, contadores ↑/↓, atualizar status, fora de repo desabilitado |
 | `DiffView` | unificado, linhas, hunks, binário, grande, lado-a-lado, a11y |
-| `CommitBar` | mensagem, sugestão IA, seleção, estados de erro |
+| `CommitBar` | mensagem, sugestão IA, escopo staged→all, menu dividido (staged/all/selection/amend/push/sync), estados de erro |
 | `ApprovalCard` | render por tipo (comando/path/segredo), aprovar/negar/motivo/escopo, teclado, aria-live, resolução |
 | `PlanCard` | render markdown, aprovar/revisar cada edição/continuar, feedback, estado aprovado |
 | `AskUserCard` | opções single/multi, texto livre, ignorar, teclado |

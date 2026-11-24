@@ -236,22 +236,29 @@ describe('ChangesPanel', () => {
     ).toBe('+6 −2');
   });
 
-  it('computes the footer totals from the commit target', () => {
-    render(
-      <ChangesPanel
-        workspaceId="ws-1"
-        gitStatus={status()}
-        sessionChanges={[
-          { path: 'src/a.ts', kind: 'modified', added: 7, removed: 2, origin: 'git', staged: true },
-          { path: 'src/b.ts', kind: 'modified', added: 3, removed: 0, origin: 'git' },
-        ]}
-      />,
+  it('uses staged files for the footer by default and all files when nothing is staged', () => {
+    const withStaged = [
+      { path: 'src/a.ts', kind: 'modified' as const, added: 7, removed: 2, origin: 'git' as const, staged: true },
+      { path: 'src/b.ts', kind: 'modified' as const, added: 3, removed: 0, origin: 'git' as const },
+    ];
+    const withoutStaged = [
+      { path: 'src/a.ts', kind: 'modified' as const, added: 7, removed: 2, origin: 'git' as const },
+      { path: 'src/b.ts', kind: 'modified' as const, added: 3, removed: 0, origin: 'git' as const },
+    ];
+    const { rerender } = render(
+      <ChangesPanel workspaceId="ws-1" gitStatus={status()} sessionChanges={withStaged} />,
     );
     const totals = () => screen.getByTitle('Linhas adicionadas e removidas').textContent;
-    expect(totals()).toBe('+10 −2');
-
-    fireEvent.change(screen.getByLabelText('Alvo do commit'), { target: { value: 'staged' } });
     expect(totals()).toBe('+7 −2');
+
+    rerender(
+      <ChangesPanel
+        workspaceId="ws-1"
+        gitStatus={status({ staged: [] })}
+        sessionChanges={withoutStaged}
+      />,
+    );
+    expect(totals()).toBe('+10 −2');
   });
 
   it('ignores session-only rows in the footer and keeps the commit disabled', () => {

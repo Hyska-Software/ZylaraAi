@@ -38,7 +38,7 @@ import type {
   WorkspaceGitCompare,
   WorkspaceGitStatus,
 } from '@/lib/types';
-import { CommitBar, shortHash } from './CommitBar';
+import { CommitBar, resolveCommitTarget, shortHash } from './CommitBar';
 import { ChangesFilterMenu, type ChangesFilter } from './ChangesFilterMenu';
 import { DiffView } from './DiffView';
 import { FileIcon } from './FileIcon';
@@ -439,9 +439,9 @@ export function ChangesPanel({
     () => rows.filter((row) => row.group === 'staged').map((row) => row.path),
     [rows],
   );
-  /* O commit tem alvo (`target`); os contadores do rodapé seguem esse alvo em
-     vez de somar todas as linhas (que incluiria o que nunca vai no commit). */
-  const [commitTarget, setCommitTarget] = useState<CommitTarget>('all');
+  /* The primary Commit action uses staged files when present, otherwise all;
+     the footer counters follow the same resolved set. */
+  const commitTarget = resolveCommitTarget('staged', stagedPaths);
   const targetRows = useMemo(
     () => committableRows(rows, commitTarget),
     [commitTarget, rows],
@@ -824,8 +824,6 @@ export function ChangesPanel({
       workspaceId={workspaceId}
       isRepo={isRepo}
       hasChanges={targetRows.length > 0}
-      target={commitTarget}
-      onTargetChange={setCommitTarget}
       stagedPaths={stagedPaths}
       added={totals.added}
       removed={totals.removed}

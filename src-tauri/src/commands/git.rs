@@ -370,6 +370,7 @@ pub async fn git_commit(
     message: String,
     target: Option<String>,
     paths: Option<Vec<String>>,
+    amend: Option<bool>,
 ) -> Result<WorkspaceGitStatus, String> {
     let trimmed = message.trim();
     if trimmed.is_empty() {
@@ -388,8 +389,12 @@ pub async fn git_commit(
     )
     .await
     .map_err(map_err)?;
+    let amend = amend.unwrap_or(false);
+    if amend && !crate::workspace::git::has_head(&root).await {
+        return Err(crate::i18n::t("git.errors.noHeadToAmend"));
+    }
     prepare_commit(&root, target, paths.as_deref()).await?;
-    crate::workspace::git::commit(&root, trimmed)
+    crate::workspace::git::commit(&root, trimmed, amend)
         .await
         .map_err(map_err)?;
     status_of(&state, &workspace_id).await

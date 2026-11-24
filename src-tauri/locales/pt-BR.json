@@ -302,6 +302,7 @@
   "git.errors.invalidBranchName": "`{name}` não é um nome de branch válido",
   "git.errors.invalidCommitTarget": "alvo de commit inválido: {target}",
   "git.errors.noChangesToDescribe": "não há alterações para descrever",
+  "git.errors.noHeadToAmend": "não há commit para emendar",
   "git.errors.noSelectedFiles": "nenhum arquivo selecionado",
   "git.errors.notRepo": "não é um repositório Git",
   "git.errors.nothingStaged": "nenhum arquivo preparado",

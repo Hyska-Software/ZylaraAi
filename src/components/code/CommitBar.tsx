@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronRight, CircleAlert, GitCommitHorizontal, Sparkles } from 'lucide-react';
-import { Button, NativeSelect, Spinner, Textarea, Tooltip } from '@/components/ui';
+import { ChevronDown, ChevronRight, CircleAlert, GitCommitHorizontal, Sparkles } from 'lucide-react';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  IconButton,
+  Spinner,
+  Textarea,
+  Tooltip,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/i18n/format';
 import { useAppStore } from '@/lib/store';
@@ -17,14 +28,8 @@ export interface CommitBarProps {
   hasChanges?: boolean;
   /** Paths currently prepared in the index (target "Preparados"). */
   stagedPaths?: string[];
-  /** Paths checked by the user (target "Seleção"). */
+  /** Paths checked by the user (target "Selection" in the menu). */
   selectedPaths?: string[];
-  /**
-   * Commit target. When provided the bar is controlled by the container, so the
-   * footer counters can follow the same set the commit will use.
-   */
-  target?: CommitTarget;
-  onTargetChange?: (target: CommitTarget) => void;
   added?: number;
   removed?: number;
   /** Extra reason to block the commit (e.g. merge conflicts). */
@@ -36,6 +41,14 @@ export interface CommitBarProps {
 }
 
 const LOG_LIMIT = 10;
+
+/** One-shot commit action; the primary button uses no override (smart scope). */
+interface CommitVariant {
+  target: CommitTarget;
+  amend?: boolean;
+  push?: boolean;
+  sync?: boolean;
+}
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
@@ -56,9 +69,20 @@ export function formatCommitDate(value: string): string {
 }
 
 /**
- * Commit bar of the Code panel (WORKBENCH §7.2/§15): target selector
- * (tudo/preparados/seleção), message with AI suggestion, commit with
- * loading/toast feedback and a collapsible recent-commits history.
+ * Default commit scope: staged files when present, otherwise the whole working
+ * tree. Explicit menu actions bypass this fallback.
+ */
+export function resolveCommitTarget(
+  target: CommitTarget,
+  stagedPaths: readonly string[],
+): CommitTarget {
+  return target === 'staged' && stagedPaths.length === 0 ? 'all' : target;
+}
+
+/**
+ * Commit bar of the Code panel (WORKBENCH §7.2/§15): smart commit scope
+ * (staged with an all-files fallback), message with AI suggestion, split commit
+ * button with explicit variants, and a collapsible recent-commits history.
  */
 export function CommitBar({
   workspaceId,
@@ -66,8 +90,6 @@ export function CommitBar({
   hasChanges = true,
   stagedPaths = [],
   selectedPaths = [],
-  target: controlledTarget,
-  onTargetChange,
   added = 0,
   removed = 0,
   blockedReason = null,
@@ -79,17 +101,6 @@ export function CommitBar({
   // The active route can differ from the persisted defaults (a started session
   // owns its model), so the suggestion must follow what the user sees selected.
   const selection = useAppStore((state) => state.selection);
-  const [localTarget, setLocalTarget] = useState<CommitTarget>('all');
-  /* Controlled when the container passes `target` (the panel needs the same set
-     for the footer counters); uncontrolled otherwise. */
-  const target = controlledTarget ?? localTarget;
-  const setTarget = useCallback(
-    (next: CommitTarget) => {
-      if (controlledTarget === undefined) setLocalTarget(next);
-      onTargetChange?.(next);
-    },
-    [controlledTarget, onTargetChange],
-  );
   const [message, setMessage] = useState('');
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
@@ -136,20 +147,16 @@ export function CommitBar({
     setSuggesting(false);
   }, [workspaceId]);
 
+  const stageCount = stagedPaths.length;
+  const selectionCount = selectedPaths.length;
+  const effectiveTarget = resolveCommitTarget('staged', stagedPaths);
+  const targetPaths = effectiveTarget === 'selection' ? selectedPaths : undefined;
+
   useEffect(() => {
     suggestRun.current += 1;
     setSuggestError(null);
     setSuggesting(false);
-  }, [target]);
-
-  const stageCount = stagedPaths.length;
-  const selectionCount = selectedPaths.length;
-
-  /* A target whose paths disappeared (e.g. after a commit) falls back to "tudo". */
-  useEffect(() => {
-    if (target === 'staged' && stageCount === 0) setTarget('all');
-    if (target === 'selection' && selectionCount === 0) setTarget('all');
-  }, [target, stageCount, selectionCount]);
+  }, [effectiveTarget]);
 
   const suggestDisabledReason = !workspaceId
     ? t('code:commit.reason.openWorkspace')
@@ -159,16 +166,14 @@ export function CommitBar({
         ? blockedReason
         : !hasChanges
           ? t('code:commit.reason.noChanges')
-          : target === 'staged' && stageCount === 0
-            ? t('code:commit.reason.noStaged')
-            : target === 'selection' && selectionCount === 0
-              ? t('code:commit.reason.noSelection')
-              : null;
+          : effectiveTarget === 'selection' && selectionCount === 0
+            ? t('code:commit.reason.noSelection')
+            : null;
   const disabledReason =
     suggestDisabledReason ?? (!message.trim() ? t('code:commit.reason.noMessage') : null);
 
   const canCommit = !disabledReason && !committing;
-  const targetPaths = target === 'selection' ? selectedPaths : undefined;
+  const canAmend = commits.length > 0;
 
   const handleSuggest = async () => {
     if (!workspaceId || suggesting || suggestDisabledReason) return;
@@ -179,7 +184,7 @@ export function CommitBar({
     try {
       const suggestion = await api.suggestCommitMessage(
         workspaceId,
-        target,
+        effectiveTarget,
         targetPaths,
         selection.providerId,
         selection.modelId,
@@ -198,11 +203,19 @@ export function CommitBar({
     }
   };
 
-  const handleCommit = async () => {
+  const runCommit = async (variant: Partial<CommitVariant> = {}) => {
     if (!workspaceId || !canCommit) return;
+    const target = variant.target ?? effectiveTarget;
+    if (target === 'staged' && stageCount === 0) return;
+    if (target === 'selection' && selectionCount === 0) return;
+    const amend = variant.amend ?? false;
+    if (amend && !canAmend) return;
+    const paths = target === 'selection' ? selectedPaths : undefined;
+    const trimmedMessage = message.trim();
     setCommitting(true);
+    let phase: 'commit' | 'pull' | 'push' = 'commit';
     try {
-      const status = await api.gitCommit(workspaceId, message.trim(), target, targetPaths);
+      const status = await api.gitCommit(workspaceId, trimmedMessage, target, paths, amend);
       setMessage('');
       setSuggestError(null);
       onCommitted?.(status);
@@ -216,12 +229,32 @@ export function CommitBar({
       }
       toast.success(
         hash
-          ? t('code:commit.successWithHash', { hash: shortHash(hash) })
-          : t('code:commit.success'),
+          ? t(
+              amend ? 'code:commit.successAmendWithHash' : 'code:commit.successWithHash',
+              { hash: shortHash(hash) },
+            )
+          : t(amend ? 'code:commit.successAmend' : 'code:commit.success'),
       );
       onRefresh?.();
+
+      if (variant.sync) {
+        phase = 'pull';
+        await api.gitPull(workspaceId);
+      }
+      if (variant.sync || variant.push) {
+        phase = 'push';
+        await api.gitPush(workspaceId);
+        toast.success(t(variant.sync ? 'code:git.syncSuccess' : 'code:git.pushSuccess'));
+        onRefresh?.();
+      }
     } catch (error) {
-      toast.error(describeError(error, t('code:commit.error.create')));
+      if (phase === 'commit') {
+        toast.error(describeError(error, t('code:commit.error.create')));
+      } else {
+        toast.error(t(phase === 'pull' ? 'code:git.pullError' : 'code:git.pushError'), {
+          description: describeError(error, t('code:git.connectionHint')),
+        });
+      }
     } finally {
       setCommitting(false);
     }
@@ -236,21 +269,16 @@ export function CommitBar({
         <span className="ml-auto text-[11.5px] tabular-nums" title={t('code:commit.linesTitle')}>
           <span className="text-success">+{added}</span> <span className="text-danger">−{removed}</span>
         </span>
-        <NativeSelect
-          aria-label={t('code:commit.targetAria')}
-          value={target}
-          onChange={(event) => setTarget(event.target.value as CommitTarget)}
-          wrapperClassName="w-auto"
-          className="h-7 w-auto min-w-28 text-[11.5px]"
+        <span
+          className="text-[11.5px] text-foreground-muted"
+          title={t('code:commit.targetAria')}
         >
-          <option value="all">{t('code:commit.target.all')}</option>
-          <option value="staged" disabled={stageCount === 0}>
-            {t('code:commit.target.staged', { count: stageCount })}
-          </option>
-          <option value="selection" disabled={selectionCount === 0}>
-            {t('code:commit.target.selection', { count: selectionCount })}
-          </option>
-        </NativeSelect>
+          {effectiveTarget === 'staged'
+            ? t('code:commit.scope.staged', { count: stageCount })
+            : effectiveTarget === 'selection'
+              ? t('code:commit.scope.selection', { count: selectionCount })
+              : t('code:commit.scope.all')}
+        </span>
       </div>
 
       <div className="px-3 pt-2">
@@ -292,10 +320,59 @@ export function CommitBar({
             disabled={!canCommit}
             title={disabledReason ?? t('code:commit.button')}
             leftIcon={<GitCommitHorizontal aria-hidden className="size-3.5" strokeWidth={1.75} />}
-            onClick={() => void handleCommit()}
+            className="rounded-r-none"
+            onClick={() => void runCommit()}
           >
             {t('code:commit.button')}
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton
+                label={t('code:commit.menuAria')}
+                variant="primary"
+                size="sm"
+                disabled={!canCommit}
+                title={disabledReason ?? t('code:commit.menuAria')}
+                className="h-8 w-6 rounded-l-none px-0"
+              >
+                <ChevronDown aria-hidden className="size-3.5" strokeWidth={1.75} />
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="min-w-52">
+              <DropdownMenuItem onSelect={() => void runCommit()}>
+                {t('code:commit.menu.commit')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={stageCount === 0}
+                onSelect={() => void runCommit({ target: 'staged' })}
+              >
+                {t('code:commit.menu.staged')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void runCommit({ target: 'all' })}>
+                {t('code:commit.menu.all')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={selectionCount === 0}
+                onSelect={() => void runCommit({ target: 'selection' })}
+              >
+                {t('code:commit.menu.selection')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={!canAmend}
+                title={canAmend ? undefined : t('code:commit.reason.noHead')}
+                onSelect={() => void runCommit({ amend: true })}
+              >
+                {t('code:commit.menu.amend')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void runCommit({ push: true })}>
+                {t('code:commit.menu.push')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void runCommit({ sync: true })}>
+                {t('code:commit.menu.sync')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </span>
       </div>
 

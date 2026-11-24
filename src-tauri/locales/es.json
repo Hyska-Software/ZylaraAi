@@ -302,6 +302,7 @@
   "git.errors.invalidBranchName": "`{name}` no es un nombre de rama válido",
   "git.errors.invalidCommitTarget": "objetivo de commit no válido: {target}",
   "git.errors.noChangesToDescribe": "no hay cambios que describir",
+  "git.errors.noHeadToAmend": "no hay ningún commit que modificar",
   "git.errors.noSelectedFiles": "ningún archivo seleccionado",
   "git.errors.notRepo": "no es un repositorio Git",
   "git.errors.nothingStaged": "ningún archivo preparado",

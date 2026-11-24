@@ -109,8 +109,9 @@ Snapshot em 2026-11-24: Registry `1.0.0`, 46 agentes, 23 distribuições `npx`, 
 oferecem checksum em nenhuma plataforma.
 
 Cada entrada declara `id`, `name`, `version`, `description`, `distribution` e
-metadados opcionais (`repository`, `authors`, `license`, `license_url`, `icon`,
-`preview`). O Registry não declara capabilities ACP; elas vêm do handshake.
+`license_url` (obrigatório exceto `dimcode`); `repository`, `authors`, `license` e
+`icon` são opcionais, e `preview` é opcional. O Registry não declara capabilities
+ACP; elas vêm do handshake.
 
 O Registry publicado não é um índice assinado. TOFU prova apenas integridade
 local do primeiro artefato, não autenticidade do publisher. A UI mostra essa
@@ -311,7 +312,9 @@ mudam.
 - A persona cria conversas com `agent_kind = acp:<id>`.
 - `Agent`/`AgentInput` ganham `acpAgentId` opcional; criação/update sincroniza o
   runtime atomicamente para principal/canal vazios e preserva o lock de threads
-  já iniciadas. Export/import v2 valida o agente instalado.
+  já iniciadas. Export/import v2 preserva a referência ACP; import sem agente
+  instalado cria a persona em estado indisponível/não executável até escolha
+  explícita de instalar ou trocar runtime.
 - Rotinas e respostas em canal com ACP são permitidas, mas permissão/elicitation
   sem canal humano falha fechado. Tarefas e líder de canal exigem a ponte host
   tools; `/goal` é desativado para ACP na v1.
@@ -331,9 +334,13 @@ mudam.
 ```rust
 AcpRegistryView { version, fetched_at, agents }
 AcpRegistryAgent { id, name, version, description, distribution, ... }
-AcpInstallation { agent_id, source, name, version, status, ... }
+AcpInstallation {
+  agent_id, source, name, version,
+  status: not_installed|installing|installed|update_available|error|disabled|incompatible|uninstalled,
+  ...
+}
 AcpInstallEvent { stage, progress?, message? }
-AcpProbeResult { protocol_version, agent_info, capabilities, auth_methods }
+AcpProbeResult { protocol_version, agent_info?, capabilities, auth_methods }
 AcpAuthMethod { id, name, description, r#type, args, env: Map<String,String> }
 AcpSessionSummary { session_id, cwd, title?, updated_at?: String, additional_directories? }
 AcpSessionPage { sessions, next_cursor? }
@@ -357,18 +364,35 @@ AcpElicitationRequest {
     request_id, session_id?, acp_request_id?, mode, message,
     requested_schema?, elicitation_id?, url?
 }
-AcpContentPayload { block: AcpContentBlock, text?, data_base64? }
+AcpContentPage { items, next_cursor? }
+AcpContentChunk { block: AcpContentBlock, offset, text?, data_base64?, done }
 AcpReportedCost { amount, currency, cumulative, session_id, updated_at }
+AcpConsentPreview { agent_id, version, manifest_digest, launch_digest, command, args, env_preview, scopes }
+#[serde(tag = "kind", rename_all = "camelCase")]
+AcpCustomAgentInput { name, command, args, env, version? }
+AcpConsentCandidate =
+  | Installed { agent_id }
+  | Registry { agent_id, distribution, channel, target?, version? }
+  | Custom { input: AcpCustomAgentInput }
+  | HistoryInjection { conversation_id, truncate_before_message_id? }
+  | SessionImport { agent_id, session_id, cwd }
+  | AdditionalRoots { conversation_id, roots }
+AcpConsentChallenge { challenge_id, candidate_digest, scopes, expires_at, preview: AcpConsentPreview }
 AcpAuthTerminalHandle { terminal_id, agent_id, method_id }
-AcpAuthTerminalStatus { state, exit_code?, signal? }
+AcpAuthTerminalStatus { state: running|exited|failed|cancelled, exit_code?, signal? }
 AcpRuntimeStatus {
-    state: connecting|ready|running|waiting_action|idle|disconnected|error,
+    state: connecting|ready|running|waiting_action|idle|auth_required|disconnected|error,
     agent_id, protocol_version, agent_version
 }
+#[serde(tag = "kind", rename_all = "camelCase")]
 RuntimeSelection =
-    | Native { model: ModelSelection }
+    | Native { provider_id, model_id, reasoning }
     | Acp { agent_id, config_fingerprint? }
 ```
+
+O union Rust usa tagged internal serialization compatível com
+`{ kind: "native", ... }` / `{ kind: "acp", ... }` do TypeScript; teste de
+round-trip Rust↔TypeScript é obrigatório.
 
 Os DTOs de protocolo espelham de perto `agent_client_protocol::v1::schema`; não
 criam um dialeto próprio. `type` ausente em `AcpAuthMethod` significa `agent`.
@@ -399,6 +423,9 @@ existe:
   "subagents": {}
 }
 ```
+
+`terminal` só é anunciado em execução local; demais capabilities só são anunciadas
+quando handlers completos existem.
 
 Prompt capabilities do agente (`text`/`resource_link` baseline; `image`, `audio`,
 `embeddedContext` opcionais) controlam o que pode ser enviado. Testes de schema
@@ -435,8 +462,7 @@ CREATE TABLE acp_consents (
   version TEXT NOT NULL,
   scopes_json TEXT NOT NULL,       -- probe | execute | auth | update
   granted_at INTEGER NOT NULL,
-  revoked_at INTEGER,
-  FOREIGN KEY (agent_id) REFERENCES acp_installations(agent_id) ON DELETE CASCADE
+  revoked_at INTEGER
 );
 
 CREATE TABLE acp_sessions (
@@ -495,6 +521,20 @@ CREATE TABLE acp_content_blocks (
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );
 
+CREATE TABLE acp_entities (
+  conversation_id TEXT NOT NULL,
+  acp_session_id TEXT NOT NULL,
+  entity_kind TEXT NOT NULL,      -- tool | plan | compaction | subagent | session_message
+  entity_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  payload_json TEXT NOT NULL,
+  spill_path TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (conversation_id, acp_session_id, entity_kind, entity_id),
+  FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+);
+
 CREATE TABLE acp_cost_samples (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id TEXT NOT NULL,
@@ -522,49 +562,61 @@ ALTER TABLE conversations ADD COLUMN title_source TEXT NOT NULL DEFAULT 'auto';
 ```
 
 Índices: `acp_sessions(agent_id, session_id)`,
-`acp_session_events(conversation_id, seq)`,
-`acp_message_map(zylara_message_id)`, `acp_content_blocks(owner_kind, owner_id)`,
-`acp_cost_samples(conversation_id)` e `agents(acp_agent_id)`. Índice único parcial em
-`acp_message_map(conversation_id, acp_session_id, acp_message_id)` quando
-`acp_message_id IS NOT NULL`. `agent_kind` continua sendo a autoridade do runtime.
+`acp_session_events(conversation_id, seq)` (único),
+`acp_message_map(zylara_message_id)`, `acp_content_blocks(owner_kind, owner_id)`
+(único com `seq`), `acp_cost_samples(conversation_id)` e `agents(acp_agent_id)`.
+Índice único parcial em
+`acp_message_map(conversation_id, acp_session_id, message_role, acp_message_id)`
+quando `acp_message_id IS NOT NULL`. Índice único equivalente usa
+`(conversation_id, acp_session_id, message_role, synthetic_key)` quando não há ID
+ACP. `agent_kind` continua sendo a autoridade do runtime.
 
 Na migração, `title_source` é backfill com `should_auto_title`: títulos que não
 são placeholder viram `user`; placeholders viram `auto`. `acp_session_events` é
-podado por idade (7 dias) e limite por conversa (10 mil eventos); o estado atual
-permanece em `acp_sessions.state_json`.
+apenas cache de replay/live, podado por idade (7 dias) e limite por conversa
+(10 mil eventos). Mensagens user-facing fora do turno viram `ChatMessage`
+duradouro; tools/plan/compaction/subagents/session messages ficam em
+`acp_entities` não podado. `acp_sessions.state_json` é snapshot, não fonte única.
+Payloads de entidade têm até 64 KiB inline; excedente vai para `spill/` e o DB
+guarda referência. `acp_cost_samples` é coalescido por turno/5 s e podado após registrar o delta em
+`usage_log`.
 
 Não persistir tokens, valores de env sensíveis, stdout bruto ou prompts completos
 em `launch_json`, `probe_json` ou logs. `distribution_json` guarda o manifesto
 público versionado; segredos do usuário ficam apenas em `secrets.json`.
+`acp_consents` não tem FK para permitir consentimento antes do install; registros
+órfãos/cancelados são limpos no boot.
 
 ### 6.3 Comandos Tauri (`commands/acp.rs`)
 
 ```text
 acp_refresh_registry() -> AcpRegistryView
 acp_list_registry(query?) -> AcpRegistryAgent[]
-acp_install_agent(agent_id, distribution, channel, target?, consent, on_event: Channel<AcpInstallEvent>) -> AcpInstallation
-acp_update_agent(agent_id, consent, on_event: Channel<AcpInstallEvent>) -> AcpInstallation
+acp_install_agent(agent_id, distribution, channel, target?, challenge_id, on_event: Channel<AcpInstallEvent>) -> AcpInstallation
+acp_update_agent(agent_id, challenge_id, on_event: Channel<AcpInstallEvent>) -> AcpInstallation
 acp_remove_agent(agent_id) -> ()
 acp_set_agent_enabled(agent_id, enabled) -> AcpInstallation
-acp_grant_consent(agent_id, scopes, manifest_digest, launch_digest) -> ()
+acp_preview_consent(candidate, scopes) -> AcpConsentChallenge
+acp_grant_consent(challenge_id) -> ()
 acp_revoke_consent(agent_id) -> ()
 acp_list_installed_agents() -> AcpInstallation[]
-acp_save_custom_agent(input) -> AcpInstallation
+acp_save_custom_agent(input, challenge_id) -> AcpInstallation
 acp_set_agent_secret(agent_id, name, value?) -> AcpInstallation
 acp_agent_icon(agent_id) -> string /* data URL SVG sanitizado */
 acp_probe_agent(agent_id) -> AcpProbeResult
 acp_authenticate(agent_id, method_id) -> AcpProbeResult
 acp_logout(agent_id) -> AcpProbeResult
 acp_list_sessions(agent_id, cwd?, cursor?) -> AcpSessionPage
-acp_import_session(agent_id, session_id, title?, cwd, consent) -> Conversation
+acp_import_session(agent_id, session_id, title?, cwd, challenge_id) -> Conversation
 acp_delete_session(agent_id, session_id) -> ()
 acp_get_session_state(conversation_id) -> AcpSessionState
 acp_list_session_events(conversation_id, after_seq?) -> AcpSessionEvent[]
-acp_get_content_blocks(owner_kind, owner_id) -> AcpContentBlock[]
-acp_get_content_block(content_id) -> AcpContentPayload
+acp_get_content_blocks(owner_kind, owner_id, cursor?) -> AcpContentPage
+acp_get_content_block(content_id, offset?, max_bytes?) -> AcpContentChunk
 acp_continue_turn(conversation_id, assistant_message_id) -> TurnResult
-acp_regenerate(conversation_id, assistant_message_id) -> TurnResult
-acp_send_history_context(conversation_id, consent) -> TurnResult
+acp_regenerate(conversation_id, assistant_message_id, challenge_id) -> TurnResult
+acp_restart_with_history(conversation_id, truncate_before_message_id?, challenge_id) -> TurnResult
+acp_send_history_context(conversation_id, challenge_id) -> TurnResult
 acp_cancel_session(conversation_id) -> ()
 acp_close_session(conversation_id) -> ()
 acp_set_config_option(conversation_id, config_id, value, type?) -> AcpSessionState
@@ -584,12 +636,22 @@ Chamadas nativas continuam idênticas. Se ambos forem enviados, precisam
 corresponder; `acp_agent_id` deriva `agent_kind = acp:<id>`.
 
 Consentimento é backend e persistido em `acp_consents`, com digest exato de
-manifesto/launch, versão, timestamp, scopes e revogação. Install consent inclui
-`probe`; executar, autenticar, listar/importar sessões e lançar o helper MCP exigem
-`execute`/`auth` correspondente. Todo caminho que spawna o agente chama
-`require_consent`; renderer nunca é autoridade. Update/versão nova exige novo
-consentimento. A estratégia de distribuição, channel, target e versão resolvida
-ficam no `distribution_json`; update não muda de estratégia sem consentimento.
+manifesto/launch, versão, timestamp, scopes e revogação. Os digests são calculados
+pelo backend a partir do candidato resolvido, nunca aceitos do renderer.
+`acp_preview_consent(candidate, scopes)` resolve distribuição/channel/target/versão,
+comando custom, histórico/import ou roots e devolve um challenge one-time de vida
+curta ligado ao digest **e ao conjunto exato de scopes**. Install/update/custom/
+grant/history/import verificam o challenge atomicamente contra candidato e scopes
+atuais; challenge velho, reaproveitado, divergente ou com escopo ampliado falha. O
+preview mostra versão/comando/args/env/digests, roots/histórico afetados e riscos
+de processo/filesystem/rede/subprocessos.
+Install consent inclui `probe`; executar, autenticar, listar/importar sessões e
+lançar o helper MCP exigem `execute`/`auth` correspondente. Todo caminho que
+spawna o agente chama `require_consent`; renderer nunca é autoridade.
+Update/versão nova exige novo consentimento. Revogar consentimento fecha sessões
+ativas antes de valer. A estratégia de distribuição, channel, target e versão
+resolvida ficam no `distribution_json`; update não muda de estratégia sem
+consentimento.
 
 `session/list` só é chamado com `sessionCapabilities.list`, usa cursor opaco e
 paginação; não persiste cursor. Import exige `loadSession`, consentimento de
@@ -601,11 +663,13 @@ marca como incompleta, sem mensagens parciais inventadas.
 conversa Zylara; a UI pede confirmação separada. Sessão ativa é fechada antes de
 delete; `-32002` é sucesso e mapping stale é limpo.
 
-`set_conversation_runtime` é a única troca de agente ACP de sessão existente:
-recusa turno ativo, fecha/invalida a sessão antiga, atualiza `agent_kind` e o par
-nativo auxiliar atomicamente, invalida itens de fila incompatíveis e emite
-`acp_runtime_status`. No Chat iniciado e em threads de persona iniciadas, o lock
-atual continua valendo; no Code, a troca é permitida entre turnos.
+`set_conversation_runtime` é a única troca de runtime de sessão existente:
+recusa turno ativo, fecha/invalida a sessão ACP antiga, atualiza `agent_kind` e o
+par nativo auxiliar atomicamente, invalida itens de fila incompatíveis, grava
+`code_events` `runtime/changed` e emite `acp_runtime_status`. Selecionar `Native`
+restaura `zylara` + `ModelSelection`; selecionar `Acp` grava `acp:<id>`. No Chat
+iniciado e em threads de persona iniciadas, o lock atual continua valendo; no
+Code, a troca é permitida entre turnos.
 
 ### 6.4 Eventos (`events.rs` + `types.ts`)
 
@@ -690,7 +754,7 @@ Modificações compartilhadas:
 | `src-tauri/src/state.rs` | `AppState.acp: AcpManager`, dirs ACP e cleanup de boot |
 | `src-tauri/src/runtime.rs` | dispatcher único native/ACP usado por todos os callers |
 | `src-tauri/src/commands/mod.rs` | `pub mod acp` |
-| `src-tauri/src/commands/turn.rs` | delegar ao dispatcher; admissão/emitter/fecho continuam iguais |
+| `src-tauri/src/commands/turn.rs` | preflight + dispatcher; admissão/emitter/fecho nativos continuam iguais após o gate |
 | `src-tauri/src/commands/{tasks,routines,channels,inbox}.rs` | trocar `harness::run_turn` direto por `runtime::run_turn` |
 | `src-tauri/src/commands/conversations.rs` | criação/seleção ACP, `set_conversation_runtime`, guard de `set_conversation_model`, Chat→Code sem escalar permissão, truncate/delete/workspace e `title_source=user` no rename |
 | `src-tauri/src/commands/code.rs` | `/compact` ACP ou recusa explícita; pending ACP no snapshot |
@@ -705,7 +769,7 @@ Modificações compartilhadas:
 | `src-tauri/src/policy/mod.rs` | Fatos ACP de terminal com programa/argv/env, sem alterar matching nativo |
 | `src-tauri/src/process_guard.rs` | Job Object/kill de árvore compartilhado |
 | `src-tauri/src/workspace/exec.rs` | API `spawn_interactive`; `run()` existente continua igual |
-| `src-tauri/src/Cargo.toml` / `Cargo.lock` | SDK ACP, `jsonschema` (draft-07), `tar`, `flate2`, `bzip2` e feature `stdio` do helper MCP |
+| `src-tauri/src/Cargo.toml` / `Cargo.lock` | SDK ACP, `agent-client-protocol-rmcp = "=5.6.0"`, `futures`, `jsonschema` (draft-07), `tar`, `flate2`, `bzip2`; feature `stdio` do SDK para o helper MCP |
 | `package.json` | Script `acp:registry:sync` e teste do snapshot |
 | `.github/workflows/acp.yml` | Matrix Windows/macOS/Linux para codec, processo, archive, paths e shims |
 | `src/lib/types.ts` | espelhos dos contratos/eventos |
@@ -739,8 +803,10 @@ turno; `set_conversation_workspace` continua recusando mudança com turno ativo.
 
 `runtime::preflight_turn` roda antes de `register_turn_if_idle` e de qualquer
 `accepted`/`queued`, em todos os callers. Valida feature flag, gramática/instalação
-do runtime, consentimento, existência da conversa e estado de lock. Falha de
-preflight não cria journal de turno.
+do runtime, consentimento, existência da conversa e lock. Para ACP, também aplica
+o budget diário: usa o último delta USD conhecido; com limite configurado e custo
+desconhecido/não-USD, falha fechado com `ACP_COST_UNKNOWN`. Falha de preflight não
+cria journal de turno.
 
 Os callers `commands::tasks`, `routines`, `channels` e `inbox` hoje chamam
 `harness::run_turn` direto. Eles passam a chamar o dispatcher; caso contrário,
@@ -761,7 +827,7 @@ usar esses helpers e testes de golden path provam que mensagens, eventos e
 
 1. Baixar apenas do origin oficial fixo; não aceitar URL arbitrário do renderer.
 2. Validar o wrapper `{version, agents}` com `registry.schema.json` e depois cada
-   entrada com `agent.schema.json` via resolver draft-07 local.
+   entrada com `agent.schema.json` via resolver draft-07 local, sem `$ref` remoto.
 3. Exigir versão de schema suportada, ids únicos, ≤ 500 agentes e ordenação
    determinística; normalizar targets de plataforma e distribuições.
 4. Gravar cache atômico em `<app-data>/acp/registry.json` com ETag/Last-Modified.
@@ -775,8 +841,9 @@ usar esses helpers e testes de golden path provam que mensagens, eventos e
 Artefatos versionados: `data/acp-registry.snapshot.json`,
 `data/acp-registry.schema.json` (wrapper), `data/acp-agent.schema.json` (entrada) e
 `scripts/sync-acp-registry.mjs` (+ script npm e teste). Falha de rede mantém o
-snapshot commitado; o script não altera o catálogo HTTP. Refresh runtime ocorre no
-startup, a cada 6 h e sob demanda, sempre nonblocking.
+snapshot commitado; o script não altera o catálogo HTTP. Refresh runtime automático
+só ocorre com `acp_enabled=true` (startup, a cada 6 h e foco); com a flag desligada,
+somente refresh manual explícito acessa a rede. Sempre nonblocking.
 
 ### 8.2 Instalação
 
@@ -813,8 +880,9 @@ startup, a cada 6 h e sob demanda, sempre nonblocking.
 
 - Resolver `uv.exe`/`uv`; comando `uvx <package-spec> <args...>`.
 - Preservar a versão exata do Registry ou acrescentá-la somente se ausente;
-  detectar runtime ausente. Aplicar a mesma grammar rígida de package spec e
-  rejeitar opções/URLs/tags.
+  detectar runtime ausente. Gramática Python/PEP 440 aceita `name==X.Y.Z` e
+  `name@X.Y.Z` exatos (incluindo o fixture real `fast-agent-acp==0.10.66`), mas
+  rejeita tags, URLs, ranges e opções.
 
 #### Windows `.cmd` e terminal auth
 
@@ -842,8 +910,9 @@ startup, a cada 6 h e sob demanda, sempre nonblocking.
 
 #### Agentes customizados e segredos
 
-- “Adicionar agente ACP” aceita comando absoluto (ou executável resolvido), args,
-  env não sensível e id `custom-<slug>`.
+- “Adicionar agente ACP” aceita comando absoluto (ou executável resolvido e então
+  fixado como caminho absoluto), args, env não sensível e id
+  `custom-<slug>-<8hex>` (com checagem de colisão).
 - Valores marcados como secret ficam em `secrets.json` no namespace
   `acp:<agent-id>:<ENV_NAME>`; o renderer só recebe nome/status mascarado.
 - Nomes de env seguem `[A-Z_][A-Z0-9_]*`; segredos nunca aparecem em args, logs,
@@ -855,22 +924,26 @@ startup, a cada 6 h e sob demanda, sempre nonblocking.
 
 - Limites iniciais: download ≤ 1 GiB, descompactado ≤ 4 GiB, ≤ 50 mil arquivos,
   probe/initialize ≤ 30 s e session/new ≤ 60 s.
-- Redirects são revalidados: HTTPS, hosts públicos, sem credenciais. DNS é
-  resolvido e todos os IPs são validados contra loopback/privado/link-local/
-  metadata; a conexão usa resolução pinada por request para resistir a DNS
-  rebinding.
-- Tipo de arquivo é detectado por magic bytes antes da extração, não só extensão.
+- Redirects são revalidados: HTTPS, hosts públicos, sem credenciais. O downloader
+  desliga redirect automático e segue no máximo 5 hops manuais; em cada hop resolve
+  e valida todos os IPs contra loopback/privado/link-local/metadata e fixa a
+  resolução daquele request para resistir a DNS rebinding.
+- Download bounded valida `Content-Length`, hash e magic; divergência/cancelamento
+  remove parcial. Tipo de arquivo é detectado por magic bytes antes da extração,
+  não só extensão.
 - Binário instalado tem manifesto de hash de todos os executáveis/scripts/libs
-  necessários ao launch closure; qualquer mudança exige reinstalação/confirmação.
-  O hash do executável principal é apenas um atalho, não a garantia completa.
+  necessários ao launch closure. Verificação completa ocorre no install/update;
+  antes de cada launch, tamanho/mtime são conferidos e qualquer divergência
+  dispara rehash ou reinstalação. O hash do executável principal é apenas um
+  atalho, não a garantia completa.
 - Update mantém a versão anterior até o probe da nova passar; sessões ativas
   continuam na versão antiga até o próximo turno. No Windows, usar staging +
   ponteiro `current`/backup swap, nunca rename in-place de diretório aberto.
 - Instalação/update emitem `AcpInstallEvent` (`download`, `verify`, `extract`,
   `probe`, `commit`, `rollback`) por Channel e aceitam cancelamento. Cancelamento
   remove staging e não altera a instalação atual.
-- Uninstall é recusado com sessão ativa; após encerrar, preserva conversas e
-  metadados para exibição histórica.
+- Uninstall é recusado com sessão ativa; após encerrar, remove o launch root mas
+  preserva um tombstone de instalação e metadados para exibição histórica.
 - `reset_app_data` fecha processos ACP antes de apagar arquivos/DB e remove tabelas
   ACP, registry cache, staging, installations, sessões, attachments, content,
   processos e namespace de segredos ACP. Tokens que o agente guarda fora do
@@ -882,9 +955,10 @@ Probe:
 
 1. Spawnar o agente com stdio.
 2. Enviar `initialize` v1.
-3. Validar versão negociada, `agentInfo`, capabilities e `authMethods`. Entrada
-   Registry sem nenhum método de auth é recusada como não conforme; custom pode
-   declarar nenhum.
+3. Validar versão negociada, capabilities e `authMethods`. `agentInfo` ausente
+   usa nome configurado/versão `unknown`, sem rejeitar agente custom válido.
+   Entrada Registry sem nenhum método de auth é recusada como não conforme;
+   custom pode declarar nenhum.
 4. Encerrar o processo; não criar sessão.
 5. Persistir apenas metadados não sensíveis.
 
@@ -906,11 +980,14 @@ Autenticação:
 ### 8.4 Criação/resumo de sessão
 
 1. Resolver `cwd`: workspace explícito ou pasta interna isolada.
-2. Root set: `[cwd, ...additionalDirectories]` somente se capability anunciada.
+2. Root set: `[cwd, ...additionalDirectories]` somente se capability anunciada;
+   load/resume reenviam a lista completa pretendida, nunca dependem de estado
+   armazenado.
 3. System prompt em modo `append` somente se capability anunciada; conteúdo
    confiável e estável (idioma, Markdown, privacidade, instruções da persona e
    `Settings.systemPrompt`), nunca override. Sem capability, o contexto confiável
-   entra delimitado no primeiro prompt, nunca como autoridade do agente.
+   entra delimitado no primeiro prompt, nunca como autoridade do agente. Load e
+   resume reenviam o mesmo system prompt usado na criação.
 4. MCP servers: nenhum por padrão; ponte host tools na Fase 6 se opt-in.
 5. Fingerprint inclui agent id/version, launch argv/env names, protocolo, cwd,
    roots, system prompt, MCP config e estado local de auth. Logout invalida o
@@ -931,8 +1008,9 @@ Nunca finge que o agente retomou o contexto nem reenvia o último prompt.
 
 Replay de `session/load`:
 
-- Bufferizar todos os updates até a resposta do request; não emitir replay como
-  deltas vivos na bolha placeholder.
+- Bufferizar todos os updates até a resposta do request em staging bounded
+  (≤ 256 MiB/100 mil eventos); não emitir replay como deltas vivos na bolha
+  placeholder. Overflow aborta o load.
 - `acp_message_map` relaciona `(sessionId, messageId)` ou `syntheticKey` a mensagens
   Zylara. Import/replay criam uma linha por mensagem ACP; no turno ao vivo, várias
   mensagens ACP do mesmo turno são segmentos da única bolha assistant e ficam no
@@ -941,17 +1019,19 @@ Replay de `session/load`:
   chunks consecutivos sem ID ficam no mesmo segmento. Na dúvida, não duplicar.
 - Updates de tool/plan/compaction são entidades ID-keyed com substituição/patch,
   não novas linhas de mensagem.
-- Depois da resposta, reconciliar apenas entidades ausentes; o DB continua fonte
-  de exibição. Replay falhado descarta o buffer inteiro.
+- Depois da resposta, reconciliar apenas entidades ausentes em uma transação; o DB
+  continua fonte de exibição. Replay falhado descarta o buffer inteiro.
 
 ### 8.5 Turno ACP
 
-1. `commands::turn` registra e emite `accepted` como hoje.
+1. Após `runtime::preflight_turn`, `commands::turn` registra e emite `accepted`
+   como hoje.
 2. ACP runtime persiste user + assistant placeholder e emite `turn_started`.
 3. Conecta/retoma a sessão.
 4. Converte anexos:
    - imagem → `image` se capability;
-   - texto → `resource` se `embeddedContext`, senão prefixo textual delimitado;
+   - texto → `resource` se `embeddedContext` e ≤ 1 MiB; maior é staging
+     `resource_link`; sem capability, prefixo textual delimitado dentro do limite;
    - binário → `resource` blob se suportado e dentro do limite;
    - fallback → `resource_link` file:// dentro dos roots autorizados.
    - Anexos sem `embeddedContext` são copiados para
@@ -965,7 +1045,7 @@ Replay de `session/load`:
 5. Envia uma única `session/prompt`.
 6. Consome updates até a resposta com `stopReason`.
 7. Emite eventos neutros incrementalmente.
-8. Persiste assistente, usage, erro/resume e estado ACP.
+8. Persiste assistente, contexto/custo reportado, erro/resume e estado ACP.
 9. Emite `done`/`cancelled`/`error`.
 10. Fecha ou mantém a conexão ociosa por timeout configurável.
 
@@ -982,7 +1062,9 @@ quando `session/prompt` responde.
   até `session/close`, idle timeout, cancelamento ou shutdown.
 - Updates durante o turno usam `PersistingEmitter`/`zylara:turn-event`.
 - Updates fora do turno são persistidos em `acp_session_events` e espelhados em
-  `zylara:acp-event`; ao reabrir, `acp_get_session_state` reconstrói o estado.
+  `zylara:acp-event`; mensagens user-facing viram `ChatMessage` e entidades viram
+  `acp_entities` duráveis. Ao reabrir, `acp_get_session_state` reconstrói o estado
+  sem depender do journal podado.
 - Subagents que continuam após o fim do turno pai aparecem como atividade aninhada
   e não são tratados como turno Zylara.
 - Perda da conexão marca estado `disconnected`; nunca inventa sucesso/falha/cancel
@@ -995,10 +1077,13 @@ quando `session/prompt` responde.
   bolha assistant quando o último stop reason permite.
 - `max_tokens`/`max_turn_requests` marcam a bolha como `incomplete` e oferecem
   Continuar; não prometem retomar o passo interno do modelo.
-- Regenerar cria uma nova sessão ACP semeada com o histórico sem a última resposta
-  ACP; nunca reenvia o prompt para a sessão antiga como se fosse idempotente.
-- Truncar/editar uma mensagem fecha a sessão ACP antiga e cria outra com o histórico
-  truncado. Excluir conversa chama `session/close` antes do cascade.
+- Regenerar/editar/truncar não faz fork nem rewind: cria uma nova sessão ACP e,
+  somente com consentimento explícito, injeta um contexto histórico bounded via
+  `acp_restart_with_history`/`acp_send_history_context`. Nunca reenvia o prompt
+  para a sessão antiga como se fosse idempotente.
+- O contexto injetado é claramente delimitado, limitado pelo orçamento de prompt e
+  não reivindica ser o histórico nativo do agente.
+- Excluir conversa chama `session/close` antes do cascade.
 - Adicionar uma sessão ACP do Chat ao Code não muda seu `cwd` nem reduz o modo de
   permissão para Autônomo silenciosamente; mantém Review ou pede escolha explícita.
   Trocar workspace exige nova sessão ACP com consentimento.
@@ -1011,7 +1096,8 @@ quando `session/prompt` responde.
 - `pending`/`in_progress` → Running; `completed` → Done; `failed` → Error.
 - Cancelamento local marca tool não finalizada como cancelada, mas aceita updates
   posteriores.
-- `rawInput` vira args; `rawOutput` vira resultado.
+- `rawInput` vira args; `rawOutput` vira resultado. Inline limitado a 64 KiB;
+  excedente vai para spill e o card mostra referência paginada.
 - `content.type=diff` vira presentation `file_change` com path absoluto validado.
 - `content.type=terminal` referencia o terminal ACP; streaming vai para
   `tool_progress`.
@@ -1032,10 +1118,18 @@ Todo `ContentBlock` é persistido em `acp_content_blocks` e referenciado por
 | `resource` blob | Artefato pelo MIME/tamanho; sem IPC inline |
 | `resource_link` | Metadado/URI persistido; nenhum fetch automático |
 
+`acp_get_content_blocks` pagina no máximo 20 itens/1 MiB de metadados+thumbnails;
+backend valida que owner/content pertence a uma conversa acessível. Artefatos são
+associados à conversa/mensagem e emitem `artifact_created`; o painel
+Biblioteca/Artefatos existente continua sendo a fonte de exibição. Bytes recebidos
+têm MIME/magic e tamanho validados antes do writer.
+
 Binários ficam em `artifacts/` via writer existente; `acp_get_content_block`
-retorna texto ou base64 sob demanda para ≤ 8 MiB. Conteúdo maior abre artefato ou
-é paginado/spillado. Imagens remotas só carregam após clique. A mesma pipeline
-vale em mensagens, thoughts, tools, replay/import e session messages.
+retorna texto ou chunks com `data_base64` ≤ 768 KiB codificado, deixando margem
+para o envelope IPC de 1 MiB (`max_bytes` clamp). Conteúdo maior abre o painel de artefato existente (limites
+próprios de artefato) ou é paginado. Imagens remotas só carregam após clique. A
+mesma pipeline vale em mensagens, thoughts, tools, replay/import e session
+messages.
 
 ### 8.7 Duas camadas de autorização
 
@@ -1087,10 +1181,15 @@ pelo texto do título. Em Autônomo, a opção separada `acp_auto_approve_permis
 
 `fs/write_text_file`:
 
+- `fs/read_text_file` registra o hash observado da conversa;
 - path absoluto, canonicalizado e dentro do root set;
 - criar diretórios apenas dentro da raiz;
-- adquirir `workspace::access`, observar versão (`ObservedFiles`), aplicar CAS
-  (`FS_STALE_VERSION`), escrita atômica preservando EOL e journal;
+- adquirir `workspace::access`; arquivo novo é permitido. Arquivo existente com
+  observação `Fresh` usa CAS; sem observação, captura before sob o lock e exige
+  aprovação explícita (autoatendida somente pela política Autônomo), depois
+  recheca o hash e escreve. `FS_NOT_OBSERVED` só ocorre se não for possível ler/
+  capturar ou se não houver canal de aprovação; divergência → `FS_STALE_VERSION`;
+- escrita atômica preservando EOL e journal;
 - capturar before/after e emitir `file_changed`;
 - exigir aprovação extra para `.git/hooks`, configuração de agente/editor, MCP e
   arquivos que controlam execução.
@@ -1107,6 +1206,11 @@ Novo `AcpTerminalRegistry`, separado do terminal PTY da UI:
 
 - todo terminal ID é ligado à sessão dona; métodos de outra sessão recebem
   `-32002`/`-32602`;
+- `cwd` omitido usa o cwd da sessão; `command` `.cmd`/`.bat` é rejeitado ou passa
+  pelo resolvedor de shim validado;
+- em `Settings.executionEnvironment=docker`, o cliente não anuncia `terminal` e
+  recusa `terminal/*` com JSON-RPC `-32601` + data `ACP_TERMINAL_DOCKER_UNSUPPORTED`
+  (tradução de paths e Docker ficam para follow-up);
 - `terminal/create` retorna imediatamente;
 - argv separado, sem shell;
 - `cwd` dentro do root set;
@@ -1181,7 +1285,8 @@ Orfãos e shutdown:
 - `usage_update.cost` é **cumulativo por sessão** e já inclui descendentes. Fica em
   `AcpReportedCost`/`acp_cost_samples`, nunca direto em `UsageInfo.cost` por turno.
 - Delta por turno só é derivado quando moeda e sessão-root são iguais e o novo
-  cumulativo é ≥ o baseline anterior. Só o delta USD inequívoco pode entrar em
+  cumulativo é ≥ o baseline anterior. Cumulativo menor indica reset/sessão nova e
+  não gera delta negativo. Só o delta USD inequívoco pode entrar em
   `usage_log`; custo de filho nunca é somado ao do pai.
 - Outras moedas são exibidas como “custo reportado pelo agente”, sem conversão.
 - Sem usage: tokens/custo/cache aparecem como `—`, nunca zero inventado.
@@ -1192,12 +1297,14 @@ Orfãos e shutdown:
 ### 8.14 Elicitation
 
 - Anunciar `form` e `url` somente se ambos os fluxos estiverem implementados.
-- Form mode aceita schema flat de string/number/boolean/enum, aplica defaults,
-  valida no cliente e deixa o usuário revisar antes do `accept`.
+- Form mode cobre todas as variantes estáveis: string, integer, number, boolean,
+  enum e array multi-select de tipos suportados; aplica defaults, valida no
+  cliente e deixa o usuário revisar antes do `accept`.
 - Rejeitar campos com nomes de segredo (`password`, `token`, `secret`, `api_key`,
   chave privada etc.); ACP exige URL mode para credenciais.
-- URL mode mostra URL completa/host, nunca faz prefetch, bloqueia hosts
-  privados/loopback fora de dev, exige consentimento e abre no navegador do sistema.
+- URL mode mostra URL completa/host, nunca faz prefetch, exige HTTPS fora de dev,
+  rejeita userinfo e caracteres de controle, bloqueia hosts privados/loopback e
+  só abre no navegador do sistema após consentimento com target completo.
 - `elicitation/complete` só é aceito para o ID original da mesma conexão; IDs
   desconhecidos/repetidos são ignorados.
 - `decline`/`cancel`/timeout são fallbacks seguros; nunca assumir sucesso.
@@ -1214,7 +1321,8 @@ de sessão.
   erro e posição fixa. Replay usa a mesma semântica.
 - Session message por `messageId`: content, sender/recipient session e mensagens
   linkadas; chunks acumulam, update substitui, omission preserva e `null`/`[]`
-  limpa conforme o schema.
+  limpa conforme o schema. Views só são linkadas por `senderMessageId`/
+  `recipientMessageId`, nunca por IDs iguais.
 - Tool call por `toolCallId`: omitted = unchanged, `null` = clear onde o schema
   permite, content/locations arrays substituem; `content.type=session` é referência
   display-only.
@@ -1239,8 +1347,11 @@ Subagents:
 - Load/resume descarta capabilities/estado correntes dos filhos. No `load`,
   anúncios antes da resposta são históricos e só snapshots após a resposta são
   atuais; no `resume` (sem replay), todos os anúncios são atuais.
-- Roots filhas herdam cwd/additionalDirectories separadamente; anúncios seguem
-  ordem ancestral antes de updates/requests filhos.
+- Roots filhas reportadas são display-only até aprovação. O root set efetivo para
+  `fs/*`/`terminal/*` é a interseção canônica com roots aprovados; fora dela, negar
+  ou pedir consentimento por diretório. Nunca expandir autoridade só porque o
+  agente relatou um caminho. Anúncios seguem ordem ancestral antes de updates/
+  requests filhos.
 - Comandos/config de filhos são read-only; requests de descendentes só são
   cancelados quando o filho reporta idle/cancelled ou o pai é fechado. Perda de
   conexão deixa estado `unknown`.
@@ -1251,10 +1362,11 @@ Subagents:
 
 O backend recusa, com código estável, operações que dependem do harness interno:
 `/goal`, completion gate, forced-final-answer, protocol fallback, cache/compact
-nativo e `set_conversation_model`. `/compact` só é aceito se o agente expuser um
-comando/config ACP equivalente; caso contrário a UI explica que a compactação é
-gerenciada pelo agente. Plugins modes/prompt não são injetados no ACP; somente a
-ponte host tools opt-in pode reutilizar tools do Zylara.
+nativo e `set_conversation_model`. O toggle Plano nativo fica oculto em ACP;
+modos do agente aparecem em controle separado. `/compact` só é aceito se o agente
+expuser um comando/config ACP equivalente; caso contrário a UI explica que a
+compactação é gerenciada pelo agente. Plugins modes/prompt não são injetados no
+ACP; somente a ponte host tools opt-in pode reutilizar tools do Zylara.
 
 ### 8.17 Persona, memória e capabilities
 
@@ -1315,7 +1427,12 @@ ponte host tools opt-in pode reutilizar tools do Zylara.
 
 ```ts
 type RuntimeSelection =
-  | { kind: 'native'; model: ModelSelection }
+  | {
+      kind: 'native';
+      providerId: string;
+      modelId: string;
+      reasoning?: ReasoningSelection | null;
+    }
   | { kind: 'acp'; agentId: string; configFingerprint?: string };
 ```
 
@@ -1389,6 +1506,8 @@ src/components/code/AcpSessionControls.tsx
   - previews ativos só abrem por ação explícita do usuário;
   - links/URI remotos só abrem com ação do usuário.
 - O modo nativo atual do Markdown não muda.
+- Cache nativo não é exibido como suportado em ACP; o indicador fica oculto ou
+  mostra “não reportado”.
 - Ícones SVG do Registry são sanitizados e cacheados; fallback para `Bot`.
 - Comandos ACP guardam `displayName` e `rawName`; colisões são exibidas com
   namespace, mas o texto enviado continua sendo o `/rawName` original. Built-ins
@@ -1454,7 +1573,9 @@ Checklist obrigatório:
 Limites são constantes de contrato testadas; não afetam o runtime nativo. O 9º
 pending request é recusado com erro estável; journal é podado por idade/tamanho;
 payloads grandes usam spill/referência. `_meta` desconhecido é descartado após
-allowlist/limite, e erros são redigidos antes de persistir/emitir.
+allowlist/limite, e erros são redigidos antes de persistir/emitir. Acima de 200
+updates/s, deltas são coalescidos sem perda; se a fila bounded estourar, a conexão
+falha fechado com `ACP_UPDATE_OVERFLOW`, nunca descarta silenciosamente.
 
 ## 12. Estratégia de testes
 
@@ -1467,12 +1588,16 @@ allowlist/limite, e erros são redigidos antes de persistir/emitir.
 - Hash válido/inválido/ausente; TOFU.
 - ZIP/tar.gz/tar.bz2/raw; path traversal, symlink, hardlink, ADS, nome reservado,
   colisão Windows, zip bomb, arquivo grande demais.
-- `npx`/`uv` resolution, grammar de package exato e args seguros.
+- `npx`/`uv` resolution, gramáticas npm e PEP 440 com specs reais do Registry e
+  args seguros.
 - DNS rebinding, IP privado/link-local/metadata e redirect host hopping.
 - Windows `.cmd` launcher com espaços, aspas, `&`, `|`, `%`, Unicode.
-- Consentimento persistido por digest/version/scope; IPC direto sem consentimento
-  falha antes do spawn; revogação/update invalida.
+- Consentimento persistido por digest/version/scope; challenge one-time correto,
+  velho/reaproveitado/divergente falha; IPC direto sem consentimento não spawna;
+  revogação/update invalida.
 - Cache offline, ETag, falha de rede e Registry inválido.
+- `acp_enabled=false` não faz refresh automático; manual explícito funciona.
+- `agentInfo` ausente em custom válido usa nome configurado/`unknown`.
 - Update/rollback sem interromper sessão ativa.
 
 ### 12.2 Agente ACP fake
@@ -1492,8 +1617,9 @@ O fixture cobre:
 - permission request allow/reject/cancel;
 - `$/cancel_request` inbound/outbound e respostas diretas a requests do agente;
 - fs read/write dentro/fora da raiz, line/limit e erros -32602/-32002;
-- terminal create/output/wait/kill/release, ownership e UTF-8 boundary;
-- elicitation form e URL;
+- terminal create/output/wait/kill/release, ownership, UTF-8 boundary e recusa em
+  Docker/shim inseguro;
+- elicitation form (string/integer/number/boolean/enum/array) e URL;
 - config options, modes e available commands;
 - session info, usage, notice, compaction e subagent;
 - image/audio/resource/resource_link em mensagem, thought, tool e replay;
@@ -1512,31 +1638,38 @@ O fixture nunca exige rede ou credencial.
   recusa runtime não nativo.
 - `agent_kind=acp:*` chama apenas o runtime ACP.
 - Todos os callers (`turn`, tasks, routines, channels, inbox) usam o dispatcher.
+- Budget diário ACP é verificado em todos os callers; custo desconhecido falha
+  fechado quando há limite.
 - Dispatcher nativo com writer de workspace pendente não faz self-deadlock; ACP
   mantém um único gate durante o turno.
 - Um turno por conversa, cancelamento, fila e reattach.
 - Persistência de parcial, erro, usage e título.
 - Restart com resume/load/new e sem duplicação.
+- Transcript/entidades ACP sobrevivem após poda de `acp_session_events`.
 - Replay com/sem `messageId`, múltiplas mensagens e falha no meio do buffer.
 - Colisão de `call_001` entre pai/filho; load histórico vs resume current.
+- Root filha fora do workspace não amplia autoridade sem consentimento.
 - Mudança de versão/config invalida sessão.
 - Anexos texto/imagem/áudio/binary conforme capabilities e roots.
 - Custo cumulativo, moeda e delta sem double-count de filhos.
 - `updatedAt` RFC3339, contexto checked/saturating e filhos não somados.
 - Workspace ACP exige trust/consentimento; `fs/write_text_file` usa lock/CAS e
-  retorna `FS_STALE_VERSION` em escrita concorrente.
+  retorna `FS_STALE_VERSION` em escrita concorrente; escrita sem leitura retorna
+  `FS_NOT_OBSERVED`.
 - Workspace changes, diff display-only e revert limits.
 - Órfão com PID reutilizado não é morto; boot id/start time conferem.
-- 9º pending request, frame 16 MiB, IPC 1 MiB, `_meta`/erro redigidos e poda de
-  journal/estado.
+- 9º pending request, frame 16 MiB, chunk 768 KiB + envelope ≤ 1 MiB, `_meta`/erro
+  redigidos e poda de journal/estado.
 - Shutdown em menos de 2 s com kill da árvore.
 
 ### 12.4 Testes de renderer
 
 - Registry, instalação, update, auth, PTY interativo e erros.
 - Seleção ACP em Chat/Code/Agentes.
+- `RuntimeSelection` Rust↔TypeScript round-trip com tag `kind`.
 - Lock de agente no Chat e troca no Code; config ACP durante streaming.
 - Import exige cwd igual/capability; replay falho rollback; delete ativo fecha antes.
+- Regenerate/edit/truncate criam nova sessão só com consentimento de contexto.
 - `set_conversation_runtime` recusa turno ativo, invalida sessão/fila e preserva lock.
 - Logout com sessão ativa bloqueia/fecha; Chat→Code ACP não vira Autônomo.
 - Fila com runtime/agente/fingerprint e item incompatível.
@@ -1551,6 +1684,7 @@ O fixture nunca exige rede ou credencial.
 - Sessão ociosa com filho ativo oferece Cancelar/Fechar e limpa descendentes.
 - ACP desligado/removido durante sessão.
 - Conversa histórica sem instalação ainda abre/renomeia/exporta/exclui.
+- Persona importada com ACP ausente fica indisponível e não executa.
 - Acessibilidade: foco, labels, teclado, `aria-live`.
 
 ### 12.5 Gates de não regressão
@@ -1586,10 +1720,10 @@ O fixture nunca exige rede ou credencial.
 | # | Tarefa | Dono | Depende de |
 | --- | --- | --- | --- |
 | T0.1 | Resolver/registrar as 8 falhas Vitest preexistentes | Lead | — |
-| T0.2 | Criar tipos Rust/TS, settings, eventos e migrations aditivas (consent, mensagens, conteúdo, custo) | Lead + storage-dev | T0.1 |
+| T0.2 | Criar tipos Rust/TS, settings, eventos e migrations aditivas (consent, mensagens, conteúdo, entidades, custo) | Lead + storage-dev | T0.1 |
 | T0.3 | Feature flag `acp_enabled=false`, gramática `agent_kind` e guard no harness | Lead | T0.2 |
 | T0.4 | Pin do SDK e spike `Lines` + codec limitado + processo interativo | Lead + code-runtime-dev | T0.2 |
-| T0.5 | `runtime::run_turn`, `preflight_turn` e todos os callers de fundo | Lead | T0.3 |
+| T0.5 | `runtime::run_turn`, `preflight_turn` (incl. budget ACP) e todos os callers de fundo | Lead | T0.3 |
 | T0.6 | Extração mecânica do ciclo de vida + gate exclusivo do runtime ACP | Lead + harness-dev | T0.5 |
 | T0.7 | `RuntimeSelection`, `acpStore`, fila e defaults | Lead + ui-core/ui-systems | T0.2 |
 
@@ -1603,7 +1737,7 @@ nenhuma mudança de comportamento.
 | T1.1 | Fetch/cache/schema do Registry | Lead | T0.4 |
 | T1.2 | Downloader/checksum/extractor seguro | Lead | T1.1 |
 | T1.3 | Launcher binário/npx/uv + Windows wrappers | Lead | T1.2 |
-| T1.4 | CRUD de instalações e probe initialize | Lead + storage-dev | T1.3 |
+| T1.4 | CRUD de instalações, consentimento e probe `initialize` com transporte mínimo | Lead + storage-dev | T1.3, T0.4 |
 | T1.5 | UI Registry/instalação/update/progress | ui-systems | T1.4 |
 
 Saída: instalar, atualizar, remover e fazer probe `initialize` sem criar turno;
@@ -1614,10 +1748,10 @@ autenticação entra na Fase 4.
 | # | Tarefa | Dono | Depende de |
 | --- | --- | --- | --- |
 | T2.1 | Client v1, transporte, codec e handler base | Lead | T0.4 |
-| T2.2 | new/resume/load/close, message map e reconciliação | Lead + storage-dev | T2.1 |
+| T2.2 | new/resume/load/close, message map, conteúdo/entidades duráveis e reconciliação | Lead + storage-dev | T2.1 |
 | T2.3 | Prompt texto/imagem/áudio/resource + staging de anexos | Lead | T2.2 |
-| T2.4 | Streaming texto/thought/tool/usage/stopReason | Lead | T2.3 |
-| T2.5 | Dispatcher ACP, persistência e supervisor fora do turno | Lead | T2.4, T0.5 |
+| T2.4 | Streaming texto/thought/tool/contexto/custo/stopReason | Lead | T2.3 |
+| T2.5 | Dispatcher ACP, persistência durável, budget e supervisor fora do turno | Lead | T2.4, T0.5 |
 | T2.6 | Peer Rust in-process + fixture executável + integração | Lead | T2.5 |
 
 Saída: turno ACP real de ponta a ponta em Code, com texto, thought, tool e uso.
@@ -1638,7 +1772,7 @@ Saída: agente externo pode operar o workspace com aprovação e cancelamento.
 
 | # | Tarefa | Dono | Depende de |
 | --- | --- | --- | --- |
-| T4.1 | ACP em Chat e Code (picker, lock, controles) | Lead + ui-core/ui-code | T2.5, T0.7 |
+| T4.1 | ACP em Chat e Code (picker, lock, `set_conversation_runtime`, controles) | Lead + ui-core/ui-code | T2.5, T0.7 |
 | T4.2 | ACP em personas Agentes + export/import | Lead + ui-agent | T4.1 |
 | T4.3 | Auth agent/terminal/logout backend + UI, incluindo PTY Channel/write/resize/exit | Lead + ui-systems | T1.4, T2.1 |
 | T4.4 | Config options, modes e slash commands (`rawName`) | Lead + ui-systems/ui-core | T2.5 |
@@ -1667,14 +1801,20 @@ Saída: paridade com as capacidades estáveis do ACP v1.
 | T6.2 | Expor web/fetch/artifacts/skills/validate_ui/memory/colaboração filtrados | harness-dev | T6.1 |
 | T6.3 | Opt-in, capabilities, auditoria e cleanup | Lead + harness-dev | T6.2 |
 | T6.4 | Testes com fake agent e MCP | harness-dev | T6.3 |
+| T6.5 | Runner ACP de tasks, budget e líder de canal | Lead + harness-dev | T6.2 |
 
-O helper usa a API MCP stdio estável do SDK e roda antes do plugin
-single-instance. Não usa `unstable_mcp_over_acp`. O token é de uso único, vinculado
-à conversa e ao boot; o socket/named pipe tem ACL local. Shell/FS não são expostos.
+O helper usa a API MCP stdio estável do SDK + `agent-client-protocol-rmcp` e o
+entrypoint `acp::mcp_bridge::helper_main()` em `lib.rs::run`, antes do plugin
+single-instance. `session/new.mcpServers` aponta para `current_exe()` com o modo
+helper/token. Não usa `unstable_mcp_over_acp`. O token é de uso único, vinculado
+à conversa/sessão e ao boot, com expiração curta; o socket/named pipe tem ACL local
+e cada request revalida sessão/admission. Shell/FS não são expostos.
 Cada tool tem mapa explícito de capability e escopo de dados; `read_artifact` é
 user-wide e isso é informado na UI. O token trafega apenas no env do helper, nunca
-em state/log/evento, e é redigido de erros. Testes cobrem reuso, cleanup e acesso
-entre conversas.
+em state/log/evento, e é redigido de erros. O agente necessariamente recebe esse
+token; a segurança vem do escopo/expiração/admission no helper e no host. Testes
+Rust de integração do helper entram em `cargo test --lib` e na CI; não há registro
+em `test:scripts` por não ser script Node.
 
 Saída: agente ACP pode usar ferramentas específicas do Zylara sem receber shell/FS
 duplicado. Esta fase não bloqueia o release ACP base.
@@ -1708,6 +1848,7 @@ permission, cancel, logout. Falhas do agente são classificadas como
   desde o primeiro teste.
 - Testes unitários/integração são critério; screenshots/SendKeys/CDP não são usados
   como prova de conclusão, conforme `AGENTS.md`.
+- Cada tarefa começa com teste automatizado que falha antes da implementação.
 
 ## 14. Critérios de aceite
 
@@ -1744,6 +1885,10 @@ permission, cancel, logout. Falhas do agente são classificadas como
 16. Documentação, i18n e evidência de verificação estão completas.
 17. Todo spawn ACP exige consentimento backend persistido e vinculado ao digest da
     versão/launch; IPC direto não contorna isso.
+18. Contratos Rust↔TypeScript (incluindo `RuntimeSelection`) têm round-trip e schema
+    fixture; regenerar/editar/truncar usam nova sessão + contexto consentido.
+19. Roots filhas não ampliam autoridade; budget ACP vale para todos os callers e
+    falha fechado quando custo é desconhecido sob limite.
 
 ## 15. Riscos e mitigação
 
@@ -1761,7 +1906,11 @@ permission, cancel, logout. Falhas do agente são classificadas como
 | Runtime ACP quebra features internas | Matriz explícita; `/goal`, completion gate e fallback desativados |
 | Mudança de versão invalida resume | Fingerprint de versão/config; load ou nova sessão explícita |
 | Baseline de testes vermelho | Corrigir antes ou registrar lista exata; gate de não regressão |
+| Gate duplo/self-deadlock | Um único dono por runtime; teste com writer pendente |
+| IPC contorna consentimento | Consentimento persistido e `require_consent` em todo spawn |
+| Schema de Registry errado | Validar wrapper e entrada separadamente com snapshot real |
 | Registry muda formato | Schema versionado, validação estrita e cache último bom |
+| Agente Registry só fala v2 | Marcado incompatível até o adapter v2; nunca finge fallback |
 | `npx`/`uv` indisponível | Detecção e orientação; sem instalador automático silencioso |
 | Conteúdo do agente perigoso | Markdown sanitizado, sem HTML ativo, URI com ação do usuário |
 

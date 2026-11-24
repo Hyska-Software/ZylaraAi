@@ -679,12 +679,19 @@ export const api = {
     invoke<WorkspaceGitStatus>('git_unstage_all', { workspaceId }),
   gitDiscard: (workspaceId: string, paths: string[]) =>
     invoke<WorkspaceGitStatus>('git_discard', { workspaceId, paths }),
-  gitCommit: (workspaceId: string, message: string, target: CommitTarget, paths?: string[]) =>
+  gitCommit: (
+    workspaceId: string,
+    message: string,
+    target: CommitTarget,
+    paths?: string[],
+    amend = false,
+  ) =>
     invoke<WorkspaceGitStatus>('git_commit', {
       workspaceId,
       message,
       target,
       paths: paths ?? null,
+      amend,
     }),
   gitBranches: (workspaceId: string) =>
     invoke<WorkspaceGitBranches>('git_branches', { workspaceId }),

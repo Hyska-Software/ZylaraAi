@@ -104,6 +104,12 @@ Decisão do plano: usar os tipos/traits/session APIs estáveis do SDK, mas alime
 git status --short -> limpo (antes da criação desta pasta de planejamento)
 ```
 
+Durante a revisão do plano, apareceram alterações concorrentes não relacionadas
+em `docs/goals/code-harness/WORKBENCH.md`, Git/Commit UI, locales e `src/lib/api.ts`.
+Elas **não foram tocadas nem revertidas**. Os resultados de teste abaixo são o
+baseline capturado antes dessas alterações; uma nova verificação completa deve
+rodar depois que o trabalho concorrente estiver estabilizado.
+
 ### Verificações executadas
 
 | Comando | Resultado observado |
