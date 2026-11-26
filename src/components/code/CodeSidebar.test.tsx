@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { AppInfo, Conversation, Settings, Workspace } from '@/lib/types';
+import type { AppInfo, ChatMessage, Conversation, Settings, Workspace } from '@/lib/types';
 
 const mocks = vi.hoisted(() => ({
   listWorkspaces: vi.fn(),
@@ -203,6 +203,8 @@ beforeEach(() => {
     activeIdByLayout: { chat: null, code: null, agent: null },
     streamsByConversation: {},
     streaming: null,
+    messagesByConversation: {},
+    pendingTurnsByConversation: {},
   });
   useUiStore.setState({
     layoutMode: 'code',
@@ -375,7 +377,7 @@ describe('CodeSidebar — Workspaces reais', () => {
     expect(screen.getByRole('button', { name: 'Corrigir o build' })).toBeTruthy();
   });
 
-  it('mostra o spinner de execução na sessão em andamento', async () => {
+  it('mostra o status Em execução na sessão em andamento', async () => {
     mocks.listWorkspaces.mockResolvedValue([workspace()]);
     useChatStore.setState({
       conversations: [
@@ -390,19 +392,78 @@ describe('CodeSidebar — Workspaces reais', () => {
 
     const idle = await screen.findByRole('button', { name: 'Sessão ativa' });
     const running = screen.getByRole('button', { name: 'Sessão em execução' });
-    const runningRow = running.closest('div') as HTMLElement;
 
-    expect(within(idle).queryByRole('status')).toBeNull();
-    // The spinner shares the row-actions slot: it lives outside the session
-    // button so the "…" trigger can be painted above it on hover.
-    expect(within(running).queryByRole('status')).toBeNull();
-    const status = within(runningRow).getByRole('status', { name: 'Executando' });
-    expect(within(runningRow).getAllByRole('status')).toHaveLength(1);
-    expect(status.parentElement?.className).toContain('right-1');
+    expect(within(idle).queryByText('Em execução')).toBeNull();
+    expect(within(running).getByText('Em execução')).toBeTruthy();
+    expect(within(running).getByText('Sem mensagens ainda')).toBeTruthy();
+  });
 
-    // The old active-session dot is gone from every row.
-    expect(idle.querySelector('span[aria-hidden="true"].rounded-full')).toBeNull();
-    expect(running.querySelector('span[aria-hidden="true"].rounded-full')).toBeNull();
+  it('mostra prévia, hora e status concluído nas sessões do Code', async () => {
+    const today = new Date();
+    today.setHours(17, 56, 0, 0);
+    mocks.listWorkspaces.mockResolvedValue([workspace()]);
+    useChatStore.setState({
+      conversations: [
+        conversation({
+          id: 'c-done',
+          title: 'Visão geral do projeto',
+          preview: 'App desktop local-first (Tauri 2 +...)',
+          lastStatus: 'complete',
+          updatedAt: today.getTime(),
+          workspaceId: 'ws-1',
+        }),
+      ],
+      activeId: 'c-done',
+    });
+    renderSidebar();
+
+    const row = await screen.findByRole('button', { name: 'Visão geral do projeto' });
+    expect(within(row).getByText('App desktop local-first (Tauri 2 +...)')).toBeTruthy();
+    expect(within(row).getByText('Concluída')).toBeTruthy();
+    expect(within(row).getByText('17:56')).toBeTruthy();
+  });
+
+  it('mostra a ferramenta ativa na linha de atividade da sessão', async () => {
+    const assistant: ChatMessage = {
+      id: 'assistant-1',
+      conversationId: 'c-live',
+      role: 'assistant',
+      content: '',
+      status: 'streaming',
+      toolCalls: [
+        {
+          id: 'tool-1',
+          name: 'read_file',
+          arguments: JSON.stringify({ path: 'docs/AGENTS.md' }),
+          status: 'running',
+        },
+      ],
+      citations: [],
+      attachments: [],
+      createdAt: 1,
+    };
+    mocks.listWorkspaces.mockResolvedValue([workspace()]);
+    useChatStore.setState({
+      conversations: [
+        conversation({
+          id: 'c-live',
+          title: 'Analisando o projeto',
+          preview: 'analisa o projeto e me da um r...',
+          workspaceId: 'ws-1',
+        }),
+      ],
+      activeId: 'c-live',
+      streamsByConversation: {
+        'c-live': streamingState({ conversationId: 'c-live', phase: 'tool' }),
+      },
+      messagesByConversation: { 'c-live': [assistant] },
+    });
+    renderSidebar();
+
+    const row = await screen.findByRole('button', { name: 'Analisando o projeto' });
+    expect(within(row).getByText(/docs\/AGENTS\.md/)).toBeTruthy();
+    expect(within(row).queryByText('analisa o projeto e me da um r...')).toBeNull();
+    expect(within(row).getByText('Em execução')).toBeTruthy();
   });
 
   it('destaca o workspace ativo e marca pasta não confiável como Leitura', async () => {

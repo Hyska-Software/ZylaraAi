@@ -6,7 +6,6 @@ import {
   Download,
   Ellipsis,
   Link2,
-  Loader2,
   Pencil,
   Pin,
   PinOff,
@@ -28,8 +27,8 @@ import {
   conversationRowActivity,
   conversationRowStatus,
   conversationRowTime,
-  type ConversationRowTone,
 } from './conversationRowMeta';
+import { ConversationRowStatusChip } from './ConversationRowStatusChip';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
@@ -86,14 +85,6 @@ function MenuEntry({ icon, children, danger, onSelect }: MenuEntryProps) {
     </DropdownMenu.Item>
   );
 }
-
-const ROW_TONE_CLASS: Record<ConversationRowTone, string> = {
-  muted: 'text-foreground-subtle',
-  accent: 'text-accent',
-  success: 'text-success',
-  danger: 'text-danger',
-  warning: 'text-warning',
-};
 
 interface ConversationRowProps {
   conversation: Conversation;
@@ -203,20 +194,7 @@ function ConversationRow({
           <span className="min-w-0 flex-1 truncate text-[11px] text-foreground-muted">
             {activity}
           </span>
-          <span
-            title={status.label}
-            className={cn(
-              'inline-flex shrink-0 items-center gap-1 text-[11px]',
-              ROW_TONE_CLASS[status.tone],
-            )}
-          >
-            {status.spinner ? (
-              <Loader2 className="size-3 animate-spin motion-reduce:animate-none" aria-hidden />
-            ) : (
-              <span className="size-1.5 rounded-full bg-current" aria-hidden />
-            )}
-            {status.label}
-          </span>
+          <ConversationRowStatusChip status={status} />
         </span>
       </button>
 

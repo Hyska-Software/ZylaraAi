@@ -35,10 +35,18 @@ describe('conversationRowStatus', () => {
     }
   });
 
-  it('shows New when the conversation has no turn yet', () => {
-    expect(conversationRowStatus(conversation())).toEqual({
+  it('shows New for an empty conversation without a persisted status', () => {
+    expect(conversationRowStatus(conversation({ messageCount: 0 }))).toEqual({
       label: t('common:shell.sidebar.rowStatusNew'),
       tone: 'muted',
+      spinner: false,
+    });
+  });
+
+  it('falls back to Finished for a non-empty conversation on older backends', () => {
+    expect(conversationRowStatus(conversation({ messageCount: 2 }))).toEqual({
+      label: t('common:shell.sidebar.rowStatusFinished'),
+      tone: 'success',
       spinner: false,
     });
   });

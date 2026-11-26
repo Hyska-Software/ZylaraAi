@@ -7,6 +7,15 @@ import { relativeTime } from '@/lib/utils';
 
 export type ConversationRowTone = 'muted' | 'accent' | 'success' | 'danger' | 'warning';
 
+/** Shared token mapping for the status chip in both sidebars. */
+export const CONVERSATION_ROW_TONE_CLASS: Record<ConversationRowTone, string> = {
+  muted: 'text-foreground-subtle',
+  accent: 'text-accent',
+  success: 'text-success',
+  danger: 'text-danger',
+  warning: 'text-warning',
+};
+
 export interface ConversationRowStatus {
   label: string;
   tone: ConversationRowTone;
@@ -46,6 +55,14 @@ export function conversationRowStatus(
   }
   const status = conversation.lastStatus;
   if (!status) {
+    // Older backends do not send lastStatus; a non-empty session has finished.
+    if (conversation.messageCount > 0) {
+      return {
+        label: t('common:shell.sidebar.rowStatusFinished'),
+        tone: 'success',
+        spinner: false,
+      };
+    }
     return {
       label: t('common:shell.sidebar.rowStatusNew'),
       tone: 'muted',

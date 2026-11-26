@@ -12,6 +12,7 @@ import {
   FolderOpen,
   FolderPlus,
   GitBranch,
+  Link2,
   MessageSquare,
   Pencil,
   Pin,
@@ -47,7 +48,6 @@ import {
   IconButton,
   Input,
   SortableList,
-  Spinner,
   sortableDropClass,
 } from '@/components/ui';
 import type { SortableListApi } from '@/components/ui';
@@ -71,6 +71,13 @@ import {
 import { filterConversationsForLayout } from '@/lib/conversations';
 import type { Conversation, Workspace } from '@/lib/types';
 import { cn, compareConversationPosition, copyText } from '@/lib/utils';
+import {
+  conversationRowActivity,
+  conversationRowStatus,
+  conversationRowTime,
+  type ConversationRowTurn,
+} from '@/components/layout/conversationRowMeta';
+import { ConversationRowStatusChip } from '@/components/layout/ConversationRowStatusChip';
 import { useIsCompact } from '@/components/layout/hooks';
 import { terminalManager } from './terminalManager';
 import { openWorkspaceTerminal } from './terminalOpen';
@@ -149,10 +156,9 @@ interface SessionRowProps {
 }
 
 /**
- * One real Code session row. A conversation with an active turn (foreground or
- * background) shows a spinner in the row-actions slot — the same one the "…"
- * menu uses, which is painted above it and fades it out on hover; the active row
- * is still distinguished by its surface and `aria-current`.
+ * One real Code session row: title + time above a preview/live-activity line and
+ * the persisted turn status. An active turn keeps the "…" trigger subdued until
+ * hover; the active row is still marked by its surface and `aria-current`.
  */
 function SessionRow({
   conversation,
@@ -167,13 +173,18 @@ function SessionRow({
   onDelete,
 }: SessionRowProps) {
   const { t } = useTranslation('code');
-  // A turn admitted by Rust has no assistant row yet, so it has no stream. Both
-  // states mean "this session is working", never "waiting for a slot".
-  const running = useChatStore(
-    (state) =>
-      selectConversationStream(state, conversation.id) !== null ||
-      Boolean(state.pendingTurnsByConversation[conversation.id]),
+  const stream = useChatStore((state) => selectConversationStream(state, conversation.id));
+  const pending = useChatStore((state) =>
+    Boolean(state.pendingTurnsByConversation[conversation.id]),
   );
+  const messages = useChatStore((state) => state.messagesByConversation[conversation.id]);
+  // A turn admitted by Rust has no assistant row yet: still show it as starting.
+  const turn: ConversationRowTurn | null =
+    stream ?? (pending ? { assistantId: '', phase: 'starting' } : null);
+  const status = conversationRowStatus(conversation, turn);
+  const activity = conversationRowActivity(conversation, turn, messages);
+  const time = conversationRowTime(conversation.updatedAt);
+  const running = turn !== null;
   return (
     <div
       {...sortable.dropProps(conversation.id)}
@@ -191,7 +202,7 @@ function SessionRow({
         }
         title={conversation.title}
         className={cn(
-          'flex h-8 w-full min-w-0 items-center gap-2 rounded-lg px-2 pr-8 text-left text-[13px]',
+          'flex min-h-[52px] w-full min-w-0 flex-col gap-1 rounded-lg px-2 py-1.5 pr-8 text-left',
           'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
           !sortable.disabled && 'cursor-grab active:cursor-grabbing',
           active
@@ -199,30 +210,34 @@ function SessionRow({
             : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
         )}
       >
-        {conversation.pinned ? (
-          <Pin aria-hidden className="size-3 shrink-0 text-foreground-subtle" strokeWidth={1.75} />
-        ) : null}
-        <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
-        {shared ? (
-          <span
-            title={t('code:sidebar.session.sharedTitle')}
-            className="ml-auto flex shrink-0 items-center gap-1 text-foreground-subtle"
-          >
-            <MessageSquare aria-hidden className="size-3.5" strokeWidth={1.75} />
-            <span className="text-[10px] font-medium leading-none">{t('code:sidebar.session.fromChat')}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          {conversation.pinned ? (
+            <Pin aria-hidden className="size-3 shrink-0 text-foreground-subtle" strokeWidth={1.75} />
+          ) : null}
+          <span className="truncate font-medium">{conversation.title}</span>
+          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-foreground-subtle">
+            {time}
           </span>
-        ) : null}
-      </button>
-
-      {/* The running turn reuses the row-actions slot: the "…" trigger is painted
-          above this spinner and fades it out on hover (≥ lg). Below that width the
-          trigger is always visible, so it hides its glyph instead of stacking two
-          icons on the same spot. */}
-      {running ? (
-        <span className="pointer-events-none absolute right-1 top-1/2 z-0 flex size-6 -translate-y-1/2 items-center justify-center text-accent transition-opacity duration-150 lg:group-hover:opacity-0 motion-reduce:transition-none">
-          <Spinner size="xs" label={t('code:sidebar.session.running')} />
+          {shared ? (
+            <span
+              title={t('code:sidebar.session.sharedTitle')}
+              className="flex shrink-0 items-center gap-1 text-foreground-subtle"
+            >
+              <MessageSquare aria-hidden className="size-3" strokeWidth={1.75} />
+              <span className="text-[10px] font-medium leading-none">
+                {t('code:sidebar.session.fromChat')}
+              </span>
+            </span>
+          ) : null}
         </span>
-      ) : null}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Link2 className="size-3 shrink-0 text-accent" aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-[11px] text-foreground-muted">
+            {activity}
+          </span>
+          <ConversationRowStatusChip status={status} />
+        </span>
+      </button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
