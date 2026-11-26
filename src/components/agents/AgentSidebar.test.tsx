@@ -26,7 +26,14 @@ vi.mock('sonner', () => ({
   }),
 }));
 
-import { emptyCodeSession, useAgentStore, useChatStore, useCodeStore, useUiStore } from '@/lib/store';
+import {
+  emptyCodeSession,
+  useAgentStore,
+  useAppStore,
+  useChatStore,
+  useCodeStore,
+  useUiStore,
+} from '@/lib/store';
 import type { StreamingState } from '@/lib/store';
 import type { Agent, AgentChannel, Conversation } from '@/lib/types';
 import { AgentSidebar } from './AgentSidebar';
@@ -140,6 +147,12 @@ beforeEach(() => {
     streaming: null,
   });
   useCodeStore.setState({ byConversation: {} });
+  useAppStore.setState({
+    settings: {
+      ...useAppStore.getState().settings,
+      enabledExperimentalFeatures: { agentChannels: true },
+    },
+  });
   useUiStore.setState({
     layoutMode: 'agent',
     activeAgentId: 'agent-1',
@@ -224,6 +237,20 @@ describe('AgentSidebar — channels', () => {
     // Two overlapping avatars plus the overflow chip ("+2") replace the # icon.
     expect(row.querySelectorAll('[data-avatar-kind]')).toHaveLength(2);
     expect(within(row).getByText('+2')).toBeTruthy();
+  });
+
+  it('hides channels while the experimental flag is off', async () => {
+    useAppStore.setState({
+      settings: {
+        ...useAppStore.getState().settings,
+        enabledExperimentalFeatures: { agentChannels: false },
+      },
+    });
+    mocks.listAgentChannels.mockResolvedValue([channel()]);
+    render(<AgentSidebar />);
+
+    await waitFor(() => expect(mocks.listAgentChannels).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /Lançamento/ })).toBeNull();
   });
 
   it('selects a channel and exposes it in the sidebar', async () => {

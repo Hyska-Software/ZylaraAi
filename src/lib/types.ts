@@ -2539,6 +2539,8 @@ export interface Settings {
   pluginSafeMode?: boolean;
   /** Developer mode: unpacked folders and unsigned packages. */
   pluginDevMode?: boolean;
+  /** Opt-in overrides for features listed in Settings → Experimental. */
+  enabledExperimentalFeatures?: Record<string, boolean>;
 }
 
 export interface ProviderKeyStatus {

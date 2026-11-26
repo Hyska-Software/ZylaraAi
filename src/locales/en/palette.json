@@ -96,6 +96,7 @@
     "plugins": "Install, discover and configure third-party plugins",
     "agents": "Concurrency, budget, notifications and computer use",
     "data": "Data folder, export and cleanup",
+    "experimental": "Opt in to experimental features",
     "about": "Version and app information"
   },
   "actions": {

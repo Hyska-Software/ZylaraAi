@@ -173,6 +173,7 @@ Tabs à esquerda (180px), conteúdo à direita (520px):
 6. **Ferramentas**: busca web (on/off), criação de arquivos (on/off), máximo de passos do agente (1–1000, padrão 64), execução de código (opt-in + tempo limite), cache de prompt, **Sessões de código** (modo de permissão padrão das novas sessões do Code — Leitura/Revisar/Editar/Autônomo, padrão **Autônomo** — e onde o diff dos arquivos abre) e ambiente de código/skills.
 7. **Dados**: abrir pasta de dados, exportar todas as conversas, limpar todos os dados (confirmação dupla).
 8. **Sobre**: versão, Tauri, commits do catálogo, link do projeto.
+9. **Experimental**: aviso de que os recursos estão em desenvolvimento e uma lista de switches para os recursos com `stage: 'experimental'` em `src/lib/experiments.ts` (plugin platform, reasoning slider, ACP agents e agent channels na primeira leva). Cada switch salva via `saveSettings` em `Settings.enabledExperimentalFeatures`, preservando campos legados quando existem. Ao promover um recurso para `stable`, basta trocar o `stage` no registro e remover o gate do consumidor: a entrada desaparece da aba e overrides antigos são ignorados.
 
 ## 10. Paleta de comandos (⌘K / Ctrl+K)
 

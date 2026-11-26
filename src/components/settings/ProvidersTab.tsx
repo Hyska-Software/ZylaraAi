@@ -29,6 +29,7 @@ import {
   providerSupportsPlan,
   providers as catalogProviders,
 } from '@/lib/catalog';
+import { isExperimentalFeatureEnabled } from '@/lib/experiments';
 import { openExternal } from '@/lib/genui/open-external';
 import { formatDate } from '@/lib/i18n/format';
 import { copyText } from '@/lib/utils';
@@ -424,6 +425,9 @@ export function ProvidersTab() {
   const { t } = useTranslation('settings');
   const { t: common } = useTranslation('common');
   const storeProviders = useAppStore((state) => state.providers);
+  const acpEnabled = useAppStore((state) =>
+    isExperimentalFeatureEnabled(state.settings, 'acpAgents'),
+  );
   const keys = useAppStore((state) => state.keys);
   const auth = useAppStore((state) => state.auth);
   const secretsError = useAppStore((state) => state.secretsError);
@@ -1436,7 +1440,7 @@ export function ProvidersTab() {
         )}
       </section>
 
-      <AcpAgentPanel />
+      {acpEnabled ? <AcpAgentPanel /> : null}
 
       <div>
         <Button

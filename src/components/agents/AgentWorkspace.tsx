@@ -20,9 +20,11 @@ import {
 } from '@/components/code';
 import { GoalPanel } from '@/components/code/GoalPanel';
 import { Button, IconButton } from '@/components/ui';
+import { isExperimentalFeatureEnabled } from '@/lib/experiments';
 import {
   selectAgent,
   useAgentStore,
+  useAppStore,
   useChatStore,
   useUiStore,
 } from '@/lib/store';
@@ -139,6 +141,9 @@ export function AgentWorkspace() {
   const activeChannelId = useUiStore((state) => state.activeChannelId);
   const agentView = useUiStore((state) => state.agentView);
   const setActiveChannelId = useUiStore((state) => state.setActiveChannelId);
+  const channelsEnabled = useAppStore((state) =>
+    isExperimentalFeatureEnabled(state.settings, 'agentChannels'),
+  );
   const [editingChannel, setEditingChannel] = useState<AgentChannel | null>(null);
   const [channelRevision, setChannelRevision] = useState(0);
   const agent = useAgentStore((state) => selectAgent(state, activeAgentId));
@@ -177,6 +182,11 @@ export function AgentWorkspace() {
     if (agent && activeId && !isThread) clearActiveConversation();
   }, [agent, activeId, isThread, clearActiveConversation]);
 
+  // Disabling the experimental channel surface leaves any open channel view.
+  useEffect(() => {
+    if (!channelsEnabled && activeChannelId) setActiveChannelId(null);
+  }, [channelsEnabled, activeChannelId, setActiveChannelId]);
+
   // A queue that survived a layout switch drains when the thread is opened
   // again, as long as no other turn is running.
   useEffect(() => {
@@ -185,7 +195,7 @@ export function AgentWorkspace() {
     void processQueue(activeId);
   }, [activeConversation?.mode, activeId, processQueue, streaming]);
 
-  if (activeChannelId) {
+  if (channelsEnabled && activeChannelId) {
     return (
       <>
         <AgentChannelView

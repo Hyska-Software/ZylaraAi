@@ -38,6 +38,7 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { isExperimentalFeatureEnabled } from '@/lib/experiments';
 import { AgentAvatar } from './AgentAvatar';
 import { AgentAvatarStack } from './AgentAvatarStack';
 import { AgentActivityDots } from './AgentActivityDots';
@@ -81,6 +82,7 @@ import type { SortableListApi } from '@/components/ui';
 import {
   selectActiveAgents,
   selectPinnedAgents,
+  useAppStore,
   useMessageQueueStore,
   useAgentStore,
   useChatStore,
@@ -620,6 +622,9 @@ function ChannelRow({
 
 export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
   const { t } = useTranslation('agents');
+  const channelsEnabled = useAppStore((state) =>
+    isExperimentalFeatureEnabled(state.settings, 'agentChannels'),
+  );
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<Agent | null>(null);
@@ -1092,6 +1097,7 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
             </Button>
           </div>
         ) : null}
+        {channelsEnabled ? (
         <section className="mb-3">
           <div className="mb-1 flex items-center justify-between px-2">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-subtle">
@@ -1154,6 +1160,7 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
             </SortableList>
           )}
         </section>
+        ) : null}
 
         {status === 'ready' && agents.length === 0 ? (
           <div className="px-2 py-5 text-center">

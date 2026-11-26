@@ -98,6 +98,8 @@ function settingsTabDescription(id: SettingsTabId): string {
       return t('palette:settingsTabDescriptions.agents');
     case 'data':
       return t('palette:settingsTabDescriptions.data');
+    case 'experimental':
+      return t('palette:settingsTabDescriptions.experimental');
     case 'about':
       return t('palette:settingsTabDescriptions.about');
     default:

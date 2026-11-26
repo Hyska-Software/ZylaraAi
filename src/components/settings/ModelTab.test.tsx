@@ -175,21 +175,13 @@ describe('ModelTab — started conversation', () => {
     });
   });
 
-  it('persists the sliding level selector toggle', async () => {
-    const user = userEvent.setup();
+  it('leaves the sliding level selector opt-in to the Experimental tab', () => {
     render(<ModelTab />);
 
-    const toggle = screen.getByRole('switch', {
-      name: 'Ativar seletor deslizante de nível de pensamento',
-    });
-    expect(toggle.getAttribute('aria-checked')).toBe('false');
-
-    await user.click(toggle);
-
-    await waitFor(() => {
-      expect(mocks.saveSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ reasoningSliderEnabled: true }),
-      );
-    });
+    expect(
+      screen.queryByRole('switch', {
+        name: 'Ativar seletor deslizante de nível de pensamento',
+      }),
+    ).toBeNull();
   });
 });

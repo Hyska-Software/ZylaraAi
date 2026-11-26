@@ -155,6 +155,32 @@
       "ok": "Remover"
     }
   },
+  "experimental": {
+    "label": "Experimental",
+    "notice": "Esses recursos ainda estão em desenvolvimento. Interfaces e comportamentos podem mudar; ativá-los é opcional.",
+    "title": "Recursos experimentais",
+    "description": "Ative um recurso para testá-lo. Desativá-lo oculta o recurso novamente sem apagar seus dados.",
+    "badge": "Experimental",
+    "empty": "Nenhum recurso experimental disponível no momento.",
+    "features": {
+      "pluginPlatform": {
+        "label": "Plataforma de plugins",
+        "description": "Instale e execute plugins de terceiros, incluindo interface e ferramentas contribuídas. Pacotes de terceiros não são revisados pela Zylara."
+      },
+      "reasoningSlider": {
+        "label": "Controle de raciocínio",
+        "description": "Substitui o seletor de pensamento por um controle deslizante no seletor de modelo e no composer."
+      },
+      "acpAgents": {
+        "label": "Agentes ACP",
+        "description": "Mostra agentes externos do Agent Client Protocol em Provedores e no seletor de modelo. Agentes externos rodam com seus privilégios de usuário."
+      },
+      "agentChannels": {
+        "label": "Canais de agentes",
+        "description": "Mostra canais compartilhados de agentes no layout Agentes, incluindo caixa de entrada e histórico de mensagens."
+      }
+    }
+  },
   "tabs": {
     "general": "Geral",
     "themes": "Temas",
@@ -167,6 +193,7 @@
     "plugins": "Plugins",
     "agents": "Agentes",
     "data": "Dados",
+    "experimental": "Experimental",
     "about": "Sobre"
   },
   "design": {

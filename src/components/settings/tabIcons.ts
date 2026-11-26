@@ -6,6 +6,7 @@
 import {
   Bot,
   Database,
+  FlaskConical,
   Info,
   KeyRound,
   Palette,
@@ -34,5 +35,6 @@ export const SETTINGS_TAB_ICONS: SettingsTabIconMap = {
   plugins: Plug,
   agents: Bot,
   data: Database,
+  experimental: FlaskConical,
   about: Info,
 };

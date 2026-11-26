@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api } from '../api';
+import { visibleProviders } from '../experiments';
 import { setLanguage } from '../i18n';
 import {
   defaultReasoningFor,
@@ -161,6 +162,7 @@ const DEFAULT_SETTINGS: Settings = {
   pluginAllowTrusted: false,
   pluginSafeMode: false,
   pluginDevMode: false,
+  enabledExperimentalFeatures: {},
 };
 
 interface AppState {
@@ -291,7 +293,7 @@ export const useAppStore = create<AppState>()(
           const settings = view.settings;
           // The merged view (bundled catalog + account model list) is the
           // source of truth for the renderer, not the static JSON import.
-          const providers = catalogView.catalog.providers;
+          const providers = visibleProviders(settings, catalogView.catalog.providers);
           const persisted = get().selection;
           const fallback = defaultSelectionFrom(settings, providers);
           const candidateProvider = persisted?.providerId ?? fallback.providerId;
@@ -424,7 +426,7 @@ export const useAppStore = create<AppState>()(
       reloadCatalog: async () => {
         try {
           const catalogView = await api.getCatalog();
-          const providers = catalogView.catalog.providers;
+          const providers = visibleProviders(get().settings, catalogView.catalog.providers);
           const current = get().selection;
           const fallback = defaultSelectionFrom(get().settings, providers);
           const provider =
@@ -458,7 +460,7 @@ export const useAppStore = create<AppState>()(
         try {
           const catalogView = await api.refreshCatalog();
           set({
-            providers: catalogView.catalog.providers,
+            providers: visibleProviders(get().settings, catalogView.catalog.providers),
             keys: catalogView.keys,
             auth: catalogView.auth ?? get().auth,
             acpAgents: catalogView.acpAgents ?? get().acpAgents,
@@ -471,7 +473,7 @@ export const useAppStore = create<AppState>()(
 
       refreshProviderModels: async (providerId) => {
         const catalogView = await api.refreshProviderModels(providerId);
-        const providers = catalogView.catalog.providers;
+        const providers = visibleProviders(get().settings, catalogView.catalog.providers);
         set({
           providers,
           keys: catalogView.keys,

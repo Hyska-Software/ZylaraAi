@@ -25,6 +25,7 @@ import {
 import { AboutTab } from './AboutTab';
 import { AgentsTab } from './AgentsTab';
 import { DataTab } from './DataTab';
+import { ExperimentalTab } from './ExperimentalTab';
 import { GeneralTab } from './GeneralTab';
 import { InstructionsTab } from './InstructionsTab';
 import { ModelTab } from './ModelTab';
@@ -199,6 +200,9 @@ export function SettingsDialog() {
                   </TabsContent>
                   <TabsContent value="data">
                     <DataTab />
+                  </TabsContent>
+                  <TabsContent value="experimental">
+                    <ExperimentalTab />
                   </TabsContent>
                   <TabsContent value="about">
                     <AboutTab />

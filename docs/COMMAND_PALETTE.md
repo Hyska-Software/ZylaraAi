@@ -248,13 +248,15 @@ resultado é `null` (exceto ⌘K). Isso torna o bloqueio testável sem montar o 
 | `alternar-tema` | Aparência | Alternar tema | sempre | `setTheme` + `saveSettings` |
 | `tema-sistema` | Aparência | Seguir tema do sistema | tema ≠ system | idem |
 | `abrir-configuracoes` | Configurações | Abrir configurações | sempre | `uiStore.openSettings()` |
-| `config-geral` … `config-sobre` | Configurações | Configurações › {aba} | sempre (7 abas) | `uiStore.openSettings(tab)` |
+| `config-geral` … `config-sobre` | Configurações | Configurações › {aba} | sempre (inclui Experimental) | `uiStore.openSettings(tab)` |
 | `abrir-pasta-dados` | Sistema | Abrir pasta de dados | sempre | `api.openDataDir` |
 | `recarregar-catalogo` | Sistema | Recarregar catálogo de modelos | sempre | `appStore.refreshCatalog` |
 
 > A fonte única do catálogo é `src/components/palette/usePaletteActions.ts`;
 > grupos/ordem vivem em `src/lib/palette/types.ts`; abas em
 > `src/lib/settingsTabs.ts`. Não duplicar essas listas em outros arquivos.
+> Os switches da aba Experimental vêm do registro em `src/lib/experiments.ts`;
+> a paleta apenas navega até a aba, sem duplicar a lista de recursos.
 
 ## 6. Arquitetura de implementação
 

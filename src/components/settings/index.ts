@@ -8,4 +8,5 @@ export { ModelTab } from './ModelTab';
 export { InstructionsTab } from './InstructionsTab';
 export { ToolsTab } from './ToolsTab';
 export { DataTab } from './DataTab';
+export { ExperimentalTab } from './ExperimentalTab';
 export { AboutTab } from './AboutTab';

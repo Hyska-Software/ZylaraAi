@@ -19,6 +19,7 @@ export type BuiltinSettingsTabId =
   | 'plugins'
   | 'agents'
   | 'data'
+  | 'experimental'
   | 'about';
 
 /** Built-in ids plus plugin-owned tabs (`plugin:<plugin>:<tab>`). */
@@ -41,6 +42,7 @@ export const SETTINGS_TABS = [
   { id: 'plugins', labelKey: 'tabs.plugins' },
   { id: 'agents', labelKey: 'tabs.agents' },
   { id: 'data', labelKey: 'tabs.data' },
+  { id: 'experimental', labelKey: 'tabs.experimental' },
   { id: 'about', labelKey: 'tabs.about' },
 ] as const satisfies readonly SettingsTabDefinition[];
 

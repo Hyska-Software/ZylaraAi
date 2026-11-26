@@ -155,6 +155,32 @@
       "ok": "Remove"
     }
   },
+  "experimental": {
+    "label": "Experimental",
+    "notice": "These features are still in development. Interfaces and behavior may change; turning them on is optional.",
+    "title": "Experimental features",
+    "description": "Turn a feature on to try it. Turning it off hides it again without deleting your data.",
+    "badge": "Experimental",
+    "empty": "No experimental features available right now.",
+    "features": {
+      "pluginPlatform": {
+        "label": "Plugin platform",
+        "description": "Install and run third-party plugins, including plugin-contributed interface and tools. Third-party packages are not reviewed by Zylara."
+      },
+      "reasoningSlider": {
+        "label": "Reasoning slider",
+        "description": "Replace the thinking selector with a sliding level control in the model picker and composer."
+      },
+      "acpAgents": {
+        "label": "ACP agents",
+        "description": "Show external Agent Client Protocol agents in Providers and the model picker. External agents run with your user privileges."
+      },
+      "agentChannels": {
+        "label": "Agent channels",
+        "description": "Show shared agent channels in the Agentes layout, including the inbox and message history."
+      }
+    }
+  },
   "tabs": {
     "general": "General",
     "themes": "Themes",
@@ -167,6 +193,7 @@
     "plugins": "Plugins",
     "agents": "Agents",
     "data": "Data",
+    "experimental": "Experimental",
     "about": "About"
   },
   "design": {

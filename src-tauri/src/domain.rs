@@ -1634,6 +1634,9 @@ pub struct Settings {
     pub plugin_safe_mode: bool,
     /// Developer mode: load unpacked folders and unsigned packages.
     pub plugin_dev_mode: bool,
+    /// Opt-in overrides for features listed in Settings -> Experimental.
+    #[serde(default)]
+    pub enabled_experimental_features: BTreeMap<String, bool>,
 }
 
 impl Default for Settings {
@@ -1721,6 +1724,7 @@ impl Default for Settings {
             plugin_allow_trusted: false,
             plugin_safe_mode: false,
             plugin_dev_mode: false,
+            enabled_experimental_features: BTreeMap::new(),
         }
     }
 }

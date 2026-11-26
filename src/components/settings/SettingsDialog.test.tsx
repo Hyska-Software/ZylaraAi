@@ -80,4 +80,14 @@ describe('SettingsDialog — aba controlada pelo uiStore (deep-link da paleta)',
     expect(useUiStore.getState().settingsTab).toBe('terminal');
     expect(await screen.findByText('Aparência do terminal')).not.toBeNull();
   });
+
+  it('opens the Experimental tab with the opt-in switches', async () => {
+    const user = userEvent.setup();
+    render(<SettingsDialog />);
+
+    await user.click(tab('Experimental'));
+
+    expect(useUiStore.getState().settingsTab).toBe('experimental');
+    expect(await screen.findByText('Recursos experimentais')).not.toBeNull();
+  });
 });

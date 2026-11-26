@@ -96,6 +96,7 @@
     "plugins": "Instale, descubra e configure plugins de terceiros",
     "agents": "Concorrência, orçamento, notificações e computer use",
     "data": "Pasta de dados, exportação e limpeza",
+    "experimental": "Ative recursos experimentais",
     "about": "Versão e informações do aplicativo"
   },
   "actions": {

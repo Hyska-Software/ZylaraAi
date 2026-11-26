@@ -2305,6 +2305,25 @@ mod tests {
     }
 
     #[test]
+    fn experimental_feature_overrides_round_trip_in_camel_case() {
+        let raw = r#"{"enabledExperimentalFeatures":{"acpAgents":true,"reasoningSlider":false}}"#;
+        let parsed: Settings = serde_json::from_str(raw).expect("deserialize settings from renderer");
+        assert_eq!(parsed.enabled_experimental_features.get("acpAgents"), Some(&true));
+        assert_eq!(parsed.enabled_experimental_features.get("reasoningSlider"), Some(&false));
+
+        let value = serde_json::to_value(&parsed).expect("serialize settings");
+        assert_eq!(value["enabledExperimentalFeatures"]["acpAgents"], true);
+        assert!(value.get("enabled_experimental_features").is_none());
+
+        let reparsed: Settings = serde_json::from_value(value).expect("reread saved settings");
+        assert_eq!(reparsed.enabled_experimental_features.len(), 2);
+
+        // Legacy settings files have no map at all.
+        let legacy: Settings = serde_json::from_str(r#"{}"#).expect("parse legacy settings");
+        assert!(legacy.enabled_experimental_features.is_empty());
+    }
+
+    #[test]
     fn normalizes_disabled_skills_list() {
         let settings = Settings {
             disabled_skills: vec![

@@ -7,6 +7,10 @@ import { toast } from 'sonner';
 import { Button, Switch, Textarea } from '@/components/ui';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { api } from '@/lib/api';
+import {
+  experimentalFeaturePatch,
+  isExperimentalFeatureEnabled,
+} from '@/lib/experiments';
 import { useAppStore } from '@/lib/store';
 import { useUiStore } from '@/lib/store/uiStore';
 import { usePluginStore } from '@/lib/plugins/store';
@@ -86,8 +90,10 @@ export function PluginsTab() {
           description={t('settings.enabledDescription')}
           control={
             <Switch
-              checked={settings.pluginsEnabled}
-              onCheckedChange={(checked) => void saveSettings({ pluginsEnabled: checked })}
+              checked={isExperimentalFeatureEnabled(settings, 'pluginPlatform')}
+              onCheckedChange={(checked) =>
+                void saveSettings(experimentalFeaturePatch(settings, 'pluginPlatform', checked))
+              }
               aria-label={t('settings.enabledTitle')}
             />
           }
