@@ -421,6 +421,7 @@ describe('CodeSidebar — Workspaces reais', () => {
     expect(within(row).getByText('App desktop local-first (Tauri 2 +...)')).toBeTruthy();
     expect(within(row).getByText('Concluída')).toBeTruthy();
     expect(within(row).getByText('17:56')).toBeTruthy();
+    expect(within(row).getByTitle('DeepSeek V4.1 Flash')).toBeTruthy();
   });
 
   it('mostra a ferramenta ativa na linha de atividade da sessão', async () => {

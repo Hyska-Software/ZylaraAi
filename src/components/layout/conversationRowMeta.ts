@@ -1,4 +1,5 @@
 import { describeCodeTool } from '@/lib/agentTrace';
+import { getModel } from '@/lib/catalog';
 import { t } from '@/lib/i18n';
 import { formatDate } from '@/lib/i18n/format';
 import type { StreamingState } from '@/lib/store/chatStore';
@@ -93,6 +94,35 @@ export function conversationRowActivity(
     if (turn.phase === 'tool') return t('chat:trace.toolsRunning');
   }
   return conversation.preview?.trim() || t('common:shell.sidebar.rowNoActivity');
+}
+
+export interface ConversationRowModel {
+  /** Catalog family used by `FamilyAvatar` to pick the brand glyph. */
+  family: string | null;
+  /** Model name used for the tooltip and the initials fallback. */
+  name: string;
+}
+
+/**
+ * Model identity for the row's activity icon. The last assistant turn wins when
+ * its messages are loaded; otherwise the session's current model is used.
+ */
+export function conversationRowModel(
+  conversation: Conversation,
+  messages?: readonly ChatMessage[],
+): ConversationRowModel {
+  const lastAssistant = messages
+    ? [...messages].reverse().find((message) =>
+        message.role === 'assistant' && Boolean(message.modelId || message.providerId),
+      )
+    : undefined;
+  const providerId = lastAssistant?.providerId || conversation.providerId;
+  const modelId = lastAssistant?.modelId || conversation.modelId;
+  const model = getModel(providerId, modelId);
+  return {
+    family: model?.family ?? providerId ?? null,
+    name: model?.name ?? modelId,
+  };
 }
 
 /** Compact sidebar time: "now", today's clock time, then relative date. */

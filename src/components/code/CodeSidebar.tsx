@@ -12,7 +12,6 @@ import {
   FolderOpen,
   FolderPlus,
   GitBranch,
-  Link2,
   MessageSquare,
   Pencil,
   Pin,
@@ -73,11 +72,13 @@ import type { Conversation, Workspace } from '@/lib/types';
 import { cn, compareConversationPosition, copyText } from '@/lib/utils';
 import {
   conversationRowActivity,
+  conversationRowModel,
   conversationRowStatus,
   conversationRowTime,
   type ConversationRowTurn,
 } from '@/components/layout/conversationRowMeta';
 import { ConversationRowStatusChip } from '@/components/layout/ConversationRowStatusChip';
+import { FamilyAvatar } from '@/components/models/FamilyAvatar';
 import { useIsCompact } from '@/components/layout/hooks';
 import { terminalManager } from './terminalManager';
 import { openWorkspaceTerminal } from './terminalOpen';
@@ -183,6 +184,7 @@ function SessionRow({
     stream ?? (pending ? { assistantId: '', phase: 'starting' } : null);
   const status = conversationRowStatus(conversation, turn);
   const activity = conversationRowActivity(conversation, turn, messages);
+  const model = conversationRowModel(conversation, messages);
   const time = conversationRowTime(conversation.updatedAt);
   const running = turn !== null;
   return (
@@ -214,7 +216,7 @@ function SessionRow({
           {conversation.pinned ? (
             <Pin aria-hidden className="size-3 shrink-0 text-foreground-subtle" strokeWidth={1.75} />
           ) : null}
-          <span className="truncate font-medium">{conversation.title}</span>
+          <span className="truncate text-xs font-medium">{conversation.title}</span>
           <span className="ml-auto shrink-0 text-[11px] tabular-nums text-foreground-subtle">
             {time}
           </span>
@@ -231,7 +233,7 @@ function SessionRow({
           ) : null}
         </span>
         <span className="flex min-w-0 items-center gap-1.5">
-          <Link2 className="size-3 shrink-0 text-accent" aria-hidden />
+          <FamilyAvatar family={model.family} name={model.name} size={12} title={model.name} />
           <span className="min-w-0 flex-1 truncate text-[11px] text-foreground-muted">
             {activity}
           </span>

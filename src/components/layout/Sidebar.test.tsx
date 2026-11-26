@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ChatMessage, Conversation, Settings } from '@/lib/types';
 
 const mocks = vi.hoisted(() => ({
@@ -444,6 +444,7 @@ describe('Sidebar — mais informações nas linhas de conversa', () => {
     expect(row.textContent).toContain('App desktop local-first (Tauri 2 +...)');
     expect(row.textContent).toContain('Concluída');
     expect(row.textContent).toContain('17:56');
+    expect(within(row).getByTitle('DeepSeek V4.1 Flash')).toBeTruthy();
   });
 
   it('mostra a ferramenta ativa e o status em execução durante um turno', () => {

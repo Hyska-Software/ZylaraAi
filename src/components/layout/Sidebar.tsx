@@ -5,7 +5,6 @@ import {
   Code,
   Download,
   Ellipsis,
-  Link2,
   Pencil,
   Pin,
   PinOff,
@@ -25,10 +24,12 @@ import { navEntries, openNavTarget } from '@/lib/plugins/ui/nav';
 import { SidebarNavItem } from './SidebarNavItem';
 import {
   conversationRowActivity,
+  conversationRowModel,
   conversationRowStatus,
   conversationRowTime,
 } from './conversationRowMeta';
 import { ConversationRowStatusChip } from './ConversationRowStatusChip';
+import { FamilyAvatar } from '@/components/models/FamilyAvatar';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
@@ -125,6 +126,7 @@ function ConversationRow({
   const messages = useChatStore((state) => state.messagesByConversation[conversation.id]);
   const status = conversationRowStatus(conversation, turn);
   const activity = conversationRowActivity(conversation, turn, messages);
+  const model = conversationRowModel(conversation, messages);
   const time = conversationRowTime(conversation.updatedAt);
   if (renaming) {
     return (
@@ -184,13 +186,13 @@ function ConversationRow({
           {conversation.pinned ? (
             <Pin className="size-3.5 shrink-0 text-foreground-subtle" aria-hidden />
           ) : null}
-          <span className="truncate font-medium">{conversation.title}</span>
+          <span className="truncate text-xs font-medium">{conversation.title}</span>
           <span className="ml-auto shrink-0 text-[11px] tabular-nums text-foreground-subtle">
             {time}
           </span>
         </span>
         <span className="flex min-w-0 items-center gap-1.5">
-          <Link2 className="size-3 shrink-0 text-accent" aria-hidden />
+          <FamilyAvatar family={model.family} name={model.name} size={12} title={model.name} />
           <span className="min-w-0 flex-1 truncate text-[11px] text-foreground-muted">
             {activity}
           </span>
