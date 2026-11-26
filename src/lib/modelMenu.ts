@@ -514,18 +514,29 @@ function budgetPresetCopy(budget: number): { label: string; description: string 
   }
 }
 
-/** Budget presets that fit the model's declared range. */
+/** Budget presets that fit the model's declared range, with a dynamic fallback. */
 export function budgetPresets(model?: ModelInfo | null): BudgetPreset[] {
   const ui = reasoningUi(model);
   if (!ui.budget) return [];
-  const min = ui.budget.min ?? 1_024;
-  const max = ui.budget.max ?? 65_536;
-  return BUDGET_PRESET_BUDGETS.filter((budget) => budget >= min && budget <= max).flatMap(
+  const min = Math.max(1_024, ui.budget.min ?? 1_024);
+  const max = Math.max(min, ui.budget.max ?? 65_536);
+  const curated = BUDGET_PRESET_BUDGETS.filter((budget) => budget >= min && budget <= max).flatMap(
     (budget) => {
       const copy = budgetPresetCopy(budget);
       return copy ? [{ budget, ...copy }] : [];
     },
   );
+  if (curated.length) return curated;
+
+  // Models outside the curated ranges still get real choices: min, middle and
+  // max from their own declaration, rounded to whole thousands of tokens.
+  const middle = Math.round((min + max) / 2 / 1_024) * 1_024;
+  const values = [...new Set([min, Math.min(max, Math.max(min, middle)), max])];
+  return values.map((budget) => ({
+    budget,
+    label: t('models:budget.custom.label', { budget }),
+    description: t('models:budget.custom.description'),
+  }));
 }
 
 /**

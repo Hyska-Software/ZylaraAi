@@ -13,6 +13,7 @@ import {
   providerLabel,
   providerAuth,
   reasoningLabel,
+  resolveReasoningDefault,
   reasoningShortLabel,
   reasoningUi,
   supportsAttachments,
@@ -174,6 +175,46 @@ describe('defaultSelection', () => {
     const selection = defaultSelection(undefined);
     expect(selection.providerId).toBe('opencode-go');
     expect(selection.modelId.length).toBeGreaterThan(0);
+  });
+});
+
+describe('resolveReasoningDefault', () => {
+  it('keeps model-declared effort values, including non-curated ones', () => {
+    const custom = {
+      ...glm,
+      reasoningOptions: [{ type: 'effort' as const, values: ['minimal', 'turbo'] }],
+    };
+    expect(resolveReasoningDefault('effort:turbo', custom)).toEqual({
+      mode: 'effort',
+      effort: 'turbo',
+    });
+    expect(resolveReasoningDefault('turbo', custom)).toEqual({
+      mode: 'effort',
+      effort: 'turbo',
+    });
+  });
+
+  it('falls back instead of sending an undeclared value', () => {
+    expect(resolveReasoningDefault('effort:turbo', glm)).toEqual(
+      defaultReasoningFor(glm),
+    );
+    expect(resolveReasoningDefault('off', glm)).toEqual(defaultReasoningFor(glm));
+    expect(resolveReasoningDefault('auto', glm)).toEqual(defaultReasoningFor(glm));
+  });
+
+  it('clamps a persisted budget to the model range', () => {
+    const budgetModel = {
+      ...glm,
+      reasoningOptions: [{ type: 'budget_tokens' as const, min: 2_048, max: 16_384 }],
+    };
+    expect(resolveReasoningDefault('budget:999999', budgetModel)).toEqual({
+      mode: 'budget',
+      budget: 16_384,
+    });
+    expect(resolveReasoningDefault('budget:10', budgetModel)).toEqual({
+      mode: 'budget',
+      budget: 2_048,
+    });
   });
 });
 

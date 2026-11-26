@@ -269,6 +269,8 @@
     "acp": {
       "title": "Agentes ACP",
       "description": "Los agentes externos hablan el Agent Client Protocol, se ejecutan como procesos locales y aparecen en el mismo selector de modelos.",
+      "experimentalTitle": "Función experimental",
+      "experimentalHint": "La compatibilidad con ACP es experimental y puede presentar errores. No se recomienda su uso; los agentes externos se ejecutan con sus privilegios, así que revise cada solicitud de permiso antes de aprobarla.",
       "empty": "Aún no hay agentes ACP instalados.",
       "browse": "Buscar en el registro",
       "addCustom": "Añadir agente manualmente",

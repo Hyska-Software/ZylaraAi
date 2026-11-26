@@ -105,6 +105,12 @@ beforeEach(async () => {
 afterEach(() => cleanup());
 
 describe('AcpAgentPanel', () => {
+
+  it('warns that ACP agents are experimental', () => {
+    render(<AcpAgentPanel />);
+    expect(screen.getByRole('status').textContent).toContain('Experimental feature');
+    expect(screen.getByRole('status').textContent).toContain('not recommended');
+  });
   it('shows the model count from the shared catalog and tests the agent', async () => {
     render(<AcpAgentPanel />);
     expect(screen.getByText('3 models')).toBeTruthy();

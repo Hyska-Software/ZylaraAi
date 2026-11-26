@@ -15,23 +15,11 @@ import { CapabilityBadges } from '@/components/models';
 import { ThinkingSelector } from '@/components/models/ThinkingSelector';
 import { SettingRow, SettingsBlock, SettingsSection } from './shared';
 
-function reasoningDefaultOf(selection: ReasoningSelection | null): Settings['reasoningDefault'] {
-  if (!selection || selection.mode === 'off') return 'off';
-  if (selection.mode === 'budget') return 'auto';
-  switch (selection.effort) {
-    case 'minimal':
-    case 'low':
-      return 'low';
-    case 'medium':
-      return 'medium';
-    case 'high':
-      return 'high';
-    case 'xhigh':
-    case 'max':
-      return 'max';
-    default:
-      return 'auto';
-  }
+function reasoningDefaultOf(selection: ReasoningSelection | null): string {
+  if (!selection) return 'auto';
+  if (selection.mode === 'off') return 'off';
+  if (selection.mode === 'budget') return `budget:${selection.budget ?? 8_192}`;
+  return selection.effort ? `effort:${selection.effort}` : 'auto';
 }
 
 export function ModelTab() {

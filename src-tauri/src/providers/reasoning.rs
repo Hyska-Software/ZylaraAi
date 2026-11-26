@@ -22,10 +22,34 @@ use crate::catalog::ModelInfo;
 
 use super::{ReasoningRequest, WireProtocol};
 
-/// Reasoning budget assumed when the UI sent an effort level but the model only
-/// exposes `budget_tokens` on the Anthropic wire protocol.
-pub(crate) fn budget_for_effort(effort: &str) -> u32 {
-    match effort.trim().to_ascii_lowercase().as_str() {
+/// Maps an effort to a token budget using the model's declared range. The
+/// position of the effort in `Effort.values` is interpolated between
+/// `BudgetTokens.min/max`; the fixed table is only a fallback for models whose
+/// catalog metadata has no budget range.
+pub(crate) fn budget_for_effort(effort: &str, model: &ModelInfo) -> u32 {
+    let normalized = effort.trim().to_ascii_lowercase();
+    let values = effort_values(model);
+    let range = model.reasoning_options.iter().find_map(|option| match option {
+        crate::catalog::ReasoningOption::BudgetTokens { min, max } => {
+            Some((*min, *max))
+        }
+        _ => None,
+    });
+    if let (Some(values), Some((min, max))) = (values, range) {
+        if let Some(position) = values.iter().position(|value| value.eq_ignore_ascii_case(&normalized)) {
+            let min = min.unwrap_or(1_024).max(1_024);
+            let max = max.unwrap_or(65_536).max(min);
+            let ratio = if values.len() <= 1 {
+                1.0
+            } else {
+                position as f64 / (values.len() - 1) as f64
+            };
+            let raw = min as f64 + ratio * (max.saturating_sub(min) as f64);
+            let rounded = ((raw / 256.0).round() * 256.0) as u32;
+            return rounded.clamp(min, max);
+        }
+    }
+    match normalized.as_str() {
         "minimal" => 512,
         "low" => 1_024,
         "medium" => 2_048,
@@ -190,7 +214,7 @@ fn apply_anthropic(model: &ModelInfo, request: &ReasoningRequest, body: &mut Val
                 set(
                     body,
                     "thinking",
-                    json!({"type": "enabled", "budget_tokens": budget_for_effort(effort)}),
+                    json!({"type": "enabled", "budget_tokens": budget_for_effort(effort, model)}),
                 );
             } else if has_any_control(model) {
                 set(body, "thinking", json!({"type": "enabled"}));
@@ -238,7 +262,7 @@ fn apply_google(model: &ModelInfo, request: &ReasoningRequest, body: &mut Value)
             if has_effort(model) {
                 set_google_thinking(body, json!({"thinkingLevel": effort.trim().to_uppercase()}));
             } else if has_budget(model) {
-                set_google_thinking(body, json!({"thinkingBudget": budget_for_effort(effort)}));
+                set_google_thinking(body, json!({"thinkingBudget": budget_for_effort(effort, model)}));
             } else if has_toggle(model) {
                 // Dynamic thinking for toggle-only Gemini 2.5 models.
                 set_google_thinking(body, json!({"thinkingBudget": -1}));
@@ -268,6 +292,26 @@ mod tests {
             .clone()
     }
 
+
+    #[test]
+    fn budget_for_effort_uses_the_model_declared_range() {
+        let mut model = model("anthropic", "claude-haiku-4-5");
+        model.reasoning_options = vec![
+            crate::catalog::ReasoningOption::Effort {
+                values: vec!["low".into(), "medium".into(), "high".into()],
+            },
+            crate::catalog::ReasoningOption::BudgetTokens {
+                min: Some(4_096),
+                max: Some(32_768),
+            },
+        ];
+        assert_eq!(budget_for_effort("low", &model), 4_096);
+        assert_eq!(budget_for_effort("medium", &model), 18_432);
+        assert_eq!(budget_for_effort("high", &model), 32_768);
+        // Models without a declared range keep the defensive fallback.
+        model.reasoning_options.clear();
+        assert_eq!(budget_for_effort("high", &model), 4_096);
+    }
     #[test]
     fn auto_never_sends_parameters() {
         let model = model("opencode-go", "claude-haiku-5-5");

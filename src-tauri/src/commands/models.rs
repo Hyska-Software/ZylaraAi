@@ -66,8 +66,38 @@ impl RemoteModel {
     }
 }
 
-/// Effort levels the UI understands, in the order the picker shows them.
-const REASONING_EFFORTS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
+/// Display order for well-known levels; unknown values are kept after them.
+const EFFORT_ORDER: [&str; 7] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+const MAX_EFFORTS: usize = 16;
+
+/// Reads every effort key the account API marks as supported. The old fixed
+/// five-level filter silently dropped model-specific values such as `minimal`.
+fn discover_reasoning_efforts(capabilities: Option<&Value>) -> Vec<String> {
+    let Some(efforts) = capabilities.and_then(|value| value.get("effort")) else {
+        return Vec::new();
+    };
+    let Some(entries) = efforts.as_object() else {
+        return Vec::new();
+    };
+    let mut values: Vec<String> = entries
+        .iter()
+        .filter(|(name, entry)| name.as_str() != "supported" && entry.get("supported").and_then(Value::as_bool).unwrap_or(false))
+        .map(|(name, _)| name.trim().to_ascii_lowercase())
+        .filter(|name| !name.is_empty())
+        .collect();
+    values.sort_by_key(|value| {
+        (
+            EFFORT_ORDER
+                .iter()
+                .position(|known| *known == value.as_str())
+                .unwrap_or(EFFORT_ORDER.len()),
+            value.clone(),
+        )
+    });
+    values.dedup();
+    values.truncate(MAX_EFFORTS);
+    values
+}
 
 fn flag_supported(item: &Value, pointer: &str) -> bool {
     item.pointer(pointer).and_then(Value::as_bool).unwrap_or(false)
@@ -172,16 +202,7 @@ fn parse_remote_model(item: &Value) -> Option<RemoteModel> {
         input_modalities = string_array(item.pointer("/modalities/input"));
     }
 
-    let reasoning_efforts = capabilities
-        .and_then(|value| value.get("effort"))
-        .map(|effort| {
-            REASONING_EFFORTS
-                .iter()
-                .filter(|level| flag_supported(effort, &format!("/{level}/supported")))
-                .map(|level| (*level).to_string())
-                .collect()
-        })
-        .unwrap_or_default();
+    let reasoning_efforts = discover_reasoning_efforts(capabilities);
     let reasoning = flag_supported(item, "/capabilities/thinking/supported")
         || item.get("reasoning").and_then(Value::as_bool).unwrap_or(false)
         || item.get("thinking").and_then(Value::as_bool).unwrap_or(false);
@@ -1079,6 +1100,27 @@ mod tests {
         assert_eq!(
             next_page_token_url("https://x.test/models", "a+b/c="),
             "https://x.test/models?pageToken=a%2Bb%2Fc%3D"
+        );
+    }
+
+    #[test]
+    fn keeps_model_specific_effort_values_from_the_account_api() {
+        let page = parse_remote_page(&json!({
+            "data": [{
+                "id": "custom-reasoner",
+                "capabilities": {
+                    "effort": {
+                        "supported": true,
+                        "minimal": { "supported": true },
+                        "turbo": { "supported": true },
+                        "high": { "supported": false }
+                    }
+                }
+            }]
+        }));
+        assert_eq!(
+            page.models[0].reasoning_efforts,
+            vec!["minimal", "turbo"]
         );
     }
 }

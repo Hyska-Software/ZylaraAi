@@ -414,6 +414,14 @@ describe('thinkingOptions', () => {
     expect(effortDescription('low')).toContain('Rápido');
     expect(effortDescription('desconhecido')).toContain('Ajusta quanto');
   });
+
+  it('derives presets from the model range when no curated preset fits', () => {
+    const presets = budgetPresets(
+      syntheticModel({ reasoningOptions: [{ type: 'budget_tokens', min: 1_100, max: 3_000 }] }),
+    );
+    expect(presets.map((preset) => preset.budget)).toEqual([1_100, 2_048, 3_000]);
+    expect(presets.every((preset) => preset.label.includes('tokens'))).toBe(true);
+  });
 });
 
 describe('thinking selection mapping', () => {

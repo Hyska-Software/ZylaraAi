@@ -2393,7 +2393,8 @@ export interface Settings {
   locale: AppLocale;
   defaultProvider: string;
   defaultModel: string;
-  reasoningDefault: 'auto' | 'off' | 'low' | 'medium' | 'high' | 'max';
+  /** Preferência persistida: `auto`, `off`, `effort:<valor>` ou `budget:<n>`. Valores legados (low/high/max) são aceitos. */
+  reasoningDefault: string;
   /** Opt-in: replaces the reasoning selector with a sliding level control. */
   reasoningSliderEnabled?: boolean;
   systemPrompt: string;

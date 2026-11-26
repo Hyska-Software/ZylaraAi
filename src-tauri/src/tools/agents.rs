@@ -151,7 +151,9 @@ pub fn definitions(agent: &Agent) -> Vec<ToolDefinition> {
                             "mode": { "type": "string", "enum": ["off", "effort", "budget"] },
                             "effort": {
                                 "type": "string",
-                                "enum": ["minimal", "low", "medium", "high", "xhigh", "max"]
+                                "maxLength": 32,
+                                "pattern": "^[a-z0-9_-]{1,32}$",
+                                "description": "Model-declared effort value. Omit to inherit the caller's thinking."
                             },
                             "budget": { "type": "integer", "minimum": 1024, "maximum": 65536 }
                         },
@@ -758,8 +760,10 @@ fn agent_avatar_from_args(args: &Value) -> Result<crate::agents::AgentAvatar, St
     })
 }
 
-fn agent_reasoning_from_args(args: &Value) -> Result<Option<ReasoningSelection>, String> {
-    const EFFORTS: [&str; 6] = ["minimal", "low", "medium", "high", "xhigh", "max"];
+fn agent_reasoning_from_args(
+    args: &Value,
+    model: Option<&crate::catalog::ModelInfo>,
+) -> Result<Option<ReasoningSelection>, String> {
     let Some(value) = args.get("reasoning").filter(|value| !value.is_null()) else {
         return Ok(None);
     };
@@ -787,13 +791,30 @@ fn agent_reasoning_from_args(args: &Value) -> Result<Option<ReasoningSelection>,
                 .map(|effort| effort.trim().to_ascii_lowercase())
                 .filter(|effort| !effort.is_empty());
             if let Some(effort) = effort.as_deref() {
-                if !EFFORTS.contains(&effort) {
+                let declared = model.and_then(|model| {
+                    model.reasoning_options.iter().find_map(|option| match option {
+                        crate::catalog::ReasoningOption::Effort { values } => Some(values),
+                        _ => None,
+                    })
+                });
+                if let Some(values) = declared {
+                    if !values.iter().any(|value| value.eq_ignore_ascii_case(effort)) {
+                        return Err(format!(
+                            "AGENT_REASONING_INVALID: {}",
+                            i18n::t_args(
+                                "tools.agents.reasoningUnknownEffort",
+                                &[("effort", effort), ("efforts", &values.join(", "))],
+                            )
+                        ));
+                    }
+                } else if effort.len() > 32
+                    || !effort
+                        .chars()
+                        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_' || ch == '-')
+                {
                     return Err(format!(
                         "AGENT_REASONING_INVALID: {}",
-                        i18n::t_args(
-                            "tools.agents.reasoningUnknownEffort",
-                            &[("effort", effort), ("efforts", &EFFORTS.join(", "))],
-                        )
+                        i18n::t("tools.agents.reasoningEffortFormat")
                     ));
                 }
             }
@@ -804,12 +825,27 @@ fn agent_reasoning_from_args(args: &Value) -> Result<Option<ReasoningSelection>,
             }))
         }
         ReasoningMode::Budget => {
+            let (min, max) = model
+                .and_then(|model| {
+                    model.reasoning_options.iter().find_map(|option| match option {
+                        crate::catalog::ReasoningOption::BudgetTokens { min, max } => {
+                            Some((min.unwrap_or(1_024).max(1_024), max.unwrap_or(65_536)))
+                        }
+                        _ => None,
+                    })
+                })
+                .unwrap_or((1_024, 65_536));
             let budget = selection.budget.unwrap_or(0);
-            if !(1_024..=65_536).contains(&budget) {
-                return Err(format!(
-                    "AGENT_REASONING_INVALID: {}",
+            if !(min..=max).contains(&budget) {
+                let message = if min == 1_024 && max == 65_536 {
                     i18n::t("tools.agents.reasoningBudgetRange")
-                ));
+                } else {
+                    i18n::t_args(
+                        "tools.agents.reasoningBudgetRangeForModel",
+                        &[("min", &min.to_string()), ("max", &max.to_string())],
+                    )
+                };
+                return Err(format!("AGENT_REASONING_INVALID: {message}"));
             }
             Ok(Some(ReasoningSelection {
                 mode: ReasoningMode::Budget,
@@ -896,7 +932,10 @@ fn create_agent_tool(
         Ok(avatar) => avatar,
         Err(error) => return ToolOutcome::error(error),
     };
-    let reasoning = match agent_reasoning_from_args(args) {
+    let selected_model = crate::catalog::CatalogFile::load()
+        .ok()
+        .and_then(|catalog| catalog.model(&provider_id, &model_id).cloned());
+    let reasoning = match agent_reasoning_from_args(args, selected_model.as_ref()) {
         Ok(Some(reasoning)) => Some(reasoning),
         Ok(None) => caller.reasoning.clone(),
         Err(error) => return ToolOutcome::error(error),
@@ -1424,6 +1463,22 @@ mod tests {
         assert_eq!(reasoning.budget, Some(16_384));
     }
 
+
+    #[test]
+    fn agent_reasoning_accepts_model_declared_effort_values() {
+        let parsed = agent_reasoning_from_args(
+            &json!({ "reasoning": { "mode": "effort", "effort": "turbo_v2" } }),
+            None,
+        )
+        .expect("safe custom effort");
+        assert_eq!(parsed.and_then(|value| value.effort).as_deref(), Some("turbo_v2"));
+
+        let invalid = agent_reasoning_from_args(
+            &json!({ "reasoning": { "mode": "effort", "effort": "not a token" } }),
+            None,
+        );
+        assert!(invalid.is_err());
+    }
     #[test]
     fn create_agent_rejects_invalid_reasoning() {
         let db = std::sync::Arc::new(Db::open_in_memory().expect("db"));

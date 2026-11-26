@@ -97,6 +97,10 @@
     "max": {
       "label": "Maximum",
       "description": "About 32 thousand reasoning tokens."
+    },
+    "custom": {
+      "label": "{{budget}} tokens",
+      "description": "Budget declared by the model."
     }
   },
   "thinking": {

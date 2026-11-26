@@ -116,11 +116,31 @@ pub(crate) fn normalize_disabled_skills(names: Vec<String>) -> Vec<String> {
     names
 }
 
+/// Accepts model-declared effort values while keeping legacy bare values valid.
+fn is_valid_reasoning_default(value: &str) -> bool {
+    if value == "auto" || value == "off" {
+        return true;
+    }
+    if let Some(budget) = value.strip_prefix("budget:") {
+        return budget
+            .parse::<u32>()
+            .is_ok_and(|amount| (1..=1_000_000).contains(&amount));
+    }
+    let effort = value.strip_prefix("effort:").unwrap_or(value);
+    if effort.is_empty() || effort.len() > 32 {
+        return false;
+    }
+    if value.starts_with("effort:") {
+        return effort
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_' || ch == '-');
+    }
+    // Bare values are the legacy `low|medium|high|max` family.
+    matches!(effort, "minimal" | "low" | "medium" | "high" | "xhigh" | "max")
+}
 /// Clamp/repair values coming from disk or from the renderer so the UI never
-/// has to deal with out-of-range settings.
-///
-/// Booleanos de preferência (como `thinking_collapsed_by_default`) são
-/// preservados como vieram do disco/renderer: não há transformação a aplicar.
+/// has to deal with out-of-range settings. Boolean preferences (such as
+/// `thinking_collapsed_by_default`) are preserved as they arrive.
 fn normalize_settings(mut settings: Settings) -> Settings {
     let defaults = Settings::default();
 
@@ -150,10 +170,7 @@ fn normalize_settings(mut settings: Settings) -> Settings {
     if !matches!(settings.send_key.as_str(), "enter" | "ctrl+enter") {
         settings.send_key = defaults.send_key;
     }
-    if !matches!(
-        settings.reasoning_default.as_str(),
-        "auto" | "off" | "low" | "medium" | "high" | "max"
-    ) {
+    if !is_valid_reasoning_default(&settings.reasoning_default) {
         settings.reasoning_default = defaults.reasoning_default;
     }
     if settings.default_provider.trim().is_empty() {
@@ -2090,6 +2107,22 @@ mod tests {
         assert_eq!(normalized.disabled_skills, vec!["pdf", "zeta"]);
     }
 
+
+    #[test]
+    fn accepts_model_declared_reasoning_defaults() {
+        for value in ["effort:xhigh", "effort:custom_level", "budget:32768", "auto", "off"] {
+            let normalized = normalize_settings(Settings {
+                reasoning_default: value.into(),
+                ..Settings::default()
+            });
+            assert_eq!(normalized.reasoning_default, value);
+        }
+        let invalid = normalize_settings(Settings {
+            reasoning_default: "effort:valor com espaço".into(),
+            ..Settings::default()
+        });
+        assert_eq!(invalid.reasoning_default, "max");
+    }
     #[test]
     fn normalizes_theme_id_syntax_and_preserves_installed_ids() {
         let invalid = normalize_settings(Settings {

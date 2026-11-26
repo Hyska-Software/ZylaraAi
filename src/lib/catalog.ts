@@ -117,19 +117,39 @@ export function defaultSelectionFrom(
       ? configured
       : (provider?.defaultModelId ?? provider?.models[0]?.id ?? '');
   const model = provider?.models.find((m) => m.id === modelId);
-  const preferred = settings?.reasoningDefault;
-  const ui = reasoningUi(model);
-  let reasoning = defaultReasoningFor(model);
-  if (preferred === 'off' && ui.canDisable) {
-    reasoning = { mode: 'off' };
-  } else if (preferred && ui.efforts.includes(preferred)) {
-    reasoning = { mode: 'effort', effort: preferred };
-  }
   return {
     providerId: provider?.id ?? providerId,
     modelId,
-    reasoning,
+    reasoning: resolveReasoningDefault(settings?.reasoningDefault, model),
   };
+}
+
+/**
+ * Applies the persisted preference against the model's own reasoning options.
+ * Unknown, disabled or out-of-range values fall back to the model default; no
+ * value is ever invented or sent to a provider that did not declare it.
+ */
+export function resolveReasoningDefault(
+  preferred: string | null | undefined,
+  model?: ModelInfo | null,
+): ReasoningSelection | null {
+  const fallback = defaultReasoningFor(model);
+  if (!preferred || preferred === 'auto') return fallback;
+  const ui = reasoningUi(model);
+  if (!ui.supported) return null;
+  if (preferred === 'off') return ui.canDisable ? { mode: 'off' } : fallback;
+
+  const budget = preferred.match(/^budget:(\d{1,7})$/);
+  if (budget) {
+    if (!ui.budget) return fallback;
+    const value = Number(budget[1]);
+    const clamped = Math.min(ui.budget.max ?? 65_536, Math.max(ui.budget.min ?? 1_024, value));
+    return { mode: 'budget', budget: clamped };
+  }
+
+  const effort = preferred.startsWith('effort:') ? preferred.slice(7) : preferred;
+  if (!effort || !ui.efforts.includes(effort)) return fallback;
+  return { mode: 'effort', effort };
 }
 
 /** Picks the first available reasoning option as the default. */

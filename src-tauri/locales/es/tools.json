@@ -37,6 +37,8 @@
   "tools.agents.reasoningBudgetRange": "`budget` debe estar entre 1024 y 65536 tokens",
   "tools.agents.reasoningShape": "use { mode: off|effort|budget, effort?, budget? }",
   "tools.agents.reasoningUnknownEffort": "effort desconocido `{effort}`; use {efforts}",
+  "tools.agents.reasoningBudgetRangeForModel": "`budget` debe estar entre {min} y {max} tokens",
+  "tools.agents.reasoningEffortFormat": "el effort debe ser un valor declarado por el modelo (letras, dígitos, `_` o `-`, hasta 32 caracteres)",
   "tools.agents.routineCreatedSummary": "Rutina creada: {title}",
   "tools.agents.routineForbidden": "la rutina pertenece a otro agente",
   "tools.agents.routineIdRequired": "el argumento `routineId` es obligatorio",

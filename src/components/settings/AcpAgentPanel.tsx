@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, CheckCircle2, LogIn, LogOut, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, LogIn, LogOut, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAppStore } from '@/lib/store';
@@ -260,6 +260,17 @@ export function AcpAgentPanel({ className }: AcpAgentPanelProps) {
             {t('providers.acp.rescan')}
           </Button>
         </div>
+      </div>
+
+      <div
+        role="status"
+        className="flex gap-2.5 rounded-xl bg-warning-soft p-3 text-[11px] leading-relaxed text-warning"
+      >
+        <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0" />
+        <p>
+          <span className="font-semibold">{t('providers.acp.experimentalTitle')}</span>{' '}
+          {t('providers.acp.experimentalHint')}
+        </p>
       </div>
 
       {error ? (

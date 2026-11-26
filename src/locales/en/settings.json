@@ -269,6 +269,8 @@
     "acp": {
       "title": "ACP agents",
       "description": "External agents speak the Agent Client Protocol, run as local processes, and appear in the same model picker.",
+      "experimentalTitle": "Experimental feature",
+      "experimentalHint": "ACP support is experimental and may contain errors. Its use is not recommended; external agents run with your user privileges, so review each permission request before approving.",
       "empty": "No ACP agents installed yet.",
       "browse": "Browse registry",
       "addCustom": "Add agent manually",
