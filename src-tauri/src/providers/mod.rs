@@ -1398,7 +1398,7 @@ pub(crate) async fn stream_one(
         WireProtocol::Google => google::stream(http, request, sink).await,
         WireProtocol::Acp => {
             let app = crate::acp::app_handle().ok_or_else(|| {
-                ProviderError::Other("ACP runtime is not initialized".to_string())
+                ProviderError::Other(crate::i18n::t("acp.errors.runtimeNotInitialized"))
             })?;
             crate::acp::client::stream(app, request, sink).await
         }

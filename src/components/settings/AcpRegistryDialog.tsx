@@ -75,7 +75,7 @@ export function AcpRegistryDialog({ open, onOpenChange }: AcpRegistryDialogProps
   };
 
   const install = async (agent: AcpRegistryAgent) => {
-    if (!consented[agent.id] || !agent.supported || agent.installed) return;
+    if (!consented[agent.id] || !agent.supported) return;
     setBusy(agent.id);
     setError(null);
     try {
@@ -186,7 +186,25 @@ export function AcpRegistryDialog({ open, onOpenChange }: AcpRegistryDialogProps
                   <p className="mt-1 text-xs leading-relaxed text-foreground-muted">
                     {agent.description}
                   </p>
+                    {agent.updateAvailable ? (
+                      <Badge tone="warning">{t('providers.acp.registry.updateAvailable')}</Badge>
+                    ) : null}
 
+                    {agent.command ? (
+                      <p className="mt-1 font-mono text-[11px] text-foreground-muted">
+                        {t('providers.acp.registry.command', {
+                          command: agent.command,
+                          args: (agent.args ?? []).join(' '),
+                        })}
+                      </p>
+                    ) : null}
+                    {agent.envNames?.length ? (
+                      <p className="mt-0.5 text-[11px] text-foreground-muted">
+                        {t('providers.acp.registry.envNames', {
+                          names: agent.envNames.join(', '),
+                        })}
+                      </p>
+                    ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-foreground-muted">
                     {agent.license ? (
                       <span>{t('providers.acp.registry.license', { license: agent.license })}</span>
@@ -228,7 +246,7 @@ export function AcpRegistryDialog({ open, onOpenChange }: AcpRegistryDialogProps
                     </p>
                   ) : null}
 
-                  {!agent.installed && agent.supported ? (
+                  {agent.supported && (!agent.installed || agent.updateAvailable) ? (
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <label className="flex min-w-0 flex-1 items-start gap-2 text-[11px] leading-relaxed text-foreground-muted">
                         <input
@@ -252,7 +270,9 @@ export function AcpRegistryDialog({ open, onOpenChange }: AcpRegistryDialogProps
                         disabled={!consented[agent.id]}
                         onClick={() => void install(agent)}
                       >
-                        {t('providers.acp.registry.install')}
+                        {agent.installed
+                          ? t('providers.acp.registry.update')
+                          : t('providers.acp.registry.install')}
                       </Button>
                     </div>
                   ) : null}

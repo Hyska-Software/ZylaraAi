@@ -330,6 +330,10 @@
         "install": "Install",
         "installed": "Installed",
         "consent": "I reviewed the command, arguments and environment variables this agent will run, and I accept them.",
+        "command": "Runs: {{command}} {{args}}",
+        "envNames": "Environment: {{names}}",
+        "update": "Update",
+        "updateAvailable": "Update available",
         "installReason": "Reason: {{reason}}"
       },
       "custom": {

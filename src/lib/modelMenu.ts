@@ -734,6 +734,8 @@ export function protocolLabel(protocol: string): string {
       return t('models:protocols.anthropic');
     case 'google':
       return t('models:protocols.google');
+    case 'acp':
+      return t('models:protocols.acp');
     default:
       return protocol;
   }

@@ -97,6 +97,10 @@ pub async fn run_turn(
         seq: AtomicU64::new(0),
     });
     EventEmitter::emit(emitter.as_ref(), TurnEvent::Accepted);
+    // ACP gates (permissions, questions, file changes) are emitted from the
+    // subprocess driver, which has no access to this turn's emitter. Bind it
+    // so those events carry the real turn id and a contiguous journal sequence.
+    crate::acp::host::bind_turn_emitter(&payload.conversation_id, emitter.clone());
     let deps = HarnessDeps {
         app: Some(app.clone()),
         db: state.db.clone(),
@@ -141,6 +145,7 @@ pub async fn run_turn(
     let _ = state
         .db
         .prune_turn_events(crate::domain::now_ms() - 24 * 60 * 60 * 1000);
+    crate::acp::host::unbind_turn_emitter(&payload.conversation_id);
     match result {
         Ok(value) => Ok(value),
         Err(error) => Err(format!("{error:#}")),

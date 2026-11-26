@@ -3644,3 +3644,28 @@ describe('chatStore — fila por conversa e Enviar agora', () => {
     expect(pending).toHaveLength(1);
   });
 });
+
+describe('chatStore — atividade de agentes ACP fora do histórico', () => {
+  it('mostra avisos, plano e compactação sem criar mensagens', async () => {
+    const turnId = 'acp-activity-test';
+    useChatStore.setState({
+      conversations: [conversation({ id: 'conv-1', providerId: 'acp__demo', modelId: 'm' })],
+      messagesByConversation: { 'conv-1': [] },
+    });
+    const events: TurnEvent[] = [
+      { type: 'notice', severity: 'info', title: 'Aviso do agente' },
+      { type: 'acp_plan', plan: { entries: [] } },
+      { type: 'acp_compaction', data: { kind: 'compaction_update' } },
+    ];
+    for (const [index, event] of events.entries()) {
+      await useChatStore.getState().applyExternalTurnEvent({
+        turnId,
+        seq: index + 1,
+        conversationId: 'conv-1',
+        event,
+      });
+    }
+    expect(toast.info).toHaveBeenCalledTimes(3);
+    expect(useChatStore.getState().messagesByConversation['conv-1']).toEqual([]);
+  });
+});

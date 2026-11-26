@@ -206,6 +206,11 @@ export interface AcpRegistryAgent {
   distributions: string[];
   platforms: string[];
   installed: boolean;
+  /** Exact launch command/args/env names shown before consent. */
+  command?: string;
+  args?: string[];
+  envNames?: string[];
+  updateAvailable?: boolean;
   supported: boolean;
   installReason?: string | null;
 }

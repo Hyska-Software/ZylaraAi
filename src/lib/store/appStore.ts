@@ -71,14 +71,14 @@ function deriveAcpAgents(
       command: old?.command ?? '',
       args: old?.args ?? [],
       envNames: old?.envNames ?? [],
-      trusted: provider.acp?.trusted ?? old?.trusted ?? false,
+      trusted: provider.acp?.trusted ?? old?.trusted ?? true,
+      supportsFs: old?.supportsFs ?? true,
+      supportsTerminal: old?.supportsTerminal ?? true,
+      supportsElicitation: old?.supportsElicitation ?? true,
       enabled: old?.enabled ?? true,
       authState: provider.acp?.authState ?? old?.authState ?? 'unknown',
       authHint: old?.authHint ?? null,
       modelCount: provider.models.length || old?.modelCount || 0,
-      supportsFs: old?.supportsFs ?? false,
-      supportsTerminal: old?.supportsTerminal ?? false,
-      supportsElicitation: old?.supportsElicitation ?? false,
       lastError: old?.lastError ?? null,
     };
   };

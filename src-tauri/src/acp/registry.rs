@@ -312,6 +312,24 @@ pub fn to_views(manifests: &[RegistryManifest], installed: &[String]) -> Vec<Acp
             } else {
                 Some(format!("no-build-for-{target}"))
             };
+            let (command, args, env_names) = match select_distribution(manifest, target) {
+                Some(Distribution::Binary(dist)) => (
+                    dist.cmd.clone(),
+                    dist.args.clone(),
+                    dist.env.keys().cloned().collect(),
+                ),
+                Some(Distribution::Npx(dist)) => {
+                    let mut args = vec![dist.package.clone()];
+                    args.extend(dist.args.clone());
+                    ("npx".to_string(), args, dist.env.keys().cloned().collect())
+                }
+                Some(Distribution::Uvx(dist)) => {
+                    let mut args = vec![dist.package.clone()];
+                    args.extend(dist.args.clone());
+                    ("uvx".to_string(), args, dist.env.keys().cloned().collect())
+                }
+                None => (String::new(), Vec::new(), Vec::new()),
+            };
             AcpRegistryAgent {
                 id: manifest.id.clone(),
                 name: manifest.name.clone(),
@@ -324,6 +342,10 @@ pub fn to_views(manifests: &[RegistryManifest], installed: &[String]) -> Vec<Acp
                 distributions,
                 platforms,
                 installed: installed.iter().any(|id| id == &manifest.id),
+                command,
+                args,
+                env_names,
+                update_available: false,
                 supported,
                 install_reason,
                 icon_svg: None,
@@ -472,5 +494,21 @@ mod tests {
             || target.starts_with("darwin-"),
             "unexpected target: {target}"
         );
+    }
+
+    #[test]
+    fn views_expose_the_exact_launch_command_and_installed_flag() {
+        let manifests = sample().agents;
+        let target = current_target();
+        let id = manifests
+            .iter()
+            .find(|manifest| select_distribution(manifest, target).is_some())
+            .map(|manifest| manifest.id.clone())
+            .expect("a supported manifest in the fixture");
+        let views = to_views(&manifests, &[id.clone()]);
+        let view = views.iter().find(|view| view.id == id).expect("registry view");
+        assert!(view.installed);
+        assert!(!view.command.is_empty(), "consent must show the exact command");
+        assert!(view.args.iter().all(|arg| !arg.is_empty()));
     }
 }

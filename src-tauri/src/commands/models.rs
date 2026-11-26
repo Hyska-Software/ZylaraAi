@@ -755,6 +755,13 @@ pub async fn list_remote_models(
     state: State<'_, AppState>,
     provider_id: String,
 ) -> Result<Vec<String>, String> {
+    if crate::acp::is_acp_id(&provider_id) {
+        let models = state
+            .db
+            .acp_models(&provider_id)
+            .map_err(|error| error.to_string())?;
+        return Ok(models.into_iter().map(|model| model.model_id).collect());
+    }
     let provider = state
         .provider(&provider_id)
         .ok_or_else(|| crate::i18n::t_args("models.errors.providerUnknown", &[("provider_id", &provider_id)]))?;

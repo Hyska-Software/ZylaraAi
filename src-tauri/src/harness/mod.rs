@@ -720,39 +720,67 @@ async fn run_stream_attempt(
                         emit(on_event, TurnEvent::Notice { severity, title, description });
                     }
                     ProviderEvent::Meta(value) => {
-                        let config_id = value
-                            .get("configId")
-                            .and_then(|v| v.as_str())
-                            .or_else(|| value.get("id").and_then(|v| v.as_str()))
-                            .unwrap_or("")
-                            .to_string();
-                        if !config_id.is_empty() {
-                            emit(
-                                on_event,
-                                TurnEvent::ConfigOptionUpdated {
-                                    config_id,
-                                    value: value
-                                        .get("currentValue")
-                                        .cloned()
-                                        .unwrap_or(serde_json::Value::Null),
-                                },
-                            );
+                        let mut emitted = false;
+                        if let Some(options) = value.get("configOptions").and_then(|v| v.as_array()) {
+                            for option in options {
+                                let config_id = option
+                                    .get("id")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                if config_id.is_empty() {
+                                    continue;
+                                }
+                                emitted = true;
+                                emit(
+                                    on_event,
+                                    TurnEvent::ConfigOptionUpdated {
+                                        config_id,
+                                        value: option
+                                            .get("currentValue")
+                                            .cloned()
+                                            .unwrap_or(serde_json::Value::Null),
+                                    },
+                                );
+                            }
+                        }
+                        if !emitted {
+                            let config_id = value
+                                .get("configId")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if !config_id.is_empty() {
+                                emit(
+                                    on_event,
+                                    TurnEvent::ConfigOptionUpdated {
+                                        config_id,
+                                        value: value
+                                            .get("currentValue")
+                                            .cloned()
+                                            .unwrap_or(serde_json::Value::Null),
+                                    },
+                                );
+                            }
                         }
                     }
-                    ProviderEvent::ToolCallFinished { id, status, result, presentation } => {
-                        emit(
-                            on_event,
-                            TurnEvent::ToolCallFinished {
-                                id,
-                                status,
-                                result,
-                                summary: None,
-                                citations: Vec::new(),
-                                presentation,
-                                finished_at: crate::domain::now_ms(),
-                            },
-                        );
-                    }
+                     ProviderEvent::ToolCallFinished { id, status, result, presentation } => {
+                        if let Some(call) = attempt.tool_calls.iter_mut().find(|call| call.id == id) {
+                            call.agent_result = Some((status.clone(), result.clone(), presentation.clone()));
+                        }
+                         emit(
+                             on_event,
+                             TurnEvent::ToolCallFinished {
+                                 id,
+                                 status,
+                                 result,
+                                 summary: None,
+                                 citations: Vec::new(),
+                                 presentation,
+                                 finished_at: crate::domain::now_ms(),
+                             },
+                         );
+                     }
                 }
                 if dirty {
                     let due = match last_checkpoint {
@@ -3687,6 +3715,10 @@ pub async fn run_turn(
             break;
         }
 
+        // ACP agents execute their own tools; their results arrive as
+        // `ToolCallFinished` from the provider adapter. Never feed those calls
+        // back into the local tool runtime (PLAN D2).
+        let acp_owned_tools = matches!(provider.transport, crate::catalog::ProviderTransport::Acp);
         let step_calls: Vec<ToolCallRecord> = streaming_calls
             .into_iter()
             .filter(|call| !call.id.is_empty())
@@ -3696,7 +3728,7 @@ pub async fn run_turn(
         if step_calls.is_empty() {
             // The model produced a final answer. Intermediate narration from
             // tool-calling steps is intentionally not part of the final message.
-            if stop_guard {
+            if stop_guard && !acp_owned_tools {
                 let todos =
                     code::session::todos(&deps.db, &conversation.id).unwrap_or_default();
                 let decision = completion::decide(completion::StopEvidence {
@@ -3760,21 +3792,35 @@ pub async fn run_turn(
         // Tools requested on the last allowed step still run: artifacts and other
         // deliverables must never be lost. A forced final-answer pass (below)
         // then summarizes what was collected.
-        for call in &step_calls {
-            emit(
-                &on_event,
-                TurnEvent::ToolCallExecuting {
-                    id: call.id.clone(),
-                    started_at: now_ms(),
-                },
-            );
-        }
-        let outcomes = match (&code_tool_ctx, profile) {
-            (Some(ctx), TurnProfile::Code) if agent.is_some() => {
-                execute_agent_tools(ctx, &runtime, &step_calls).await
+        // ACP tools already ran inside the agent. Convert the projected result
+        // to an outcome instead of re-executing the call locally.
+        let outcomes: Vec<ToolOutcome> = if acp_owned_tools {
+            step_calls
+                .iter()
+                .map(|call| ToolOutcome {
+                    content: call.result.clone().unwrap_or_default(),
+                    is_error: call.status == ToolCallStatus::Error,
+                    presentation: call.presentation.clone(),
+                    ..ToolOutcome::default()
+                })
+                .collect()
+        } else {
+            for call in &step_calls {
+                emit(
+                    &on_event,
+                    TurnEvent::ToolCallExecuting {
+                        id: call.id.clone(),
+                        started_at: now_ms(),
+                    },
+                );
             }
-            (Some(ctx), TurnProfile::Code) => code::tools::execute_batch(ctx, &step_calls).await,
-            _ => execute_tools(&runtime, &step_calls).await,
+            match (&code_tool_ctx, profile) {
+                (Some(ctx), TurnProfile::Code) if agent.is_some() => {
+                    execute_agent_tools(ctx, &runtime, &step_calls).await
+                }
+                (Some(ctx), TurnProfile::Code) => code::tools::execute_batch(ctx, &step_calls).await,
+                _ => execute_tools(&runtime, &step_calls).await,
+            }
         };
         let mut paired: Vec<(ToolCallRecord, ToolOutcome)> = Vec::new();
         for (mut call, outcome) in step_calls.into_iter().zip(outcomes.into_iter()) {
@@ -3797,20 +3843,28 @@ pub async fn run_turn(
             call.images = refs;
 
             // Completion gate receipts (mutations, checks, plan, question).
-            stop_progress.observe(&call.name, &call.arguments, &outcome);
+            // ACP tools belong to the agent and must not feed the local gate.
+            if !acp_owned_tools {
+                stop_progress.observe(&call.name, &call.arguments, &outcome);
+            }
 
-            emit(
-                &on_event,
-                TurnEvent::ToolCallFinished {
-                    id: call.id.clone(),
-                    status: if outcome.is_error { "error" } else { "done" }.to_string(),
-                    result: truncate_chars(&outcome.content, MAX_EVENT_TOOL_RESULT_CHARS),
-                    summary: outcome.summary.clone(),
-                    citations: outcome.citations.clone(),
-                    presentation: outcome.presentation.clone(),
-                    finished_at: call.finished_at.unwrap_or_else(now_ms),
-                },
-            );
+            // The ACP adapter already emitted `ToolCallFinished` from the
+            // agent's own `tool_call_update`; emitting it again would overwrite
+            // the agent's status/result in the renderer.
+            if !acp_owned_tools {
+                emit(
+                    &on_event,
+                    TurnEvent::ToolCallFinished {
+                        id: call.id.clone(),
+                        status: if outcome.is_error { "error" } else { "done" }.to_string(),
+                        result: truncate_chars(&outcome.content, MAX_EVENT_TOOL_RESULT_CHARS),
+                        summary: outcome.summary.clone(),
+                        citations: outcome.citations.clone(),
+                        presentation: outcome.presentation.clone(),
+                        finished_at: call.finished_at.unwrap_or_else(now_ms),
+                    },
+                );
+            }
             for artifact in &outcome.artifacts {
                 emit(
                     &on_event,
@@ -5490,27 +5544,36 @@ fn attachment_image_mime(attachment: &StoredAttachment, bytes: &[u8]) -> String 
 /* Tools                                                               */
 /* ------------------------------------------------------------------ */
 
-#[derive(Clone, Default)]
-struct StreamingToolCall {
-    id: String,
-    name: String,
-    arguments: String,
-}
+ #[derive(Clone, Default)]
+ struct StreamingToolCall {
+     id: String,
+     name: String,
+     arguments: String,
+    /// Result already produced by an ACP agent. Its presence means the harness
+    /// must not execute the tool locally (D2: the agent owns its tools).
+    agent_result: Option<(String, String, Option<serde_json::Value>)>,
+ }
 
-fn tool_call_record(call: StreamingToolCall) -> ToolCallRecord {
-    ToolCallRecord {
-        id: call.id,
-        name: call.name,
-        arguments: call.arguments,
-        result: None,
-        status: ToolCallStatus::Running,
-        summary: None,
-        started_at: Some(now_ms()),
-        finished_at: None,
-        presentation: None,
-        images: Vec::new(),
-    }
-}
+ fn tool_call_record(call: StreamingToolCall) -> ToolCallRecord {
+    let agent_result = call.agent_result;
+    let status = match agent_result.as_ref().map(|result| result.0.as_str()) {
+        Some("failed" | "cancelled" | "rejected" | "error") => ToolCallStatus::Error,
+        Some(_) => ToolCallStatus::Done,
+        None => ToolCallStatus::Running,
+    };
+     ToolCallRecord {
+         id: call.id,
+         name: call.name,
+         arguments: call.arguments,
+        result: agent_result.as_ref().map(|result| result.1.clone()),
+        status,
+         summary: None,
+         started_at: Some(now_ms()),
+         finished_at: None,
+        presentation: agent_result.and_then(|result| result.2),
+         images: Vec::new(),
+     }
+ }
 
 /// Effective built-in tool allowlist for an agent running the Code profile.
 /// Capability switches are deny filters; `tools` is an additional allowlist.
@@ -15458,5 +15521,23 @@ mod agent_loop_tests {
             outcomes.iter().all(|outcome| !outcome.is_error),
             "{outcomes:?}"
         );
+    }
+
+    #[test]
+    fn acp_agent_tool_result_is_kept_without_local_execution() {
+        let call = StreamingToolCall {
+            id: "acp-tool-1".to_string(),
+            name: "edit".to_string(),
+            arguments: "{\"path\":\"a.txt\"}".to_string(),
+            agent_result: Some((
+                "completed".to_string(),
+                "agent already edited a.txt".to_string(),
+                Some(serde_json::json!({ "kind": "diff" })),
+            )),
+        };
+        let record = tool_call_record(call);
+        assert_eq!(record.status, ToolCallStatus::Done);
+        assert_eq!(record.result.as_deref(), Some("agent already edited a.txt"));
+        assert_eq!(record.presentation, Some(serde_json::json!({ "kind": "diff" })));
     }
 }

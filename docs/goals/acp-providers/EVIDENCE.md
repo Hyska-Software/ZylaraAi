@@ -82,3 +82,55 @@ Data: 2026-11-25.
 - Kill de árvore usa helper local (o `workspace::exec::kill_process_tree` é privado ao módulo).
 - `agents.acp_agent_id` existe como coluna aditiva; a seleção do agente ACP para uma persona usa o
   `provider_id = acp__…` no seletor comum (conforme D13 — um único seletor).
+
+## Comparação com o Paseo e correções posteriores (2026-11-25)
+
+O plano completo, a matriz de comparação e os 15 achados estão em
+`docs/goals/acp-providers/COMPARISON-PLAN.md`. A referência foi o Paseo
+`e51bb7b`, com código-fonte local em `.research/paseo-src` (ignorado pelo git).
+
+Correções aplicadas após a comparação:
+
+- **Execução**: tool calls ACP não são reexecutadas pelo harness; o resultado
+  emitido pelo agente é preservado sem duplicar `ToolCallFinished`, e o gate de
+  conclusão local não é aplicado a turnos ACP (`harness/mod.rs`).
+- **Eventos de turno**: aprovações, perguntas e `FileChanged` do ACP usam o
+  `EventEmitter` real do turno via `acp::host::bind_turn_emitter` — antes tinham
+  `turnId` sintético e eram descartados pelo `applyEnvelope` do renderer.
+- **Instalação**: `acp_install_agent` faz probe imediato, grava modelos/estado de
+  auth e cria um modelo padrão quando o agente exige login; o agente instalado
+  fica selecionável sem boot scan manual.
+- **Sessão/probe**: `fresh` é calculado antes de `session/new` (o resumo D5 agora
+  é enviado em sessões novas) e `sessionId` do probe é lido da resposta plana.
+- **Permissões/elicitação**: escolha "sempre" (escopo de sessão/workspace/global)
+  é propagada como `allow_always`; respostas de elicitação usam os valores
+  `selected` mapeados de volta ao schema ACP, não apenas texto livre.
+- **Config/modelos**: `config_option_update` emite `ConfigOptionUpdated` por
+  opção; o renderer re-faz o probe do agente ACP e recarrega o catálogo.
+- **UI**: avisos, planos e compactação ACP aparecem como toasts i18nificados sem
+  entrar no histórico de mensagens; o diálogo do Registry mostra comando/args/env
+  exatos e oferece atualização quando a versão instalada difere do Registry.
+- **Registry**: ETag é persistido e reutilizado, `installed` é comparado pelo id
+  de Registry (sem o prefixo `acp__`) e `update_available` é calculado.
+- **Segurança/i18n**: `acp_stderr` sanitiza o id da conversa no caminho do log;
+  erros ACP e o rótulo do protocolo `acp` passam por i18n nos três idiomas.
+- **Limpeza**: writer morto de `acp_events`, wrapper `client::cancel` redundante
+  e `AcpManager::close_all` sem chamador foram removidos.
+- `agents.acp_agent_id` foi mantida apenas como coluna aditiva de compatibilidade de schema;
+  não há leitura/escrita e a seleção continua por `provider_id = acp__…` (D13).
+
+Lacunas de paridade que permanecem como features (não defeitos): importação de
+sessões do agente, slash commands, modos/steering/fila e subagentes cross-provider
+do Paseo.
+
+### Verificação após as correções
+
+| Comando | Resultado |
+| --- | --- |
+| `cd src-tauri && cargo check` | sem erros |
+| `cd src-tauri && cargo test --lib acp::` | 46 passaram, 1 ignorado (smoke do Registry) |
+| `cd src-tauri && cargo test --lib` | 1731 passaram; as mesmas 7 falhas pré-existentes (plugins/genui/pipeline), nenhuma em ACP |
+| `pnpm typecheck` | sem erros |
+| `pnpm test` | 3266 passaram; 6 falhas pré-existentes de preço/largura em `modelMenu`, `sessionCost`, `CodeContextMeterChip` e `ModelPill` |
+| `pnpm test:scripts` | 20/20 |
+| `pnpm i18n:check` | catálogos em paridade; as mesmas 7 literais pré-existentes em arquivos não ACP |

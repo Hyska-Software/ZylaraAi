@@ -3301,27 +3301,6 @@ impl Db {
         Ok(())
     }
 
-    pub fn acp_event_append(
-        &self,
-        conversation_id: Option<&str>,
-        provider_id: Option<&str>,
-        kind: &str,
-        payload: serde_json::Value,
-    ) -> Result<()> {
-        let conn = self.connection();
-        conn.execute(
-            "INSERT INTO acp_events (conversation_id, provider_id, kind, payload_json, created_at)
-             VALUES (?1,?2,?3,?4,?5)",
-            rusqlite::params![
-                conversation_id,
-                provider_id,
-                kind,
-                payload.to_string(),
-                crate::domain::now_ms(),
-            ],
-        )?;
-        Ok(())
-    }
 
     pub fn acp_clear_all(&self) -> Result<()> {
         let conn = self.connection();

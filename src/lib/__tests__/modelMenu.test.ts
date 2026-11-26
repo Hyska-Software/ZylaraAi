@@ -26,6 +26,7 @@ import {
   providerHasKey,
   reasoningForModel,
   selectionKey,
+  protocolLabel,
   selectorProviders,
   thinkingHeadline,
   thinkingNote,
@@ -659,5 +660,13 @@ describe('selectorProviders', () => {
     expect(ids(list)).toContain('acme-gateway');
     expect(ids(list)).not.toContain('groq');
     expect(ids(list)).not.toContain('openrouter');
+  });
+
+});
+
+describe('protocolLabel', () => {
+  it('localizes the ACP transport label instead of leaking the raw id', () => {
+    expect(protocolLabel('acp')).not.toBe('acp');
+    expect(protocolLabel('acp')).toContain('ACP');
   });
 });

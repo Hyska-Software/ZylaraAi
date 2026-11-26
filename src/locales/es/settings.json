@@ -330,6 +330,10 @@
         "install": "Instalar",
         "installed": "Instalado",
         "consent": "He revisado el comando, los argumentos y las variables de entorno que ejecutará este agente, y los acepto.",
+        "command": "Ejecuta: {{command}} {{args}}",
+        "envNames": "Entorno: {{names}}",
+        "update": "Actualizar",
+        "updateAvailable": "Actualización disponible",
         "installReason": "Motivo: {{reason}}"
       },
       "custom": {

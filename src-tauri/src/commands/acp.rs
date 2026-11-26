@@ -1,5 +1,6 @@
 //! Tauri commands for ACP agents: Registry discovery, installation, auth and diagnostics.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use futures_util::StreamExt;
@@ -19,12 +20,8 @@ fn now_ms() -> i64 {
     crate::domain::now_ms()
 }
 
-fn installed_ids(state: &RuntimeState) -> Vec<String> {
-    state
-        .db
-        .acp_agents()
-        .map(|rows| rows.into_iter().map(|row| row.id).collect())
-        .unwrap_or_default()
+fn installed_rows(state: &RuntimeState) -> Vec<AcpAgentRow> {
+    state.db.acp_agents().unwrap_or_default()
 }
 
 fn manifest_by_id(id: &str, state: &RuntimeState) -> Option<crate::acp::registry::RegistryManifest> {
@@ -48,6 +45,8 @@ fn view_of(state: &RuntimeState, row: &AcpAgentRow) -> AcpAgentView {
 }
 
 async fn registry_agents(state: &RuntimeState, force: bool) -> Result<Vec<AcpRegistryAgent>, String> {
+    let fetched_at_key = format!("{REGISTRY_CACHE_KEY}:fetched_at");
+    let etag_key = format!("{REGISTRY_CACHE_KEY}:etag");
     let cached_raw = state.db.acp_cache_get(REGISTRY_CACHE_KEY).ok().flatten();
     let cached = cached_raw
         .as_deref()
@@ -55,7 +54,7 @@ async fn registry_agents(state: &RuntimeState, force: bool) -> Result<Vec<AcpReg
     let fresh = cached.as_ref().is_some_and(|_file| {
         state
             .db
-            .acp_cache_get(&format!("{REGISTRY_CACHE_KEY}:fetched_at"))
+            .acp_cache_get(&fetched_at_key)
             .ok()
             .flatten()
             .and_then(|raw| raw.parse::<i64>().ok())
@@ -63,7 +62,8 @@ async fn registry_agents(state: &RuntimeState, force: bool) -> Result<Vec<AcpReg
     });
 
     let manifests = if force || !fresh {
-        match crate::acp::registry::fetch(&state.http, None).await {
+        let etag = state.db.acp_cache_get(&etag_key).ok().flatten();
+        match crate::acp::registry::fetch(&state.http, etag.as_deref()).await {
             Ok(fetch) if !fetch.not_modified && !fetch.agents.is_empty() => {
                 let file = crate::acp::RegistryFile {
                     version: "1.0.0".to_string(),
@@ -71,15 +71,21 @@ async fn registry_agents(state: &RuntimeState, force: bool) -> Result<Vec<AcpReg
                 };
                 if let Ok(raw) = serde_json::to_string(&file) {
                     let _ = state.db.acp_cache_set(REGISTRY_CACHE_KEY, &raw);
-                    let _ = state
-                        .db
-                        .acp_cache_set(&format!("{REGISTRY_CACHE_KEY}:fetched_at"), &now_ms().to_string());
                 }
+                if let Some(etag) = fetch.etag {
+                    let _ = state.db.acp_cache_set(&etag_key, &etag);
+                }
+                let _ = state.db.acp_cache_set(&fetched_at_key, &now_ms().to_string());
                 fetch.agents
             }
-            Ok(_) => cached
-                .map(|file| file.agents)
-                .unwrap_or_else(|| crate::acp::registry::embedded_snapshot().agents),
+            Ok(_) => {
+                // 304 Not Modified: keep the snapshot but refresh the clock so
+                // every UI open does not hit the CDN again.
+                let _ = state.db.acp_cache_set(&fetched_at_key, &now_ms().to_string());
+                cached
+                    .map(|file| file.agents)
+                    .unwrap_or_else(|| crate::acp::registry::embedded_snapshot().agents)
+            }
             Err(error) => {
                 eprintln!("zylara: falha ao atualizar Registry ACP: {error:#}");
                 cached
@@ -117,9 +123,30 @@ async fn registry_agents(state: &RuntimeState, force: bool) -> Result<Vec<AcpReg
         .collect::<Vec<()>>()
         .await;
 
-    let mut views = crate::acp::registry::to_views(&manifests, &installed_ids(state));
+    // `to_views` expects registry ids (without `acp__`), not provider ids.
+    let installed = installed_rows(state);
+    let installed_ids: Vec<String> = installed
+        .iter()
+        .map(|row| {
+            row.registry_id
+                .clone()
+                .unwrap_or_else(|| row.id.strip_prefix(acp::ID_PREFIX).unwrap_or(&row.id).to_string())
+        })
+        .collect();
+    let versions: HashMap<String, String> = installed
+        .iter()
+        .filter_map(|row| {
+            row.registry_id
+                .as_ref()
+                .map(|id| (id.clone(), row.version.clone()))
+        })
+        .collect();
+    let mut views = crate::acp::registry::to_views(&manifests, &installed_ids);
     for view in &mut views {
         view.icon_svg = crate::acp::load_icon_svg_by_id(&state.data_dir, &view.id);
+        view.update_available = versions
+            .get(&view.id)
+            .is_some_and(|version| version != &view.version);
     }
     Ok(views)
 }
@@ -151,14 +178,14 @@ pub async fn acp_install_agent(
         accept_command,
     };
     if !req.accept_command {
-        return Err("ACP_INSTALL_CONSENT_REQUIRED".to_string());
+        return Err(crate::i18n::t("acp.errors.consentRequired").to_string());
     }
     let registry_id = req.registry_id.trim();
     let manifest = manifest_by_id(registry_id, &state)
-        .ok_or_else(|| format!("unknown ACP agent: {registry_id}"))?;
+        .ok_or_else(|| crate::i18n::t_args("acp.errors.unknownAgent", &[("id", registry_id)]))?;
     let target = crate::acp::registry::current_target();
     let distribution = crate::acp::registry::select_distribution(&manifest, target)
-        .ok_or_else(|| format!("ACP_AGENT_UNSUPPORTED: no distribution for {target}"))?;
+        .ok_or_else(|| crate::i18n::t_args("acp.errors.unsupportedDistribution", &[("target", target)]))?;
     let data_dir = crate::config::data_dir(&app).map_err(|e| e.to_string())?;
     let id = acp::provider_id(registry_id);
     let mut row = match distribution {
@@ -210,7 +237,54 @@ pub async fn acp_install_agent(
     }
     row.updated_at = now;
     state.db.acp_agent_save(&row).map_err(|e| e.to_string())?;
-    Ok(view_of(&state, &row))
+    // Discover models and auth state now: otherwise the new provider has an
+    // empty model list and the composer cannot send a turn until a boot scan
+    // or a manual "Test agent" happens to run.
+    match crate::acp::client::probe(&app, &id).await {
+        Ok((auth, models)) => {
+            if !models.is_empty() {
+                let _ = state.db.acp_models_replace(&id, &models);
+            }
+            let mut stored = state
+                .db
+                .acp_agent(&id)
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| row.clone());
+            stored.auth_state = auth.state;
+            stored.auth_hint = auth.hint;
+            stored.last_error = None;
+            stored.updated_at = now_ms();
+            let _ = state.db.acp_agent_save(&stored);
+            Ok(view_of(&state, &stored))
+        }
+        Err(error) => {
+            // An agent that needs interactive login still needs one routable
+            // model so the shared selector can resolve a turn.
+            if state
+                .db
+                .acp_models(&id)
+                .map(|models| models.is_empty())
+                .unwrap_or(true)
+            {
+                let _ = state
+                    .db
+                    .acp_models_replace(&id, &crate::acp::session::discover_models(&[]));
+            }
+            let mut stored = state
+                .db
+                .acp_agent(&id)
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| row.clone());
+            stored.auth_state = "auth_required".to_string();
+            stored.auth_hint = Some(error.to_string());
+            stored.last_error = Some(error.to_string());
+            stored.updated_at = now_ms();
+            let _ = state.db.acp_agent_save(&stored);
+            Ok(view_of(&state, &stored))
+        }
+    }
 }
 
 #[tauri::command]
@@ -232,7 +306,7 @@ pub async fn acp_add_custom_agent(
     };
     let name = input.name.trim();
     if name.is_empty() {
-        return Err("ACP_AGENT_NAME_REQUIRED".to_string());
+        return Err(crate::i18n::t("acp.errors.nameRequired").to_string());
     }
     let slug = name
         .to_ascii_lowercase()
@@ -463,7 +537,7 @@ pub async fn acp_stderr(
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let data_dir = crate::config::data_dir(&app).map_err(|e| e.to_string())?;
-    let path = data_dir.join("acp").join("logs").join(format!("{conversation_id}.log"));
+    let path = data_dir.join("acp").join("logs").join(crate::acp::session::safe_log_name(&conversation_id));
     let raw = std::fs::read(path).map_err(|e| e.to_string())?;
     let end = raw.len().min(16 * 1024);
     Ok(String::from_utf8_lossy(&raw[raw.len() - end..]).to_string())

@@ -992,6 +992,14 @@ export const useChatStore = create<ChatState>()((set, get) => {
       });
     };
 
+    const refreshAcpModels = (conversationId: string) => {
+      const app = useAppStore.getState();
+      const providerId = get().conversations.find((entry) => entry.id === conversationId)?.providerId ?? '';
+      const revalidate = providerId.startsWith('acp__')
+        ? app.testAgent(providerId).catch(() => undefined)
+        : Promise.resolve();
+      return revalidate.finally(() => app.reloadCatalog());
+    };
     const handleEvent = (event: TurnEvent) => {
       // O estado de harness de código (aprovações/plano/tarefas/contexto/
       // alterações/jobs) é ortogonal ao streaming e vive no `codeStore`.
@@ -1508,11 +1516,21 @@ export const useChatStore = create<ChatState>()((set, get) => {
           }));
           break;
         case 'notice':
-          // ACP notices are out-of-band information, never message content.
+          // Out-of-band information: show it, but never inject it into history.
+          toast.info(t('chat:toasts.acpNotice', { title: event.title }), {
+            description: event.description,
+          });
+          break;
+        case 'acp_plan':
+          toast.info(t('chat:toasts.acpPlan'));
+          break;
+        case 'acp_compaction':
+          toast.info(t('chat:toasts.acpCompaction'));
           break;
         case 'config_option_updated':
-          // A new session option can add or remove models in the shared selector.
-          void useAppStore.getState().reloadCatalog();
+          // An agent can add/remove model options mid-turn. Re-probe the ACP
+          // provider of this conversation, then refresh the shared selector.
+          void refreshAcpModels(context.conversationId);
           break;
         default:
           break;
@@ -3287,10 +3305,30 @@ export const useChatStore = create<ChatState>()((set, get) => {
         await loadConversationIntoCache(conversationId);
       }
       const conversation = get().conversations.find((entry) => entry.id === conversationId);
-      if (event.type === 'notice' || event.type === 'config_option_updated') {
-        // No assistant row is involved: keep notices out of history and refresh
-        // the model selector when the agent advertises new config options.
-        if (event.type === 'config_option_updated') void useAppStore.getState().reloadCatalog();
+      if (
+        event.type === 'notice' ||
+        event.type === 'acp_plan' ||
+        event.type === 'acp_compaction' ||
+        event.type === 'config_option_updated'
+      ) {
+        // No assistant row is involved: keep out-of-band activity out of the
+        // transcript, but make it visible and refresh advertised models.
+        if (event.type === 'notice') {
+          toast.info(t('chat:toasts.acpNotice', { title: event.title }), {
+            description: event.description,
+          });
+        } else if (event.type === 'acp_plan') {
+          toast.info(t('chat:toasts.acpPlan'));
+        } else if (event.type === 'acp_compaction') {
+          toast.info(t('chat:toasts.acpCompaction'));
+        } else {
+          const app = useAppStore.getState();
+          const providerId = conversation?.providerId ?? '';
+          const revalidate = providerId.startsWith('acp__')
+            ? app.testAgent(providerId).catch(() => undefined)
+            : Promise.resolve();
+          void revalidate.finally(() => app.reloadCatalog());
+        }
         return;
       }
       let stream = selectConversationStream(get(), conversationId);

@@ -97,7 +97,6 @@ impl Connection {
 pub(crate) struct SharedState {
     pub(crate) turn: Option<TurnState>,
     pub(crate) config_state: BTreeMap<String, Value>,
-    pub(crate) cancelled: bool,
 }
 
 pub(crate) struct TurnState {
@@ -514,7 +513,7 @@ fn secret_value(app: &tauri::AppHandle, row: &AcpAgentRow, name: &str) -> Option
         .map(str::to_string)
 }
 
-fn safe_log_name(conversation_id: &str) -> String {
+pub fn safe_log_name(conversation_id: &str) -> String {
     let stem: String = conversation_id
         .chars()
         .map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' { ch } else { '_' })
@@ -798,6 +797,7 @@ pub(crate) async fn acquire(
         .ok()
         .flatten();
     let mut session_id = String::new();
+    let mut resumed = false;
     let mut options = Vec::new();
     if let Some(saved) = saved {
         let resume = if spawned.capabilities.resume {
@@ -825,6 +825,7 @@ pub(crate) async fn acquire(
                     .unwrap_or(&saved.session_id)
                     .to_string();
                 options = config_options_from(&response);
+                resumed = true;
             }
         }
     }
@@ -839,10 +840,10 @@ pub(crate) async fn acquire(
             .and_then(Value::as_str)
             .map(crate::acp::mapping::clean_text)
             .filter(|id| !id.is_empty())
-            .ok_or_else(|| ProviderError::BadRequest("ACP agent returned no sessionId".into()))?;
+            .ok_or_else(|| ProviderError::BadRequest(crate::i18n::t("acp.errors.noSessionId")))?;
         options = config_options_from(&response);
     }
-    let fresh = session_id.is_empty();
+    let fresh = !resumed;
 
     let models = discover_models(&options);
     let _ = state.db.acp_models_replace(provider_id, &models);
@@ -1130,7 +1131,6 @@ pub(crate) async fn send_prompt(
     let (updates_tx, mut updates_rx) = unbounded_channel::<Value>();
     {
         let mut guard = handle.shared.state.lock();
-        guard.cancelled = false;
         guard.turn = Some(TurnState {
             sink: sink.clone(),
             updates: updates_tx,
@@ -1215,26 +1215,10 @@ async fn clear_turn(handle: &SessionHandle) {
     {
         let mut guard = handle.shared.state.lock();
         guard.turn = None;
-        guard.cancelled = false;
     }
     crate::acp::host::clear_cancel(&handle.conversation_id);
 }
 
-/// Ask the agent to stop and kill its process tree if it does not comply.
-pub(crate) async fn cancel(conversation_id: &str, provider_id: &str) {
-    let handle = {
-        let live = LIVE.lock();
-        let key = AcpManager::session_key(conversation_id, provider_id);
-        live.get(&key).cloned()
-    };
-    let Some(handle) = handle else {
-        return;
-    };
-    handle.shared.state.lock().cancelled = true;
-    handle
-        .conn
-        .notify("session/cancel", json!({ "sessionId": handle.session_id }));
-}
 
 /// Close one session and terminate its process tree.
 pub(crate) async fn close(conversation_id: &str, provider_id: &str) {

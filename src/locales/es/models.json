@@ -148,7 +148,8 @@
     "openai-chat": "OpenAI Chat",
     "openai-responses": "OpenAI Responses",
     "anthropic": "Anthropic Messages",
-    "google": "Google Gemini"
+    "google": "Google Gemini",
+    "acp": "Agent Client Protocol (ACP)"
   },
   "status": {
     "unavailable": "No disponible en el gateway — no se puede usar.",

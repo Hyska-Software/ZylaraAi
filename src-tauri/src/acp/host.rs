@@ -19,8 +19,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::acp::AcpAgentRow;
 use crate::domain::{
-    ApprovalDetail, ApprovalRequest, AskOption, AskQuestion, AskUserRequest, FileChange,
-    FileChangeKind, RiskClass,
+    ApprovalDetail, ApprovalRequest, AskOption, AskQuestion, AskUserAnswer, AskUserRequest,
+    FileChange, FileChangeKind, RiskClass,
 };
 use crate::events::TurnEvent;
 use crate::harness::EventEmitter;
@@ -32,8 +32,27 @@ pub(crate) const METHOD_NOT_FOUND: &str = "ACP_METHOD_NOT_FOUND:";
 pub(crate) const INVALID_PARAMS: &str = "ACP_INVALID_PARAMS:";
 static CANCELS: LazyLock<Mutex<HashMap<String, CancellationToken>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+/// Tunnel turn-scoped events (approvals, questions, file changes) through the
+/// emitter of the active turn. A synthetic emitter would use a foreign
+/// `turnId` and be dropped by the renderer's sequence filter.
+static TURN_EMITTERS: LazyLock<Mutex<HashMap<String, Arc<dyn EventEmitter>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 static TERMINALS: LazyLock<Mutex<HashMap<String, Value>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Attach the active turn's emitter for the lifetime of one ACP turn.
+pub fn bind_turn_emitter(conversation_id: &str, emitter: Arc<dyn EventEmitter>) {
+    turn_emitters().lock().insert(conversation_id.to_string(), emitter);
+}
+
+/// Detach the active turn's emitter. Probes keep the synthetic fallback below.
+pub fn unbind_turn_emitter(conversation_id: &str) {
+    turn_emitters().lock().remove(conversation_id);
+}
+
+fn turn_emitters() -> &'static Mutex<HashMap<String, Arc<dyn EventEmitter>>> {
+    &TURN_EMITTERS
+}
 
 fn cancels() -> &'static Mutex<HashMap<String, CancellationToken>> {
     &CANCELS
@@ -80,8 +99,10 @@ impl EventEmitter for IpcEmitter {
         let _ = self.app.emit("zylara:turn-event", payload);
     }
 }
-
 fn emitter(app: &AppHandle, conversation_id: &str, agent_id: &str) -> Arc<dyn EventEmitter> {
+    if let Some(bound) = turn_emitters().lock().get(conversation_id).cloned() {
+        return bound;
+    }
     Arc::new(IpcEmitter {
         app: app.clone(),
         conversation_id: conversation_id.to_string(),
@@ -217,6 +238,7 @@ async fn permission(
         },
     );
 
+    let mut persistent = false;
     let approved = match decision {
         PolicyDecision::Deny { .. } => false,
         PolicyDecision::Allow => true,
@@ -242,14 +264,15 @@ async fn permission(
                 &cancel_for(conversation_id),
             )
             .await;
+            persistent = outcome.scope.is_some();
             outcome.is_approved()
         }
     };
 
     Ok(if approved {
-        picker.allowed()
+        picker.allowed(persistent)
     } else {
-        picker.rejected()
+        picker.rejected(persistent)
     })
 }
 
@@ -285,24 +308,27 @@ impl PermissionPicker {
         picker
     }
 
-    /// Prefer the narrowest grant that the agent offered.
-    fn allowed(&self) -> Value {
-        match self
-            .allow_once
-            .as_ref()
-            .or(self.allow_always.as_ref())
-        {
+    /// Prefer the narrowest grant, or the persistent one when the user chose
+    /// "always" in the approval card.
+    fn allowed(&self, persistent: bool) -> Value {
+        let selected = if persistent {
+            self.allow_always.as_ref().or(self.allow_once.as_ref())
+        } else {
+            self.allow_once.as_ref().or(self.allow_always.as_ref())
+        };
+        match selected {
             Some(id) => json!({ "outcome": { "selected": { "optionId": id } } }),
             None => json!({ "outcome": "cancelled" }),
         }
     }
 
-    fn rejected(&self) -> Value {
-        match self
-            .reject_once
-            .as_ref()
-            .or(self.reject_always.as_ref())
-        {
+    fn rejected(&self, persistent: bool) -> Value {
+        let selected = if persistent {
+            self.reject_always.as_ref().or(self.reject_once.as_ref())
+        } else {
+            self.reject_once.as_ref().or(self.reject_always.as_ref())
+        };
+        match selected {
             Some(id) => json!({ "outcome": { "selected": { "optionId": id } } }),
             None => json!({ "outcome": "cancelled" }),
         }
@@ -353,8 +379,10 @@ async fn elicitation(
         return Ok(json!({ "action": "decline" }));
     }
     let mut questions = Vec::with_capacity(fields.len());
+    let mut option_values: HashMap<String, HashMap<String, Value>> = HashMap::new();
     for (name, field) in fields {
         let mut options = Vec::new();
+        let mut values_by_label = HashMap::new();
         if let Some(enum_values) = field.get("enum").and_then(Value::as_array) {
             for value in enum_values.iter().take(6) {
                 let label = match value {
@@ -362,6 +390,7 @@ async fn elicitation(
                     other => crate::acp::mapping::clean_text(&other.to_string()),
                 };
                 if !label.is_empty() {
+                    values_by_label.insert(label.clone(), value.clone());
                     options.push(AskOption {
                         label,
                         description: None,
@@ -369,8 +398,9 @@ async fn elicitation(
                 }
             }
         }
+        let question_id = crate::acp::mapping::clean_text(name);
         questions.push(AskQuestion {
-            id: crate::acp::mapping::clean_text(name),
+            id: question_id.clone(),
             question: crate::acp::mapping::clean_text(
                 field
                     .get("title")
@@ -381,6 +411,7 @@ async fn elicitation(
             options,
             multi_select: false,
         });
+        option_values.insert(question_id, values_by_label);
     }
     let request = AskUserRequest {
         id: format!("acp-elicitation-{}", uuid::Uuid::new_v4()),
@@ -401,16 +432,42 @@ async fn elicitation(
     if response.skipped {
         return Ok(json!({ "action": "cancel" }));
     }
-    let mut content = serde_json::Map::new();
-    for answer in response.answers {
-        content.insert(
-            answer.question_id,
-            Value::String(crate::acp::mapping::clean_text(
-                answer.custom.as_deref().unwrap_or_default(),
-            )),
-        );
-    }
+    let content = elicitation_content(&option_values, response.answers);
     Ok(json!({ "action": "accept", "content": content }))
+}
+
+/// Map the approval UI's answers back to the ACP schema values advertised by
+/// the agent. A custom answer wins; selected enum values keep their original
+/// JSON type (important for boolean/number enums).
+fn elicitation_content(
+    option_values: &HashMap<String, HashMap<String, Value>>,
+    answers: Vec<AskUserAnswer>,
+) -> serde_json::Map<String, Value> {
+    let mut content = serde_json::Map::new();
+    for answer in answers {
+        let mapped: Vec<Value> = answer
+            .selected
+            .iter()
+            .map(|label| {
+                option_values
+                    .get(&answer.question_id)
+                    .and_then(|values| values.get(label))
+                    .cloned()
+                    .unwrap_or_else(|| Value::String(label.clone()))
+            })
+            .collect();
+        let value = if let Some(custom) = answer.custom.filter(|text| !text.trim().is_empty()) {
+            Value::String(crate::acp::mapping::clean_text(&custom))
+        } else {
+            match mapped.len() {
+                0 => Value::Null,
+                1 => mapped.into_iter().next().unwrap_or(Value::Null),
+                _ => Value::Array(mapped),
+            }
+        };
+        content.insert(answer.question_id, value);
+    }
+    content
 }
 
 fn session_cwd(app: &AppHandle, conversation_id: &str, row: &AcpAgentRow) -> std::path::PathBuf {
@@ -687,8 +744,9 @@ mod tests {
         ]);
         let values = options.as_array().expect("options array");
         let picker = PermissionPicker::new(values);
-        assert_eq!(picker.allowed()["outcome"]["selected"]["optionId"], "yes-once");
-        assert_eq!(picker.rejected()["outcome"]["selected"]["optionId"], "no");
+        assert_eq!(picker.allowed(false)["outcome"]["selected"]["optionId"], "yes-once");
+        assert_eq!(picker.allowed(true)["outcome"]["selected"]["optionId"], "yes-always");
+        assert_eq!(picker.rejected(false)["outcome"]["selected"]["optionId"], "no");
     }
 
     #[test]
@@ -705,5 +763,31 @@ mod tests {
         };
         let value = mcp_server_value(&config, true).expect("stdio server");
         assert_eq!(value["env"], json!({}));
+    }
+
+    #[test]
+    fn elicitation_preserves_selected_enum_values_and_custom_text() {
+        let mut option_values = HashMap::new();
+        option_values.insert(
+            "q1".to_string(),
+            [("yes".to_string(), Value::Bool(true))]
+                .into_iter()
+                .collect(),
+        );
+        let answers = vec![
+            AskUserAnswer {
+                question_id: "q1".into(),
+                selected: vec!["yes".into()],
+                custom: None,
+            },
+            AskUserAnswer {
+                question_id: "q2".into(),
+                selected: vec!["first".into()],
+                custom: Some("typed answer".into()),
+            },
+        ];
+        let content = elicitation_content(&option_values, answers);
+        assert_eq!(content["q1"], json!(true));
+        assert_eq!(content["q2"], json!("typed answer"));
     }
 }

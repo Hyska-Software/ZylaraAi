@@ -25,7 +25,7 @@ pub async fn stream(
     let provider_id = request.config.provider_id.as_str();
     if !crate::acp::is_acp_id(provider_id) {
         return Err(ProviderError::BadRequest(
-            "not an ACP provider route".to_string(),
+            crate::i18n::t("acp.errors.notAcpRoute"),
         ));
     }
     let state = app.state::<crate::state::AppState>();
@@ -34,7 +34,12 @@ pub async fn stream(
         .acp_agent(provider_id)
         .ok()
         .flatten()
-        .ok_or_else(|| ProviderError::BadRequest(format!("ACP agent {provider_id} not installed")))?;
+        .ok_or_else(|| {
+            ProviderError::BadRequest(crate::i18n::t_args(
+                "acp.errors.agentNotInstalled",
+                &[("id", provider_id)],
+            ))
+        })?;
     let conversation_id = if request.config.session_id.is_empty() {
         provider_id.to_string()
     } else {
@@ -54,7 +59,7 @@ pub async fn stream(
     let prompt = prompt_blocks(request, &handle.capabilities, handle.fresh);
     if prompt.is_empty() {
         return Err(ProviderError::BadRequest(
-            "ACP turn has no user message".to_string(),
+            crate::i18n::t("acp.errors.noUserMessage"),
         ));
     }
     let result = session::send_prompt(&handle, prompt, sink, &request.cancel).await;
@@ -200,12 +205,7 @@ async fn try_probe(
                 .cloned()
                 .unwrap_or_default();
             let models = session::discover_models(&options);
-            let probe_session_id = value
-                .get("result")
-                .and_then(|result| result.get("sessionId"))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
+            let probe_session_id = session_id_from(&value);
             let state = app.state::<crate::state::AppState>();
             if session::discover_thinking_config(&options).is_some() {
                 session::persist_thinking_config(app, &row.id, &options);
@@ -265,6 +265,23 @@ async fn try_probe(
     };
     shutdown_spawned(spawned);
     result
+}
+
+/// `session/new` returns the id at the top level. Older agents wrapped results
+/// under `result`; both shapes are accepted so the config-option loop can
+/// actually address the session it just opened.
+fn session_id_from(value: &Value) -> String {
+    value
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            value
+                .get("result")
+                .and_then(|result| result.get("sessionId"))
+                .and_then(Value::as_str)
+        })
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// Authenticate with an ACP agent: protocol login, terminal relaunch or logout.
@@ -538,10 +555,6 @@ fn shutdown_spawned(spawned: session::Spawned) {
     spawned.task.abort();
 }
 
-/// Cancel a live turn without blocking on the agent.
-pub async fn cancel(conversation_id: &str, provider_id: &str) {
-    session::cancel(conversation_id, provider_id).await;
-}
 
 /// Close a live session and its process tree.
 pub async fn close(conversation_id: &str, provider_id: &str) {
@@ -664,5 +677,15 @@ mod tests {
         let provider_id = format!("{ID_PREFIX}agent");
         assert!(crate::acp::is_acp_id(&provider_id));
         assert!(!crate::acp::is_acp_id("custom__agent"));
+    }
+
+    #[test]
+    fn probe_reads_flat_and_wrapped_session_ids() {
+        assert_eq!(session_id_from(&json!({ "sessionId": "s1" })), "s1");
+        assert_eq!(
+            session_id_from(&json!({ "result": { "sessionId": "s2" } })),
+            "s2"
+        );
+        assert_eq!(session_id_from(&json!({})), "");
     }
 }

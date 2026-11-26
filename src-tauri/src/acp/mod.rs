@@ -87,6 +87,15 @@ pub struct AcpRegistryAgent {
     pub distributions: Vec<String>,
     pub platforms: Vec<String>,
     pub installed: bool,
+    /// Exact launch command and arguments shown before install consent.
+    #[serde(default)]
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env_names: Vec<String>,
+    #[serde(default)]
+    pub update_available: bool,
     pub supported: bool,
     pub install_reason: Option<String>,
     /// Validated monochrome SVG from the Registry cache (inline glyph).
@@ -430,16 +439,6 @@ impl AcpManager {
             .collect()
     }
 
-    /// Terminate every live agent process. Called on app shutdown.
-    pub async fn close_all(&self) {
-        let mut sessions = self.sessions.lock().await;
-        for (_, session) in sessions.iter_mut() {
-            if let Some(child) = session.child.as_mut() {
-                let _ = child.start_kill();
-            }
-        }
-        sessions.clear();
-    }
 }
 
 static MANAGER: OnceLock<Arc<AcpManager>> = OnceLock::new();
