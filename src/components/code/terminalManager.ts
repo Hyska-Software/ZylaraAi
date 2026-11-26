@@ -21,6 +21,7 @@ import { t } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
 import { normalizeTerminalFontSize } from '@/lib/terminalSettings';
 import type { TerminalEvent, TerminalInfo, TerminalTarget } from '@/lib/types';
+import { createTerminalLinkHandler, createTerminalUrlLinkProvider } from './terminalLinks';
 import {
   buildTerminalTheme,
   prefersReducedMotion,
@@ -232,7 +233,7 @@ function terminalAppearance(): TerminalAppearance {
 }
 
 function createTerminal(appearance: TerminalAppearance): XTerm {
-  return new XTerm({
+  const term = new XTerm({
     cursorBlink: !prefersReducedMotion(),
     fontFamily: appearance.fontFamily,
     fontSize: appearance.fontSize,
@@ -240,7 +241,12 @@ function createTerminal(appearance: TerminalAppearance): XTerm {
     allowProposedApi: true,
     screenReaderMode: true,
     theme: buildTerminalTheme(),
+    // OSC 8 hyperlinks use the same validated opener instead of xterm's confirm.
+    linkHandler: createTerminalLinkHandler(),
   });
+  // Plain http(s) URLs printed by PTY commands become clickable too.
+  term.registerLinkProvider(createTerminalUrlLinkProvider(term));
+  return term;
 }
 
 /** Waits for the configured font before measuring cells (avoids stale rows/columns). */

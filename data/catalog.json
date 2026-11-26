@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generatedAt": "2026-11-24T16:32:07.637Z",
+ "generatedAt": "2026-11-26T19:19:42.751Z",
  "sources": {
   "docs": [
    "https://opencode.ai/v2/docs/console/go/",
@@ -916,8 +916,7 @@
      "modalities": {
       "input": [
        "text",
-       "image",
-       "pdf"
+       "image"
       ],
       "output": [
        "text"
@@ -1035,7 +1034,7 @@
      },
      "releaseDate": "2026-11-04",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "A next-generation multimodal productivity model with significantly enhanced Agent and complex task execution capabilities.",
      "tags": [
       "reasoning",
@@ -1079,7 +1078,7 @@
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
      "tags": [
       "free",
@@ -1115,8 +1114,8 @@
        "text"
       ]
      },
-     "contextWindow": 1024000,
-     "maxOutput": 64000,
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
      "cost": {
       "input": 0.834,
       "output": 2.501,
@@ -1254,7 +1253,7 @@
      "releaseDate": "2026-07-16",
      "knowledge": null,
      "openWeights": true,
-     "description": "Multimodal Kimi model with 1M context and toggleable max-effort thinking for long-horizon agent work",
+     "description": "Multimodal Kimi model with 1M context and always-on thinking for long-horizon agent work",
      "tags": [
       "open-weights",
       "reasoning",
@@ -1464,7 +1463,7 @@
      },
      "releaseDate": "2026-11-02",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Meituan's multimodal reasoning model for long-horizon coding and agent tasks, with visual understanding and a 1M-token context window",
      "tags": [
       "reasoning",
@@ -2886,7 +2885,7 @@
       }
      },
      "releaseDate": "2025-09-29",
-     "knowledge": "2025-07-31",
+     "knowledge": "2025-01-31",
      "openWeights": false,
      "description": "Balanced Claude model for coding, analysis, agent workflows, and cost control",
      "tags": [
@@ -2930,7 +2929,7 @@
       ]
      },
      "contextWindow": 1000000,
-     "maxOutput": 64000,
+     "maxOutput": 128000,
      "cost": {
       "input": 3,
       "output": 15,
@@ -3449,6 +3448,53 @@
       "free",
       "reasoning",
       "vision"
+     ],
+     "status": "free"
+    },
+    {
+     "id": "seaglass-alpha-free",
+     "name": "Seaglass Alpha Free",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": false,
+     "modalities": {
+      "input": [
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 131072,
+     "cost": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0
+     },
+     "releaseDate": "2026-11-26",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Stealth reasoning model, free for a limited time",
+     "tags": [
+      "free",
+      "reasoning"
      ],
      "status": "free"
     },
@@ -5953,8 +5999,7 @@
      "modalities": {
       "input": [
        "text",
-       "image",
-       "pdf"
+       "image"
       ],
       "output": [
        "text"
@@ -6065,7 +6110,7 @@
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
      "tags": [
       "free",
@@ -6240,7 +6285,7 @@
      "releaseDate": "2026-07-16",
      "knowledge": null,
      "openWeights": true,
-     "description": "Multimodal Kimi model with 1M context and toggleable max-effort thinking for long-horizon agent work",
+     "description": "Multimodal Kimi model with 1M context and always-on thinking for long-horizon agent work",
      "tags": [
       "open-weights",
       "reasoning",
@@ -6616,9 +6661,9 @@
       "output": 2.09,
       "cache_read": 0.07
      },
-     "releaseDate": "2026-10-06",
+     "releaseDate": "2026-10-05",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Mistral's 1T-parameter multimodal MoE for reasoning, coding, and agentic work",
      "tags": [
       "reasoning",
@@ -8273,6 +8318,70 @@
      "status": "stable"
     },
     {
+     "id": "gpt-6-astra-healthcare",
+     "name": "GPT-6 Astra Healthcare",
+     "family": "gpt",
+     "protocols": [
+      "openai-responses"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 10,
+      "output": 50,
+      "cache_read": 1,
+      "tiers": [
+       {
+        "input": 20,
+        "output": 75,
+        "cache_read": 2,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 20,
+       "output": 75,
+       "cache_read": 2
+      }
+     },
+     "releaseDate": "2026-11-24",
+     "knowledge": "2026-04-30",
+     "openWeights": false,
+     "description": "GPT-6 Astra paired with a harness tailored to clinical questions; its web search uses a dedicated index of medical sources.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "gpt-6-luna",
      "name": "GPT-6 Luna",
      "family": "gpt",
@@ -8477,6 +8586,70 @@
      "status": "stable"
     },
     {
+     "id": "gpt-6.1-sol-healthcare",
+     "name": "GPT-6.1 Sol Healthcare",
+     "family": "gpt",
+     "protocols": [
+      "openai-responses"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2
+      }
+     },
+     "releaseDate": "2026-11-24",
+     "knowledge": "2026-04-30",
+     "openWeights": false,
+     "description": "GPT-6.1 Sol paired with a harness tailored to clinical questions; its web search uses a dedicated index of medical sources.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "gpt-6.1-terra",
      "name": "GPT-6.1 Terra",
      "family": "gpt",
@@ -8612,6 +8785,73 @@
      "status": "stable"
     },
     {
+     "id": "gpt-6.2-astra-healthcare",
+     "name": "GPT-6.2 Astra Healthcare",
+     "family": "gpt",
+     "protocols": [
+      "openai-responses"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 8,
+      "output": 40,
+      "cache_read": 0.4,
+      "cache_write": 10,
+      "tiers": [
+       {
+        "input": 16,
+        "output": 60,
+        "cache_read": 0.8,
+        "cache_write": 20,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 16,
+       "output": 60,
+       "cache_read": 0.8,
+       "cache_write": 20
+      }
+     },
+     "releaseDate": "2026-11-24",
+     "knowledge": "2026-05-18",
+     "openWeights": false,
+     "description": "GPT-6.2 Astra paired with a harness tailored to clinical questions; its web search uses a dedicated index of medical sources.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "gpt-6.2-sol",
      "name": "GPT-6.2 Sol",
      "family": "gpt",
@@ -8672,6 +8912,73 @@
      "knowledge": "2026-06-01",
      "openWeights": false,
      "description": "An efficient reasoning model for everyday work, multistep agentic workflows, and coding.",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "gpt-6.2-sol-healthcare",
+     "name": "GPT-6.2 Sol Healthcare",
+     "family": "gpt",
+     "protocols": [
+      "openai-responses"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1050000,
+     "maxOutput": 128000,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.1,
+      "cache_write": 2.5,
+      "tiers": [
+       {
+        "input": 4,
+        "output": 15,
+        "cache_read": 0.2,
+        "cache_write": 5,
+        "tier": {
+         "type": "context",
+         "size": 272000
+        }
+       }
+      ],
+      "context_over_200k": {
+       "input": 4,
+       "output": 15,
+       "cache_read": 0.2,
+       "cache_write": 5
+      }
+     },
+     "releaseDate": "2026-11-24",
+     "knowledge": "2026-06-01",
+     "openWeights": false,
+     "description": "GPT-6.2 Sol paired with a harness tailored to clinical questions; its web search uses a dedicated index of medical sources.",
      "tags": [
       "reasoning",
       "vision"
@@ -8847,7 +9154,7 @@
       "cache_write": 12.5
      },
      "releaseDate": "2026-06-07",
-     "knowledge": null,
+     "knowledge": "2026-01-31",
      "openWeights": false,
      "description": "Claude model for creative writing, analysis, and controlled agent workflows",
      "tags": [
@@ -9415,7 +9722,7 @@
       "cache_write": 3.75
      },
      "releaseDate": "2025-09-29",
-     "knowledge": "2025-07-31",
+     "knowledge": "2025-01-31",
      "openWeights": false,
      "description": "Balanced Claude model for coding, analysis, agent workflows, and cost control",
      "tags": [
@@ -11025,9 +11332,9 @@
       "output": 2.1,
       "cache_read": 0.07
      },
-     "releaseDate": "2026-10-06",
+     "releaseDate": "2026-10-05",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Mistral's 1T-parameter multimodal MoE for reasoning, coding, and agentic work",
      "tags": [
       "reasoning",
@@ -11116,9 +11423,9 @@
       "output": 2.1,
       "cache_read": 0.07
      },
-     "releaseDate": "2026-10-06",
+     "releaseDate": "2026-10-05",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Mistral's 1T-parameter multimodal MoE for reasoning, coding, and agentic work",
      "tags": [
       "reasoning",
@@ -11161,7 +11468,7 @@
       "output": 7.5,
       "cache_read": 0.15
      },
-     "releaseDate": "2026-04-29",
+     "releaseDate": "2026-04-28",
      "knowledge": null,
      "openWeights": true,
      "description": "Balanced Mistral model for enterprise assistants, multilingual work, and tools",
@@ -11206,7 +11513,7 @@
       "output": 7.5,
       "cache_read": 0.15
      },
-     "releaseDate": "2026-04-29",
+     "releaseDate": "2026-04-28",
      "knowledge": null,
      "openWeights": true,
      "description": "Balanced Mistral model for enterprise assistants, multilingual work, and tools",
@@ -11481,7 +11788,7 @@
      "releaseDate": "2026-07-16",
      "knowledge": null,
      "openWeights": true,
-     "description": "Multimodal Kimi model with 1M context and toggleable max-effort thinking for long-horizon agent work",
+     "description": "Multimodal Kimi model with 1M context and always-on thinking for long-horizon agent work",
      "tags": [
       "open-weights",
       "reasoning",
@@ -11602,8 +11909,51 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "ZAI_API_KEY",
-   "defaultModelId": "glm-5.3-flashx",
+   "defaultModelId": "glm-5.3-flashx-legal",
    "models": [
+    {
+     "id": "glm-4-32b-0414-128k",
+     "name": "GLM-4-32B-0414-128K",
+     "family": "glm",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": false,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": false,
+     "modalities": {
+      "input": [
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 128000,
+     "maxOutput": 16384,
+     "cost": {
+      "input": 0.1,
+      "output": 0.1
+     },
+     "releaseDate": "2025-04-14",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "32B GLM-4 foundation model tuned for instruction following, code generation, function calling and search-based Q&A",
+     "tags": [
+      "open-weights",
+      "reasoning"
+     ],
+     "status": "stable"
+    },
     {
      "id": "glm-4.5",
      "name": "GLM-4.5",
@@ -12321,6 +12671,56 @@
      "knowledge": null,
      "openWeights": true,
      "description": "High-speed GLM-5.3-Flash serving option for coding and agent workflows",
+     "tags": [
+      "open-weights",
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "glm-5.3-flashx-legal",
+     "name": "GLM-5.3-FlashX-Legal",
+     "family": "glm",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video",
+       "pdf"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1000000,
+     "maxOutput": 131072,
+     "cost": {
+      "input": 0.37,
+      "output": 1.25,
+      "cache_read": 0.075,
+      "cache_write": 0
+     },
+     "releaseDate": "2026-11-02",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "GLM-5.3-FlashX tuned for legal workflows: legal research, contract review and document drafting",
      "tags": [
       "open-weights",
       "fast",
@@ -13084,6 +13484,52 @@
       "vision"
      ],
      "status": "beta"
+    },
+    {
+     "id": "step-1o-turbo-vision",
+     "name": "Step-1o Turbo Vision",
+     "family": "step",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": false,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 32768,
+     "maxOutput": 32768,
+     "cost": {
+      "input": 0.37429,
+      "output": 1.1977,
+      "cache_read": 0.074858
+     },
+     "releaseDate": "2025-01-21",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Fast StepFun vision model for image and video understanding with text output",
+     "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
     }
    ],
    "category": "lab",
@@ -13102,7 +13548,7 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "OPENROUTER_API_KEY",
-   "defaultModelId": "radixark/daisyrose-27b",
+   "defaultModelId": "upstage/solar-mini-4-5",
    "models": [
     {
      "id": "anthropic/claude-fable-5.2",
@@ -13367,41 +13813,8 @@
      "status": "stable"
     },
     {
-     "id": "liquid/lfm-3-1.7b:free",
-     "name": "LFM3-1.7B (free)",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 262144,
-     "maxOutput": 8192,
-     "cost": {
-      "input": 0,
-      "output": 0
-     },
-     "releaseDate": "2026-11-06",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Free provider route for experiments, demos, and cost-sensitive chat workloads",
-     "tags": [
-      "free"
-     ],
-     "status": "free"
-    },
-    {
-     "id": "inclusionai/ling-3.2-flash:free",
-     "name": "Ling 3.2 Flash (free)",
+     "id": "inclusionai/lingsante-3.1-air-vl",
+     "name": "LingSante 3.1 Air VL",
      "family": "default",
      "protocols": [
       "openai-chat"
@@ -13422,23 +13835,22 @@
        "text"
       ]
      },
-     "contextWindow": 1048576,
-     "maxOutput": 262144,
+     "contextWindow": 131072,
+     "maxOutput": 32768,
      "cost": {
-      "input": 0,
-      "output": 0
+      "input": 0.06,
+      "output": 0.18,
+      "cache_read": 0.012
      },
-     "releaseDate": "2026-11-13",
+     "releaseDate": "2026-11-19",
      "knowledge": null,
      "openWeights": true,
      "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
      "tags": [
-      "free",
-      "fast",
       "reasoning",
       "vision"
      ],
-     "status": "free"
+     "status": "stable"
     },
     {
      "id": "nex-agi/nex-n2.6",
@@ -13485,6 +13897,101 @@
      "status": "stable"
     },
     {
+     "id": "upstage/solar-mini-4-5",
+     "name": "Solar Mini 4.5 (Preview)",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": false,
+     "modalities": {
+      "input": [
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 524288,
+     "maxOutput": 131072,
+     "cost": {
+      "input": 0.01,
+      "output": 0.04,
+      "cache_read": 0.001
+     },
+     "releaseDate": "2026-11-24",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Efficient model for low-latency assistance, extraction, and routine automation",
+     "tags": [
+      "fast",
+      "reasoning"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "upstage/solar-pro-4-contributor",
+     "name": "Solar Pro 4 Contributor",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": false,
+     "modalities": {
+      "input": [
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 524288,
+     "maxOutput": 131072,
+     "cost": {
+      "input": 0.09,
+      "output": 0.36,
+      "cache_read": 0.018
+     },
+     "releaseDate": "2026-11-24",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Flagship model for demanding analysis, coding, and production agent workflows",
+     "tags": [
+      "reasoning"
+     ],
+     "status": "beta"
+    },
+    {
      "id": "google/gemini-4-carbon",
      "name": "Gemini 4 Carbon",
      "family": "gemini",
@@ -13516,7 +14023,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 943718,
+     "maxOutput": 65536,
      "cost": {
       "input": 2,
       "output": 10,
@@ -13569,7 +14076,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 943718,
+     "maxOutput": 65536,
      "cost": {
       "input": 1.5,
       "output": 7.5,
@@ -13622,7 +14129,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 943718,
+     "maxOutput": 65536,
      "cost": {
       "input": 3,
       "output": 15,
@@ -13635,52 +14142,6 @@
      "knowledge": "2026-03",
      "openWeights": false,
      "description": "Gemini multimodal model for text, image, audio, video, and document tasks",
-     "tags": [
-      "fast",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "google/gemini-omni-1.2-flash",
-     "name": "Gemini Omni 1.2 Flash",
-     "family": "gemini",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "high"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "video"
-      ],
-      "output": [
-       "text",
-       "video"
-      ]
-     },
-     "contextWindow": 131072,
-     "maxOutput": 65536,
-     "cost": {
-      "input": 1.5,
-      "output": 9
-     },
-     "releaseDate": "2026-11-05",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Omni-modal model for text, vision, audio, and multimodal agent tasks",
      "tags": [
       "fast",
       "reasoning",
@@ -13778,9 +14239,9 @@
      "attachment": true,
      "modalities": {
       "input": [
-       "pdf",
+       "text",
        "image",
-       "text"
+       "pdf"
       ],
       "output": [
        "text"
@@ -13813,7 +14274,7 @@
       }
      },
      "releaseDate": "2026-11-17",
-     "knowledge": null,
+     "knowledge": "2026-05-18",
      "openWeights": false,
      "description": "Frontier GPT model for professional reasoning, coding, and multimodal work",
      "tags": [
@@ -13912,9 +14373,9 @@
      "attachment": true,
      "modalities": {
       "input": [
-       "pdf",
+       "text",
        "image",
-       "text"
+       "pdf"
       ],
       "output": [
        "text"
@@ -13947,7 +14408,7 @@
       }
      },
      "releaseDate": "2026-11-17",
-     "knowledge": null,
+     "knowledge": "2026-06-01",
      "openWeights": false,
      "description": "Frontier GPT model for professional reasoning, coding, and multimodal work",
      "tags": [
@@ -13988,7 +14449,7 @@
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Tencent Hy reasoning model for coding, instruction following, and agent tasks",
      "tags": [
       "fast",
@@ -14032,7 +14493,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 943718,
+     "maxOutput": 524288,
      "cost": {
       "input": 0.1,
       "output": 0.5,
@@ -14042,7 +14503,7 @@
      "releaseDate": "2026-11-09",
      "knowledge": null,
      "openWeights": false,
-     "description": "Open Llama multimodal model for image understanding and text reasoning",
+     "description": "Muse Ember is Meta's smallest and most efficient reasoning model, built for the work agents repeat all day: tool calls, coding subtasks, routing, extraction, and long-document parsing. It pairs with Muse Wonder or Muse Spark, which plan while Muse Ember handles the volume.",
      "tags": [
       "reasoning",
       "vision"
@@ -14115,7 +14576,7 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "AI_GATEWAY_API_KEY",
-   "defaultModelId": "google/gemini-4-neon",
+   "defaultModelId": "thinkingmachines/inkling-2-mini",
    "models": [
     {
      "id": "anthropic/claude-fable-5.2",
@@ -14349,6 +14810,56 @@
      "status": "stable"
     },
     {
+     "id": "thinkingmachines/inkling-2-mini",
+     "name": "Inkling 2 Mini",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
+     "cost": {
+      "input": 0.075,
+      "output": 0.3,
+      "cache_read": 0.015
+     },
+     "releaseDate": "2026-11-20",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Looped MoE reasoning model (26.4B total, 3.4B active) for agentic coding, vision, and knowledge work",
+     "tags": [
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "thinkingmachines/inkling-2-small",
      "name": "Inkling 2 Small",
      "family": "default",
@@ -14477,7 +14988,7 @@
       ]
      },
      "contextWindow": 1000000,
-     "maxOutput": 1000000,
+     "maxOutput": 65536,
      "cost": {
       "input": 2,
       "output": 10,
@@ -14525,7 +15036,7 @@
       ]
      },
      "contextWindow": 1000000,
-     "maxOutput": 1000000,
+     "maxOutput": 65536,
      "cost": {
       "input": 1.5,
       "output": 7.5,
@@ -14573,7 +15084,7 @@
       ]
      },
      "contextWindow": 1000000,
-     "maxOutput": 1000000,
+     "maxOutput": 65536,
      "cost": {
       "input": 3,
       "output": 15,
@@ -14591,9 +15102,9 @@
      "status": "stable"
     },
     {
-     "id": "zai/glm-5.3-flashx-legal",
-     "name": "GLM 5.3 FlashX Legal",
-     "family": "glm",
+     "id": "google/gemini-4-neon-fast",
+     "name": "Gemini 4 Neon (Fast)",
+     "family": "gemini",
      "protocols": [
       "openai-chat"
      ],
@@ -14603,8 +15114,9 @@
        "type": "effort",
        "values": [
         "low",
+        "medium",
         "high",
-        "max"
+        "xhigh"
        ]
       }
      ],
@@ -14612,25 +15124,25 @@
      "modalities": {
       "input": [
        "text",
-       "image"
+       "image",
+       "pdf"
       ],
       "output": [
        "text"
       ]
      },
      "contextWindow": 1000000,
-     "maxOutput": 131072,
+     "maxOutput": 65536,
      "cost": {
-      "input": 0.37,
-      "output": 1.25,
-      "cache_read": 0.075
+      "input": 5.4,
+      "output": 27,
+      "cache_read": 0.27
      },
-     "releaseDate": "2026-11-02",
-     "knowledge": null,
+     "releaseDate": "2026-11-18",
+     "knowledge": "2026-03",
      "openWeights": false,
-     "description": "GLM vision model for visual reasoning, documents, and multimodal agents",
+     "description": "Google's Gemini 4 model for fast, frontier-level coding, knowledge work and science workflows, with four thinking levels and a 1M-token context window",
      "tags": [
-      "open-weights",
       "fast",
       "reasoning",
       "vision"
@@ -14941,7 +15453,7 @@
      },
      "releaseDate": "2026-11-04",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Tencent Hy reasoning model for coding, instruction following, and agent tasks",
      "tags": [
       "reasoning",
@@ -14985,50 +15497,10 @@
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
      "tags": [
       "fast",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "meituan/longcat-2.5",
-     "name": "LongCat 2.5",
-     "family": "longcat",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 0.3,
-      "output": 1.2,
-      "cache_read": 0.006
-     },
-     "releaseDate": "2026-11-02",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
-     "tags": [
       "reasoning",
       "vision"
      ],
@@ -15067,7 +15539,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 1048576,
+     "maxOutput": 524288,
      "cost": {
       "input": 0.1,
       "output": 0.5,
@@ -15448,53 +15920,6 @@
    "defaultModelId": "Qwen/Qwen4-Max",
    "models": [
     {
-     "id": "deepseek-ai/DeepSeek-V4-Flash-0731",
-     "name": "DeepSeek V4 Flash 0731",
-     "family": "deepseek",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      },
-      {
-       "type": "effort",
-       "values": [
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 384000,
-     "cost": {
-      "input": 0.14,
-      "output": 0.28,
-      "cache_read": 0.03
-     },
-     "releaseDate": "2026-07-31",
-     "knowledge": "2025-05",
-     "openWeights": true,
-     "description": "Official DeepSeek V4 Flash release with enhanced agentic capabilities and integrated DSpark speculative decoding",
-     "tags": [
-      "open-weights",
-      "fast",
-      "reasoning"
-     ],
-     "status": "stable"
-    },
-    {
      "id": "deepseek-ai/DeepSeek-V4-Pro-0813",
      "name": "DeepSeek V4 Pro 0813",
      "family": "deepseek",
@@ -15637,6 +16062,54 @@
      "status": "stable"
     },
     {
+     "id": "deepseek-ai/DeepSeek-V4.1-Flash-1017-fast",
+     "name": "DeepSeek V4.1 Flash 1017 Fast",
+     "family": "deepseek",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "low",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 384000,
+     "cost": {
+      "input": 0.6,
+      "output": 2.4,
+      "cache_read": 0.012
+     },
+     "releaseDate": "2026-10-17",
+     "knowledge": "2025-05",
+     "openWeights": true,
+     "description": "October 17 update of DeepSeek V4.1 Flash with improved reasoning, coding, agentic tasks, and visual understanding",
+     "tags": [
+      "open-weights",
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "reflection/Beam-1.0-501B-A23B",
      "name": "Beam 1.0 501B A23B",
      "family": "default",
@@ -15679,6 +16152,53 @@
      "description": "Sparse mixture-of-experts reasoning model with 23B active parameters for coding and agentic workflows",
      "tags": [
       "reasoning"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "elorian-labs/glimpse-1.0",
+     "name": "Glimpse 1.0",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "low",
+        "medium",
+        "xhigh"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 262144,
+     "maxOutput": 256000,
+     "cost": {
+      "input": 0.6,
+      "output": 3,
+      "cache_read": 0.06
+     },
+     "releaseDate": "2026-10-16",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Visual thinking model that reasons over images and video, post-trained by Elorian on an open-weights base",
+     "tags": [
+      "reasoning",
+      "vision"
      ],
      "status": "stable"
     },
@@ -15780,25 +16300,14 @@
      "status": "stable"
     },
     {
-     "id": "zai-org/GLM-5.2",
-     "name": "GLM-5.2",
-     "family": "glm",
+     "id": "ricursive-ai/Ripple-65B-Preview",
+     "name": "Ripple 65B Preview",
+     "family": "default",
      "protocols": [
       "openai-chat"
      ],
      "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      },
-      {
-       "type": "effort",
-       "values": [
-        "high",
-        "max"
-       ]
-      }
-     ],
+     "reasoningOptions": [],
      "attachment": false,
      "modalities": {
       "input": [
@@ -15808,21 +16317,18 @@
        "text"
       ]
      },
-     "contextWindow": 1048575,
-     "maxOutput": 164000,
+     "contextWindow": 131072,
+     "maxOutput": 131072,
      "cost": {
-      "input": 1.4,
-      "output": 4.4,
-      "cache_read": 0.26
+      "input": 0.2,
+      "output": 0.6,
+      "cache_read": 0.02
      },
-     "releaseDate": "2026-06-13",
+     "releaseDate": "2026-11-04",
      "knowledge": null,
      "openWeights": true,
-     "description": "Open flagship GLM for long-horizon coding agents and million-token context work",
-     "tags": [
-      "open-weights",
-      "reasoning"
-     ],
+     "description": "Dense 65B open-weight model pretrained from scratch on 12T tokens and post-trained for agentic coding",
+     "tags": [],
      "status": "stable"
     },
     {
@@ -15953,7 +16459,7 @@
      },
      "releaseDate": "2026-11-04",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "A next-generation multimodal productivity model with significantly enhanced Agent and complex task execution capabilities.",
      "tags": [
       "reasoning",
@@ -16000,7 +16506,7 @@
      "releaseDate": "2026-07-16",
      "knowledge": null,
      "openWeights": true,
-     "description": "Multimodal Kimi model with 1M context and toggleable max-effort thinking for long-horizon agent work",
+     "description": "Multimodal Kimi model with 1M context and always-on thinking for long-horizon agent work",
      "tags": [
       "open-weights",
       "reasoning",
@@ -16051,48 +16557,6 @@
      "description": "Multimodal Kimi model with a 1M-token context window and always-on reasoning, for coding, 3D creation and financial research",
      "tags": [
       "open-weights",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "MiniMaxAI/MiniMax-M3",
-     "name": "MiniMax-M3",
-     "family": "minimax",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "video"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 524288,
-     "maxOutput": 524288,
-     "cost": {
-      "input": 0.3,
-      "output": 1.2,
-      "cache_read": 0.06
-     },
-     "releaseDate": "2026-06-01",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "MiniMax multimodal model for long-context coding, perception, and agent planning",
-     "tags": [
-      "fast",
       "reasoning",
       "vision"
      ],
@@ -16242,44 +16706,6 @@
      "status": "stable"
     },
     {
-     "id": "nvidia/nemotron-3-ultra-550b-a55b",
-     "name": "Nemotron 3 Ultra 550B A55B",
-     "family": "nemotron",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 512300,
-     "maxOutput": 512300,
-     "cost": {
-      "input": 0.6,
-      "output": 3.6,
-      "cache_read": 0.2
-     },
-     "releaseDate": "2026-06-04",
-     "knowledge": "2025-09",
-     "openWeights": true,
-     "description": "Largest Nemotron 3 model for maximum open-weight reasoning and agent accuracy",
-     "tags": [
-      "reasoning"
-     ],
-     "status": "stable"
-    },
-    {
      "id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
      "name": "Nemotron 3.5 Super VL 120B A12B",
      "family": "nemotron",
@@ -16321,6 +16747,56 @@
      "status": "stable"
     },
     {
+     "id": "Qwen/Qwen3.8-Flash",
+     "name": "Qwen3.8 Flash",
+     "family": "qwen",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      },
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "xhigh"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1000000,
+     "maxOutput": 131072,
+     "cost": {
+      "input": 0.15,
+      "output": 0.47
+     },
+     "releaseDate": "2026-08-26",
+     "knowledge": null,
+     "openWeights": false,
+     "description": "Qwen vision-language model for visual reasoning, documents, and agent tasks",
+     "tags": [
+      "open-weights",
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "Qwen/Qwen4-Max",
      "name": "Qwen4 Max",
      "family": "qwen",
@@ -16344,9 +16820,9 @@
      "contextWindow": 1000000,
      "maxOutput": 262144,
      "cost": {
-      "input": 1.05,
-      "output": 3.15,
-      "cache_read": 0.0525
+      "input": 1.5,
+      "output": 4.5,
+      "cache_read": 0.075
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
@@ -16375,7 +16851,7 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "FIREWORKS_API_KEY",
-   "defaultModelId": "accounts/fireworks/models/kimi-k3p1-pro",
+   "defaultModelId": "accounts/fireworks/models/inkling-2-mini",
    "models": [
     {
      "id": "accounts/fireworks/routers/deepseek-flash-latest",
@@ -16458,7 +16934,7 @@
        "text"
       ]
      },
-     "contextWindow": 1000000,
+     "contextWindow": 1048576,
      "maxOutput": 384000,
      "cost": {
       "input": 0.3,
@@ -16508,12 +16984,112 @@
        "text"
       ]
      },
-     "contextWindow": 1000000,
+     "contextWindow": 1048576,
      "maxOutput": 384000,
      "cost": {
       "input": 0.3,
       "output": 1.2,
       "cache_read": 0.006
+     },
+     "releaseDate": "2026-10-17",
+     "knowledge": "2025-05",
+     "openWeights": true,
+     "description": "October 17 update of DeepSeek V4.1 Flash with improved reasoning, coding, agentic tasks, and visual understanding",
+     "tags": [
+      "open-weights",
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "accounts/fireworks/routers/deepseek-v4p1-flash-1017-us",
+     "name": "DeepSeek V4.1 Flash 1017 (US)",
+     "family": "deepseek",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      },
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 384000,
+     "cost": {
+      "input": 0.45,
+      "output": 1.8,
+      "cache_read": 0.009
+     },
+     "releaseDate": "2026-10-17",
+     "knowledge": "2025-05",
+     "openWeights": true,
+     "description": "October 17 update of DeepSeek V4.1 Flash with improved reasoning, coding, agentic tasks, and visual understanding",
+     "tags": [
+      "open-weights",
+      "fast",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "accounts/fireworks/routers/deepseek-v4p1-flash-1017-flex",
+     "name": "DeepSeek V4.1 Flash 1017 Flex",
+     "family": "deepseek",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      },
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 384000,
+     "cost": {
+      "input": 0.15,
+      "output": 0.6,
+      "cache_read": 0.003
      },
      "releaseDate": "2026-10-17",
      "knowledge": "2025-05",
@@ -16727,9 +17303,9 @@
      "status": "stable"
     },
     {
-     "id": "accounts/fireworks/models/glm-5p3",
-     "name": "GLM 5.3",
-     "family": "glm",
+     "id": "accounts/fireworks/models/inkling-2-mini",
+     "name": "Inkling 2 Mini",
+     "family": "default",
      "protocols": [
       "openai-chat"
      ],
@@ -16738,42 +17314,47 @@
       {
        "type": "effort",
        "values": [
+        "minimal",
         "low",
+        "medium",
         "high",
+        "xhigh",
         "max"
        ]
       }
      ],
-     "attachment": false,
+     "attachment": true,
      "modalities": {
       "input": [
-       "text"
+       "text",
+       "image"
       ],
       "output": [
        "text"
       ]
      },
-     "contextWindow": 1048573,
-     "maxOutput": 262144,
+     "contextWindow": 1048576,
+     "maxOutput": 65536,
      "cost": {
-      "input": 1.4,
-      "output": 4.4,
-      "cache_read": 0.26
+      "input": 0.15,
+      "output": 0.5,
+      "cache_read": 0.015
      },
-     "releaseDate": "2026-08-14",
+     "releaseDate": "2026-11-20",
      "knowledge": null,
      "openWeights": true,
-     "description": "Flagship GLM model for long-horizon coding, agents, and complex project delivery",
+     "description": "Looped MoE reasoning model (26.4B total, 3.4B active) for agentic coding, vision, and knowledge work",
      "tags": [
-      "open-weights",
-      "reasoning"
+      "fast",
+      "reasoning",
+      "vision"
      ],
      "status": "stable"
     },
     {
-     "id": "accounts/fireworks/routers/glm-5p3-fast",
-     "name": "GLM 5.3 Fast",
-     "family": "glm",
+     "id": "accounts/fireworks/models/inkling-2-small",
+     "name": "Inkling 2 Small",
+     "family": "default",
      "protocols": [
       "openai-chat"
      ],
@@ -16782,86 +17363,47 @@
       {
        "type": "effort",
        "values": [
+        "none",
+        "minimal",
         "low",
+        "medium",
         "high",
+        "xhigh",
         "max"
        ]
       }
      ],
-     "attachment": false,
+     "attachment": true,
      "modalities": {
       "input": [
-       "text"
+       "text",
+       "image"
       ],
       "output": [
        "text"
       ]
      },
-     "contextWindow": 1048572,
-     "maxOutput": 262144,
+     "contextWindow": 1048576,
+     "maxOutput": 131072,
      "cost": {
-      "input": 2.1,
-      "output": 6.6,
-      "cache_read": 0.39
+      "input": 0.3,
+      "output": 1,
+      "cache_read": 0.03
      },
-     "releaseDate": "2026-08-14",
+     "releaseDate": "2026-11-05",
      "knowledge": null,
      "openWeights": true,
-     "description": "Flagship GLM model for long-horizon coding, agents, and complex project delivery",
+     "description": "Multimodal MoE reasoning model (594B total, 17B active) for agentic coding, vision, and knowledge work",
      "tags": [
-      "open-weights",
-      "reasoning"
+      "reasoning",
+      "vision"
      ],
      "status": "stable"
     },
     {
-     "id": "accounts/fireworks/routers/glm-fast-latest",
-     "name": "GLM 5.3 Fast (Latest)",
-     "family": "glm",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048572,
-     "maxOutput": 262144,
-     "cost": {
-      "input": 2.1,
-      "output": 6.6,
-      "cache_read": 0.39
-     },
-     "releaseDate": "2026-08-14",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Flagship GLM model for long-horizon coding, agents, and complex project delivery",
-     "tags": [
-      "open-weights",
-      "reasoning"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "accounts/fireworks/models/glm-5p3-flash",
-     "name": "GLM 5.3 Flash",
-     "family": "glm",
+     "id": "accounts/fireworks/models/ultramarine-1-flash-us",
+     "name": "Ultramarine 1 Flash",
+     "family": "default",
      "protocols": [
       "openai-chat"
      ],
@@ -16886,19 +17428,18 @@
        "text"
       ]
      },
-     "contextWindow": 1048573,
+     "contextWindow": 1048576,
      "maxOutput": 131072,
      "cost": {
       "input": 0.15,
       "output": 0.5,
       "cache_read": 0.03
      },
-     "releaseDate": "2026-08-26",
+     "releaseDate": "2026-11-12",
      "knowledge": null,
-     "openWeights": true,
-     "description": "Native multimodal GLM model for efficient coding and long-horizon agent tasks",
+     "openWeights": false,
+     "description": "Paper Instruments' agentic model for professional knowledge work, RL-trained on GLM-5.3 Flash",
      "tags": [
-      "open-weights",
       "fast",
       "reasoning",
       "vision"
@@ -16906,9 +17447,9 @@
      "status": "stable"
     },
     {
-     "id": "accounts/fireworks/routers/glm-5p3-spot",
-     "name": "GLM 5.3 Spot",
-     "family": "glm",
+     "id": "accounts/fireworks/models/hy4-flash",
+     "name": "Hy4 flash",
+     "family": "hy",
      "protocols": [
       "openai-chat"
      ],
@@ -16917,54 +17458,12 @@
       {
        "type": "effort",
        "values": [
-        "low",
-        "high",
-        "max"
+        "none",
+        "high"
        ]
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048573,
-     "maxOutput": 262144,
-     "cost": {
-      "input": 0.7,
-      "output": 2.2,
-      "cache_read": 0.13
-     },
-     "releaseDate": "2026-08-14",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Flagship GLM model for long-horizon coding, agents, and complex project delivery",
-     "tags": [
-      "open-weights",
-      "reasoning"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "accounts/fireworks/routers/glm-flash-latest",
-     "name": "GLM Flash Latest (GLM 5.3 Flash)",
-     "family": "glm",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
+      },
       {
-       "type": "effort",
-       "values": [
-        "low",
-        "high",
-        "max"
-       ]
+       "type": "budget_tokens"
       }
      ],
      "attachment": true,
@@ -16977,72 +17476,177 @@
        "text"
       ]
      },
-     "contextWindow": 1048573,
-     "maxOutput": 131072,
+     "contextWindow": 524288,
+     "maxOutput": 65536,
      "cost": {
-      "input": 0.15,
-      "output": 0.5,
-      "cache_read": 0.03
+      "input": 0.07,
+      "output": 0.281,
+      "cache_read": 0.003
      },
-     "releaseDate": "2026-08-26",
+     "releaseDate": "2026-11-16",
      "knowledge": null,
      "openWeights": true,
-     "description": "Native multimodal GLM model for efficient coding and long-horizon agent tasks",
+     "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
      "tags": [
-      "open-weights",
       "fast",
       "reasoning",
       "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "accounts/fireworks/routers/glm-latest",
-     "name": "GLM Latest",
-     "family": "glm",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048573,
-     "maxOutput": 262144,
-     "cost": {
-      "input": 1.4,
-      "output": 4.4,
-      "cache_read": 0.26
-     },
-     "releaseDate": "2026-08-14",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Flagship GLM model for long-horizon coding, agents, and complex project delivery",
-     "tags": [
-      "open-weights",
-      "reasoning"
      ],
      "status": "stable"
     },
     {
      "id": "accounts/fireworks/models/kimi-k3p1-pro",
      "name": "Kimi K3.1 Pro",
+     "family": "kimi",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      },
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 1048576,
+     "cost": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.2
+     },
+     "releaseDate": "2026-10-23",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Multimodal Kimi model with a 1M-token context window and always-on reasoning, for coding, 3D creation and financial research",
+     "tags": [
+      "open-weights",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "accounts/fireworks/routers/kimi-k3p1-pro-us",
+     "name": "Kimi K3.1 Pro (US)",
+     "family": "kimi",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      },
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 1048576,
+     "cost": {
+      "input": 2.5,
+      "output": 12.5,
+      "cache_read": 0.25
+     },
+     "releaseDate": "2026-10-23",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Multimodal Kimi model with a 1M-token context window and always-on reasoning, for coding, 3D creation and financial research",
+     "tags": [
+      "open-weights",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "accounts/fireworks/routers/kimi-k3p1-pro-ultrafast",
+     "name": "Kimi K3.1 Pro Ultra-fast",
+     "family": "kimi",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      },
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 1048576,
+     "cost": {
+      "input": 5,
+      "output": 25,
+      "cache_read": 0.5
+     },
+     "releaseDate": "2026-10-23",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Multimodal Kimi model with a 1M-token context window and always-on reasoning, for coding, 3D creation and financial research",
+     "tags": [
+      "open-weights",
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "accounts/fireworks/routers/kimi-latest",
+     "name": "Kimi Latest (Kimi K3.1 Pro)",
      "family": "kimi",
      "protocols": [
       "openai-chat"
@@ -17120,7 +17724,7 @@
        "text"
       ]
      },
-     "contextWindow": 1000000,
+     "contextWindow": 1048576,
      "maxOutput": 512000,
      "cost": {
       "input": 0.15,
@@ -17185,8 +17789,8 @@
      "status": "stable"
     },
     {
-     "id": "accounts/fireworks/routers/qwen-max-latest",
-     "name": "Qwen Max Latest (Qwen3.8 Max)",
+     "id": "accounts/fireworks/models/qwen4-max",
+     "name": "Qwen4 Max",
      "family": "qwen",
      "protocols": [
       "openai-chat"
@@ -17198,7 +17802,7 @@
        "values": [
         "none",
         "low",
-        "medium",
+        "high",
         "xhigh"
        ]
       }
@@ -17214,108 +17818,16 @@
       ]
      },
      "contextWindow": 262144,
-     "maxOutput": 131072,
+     "maxOutput": 262144,
      "cost": {
-      "input": 2,
-      "output": 6,
-      "cache_read": 0.25
+      "input": 1.5,
+      "output": 4.5,
+      "cache_read": 0.075
      },
-     "releaseDate": "2026-08-03",
+     "releaseDate": "2026-11-16",
      "knowledge": null,
      "openWeights": false,
-     "description": "2.4-trillion-parameter MoE flagship for coding, professional work, multimodal understanding, and long-horizon agentic workflows",
-     "tags": [
-      "open-weights",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "accounts/fireworks/models/qwen3p8-2p4t-a95b",
-     "name": "Qwen3.8 2.4T A95B",
-     "family": "qwen",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "none",
-        "low",
-        "medium",
-        "xhigh"
-       ]
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 262144,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 2,
-      "output": 6,
-      "cache_read": 0.25
-     },
-     "releaseDate": "2026-08-12",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Open-weight sparse MoE (2.4T total, 95B active), the open-weight twin of Qwen3.8 Max for coding, research, complex reasoning, and agentic workflows",
-     "tags": [
-      "open-weights",
-      "reasoning"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "accounts/fireworks/models/qwen3p8-max",
-     "name": "Qwen3.8 Max",
-     "family": "qwen",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "none",
-        "low",
-        "medium",
-        "xhigh"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 262144,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 2,
-      "output": 6,
-      "cache_read": 0.25
-     },
-     "releaseDate": "2026-08-03",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "2.4-trillion-parameter MoE flagship for coding, professional work, multimodal understanding, and long-horizon agentic workflows",
+     "description": "Flagship multimodal model for coding, office productivity, frontend design, and complex agentic tasks",
      "tags": [
       "open-weights",
       "reasoning",
@@ -17532,6 +18044,41 @@
      "status": "stable"
     },
     {
+     "id": "nvidia/cosmos-reason2-8b",
+     "name": "Cosmos Reason2 8B",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 131072,
+     "maxOutput": 16384,
+     "cost": {
+      "input": 0,
+      "output": 0
+     },
+     "releaseDate": "2025-12-01",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Vision language model for physical-world understanding with structured reasoning on video and images",
+     "tags": [
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "google/diffusiongemma-26b-a4b-it",
      "name": "DiffusionGemma 26B A4B IT",
      "family": "default",
@@ -17652,6 +18199,39 @@
      "status": "stable"
     },
     {
+     "id": "nvidia/streampetr",
+     "name": "streampetr",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": false,
+     "reasoningOptions": [],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 128000,
+     "maxOutput": 8192,
+     "cost": {
+      "input": 0,
+      "output": 0
+     },
+     "releaseDate": "2025-11-13",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Temporal 3D object detection model for autonomous driving",
+     "tags": [
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "nvidia/synthetic-video-detector",
      "name": "synthetic-video-detector",
      "family": "default",
@@ -17681,80 +18261,6 @@
      "description": "Detects AI-generated (synthetic) video",
      "tags": [
       "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "nvidia/usdcode",
-     "name": "usdcode",
-     "family": "default",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": false,
-     "reasoningOptions": [],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 128000,
-     "maxOutput": 4096,
-     "cost": {
-      "input": 0,
-      "output": 0
-     },
-     "releaseDate": "2026-01-01",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "Nemotron model for efficient reasoning, coding, and specialized AI agents",
-     "tags": [],
-     "status": "stable"
-    },
-    {
-     "id": "z-ai/glm-5.3",
-     "name": "GLM-5.3",
-     "family": "glm",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": false,
-     "modalities": {
-      "input": [
-       "text"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1000000,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 0,
-      "output": 0
-     },
-     "releaseDate": "2026-08-14",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Flagship GLM model for long-horizon coding, agents, and complex project delivery",
-     "tags": [
-      "open-weights",
-      "reasoning"
      ],
      "status": "stable"
     },
@@ -17805,6 +18311,48 @@
      "status": "stable"
     },
     {
+     "id": "openai/gpt-oss-20b",
+     "name": "GPT OSS 20B",
+     "family": "gpt",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "low",
+        "medium",
+        "high"
+       ]
+      }
+     ],
+     "attachment": false,
+     "modalities": {
+      "input": [
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 131072,
+     "maxOutput": 131072,
+     "cost": {
+      "input": 0,
+      "output": 0
+     },
+     "releaseDate": "2025-08-05",
+     "knowledge": "2024-06",
+     "openWeights": true,
+     "description": "Open GPT reasoning model for self-hosted agents and controllable deployments",
+     "tags": [
+      "reasoning"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "moonshotai/kimi-k2.6",
      "name": "Kimi K2.6",
      "family": "kimi",
@@ -17847,55 +18395,6 @@
      "knowledge": "2025-01",
      "openWeights": true,
      "description": "Multimodal Kimi workhorse for agent loops, coding tasks, and visual context",
-     "tags": [
-      "open-weights",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "moonshotai/kimi-k3",
-     "name": "Kimi K3",
-     "family": "kimi",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      },
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "video"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 1048576,
-     "cost": {
-      "input": 0,
-      "output": 0
-     },
-     "releaseDate": "2026-07-16",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "Multimodal Kimi model with 1M context and toggleable max-effort thinking for long-horizon agent work",
      "tags": [
       "open-weights",
       "reasoning",
@@ -18501,6 +19000,49 @@
      "status": "stable"
     },
     {
+     "id": "ibm-granite/granite-4.2-8b",
+     "name": "Granite 4.2 8B",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "low",
+        "high"
+       ]
+      }
+     ],
+     "attachment": false,
+     "modalities": {
+      "input": [
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 131072,
+     "maxOutput": 117964,
+     "cost": {
+      "input": 0.06,
+      "output": 0.25,
+      "cache_read": 0.015
+     },
+     "releaseDate": "2026-08-25",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Reasoning model for deliberate analysis, multi-step problem solving, and tool use",
+     "tags": [
+      "reasoning"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "thinkingmachines/Inkling-2-Mini",
      "name": "Inkling 2 Mini",
      "family": "default",
@@ -18592,6 +19134,48 @@
      "openWeights": true,
      "description": "Multimodal MoE reasoning model (594B total, 17B active) for agentic coding, vision, and knowledge work",
      "tags": [
+      "reasoning",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "inclusionAI/Ling-3.0-flash-VL",
+     "name": "Ling 3.0 Flash VL",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "toggle"
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image",
+       "video"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 131072,
+     "maxOutput": 32768,
+     "cost": {
+      "input": 0.06,
+      "output": 0.18,
+      "cache_read": 0.012
+     },
+     "releaseDate": "2026-09-10",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Native multimodal hybrid MoE model for image and video understanding, reasoning, and visual agents",
+     "tags": [
+      "fast",
       "reasoning",
       "vision"
      ],
@@ -18726,7 +19310,7 @@
      },
      "releaseDate": "2026-11-04",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "A next-generation multimodal productivity model with significantly enhanced Agent and complex task execution capabilities.",
      "tags": [
       "reasoning",
@@ -18770,7 +19354,7 @@
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
      "tags": [
       "fast",
@@ -18806,7 +19390,7 @@
       ]
      },
      "contextWindow": 1048576,
-     "maxOutput": 64000,
+     "maxOutput": 65536,
      "cost": {
       "input": 0.834,
       "output": 2.501,
@@ -18955,21 +19539,16 @@
      "status": "stable"
     },
     {
-     "id": "Qwen/Qwen3.8-2.4T-A95B",
-     "name": "Qwen3.8 2.4T A95B",
-     "family": "qwen",
+     "id": "nvidia/NVIDIA-Nemotron-3.5-Lightning",
+     "name": "Nemotron 3.5 Lightning 30B A3B",
+     "family": "nemotron",
      "protocols": [
       "openai-chat"
      ],
      "reasoning": true,
      "reasoningOptions": [
       {
-       "type": "effort",
-       "values": [
-        "low",
-        "medium",
-        "xhigh"
-       ]
+       "type": "toggle"
       }
      ],
      "attachment": false,
@@ -18982,18 +19561,18 @@
       ]
      },
      "contextWindow": 262144,
-     "maxOutput": 131072,
+     "maxOutput": 262144,
      "cost": {
-      "input": 2,
-      "output": 6,
-      "cache_read": 0.2
+      "input": 0.06,
+      "output": 0.16,
+      "cache_read": 0.03
      },
-     "releaseDate": "2026-08-12",
-     "knowledge": null,
+     "releaseDate": "2026-08-11",
+     "knowledge": "2025-09",
      "openWeights": true,
-     "description": "Open-weight sparse MoE (2.4T total, 95B active), the open-weight twin of Qwen3.8 Max for coding, research, complex reasoning, and agentic workflows",
+     "description": "Fast NVIDIA Nemotron MoE for reliable agentic tasks across enterprise workloads",
      "tags": [
-      "open-weights",
+      "fast",
       "reasoning"
      ],
      "status": "stable"
@@ -19092,49 +19671,6 @@
      "status": "stable"
     },
     {
-     "id": "Qwen/Qwen3.8-Max",
-     "name": "Qwen3.8 Max",
-     "family": "qwen",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": false,
-     "reasoningOptions": [
-      {
-       "type": "toggle"
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "video",
-       "pdf"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 256000,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 1.65,
-      "output": 4.951,
-      "cache_read": 0.206
-     },
-     "releaseDate": "2026-08-03",
-     "knowledge": null,
-     "openWeights": false,
-     "description": "2.4-trillion-parameter MoE flagship for coding, professional work, multimodal understanding, and long-horizon agentic workflows",
-     "tags": [
-      "open-weights",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
      "id": "Qwen/Qwen4-Max",
      "name": "Qwen4 Max",
      "family": "qwen",
@@ -19177,52 +19713,6 @@
      "description": "Flagship multimodal model for coding, office productivity, frontend design, and complex agentic tasks",
      "tags": [
       "open-weights",
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "stepfun-ai/Step-5-Preview",
-     "name": "Step 5 Preview",
-     "family": "step",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "low",
-        "medium",
-        "high"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "video"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1048576,
-     "maxOutput": 1000000,
-     "cost": {
-      "input": 1,
-      "output": 2.7,
-      "cache_read": 0.1
-     },
-     "releaseDate": "2026-09-16",
-     "knowledge": null,
-     "openWeights": true,
-     "description": "StepFun's next-generation flagship base model for coding and professional knowledge work, with native text, image, and video input and a 1M-token context window",
-     "tags": [
       "reasoning",
       "vision"
      ],
@@ -19830,7 +20320,7 @@
      "releaseDate": "2026-07-16",
      "knowledge": null,
      "openWeights": true,
-     "description": "Multimodal Kimi model with 1M context and toggleable max-effort thinking for long-horizon agent work",
+     "description": "Multimodal Kimi model with 1M context and always-on thinking for long-horizon agent work",
      "tags": [
       "open-weights",
       "reasoning",
@@ -20697,7 +21187,7 @@
       "input": 1.68225,
       "output": 8.41125
      },
-     "releaseDate": "2026-04-29",
+     "releaseDate": "2026-04-28",
      "knowledge": null,
      "openWeights": true,
      "description": "Balanced Mistral model for enterprise assistants, multilingual work, and tools",
@@ -21434,7 +21924,7 @@
      },
      "releaseDate": "2026-11-04",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "A next-generation multimodal productivity model with significantly enhanced Agent and complex task execution capabilities.",
      "tags": [
       "reasoning",
@@ -21478,7 +21968,7 @@
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Tencent's lower-cost Hy4 tier for everyday agent and productivity tasks, with image understanding and a 1M-token context window.",
      "tags": [
       "fast",
@@ -21853,7 +22343,7 @@
       ]
      },
      "contextWindow": 1000000,
-     "maxOutput": 262000,
+     "maxOutput": 262144,
      "cost": {
       "input": 1.413,
       "output": 4.24,
@@ -21934,7 +22424,7 @@
     "openai-chat": "/chat/completions"
    },
    "authEnv": "VENICE_API_KEY",
-   "defaultModelId": "gemini-4-neon",
+   "defaultModelId": "inkling-2-mini",
    "models": [
     {
      "id": "claude-fable-5-2",
@@ -21979,54 +22469,6 @@
      "openWeights": false,
      "description": "Claude model for creative writing, analysis, and controlled agent workflows",
      "tags": [
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "deepseek-v4-1-flash-1017",
-     "name": "DeepSeek v4.1 Flash (1017)",
-     "family": "deepseek",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [
-      {
-       "type": "effort",
-       "values": [
-        "none",
-        "low",
-        "high",
-        "max"
-       ]
-      }
-     ],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1000000,
-     "maxOutput": 262144,
-     "cost": {
-      "input": 0.3,
-      "output": 1.2,
-      "cache_read": 0.0075
-     },
-     "releaseDate": "2026-10-17",
-     "knowledge": "2025-05",
-     "openWeights": true,
-     "description": "Fast DeepSeek model for efficient chat, coding help, and agent loops",
-     "tags": [
-      "open-weights",
-      "fast",
       "reasoning",
       "vision"
      ],
@@ -22208,6 +22650,56 @@
      "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
      "tags": [
       "fast",
+      "vision"
+     ],
+     "status": "stable"
+    },
+    {
+     "id": "inkling-2-mini",
+     "name": "Inkling 2 Mini",
+     "family": "default",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+       ]
+      }
+     ],
+     "attachment": true,
+     "modalities": {
+      "input": [
+       "text",
+       "image"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 524288,
+     "maxOutput": 131072,
+     "cost": {
+      "input": 0.12,
+      "output": 0.5,
+      "cache_read": 0.024
+     },
+     "releaseDate": "2026-11-20",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "Looped MoE reasoning model (26.4B total, 3.4B active) for agentic coding, vision, and knowledge work",
+     "tags": [
+      "fast",
+      "reasoning",
       "vision"
      ],
      "status": "stable"
@@ -22737,6 +23229,49 @@
      "status": "stable"
     },
     {
+     "id": "hy4",
+     "name": "Hy4",
+     "family": "hy",
+     "protocols": [
+      "openai-chat"
+     ],
+     "reasoning": true,
+     "reasoningOptions": [
+      {
+       "type": "effort",
+       "values": [
+        "none",
+        "low",
+        "high"
+       ]
+      }
+     ],
+     "attachment": false,
+     "modalities": {
+      "input": [
+       "text"
+      ],
+      "output": [
+       "text"
+      ]
+     },
+     "contextWindow": 1048576,
+     "maxOutput": 64000,
+     "cost": {
+      "input": 1.0425,
+      "output": 3.12625,
+      "cache_read": 0.0525
+     },
+     "releaseDate": "2026-11-04",
+     "knowledge": null,
+     "openWeights": true,
+     "description": "A next-generation multimodal productivity model with significantly enhanced Agent and complex task execution capabilities.",
+     "tags": [
+      "reasoning"
+     ],
+     "status": "stable"
+    },
+    {
      "id": "kimi-k3-1-pro",
      "name": "Kimi K3.1 Pro",
      "family": "kimi",
@@ -22821,7 +23356,7 @@
      },
      "releaseDate": "2026-10-23",
      "knowledge": null,
-     "openWeights": false,
+     "openWeights": true,
      "description": "Kimi multimodal agent model for visual understanding, coding, and planning",
      "tags": [
       "open-weights",
@@ -22868,9 +23403,9 @@
      "status": "stable"
     },
     {
-     "id": "muse-spark-open",
-     "name": "Muse Spark Open",
-     "family": "muse",
+     "id": "qwen-4-max",
+     "name": "Qwen 4 Max",
+     "family": "qwen",
      "protocols": [
       "openai-chat"
      ],
@@ -22879,6 +23414,7 @@
       {
        "type": "effort",
        "values": [
+        "none",
         "low",
         "medium",
         "high",
@@ -22896,50 +23432,12 @@
        "text"
       ]
      },
-     "contextWindow": 1048576,
-     "maxOutput": 131072,
-     "cost": {
-      "input": 1.5625,
-      "output": 5.3125,
-      "cache_read": 0.1875
-     },
-     "releaseDate": "2026-10-15",
-     "knowledge": "2026-01-04",
-     "openWeights": true,
-     "description": "Multimodal reasoning model for visual analysis, planning, and tool use",
-     "tags": [
-      "reasoning",
-      "vision"
-     ],
-     "status": "stable"
-    },
-    {
-     "id": "qwen-4-max",
-     "name": "Qwen 4 Max",
-     "family": "qwen",
-     "protocols": [
-      "openai-chat"
-     ],
-     "reasoning": true,
-     "reasoningOptions": [],
-     "attachment": true,
-     "modalities": {
-      "input": [
-       "text",
-       "image",
-       "video"
-      ],
-      "output": [
-       "text"
-      ]
-     },
-     "contextWindow": 1000000,
-     "maxOutput": 393216,
+     "contextWindow": 262144,
+     "maxOutput": 65536,
      "cost": {
       "input": 1.875,
       "output": 5.625,
-      "cache_read": 0.09375,
-      "cache_write": 2.34375
+      "cache_read": 0.09375
      },
      "releaseDate": "2026-11-16",
      "knowledge": null,
@@ -22947,6 +23445,7 @@
      "description": "Flagship multimodal model for coding, office productivity, frontend design, and complex agentic tasks",
      "tags": [
       "open-weights",
+      "reasoning",
       "vision"
      ],
      "status": "stable"

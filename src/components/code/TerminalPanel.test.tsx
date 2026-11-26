@@ -4,8 +4,17 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 
 import type { TerminalEvent, TerminalInfo } from '@/lib/types';
 
-/** Options of every fake xterm, in creation order (assertions read the live object). */
-const xtermRegistry = vi.hoisted(() => ({ options: [] as Record<string, unknown>[] }));
+/** Instances, options and link providers of every fake xterm, in creation order. */
+const xtermRegistry = vi.hoisted(() => ({
+  options: [] as Record<string, unknown>[],
+  instances: [] as Record<string, unknown>[],
+  providers: [] as Array<{
+    provideLinks(y: number, callback: (links: unknown[] | undefined) => void): void;
+  }>,
+}));
+
+const externalMock = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/components/chat/external', () => ({ openExternalUrl: externalMock.openExternalUrl }));
 
 /** xterm needs a canvas; the test validates the wiring with the backend, not the render. */
 vi.mock('@xterm/xterm', () => {
@@ -17,9 +26,11 @@ vi.mock('@xterm/xterm', () => {
     cleared = false;
     options: Record<string, unknown>;
     host: HTMLElement | null = null;
+    buffer = { active: { getLine: (_index: number): unknown => undefined } };
     constructor(options: Record<string, unknown> = {}) {
       this.options = { ...options };
       xtermRegistry.options.push(this.options);
+      xtermRegistry.instances.push(this as unknown as Record<string, unknown>);
     }
     loadAddon() {}
     open(host: HTMLElement) {
@@ -37,6 +48,12 @@ vi.mock('@xterm/xterm', () => {
     dispose() {}
     onData(handler: (data: string) => void) {
       (this as unknown as { handler: (data: string) => void }).handler = handler;
+      return { dispose: () => undefined };
+    }
+    registerLinkProvider(provider: {
+      provideLinks(y: number, callback: (links: unknown[] | undefined) => void): void;
+    }) {
+      xtermRegistry.providers.push(provider);
       return { dispose: () => undefined };
     }
   }
@@ -106,6 +123,9 @@ beforeEach(() => {
   nextTerminal = 1;
   __resetTerminalManagerForTests();
   xtermRegistry.options.length = 0;
+  xtermRegistry.instances.length = 0;
+  xtermRegistry.providers.length = 0;
+  externalMock.openExternalUrl.mockReset();
   useChatStore.setState({ activeId: null });
   useUiStore.setState({ activeWorkspaceId: null });
   (globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver =
@@ -178,6 +198,40 @@ describe('TerminalPanel', () => {
       );
       expect(xtermRegistry.options[0]?.fontSize).toBe(18);
     });
+  });
+
+  it('abre URLs impressas no terminal no navegador do sistema', async () => {
+    render(<TerminalPanel conversationId="conv-1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
+    await screen.findByRole('tab', { name: 'Terminal 1' });
+
+    expect(xtermRegistry.options[0]?.linkHandler).toBeDefined();
+    expect(xtermRegistry.providers).toHaveLength(1);
+
+    const fake = xtermRegistry.instances[0] as {
+      buffer: {
+        active: {
+          getLine: (index: number) => { translateToString: () => string } | undefined;
+        };
+      };
+    };
+    fake.buffer.active.getLine = (index) =>
+      index === 5 ? { translateToString: () => '  Local:   http://localhost:1420/' } : undefined;
+
+    type RecordedLink = {
+      text: string;
+      activate: (event: MouseEvent, text: string) => void;
+    };
+    let links: RecordedLink[] | undefined;
+    xtermRegistry.providers[0].provideLinks(6, (result) => {
+      links = result as RecordedLink[] | undefined;
+    });
+
+    const link = links?.[0];
+    expect(link?.text).toBe('http://localhost:1420/');
+    if (!link) throw new Error('No link was provided for the terminal line');
+    link.activate({} as MouseEvent, link.text);
+    expect(externalMock.openExternalUrl).toHaveBeenCalledWith('http://localhost:1420/');
   });
 
   it('mantém o destaque compacto das abas: preenchimento neutro e sem sombra', async () => {
