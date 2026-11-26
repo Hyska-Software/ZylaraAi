@@ -97,7 +97,15 @@
       "emptyTitle": "No conversations yet.",
       "emptyHint": "Start a new chat.",
       "renameAria": "Rename conversation",
-      "optionsAria": "Conversation options"
+      "optionsAria": "Conversation options",
+      "rowTimeNow": "now",
+      "rowNoActivity": "No messages yet",
+      "rowStatusNew": "New",
+      "rowStatusRunning": "Running",
+      "rowStatusFinished": "Finished",
+      "rowStatusFailed": "Failed",
+      "rowStatusCancelled": "Cancelled",
+      "rowStatusIncomplete": "Incomplete"
     },
     "menu": {
       "pin": "Pin",

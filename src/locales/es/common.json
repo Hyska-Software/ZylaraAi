@@ -97,7 +97,15 @@
       "emptyTitle": "Aún no hay conversaciones.",
       "emptyHint": "Empieza un chat nuevo.",
       "renameAria": "Renombrar conversación",
-      "optionsAria": "Opciones de la conversación"
+      "optionsAria": "Opciones de la conversación",
+      "rowTimeNow": "ahora",
+      "rowNoActivity": "Aún sin mensajes",
+      "rowStatusNew": "Nueva",
+      "rowStatusRunning": "En curso",
+      "rowStatusFinished": "Finalizada",
+      "rowStatusFailed": "Fallida",
+      "rowStatusCancelled": "Cancelada",
+      "rowStatusIncomplete": "Incompleta"
     },
     "menu": {
       "pin": "Fijar",

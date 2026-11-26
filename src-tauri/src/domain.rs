@@ -88,6 +88,9 @@ pub struct Conversation {
     /// channels, tasks and other agent threads).
     #[serde(default)]
     pub is_main: bool,
+    /// Status of the last non-user turn, used by sidebar rows.
+    #[serde(default)]
+    pub last_status: Option<String>,
 }
 
 fn default_agent_kind() -> String {
@@ -3309,10 +3312,12 @@ mod tests {
             channel_id: None,
             task_id: None,
             is_main: false,
+            last_status: Some("complete".into()),
         };
         let json = serde_json::to_value(&conversation).expect("serialize conversation");
         assert_eq!(json["mode"], "code");
         assert_eq!(json["codeLinked"], true);
+        assert_eq!(json["lastStatus"], "complete");
         assert!(
             json.get("code_linked").is_none(),
             "o IPC usa camelCase: {json}"

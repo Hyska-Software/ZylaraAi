@@ -18,6 +18,9 @@ vi.mock('@xterm/xterm', () => {
     write() {}
     clear() {}
     dispose() {}
+    registerLinkProvider() {
+      return { dispose: () => undefined };
+    }
     onData() {
       return { dispose: () => undefined };
     }

@@ -343,10 +343,10 @@ describe('ModelPill (edge) — etapa de pensamento compacta', () => {
     renderPill();
 
     const thinkingDialog = await openThinkingStage(user);
-    // Menu de pensamento: 15–19rem, dimensionado pelo conteúdo.
+    // Menu de pensamento: 16–20rem, dimensionado pelo conteúdo.
     expect(hasToken(thinkingDialog, 'w-auto')).toBe(true);
-    expect(hasToken(thinkingDialog, 'min-w-[15rem]')).toBe(true);
-    expect(hasToken(thinkingDialog, 'max-w-[19rem]')).toBe(true);
+    expect(hasToken(thinkingDialog, 'min-w-[16rem]')).toBe(true);
+    expect(hasToken(thinkingDialog, 'max-w-[20rem]')).toBe(true);
     expect(hasToken(thinkingDialog, 'w-[22rem]')).toBe(false);
 
     const listbox = within(thinkingDialog).getByRole('listbox', { name: 'Modo de pensamento' });

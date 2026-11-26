@@ -243,9 +243,9 @@ describe('sessionCostFromMessages', () => {
 describe('catalogCost', () => {
   it('reads the bundled catalog when the live list has no match', () => {
     const cost = catalogCost([], 'opencode-go', 'deepseek-v4.1-flash');
-    expect(cost?.input).toBe(0.3);
-    expect(cost?.output).toBe(1.2);
-    expect(cost?.cache_read).toBe(0.006);
+    expect(cost?.input).toBe(0.12);
+    expect(cost?.output).toBe(0.48);
+    expect(cost?.cache_read).toBe(0.0024);
   });
 
   it('prefers the live merged catalog', () => {

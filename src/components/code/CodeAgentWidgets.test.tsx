@@ -223,8 +223,8 @@ describe('CodeContextMeterChip — medidor do header Code', () => {
     render(<CodeContextMeterChip conversationId={CONVERSATION_ID} />);
 
     const button = screen.getByRole('button', { name: 'Contexto usado: 44%' });
-    // DeepSeek V4.1 Flash: $0.30/M input + $1.20/M output.
-    expect(button.textContent).toContain('$0.0015');
+    // DeepSeek V4.1 Flash: $0.12/M input + $0.48/M output.
+    expect(button.textContent).toContain('$0.0006');
     expect(button.getAttribute('aria-describedby')).toBeTruthy();
 
     fireEvent.click(button);
@@ -232,8 +232,8 @@ describe('CodeContextMeterChip — medidor do header Code', () => {
     expect(within(dialog).getByText('Custo da sessão')).toBeTruthy();
     expect(within(dialog).getByText('Entrada')).toBeTruthy();
     expect(within(dialog).getByText('Saída')).toBeTruthy();
-    expect(within(dialog).getByText('1.0K · $0.0003')).toBeTruthy();
-    expect(within(dialog).getByText('1.0K · $0.0012')).toBeTruthy();
+    expect(within(dialog).getByText('1.0K · $0.0001')).toBeTruthy();
+    expect(within(dialog).getByText('1.0K · $0.0005')).toBeTruthy();
     expect(
       within(dialog).getByText('Preços oficiais de API do catálogo; assinaturas não são cobradas por token.'),
     ).toBeTruthy();
@@ -268,7 +268,7 @@ describe('CodeContextMeterChip — medidor do header Code', () => {
 
     const button = screen.getByRole('button', { name: 'Contexto usado: 44%' });
     // 1M input + 100K output (parent turn already merged the child) priced once.
-    expect(button.textContent).toContain('$0.42');
+    expect(button.textContent).toContain('$0.17');
 
     fireEvent.click(button);
     const dialog = await screen.findByRole('dialog', { name: 'Detalhes do contexto' });
@@ -283,7 +283,7 @@ describe('CodeContextMeterChip — medidor do header Code', () => {
 
     const button = screen.getByRole('button', { name: 'Contexto usado: 44%' });
     expect(button.textContent).toContain('44%');
-    expect(button.textContent).toContain('$0.0015');
+    expect(button.textContent).toContain('$0.0006');
     expect(button.textContent).not.toContain('98%');
     expect(button.getAttribute('aria-describedby')).toBeTruthy();
   });
@@ -306,7 +306,7 @@ describe('CodeContextMeterChip — medidor do header Code', () => {
       event: { type: 'usage', usage: { inputTokens: 1_000_000, outputTokens: 100_000 } },
     });
 
-    expect(button.textContent).toContain('$0.42');
+    expect(button.textContent).toContain('$0.17');
   });
 
   it('relê o custo a cada 10 s enquanto o turno roda (rede de segurança)', () => {

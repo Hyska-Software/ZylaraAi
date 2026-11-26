@@ -39,7 +39,9 @@ use crate::domain::{
 const CONVERSATION_COLUMNS: &str = "id, title, created_at, updated_at, pinned, \
      provider_id, model_id, message_count, preview, mode, code_linked, workspace_id, \
      agent_kind, permission_mode, parent_conversation_id, subagent_task_call_id, subagent_type, \
-     agent_id, channel_id, task_id, sort_order, is_main";
+     agent_id, channel_id, task_id, sort_order, is_main, \
+     (SELECT status FROM messages WHERE conversation_id = conversations.id \
+      AND role <> 'user' ORDER BY created_at DESC, id DESC LIMIT 1) AS last_message_status";
 
 const AGENT_COLUMNS: &str = "a.id, a.name, a.role, a.description, a.avatar_json, a.department, \
      a.pinned, a.sort_order, a.provider_id, a.model_id, a.fallback_provider_id, \
@@ -2103,6 +2105,7 @@ fn conversation_from_row(row: &Row<'_>) -> rusqlite::Result<Conversation> {
         task_id: row.get(19)?,
         sort_order: row.get(20)?,
         is_main: row.get::<_, i64>(21)? != 0,
+        last_status: row.get(22)?,
     })
 }
 
@@ -6896,7 +6899,9 @@ impl Db {
              c.provider_id, c.model_id, c.message_count, c.preview, c.mode, c.code_linked, \
              c.workspace_id, c.agent_kind, c.permission_mode, c.parent_conversation_id, \
              c.subagent_task_call_id, c.subagent_type, c.agent_id, c.channel_id, c.task_id, \
-             c.sort_order, c.is_main \
+             c.sort_order, c.is_main, \
+             (SELECT status FROM messages WHERE conversation_id = c.id \
+              AND role <> 'user' ORDER BY created_at DESC, id DESC LIMIT 1) AS last_message_status \
              FROM conversations c \
              LEFT JOIN messages m ON m.conversation_id = c.id \
              WHERE c.parent_conversation_id IS NULL \
@@ -10354,6 +10359,7 @@ mod tests {
             .expect("present");
         assert_eq!(refreshed.message_count, 2);
         assert_eq!(refreshed.preview.as_deref(), Some("Olá mundo, tudo bem?"));
+        assert_eq!(refreshed.last_status.as_deref(), Some("complete"));
 
         // Updates keep every JSON column intact.
         assistant.content = "Tudo ótimo! (editado)".to_string();
@@ -10369,6 +10375,11 @@ mod tests {
 
         assistant.status = MessageStatus::Incomplete;
         db.update_message(&assistant).expect("update incomplete");
+        let after_incomplete = db
+            .get_conversation(&conversation.id)
+            .expect("get conversation")
+            .expect("present");
+        assert_eq!(after_incomplete.last_status.as_deref(), Some("incomplete"));
         let stored = db
             .get_message(&assistant.id)
             .expect("get message")

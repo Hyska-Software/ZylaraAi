@@ -1891,6 +1891,8 @@ export interface Conversation {
   taskId?: string | null;
   /** Primary conversation of the agent persona; always pinned at the top. */
   isMain?: boolean;
+  /** Status of the last non-user turn, used by the sidebar row. */
+  lastStatus?: MessageStatus | null;
 }
 
 export interface ConversationDetail {

@@ -311,6 +311,7 @@ describe('provedor Anthropic direto (API key)', () => {
       ]),
     );
     expect(thinkingOptions(haiku, { mode: 'budget', budget: 8_192 }).map((o) => o.id)).toEqual([
+      'off',
       'budget:4096',
       'budget:8192',
       'budget:16384',
@@ -581,7 +582,7 @@ describe('modelDetails', () => {
     const line = (label: string) => details.lines.find((entry) => entry.label === label)?.value;
     expect(line('Contexto')).toBe('1M');
     expect(line('Saída máx.')).toBe('384K');
-    expect(line('Custo (1M tok.)')).toBe('$0.30 / $1.20');
+    expect(line('Custo (1M tok.)')).toBe('$0.12 / $0.48');
     expect(line('Entrada')).toBe('Texto, Imagem');
     expect(line('Protocolo')).toBe('OpenAI Chat');
     // Catalog-driven value: `pnpm catalog:sync` updates the date, so the test

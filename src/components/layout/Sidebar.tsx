@@ -5,6 +5,8 @@ import {
   Code,
   Download,
   Ellipsis,
+  Link2,
+  Loader2,
   Pencil,
   Pin,
   PinOff,
@@ -22,6 +24,12 @@ import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { navEntries, openNavTarget } from '@/lib/plugins/ui/nav';
 import { SidebarNavItem } from './SidebarNavItem';
+import {
+  conversationRowActivity,
+  conversationRowStatus,
+  conversationRowTime,
+  type ConversationRowTone,
+} from './conversationRowMeta';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
@@ -79,6 +87,14 @@ function MenuEntry({ icon, children, danger, onSelect }: MenuEntryProps) {
   );
 }
 
+const ROW_TONE_CLASS: Record<ConversationRowTone, string> = {
+  muted: 'text-foreground-subtle',
+  accent: 'text-accent',
+  success: 'text-success',
+  danger: 'text-danger',
+  warning: 'text-warning',
+};
+
 interface ConversationRowProps {
   conversation: Conversation;
   active: boolean;
@@ -114,6 +130,11 @@ function ConversationRow({
   onDelete,
 }: ConversationRowProps) {
   const { t } = useTranslation('common');
+  const turn = useChatStore((state) => state.streamsByConversation[conversation.id] ?? null);
+  const messages = useChatStore((state) => state.messagesByConversation[conversation.id]);
+  const status = conversationRowStatus(conversation, turn);
+  const activity = conversationRowActivity(conversation, turn, messages);
+  const time = conversationRowTime(conversation.updatedAt);
   if (renaming) {
     return (
       <div
@@ -157,9 +178,10 @@ function ConversationRow({
         {...sortable.itemProps(conversation.id)}
         onClick={onSelect}
         aria-current={active ? 'true' : undefined}
+        aria-label={conversation.title}
         title={conversation.title}
         className={cn(
-          'flex h-8 w-full min-w-0 items-center gap-2 rounded-lg px-2 pr-8 text-left text-[13px]',
+          'flex min-h-[52px] w-full min-w-0 flex-col gap-1 rounded-lg px-2 py-1.5 pr-8 text-left',
           'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
           !sortable.disabled && 'cursor-grab active:cursor-grabbing',
           active
@@ -167,8 +189,35 @@ function ConversationRow({
             : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
         )}
       >
-        {conversation.pinned ? <Pin className="size-3.5 shrink-0 text-foreground-subtle" /> : null}
-        <span className="truncate">{conversation.title}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          {conversation.pinned ? (
+            <Pin className="size-3.5 shrink-0 text-foreground-subtle" aria-hidden />
+          ) : null}
+          <span className="truncate font-medium">{conversation.title}</span>
+          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-foreground-subtle">
+            {time}
+          </span>
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Link2 className="size-3 shrink-0 text-accent" aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-[11px] text-foreground-muted">
+            {activity}
+          </span>
+          <span
+            title={status.label}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1 text-[11px]',
+              ROW_TONE_CLASS[status.tone],
+            )}
+          >
+            {status.spinner ? (
+              <Loader2 className="size-3 animate-spin motion-reduce:animate-none" aria-hidden />
+            ) : (
+              <span className="size-1.5 rounded-full bg-current" aria-hidden />
+            )}
+            {status.label}
+          </span>
+        </span>
       </button>
 
       <DropdownMenu.Root>

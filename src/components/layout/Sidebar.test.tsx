@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { Conversation, Settings } from '@/lib/types';
+import type { ChatMessage, Conversation, Settings } from '@/lib/types';
 
 const mocks = vi.hoisted(() => ({
   createConversation: vi.fn(),
@@ -99,7 +99,13 @@ beforeEach(() => {
     conversation({ id, codeLinked: true }),
   );
   useAppStore.setState({ settings: settings() });
-  useChatStore.setState({ conversations: [], conversationsLoading: false, activeId: null });
+  useChatStore.setState({
+    conversations: [],
+    conversationsLoading: false,
+    activeId: null,
+    streamsByConversation: {},
+    messagesByConversation: {},
+  });
   useUiStore.setState({ activeView: 'chat', layoutMode: 'chat' });
 });
 
@@ -413,5 +419,96 @@ describe('Sidebar — reordenação por teclado', () => {
       expect(mocks.reorderConversations).toHaveBeenCalledWith(['c-2', 'c-1']),
     );
     expect(useChatStore.getState().conversations.map((item) => item.id)).toEqual(['c-2', 'c-1']);
+  });
+});
+
+describe('Sidebar — mais informações nas linhas de conversa', () => {
+  it('mostra prévia, hora e status concluído por padrão', () => {
+    const today = new Date();
+    today.setHours(17, 56, 0, 0);
+    useChatStore.setState({
+      conversations: [
+        conversation({
+          id: 'c-done',
+          title: 'Visão geral do projeto',
+          preview: 'App desktop local-first (Tauri 2 +...)',
+          lastStatus: 'complete',
+          updatedAt: today.getTime(),
+        }),
+      ],
+      activeId: null,
+    });
+    render(<Sidebar />);
+
+    const row = screen.getByRole('button', { name: 'Visão geral do projeto' });
+    expect(row.textContent).toContain('App desktop local-first (Tauri 2 +...)');
+    expect(row.textContent).toContain('Concluída');
+    expect(row.textContent).toContain('17:56');
+  });
+
+  it('mostra a ferramenta ativa e o status em execução durante um turno', () => {
+    const assistant: ChatMessage = {
+      id: 'a-1',
+      conversationId: 'c-live',
+      role: 'assistant',
+      content: '',
+      status: 'streaming',
+      toolCalls: [
+        {
+          id: 'tool-1',
+          name: 'read_file',
+          arguments: JSON.stringify({ path: 'docs/AGENTS.md' }),
+          status: 'running',
+        },
+      ],
+      citations: [],
+      attachments: [],
+      createdAt: 1,
+    };
+    useChatStore.setState({
+      conversations: [
+        conversation({
+          id: 'c-live',
+          title: 'analisa o projeto e me da um relatório',
+          preview: 'analisa o projeto e me da um r...',
+          updatedAt: Date.now(),
+        }),
+      ],
+      activeId: 'c-live',
+      streamsByConversation: {
+        'c-live': {
+          turnId: 't-1',
+          conversationId: 'c-live',
+          assistantId: 'a-1',
+          userMessageId: null,
+          phase: 'tool',
+          step: 1,
+          startedAt: Date.now(),
+          turnKind: 'user',
+        },
+      },
+      messagesByConversation: { 'c-live': [assistant] },
+    });
+    render(<Sidebar />);
+
+    const row = screen.getByRole('button', {
+      name: 'analisa o projeto e me da um relatório',
+    });
+    expect(row.textContent).toContain('docs/AGENTS.md');
+    expect(row.textContent).not.toContain('analisa o projeto e me da um r...');
+    expect(row.textContent).toContain('Em execução');
+    expect(row.textContent).toContain('agora');
+  });
+
+  it('sinaliza uma conversa cujo último turno falhou', () => {
+    useChatStore.setState({
+      conversations: [
+        conversation({ id: 'c-error', title: 'Com falha', lastStatus: 'error' }),
+      ],
+      activeId: null,
+    });
+    render(<Sidebar />);
+
+    expect(screen.getByRole('button', { name: 'Com falha' }).textContent).toContain('Falhou');
   });
 });
