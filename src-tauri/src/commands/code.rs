@@ -72,7 +72,11 @@ fn pending_questions_for(state: &AppState, conversation_id: &str) -> Vec<AskUser
 /// last persisted `turn_events` id otherwise, and the journal as a fallback
 /// for sessions created before turn events were persisted. A turn without file
 /// writes yields an explicit empty summary (never the previous turn's files).
-fn latest_turn_changes(state: &AppState, conversation_id: &str) -> Option<ChangesSummary> {
+async fn latest_turn_changes(
+    state: &AppState,
+    conversation_id: &str,
+    workspace: Option<&Workspace>,
+) -> Option<ChangesSummary> {
     let active_turn = state
         .active_turns()
         .into_iter()
@@ -82,14 +86,28 @@ fn latest_turn_changes(state: &AppState, conversation_id: &str) -> Option<Change
     let turn_id = active_turn
         .or_else(|| state.db.last_turn_id(conversation_id).ok().flatten())
         .or_else(|| state.db.last_file_journal_turn(conversation_id).ok().flatten())?;
-    crate::harness::code::session::turn_changes(&state.db, conversation_id, &turn_id).or_else(|| {
-        Some(ChangesSummary {
+    let raw = crate::harness::code::session::turn_changes(&state.db, conversation_id, &turn_id)
+        .unwrap_or(ChangesSummary {
+            turn_id: Some(turn_id.clone()),
+            files: Vec::new(),
+            added: 0,
+            removed: 0,
+        });
+    let root = workspace.map(|workspace| PathBuf::from(&workspace.path));
+    let visible = if let Some(root) = root.as_deref().filter(|root| root.is_dir()) {
+        crate::workspace::git::filter_changes_summary(raw, root).await
+    } else {
+        raw
+    };
+    if visible.files.is_empty() {
+        return Some(ChangesSummary {
             turn_id: Some(turn_id),
             files: Vec::new(),
             added: 0,
             removed: 0,
-        })
-    })
+        });
+    }
+    Some(visible)
 }
 
 /// Reconstrói o estado da sessão a partir do log de eventos + journal + git.
@@ -118,7 +136,7 @@ async fn session_state(state: &AppState, conversation_id: &str) -> Result<CodeSe
     }
 
     let changes = collect_changes(state, conversation_id, workspace.as_ref()).await;
-    let last_turn_changes = latest_turn_changes(state, conversation_id);
+    let last_turn_changes = latest_turn_changes(state, conversation_id, workspace.as_ref()).await;
 
     let approvals = pending_approvals_for(state, conversation_id);
     let questions = pending_questions_for(state, conversation_id);
@@ -201,7 +219,27 @@ async fn collect_changes(
         .map_err(|_| ())
         .ok()?;
     let mut files: BTreeMap<String, FileChangeSummary> = BTreeMap::new();
-    for entry in &journal {
+    // Resolve the repository once: journal paths are workspace-relative while
+    // `git status`/numstat paths are repository-relative.
+    let workspace_status = if let Some(workspace) = workspace {
+        let root = PathBuf::from(&workspace.path);
+        Some((root.clone(), crate::workspace::git::detect(&root).await))
+    } else {
+        None
+    };
+    let journal_entries = if let Some((workspace_root, status)) = workspace_status.as_ref() {
+        let repo_root = status.root.clone().unwrap_or_else(|| workspace_root.clone());
+        let journal_paths: Vec<String> = journal.iter().map(|entry| entry.path.clone()).collect();
+        let ignored =
+            crate::workspace::git::ignored_paths(workspace_root, &repo_root, &journal_paths).await;
+        journal
+            .iter()
+            .filter(|entry| !ignored.contains(&entry.path))
+            .collect::<Vec<_>>()
+    } else {
+        journal.iter().collect()
+    };
+    for entry in journal_entries {
         files.insert(
             entry.path.clone(),
             FileChangeSummary {
@@ -214,17 +252,35 @@ async fn collect_changes(
             },
         );
     }
-    if let Some(workspace) = workspace {
-        let root = PathBuf::from(&workspace.path);
-        let status = crate::workspace::git::detect(&root).await;
+    if let Some((root, status)) = workspace_status.as_ref() {
         if status.is_repo {
+            let repo_root = status.root.clone().unwrap_or_else(|| root.clone());
+            let workspace_prefix = root.strip_prefix(&repo_root).ok();
+            let display = |path: &Path| path.to_string_lossy().replace('\\', "/");
+            // Repository path -> workspace path shown by the panel.
+            let to_workspace = |repo_path: &str| -> String {
+                match workspace_prefix {
+                    Some(prefix) => Path::new(repo_path)
+                        .strip_prefix(prefix)
+                        .map(|path| display(&path))
+                        .unwrap_or_else(|_| repo_path.to_string()),
+                    None => repo_path.replace('\\', "/"),
+                }
+            };
+            // Workspace path -> repository path used by git commands/stats.
+            let to_repo = |workspace_path: &str| -> String {
+                match workspace_prefix {
+                    Some(prefix) => display(&prefix.join(workspace_path)),
+                    None => workspace_path.to_string(),
+                }
+            };
             // Real per-file counters (`+N −M`). `git diff` on the index only
             // covers staged work; the working-tree diff covers the rest. Sum
             // both when a path appears in each (mixed staged/unstaged edits).
-            let mut stats = crate::workspace::git::diff_stats(&root, true)
+            let mut stats = crate::workspace::git::diff_stats(&repo_root, true)
                 .await
                 .unwrap_or_default();
-            for (path, stat) in crate::workspace::git::diff_stats(&root, false)
+            for (path, stat) in crate::workspace::git::diff_stats(&repo_root, false)
                 .await
                 .unwrap_or_default()
             {
@@ -234,8 +290,9 @@ async fn collect_changes(
             }
 
             for file in &status.staged {
-                let entry = files.entry(file.path.clone()).or_insert_with(|| FileChangeSummary {
-                    path: file.path.clone(),
+                let path = to_workspace(&file.path);
+                let entry = files.entry(path.clone()).or_insert_with(|| FileChangeSummary {
+                    path: path.clone(),
                     kind: FileChangeKind::Modified,
                     added: 0,
                     removed: 0,
@@ -248,14 +305,15 @@ async fn collect_changes(
                 } else {
                     "git".to_string()
                 });
-                if let Some(stat) = stats.get(&file.path) {
+                if let Some(stat) = stats.get(&to_repo(&path)) {
                     entry.added = stat.added;
                     entry.removed = stat.removed;
                 }
             }
             for file in &status.unstaged {
-                let entry = files.entry(file.path.clone()).or_insert_with(|| FileChangeSummary {
-                    path: file.path.clone(),
+                let path = to_workspace(&file.path);
+                let entry = files.entry(path.clone()).or_insert_with(|| FileChangeSummary {
+                    path: path.clone(),
                     kind: FileChangeKind::Modified,
                     added: 0,
                     removed: 0,
@@ -267,16 +325,17 @@ async fn collect_changes(
                 } else if entry.origin.as_deref() == Some("session") {
                     entry.origin = Some("both".to_string());
                 }
-                if let Some(stat) = stats.get(&file.path) {
+                if let Some(stat) = stats.get(&to_repo(&path)) {
                     entry.added = stat.added;
                     entry.removed = stat.removed;
                 }
             }
-            for path in &status.untracked {
+            for repo_path in &status.untracked {
                 // New file: `git diff` ignores it, so count the content lines
                 // instead (same rule as the synthetic diff patch used by the tab).
-                let stat = crate::workspace::git::untracked_stats(&root, path);
-                if let Some(entry) = files.get_mut(path) {
+                let path = to_workspace(repo_path);
+                let stat = crate::workspace::git::untracked_stats(&repo_root, repo_path);
+                if let Some(entry) = files.get_mut(&path) {
                     if entry.origin.as_deref() == Some("session") {
                         entry.origin = Some("both".to_string());
                     }
@@ -286,7 +345,7 @@ async fn collect_changes(
                     files.insert(
                         path.clone(),
                         FileChangeSummary {
-                            path: path.clone(),
+                            path,
                             kind: FileChangeKind::Created,
                             added: stat.added,
                             removed: stat.removed,

@@ -121,6 +121,7 @@ async fn run_git(root: &PathBuf, args: &[&str]) -> Result<String, String> {
         timeout: GIT_TIMEOUT,
         cancel: CancellationToken::new(),
         max_output_bytes: GIT_OUTPUT_CAP,
+        stdin: None,
     };
     let output = exec::run(request, None)
         .await

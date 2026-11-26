@@ -333,6 +333,15 @@ Duas origens, com origem marcada por arquivo:
 - **Sessão** (journal do agente): o que a sessão tocou desde o último commit.
 - **Git** (working tree): status real do repositório.
 
+**Visibilidade:** a lista segue o Git, não o atributo de oculto do sistema. Dotfiles e
+diretórios ocultos **não ignorados** (`.env.example`, `.github/workflows/ci.yml`) aparecem
+normalmente. Um path untracked/não indexado ignorado pelas regras atuais do Git fica fora da
+lista em todas as origens (status, journal, último turno, eventos ao vivo e replay). Paths
+tracked, staged/force-added, conflitados e suas deleções permanecem visíveis mesmo quando o nome
+combina com um padrão de ignore — o painel não pode esconder o que o índice commitaria. Fora de
+um repositório ou se o Git falhar, o histórico é preservado (fail open). A aba Arquivos mantém
+sua política própria e continua escondendo hidden/ignorados.
+
 Agrupamentos: `Staged` / `Não staged` / `Novos` (`Untracked`); modo de visualização "somente
 sessão" × "todos" (default todos, com a origem como badge). Cada linha: ícone, caminho relativo,
 `+N −M`, badge `agente` quando aplicável, ações no hover (reverter arquivo, stage/unstage).
@@ -519,7 +528,7 @@ usuário). A paleta ⌘K continua com os comandos globais.
 Microcopy-chave:
 
 - Vazio de workspace: "Nenhuma pasta aberta" / "Abra uma pasta para o agente ler, editar e rodar comandos aqui." / botão **Abrir pasta…**
-- Vazio de alterações: "Nenhuma alteração pendente" / "As edições do agente e as mudanças do git aparecem aqui."
+- Vazio de alterações: "Nenhuma alteração pendente" / "Arquivos ocultos não ignorados aparecem aqui; arquivos ignorados pelo Git ficam fora da lista."
 - Vazio de commits: "Sem commits ainda" (nunca "0 commits").
 - Aprovação: "Executar comando?" / "Gravar alteração?" / "Ler arquivo fora do projeto?" com o
   caminho absoluto e o motivo.
@@ -546,7 +555,7 @@ Microcopy-chave:
 | `CodeSidebar` | workspaces (agrupamento, expansão, menu, remover sem apagar pasta), sessões por status, abrir pasta, empty state |
 | `CodeSessionHeader` | título, chip workspace (branch/sujo/ahead), medidor, toggle painel, abas persistidas (os controles de permissão/Plano vivem no composer) |
 | `FileTree` | expandir/colapsar, filtro, badges git, virtualização, seleção, teclado, estado grande/vazio |
-| `ChangesPanel` | agrupamentos, origem, contadores, diff, reverter arquivo/turno (com confirmação), preparar/desmarcar tudo, conflitos bloqueiam o stage em lote, commit desabilitado/habilitado |
+| `ChangesPanel` | agrupamentos, origem, contadores, diff, reverter arquivo/turno (com confirmação), preparar/desmarcar tudo, conflitos bloqueiam o stage em lote, commit desabilitado/habilitado; dotfiles não ignorados visíveis, ignorados ausentes, badge/contadores coerentes |
 | `GitActionsMenu` | fetch/pull/push via api, estados de loading/erro, contadores ↑/↓, atualizar status, fora de repo desabilitado |
 | `DiffView` | unificado, linhas, hunks, binário, grande, lado-a-lado, a11y |
 | `CommitBar` | mensagem, sugestão IA, escopo staged→all, menu dividido (staged/all/selection/amend/push/sync), estados de erro |

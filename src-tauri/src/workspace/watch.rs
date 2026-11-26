@@ -260,12 +260,32 @@ impl Batch {
     }
 }
 
+/// Reloads the watcher matcher and forces a full panel refresh whenever ignore
+/// rules change. A stale matcher could hide the very event that reconciles
+/// newly ignored or newly visible files.
+fn batch_changes_ignore_rules(paths: &[PathBuf]) -> bool {
+    paths.iter().any(|path| {
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name == ".gitignore")
+        {
+            return true;
+        }
+        let parts: Vec<_> = path.components().filter_map(|part| part.as_os_str().to_str()).collect();
+        parts.len() >= 3
+            && parts[parts.len() - 3] == ".git"
+            && parts[parts.len() - 2] == "info"
+            && parts[parts.len() - 1] == "exclude"
+    })
+}
+
 /// Coalescing loop: quiet-window debounce, dedupe/filter and emission rate cap.
 fn coalesce<F>(root: PathBuf, workspace_id: String, rx: Receiver<notify::Result<Event>>, emit: F)
 where
     F: Fn(WorkspaceChangedEvent),
 {
-    let gitignore = root_gitignore(&root);
+    let mut gitignore = root_gitignore(&root);
     let mut pending = Batch::default();
     let mut last_emit: Option<Instant> = None;
 
@@ -295,6 +315,11 @@ where
             }
         }
 
+        let ignore_rules_changed = batch_changes_ignore_rules(&pending.paths);
+        if ignore_rules_changed {
+            gitignore = root_gitignore(&root);
+            pending.overflow = true;
+        }
         let event = pending.into_event(&workspace_id, &root, &gitignore);
         pending = Batch::default();
         if event.paths.is_empty() && !event.overflow {
@@ -317,6 +342,17 @@ fn root_gitignore(root: &Path) -> Gitignore {
 mod tests {
     use super::*;
     use std::sync::mpsc;
+
+    #[test]
+    fn ignore_rule_changes_force_a_full_refresh() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        assert!(batch_changes_ignore_rules(&[
+            temp.path().join(".gitignore"),
+            temp.path().join("src/.gitignore"),
+            temp.path().join(".git/info/exclude"),
+        ]));
+        assert!(!batch_changes_ignore_rules(&[temp.path().join("src/main.rs")]));
+    }
 
     #[test]
     fn filter_excludes_build_and_dependency_dirs() {
@@ -368,6 +404,24 @@ mod tests {
         assert!(registry
             .start("ws", temp.path(), |_| {})
             .expect("restart after stop"));
+        registry.stop("ws");
+    }
+
+    #[test]
+    fn ignore_rule_edit_delivers_an_overflow_batch() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let (tx, rx) = mpsc::channel();
+        let registry = WorkspaceWatchRegistry::new();
+        registry
+            .start("ws", temp.path(), move |event| {
+                let _ = tx.send(event);
+            })
+            .expect("start watcher");
+        std::fs::write(temp.path().join(".gitignore"), "ignored.txt\n").expect("gitignore");
+        let event = rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("workspace-changed event");
+        assert!(event.overflow, "{event:?}");
         registry.stop("ws");
     }
 

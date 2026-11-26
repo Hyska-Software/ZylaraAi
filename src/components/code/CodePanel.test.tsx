@@ -24,6 +24,7 @@ vi.mock('@/lib/api', () => ({
     gitStage: vi.fn(),
     gitUnstage: vi.fn(),
     gitDiscard: vi.fn(),
+    getCodeSessionState: vi.fn(),
     gitCommit: vi.fn(),
     suggestCommitMessage: vi.fn(),
     revertFile: vi.fn(),
@@ -57,6 +58,7 @@ import {
   useChatStore,
   useCodeStore,
   useUiStore,
+  emptyCodeSession,
 } from '@/lib/store';
 import { EMPTY_PREFS, usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { setPluginUiState } from '@/lib/plugins/ui/registry';
@@ -146,6 +148,18 @@ beforeEach(() => {
   apiMock.gitLog.mockResolvedValue([]);
   apiMock.gitBranches.mockResolvedValue({ current: 'main', branches: ['main'], all: [] });
   apiMock.getWorkspace.mockResolvedValue(null);
+  apiMock.getCodeSessionState.mockResolvedValue({
+    conversationId: 'conv-1',
+    permissionMode: 'autonomous',
+    planMode: false,
+    todos: [],
+    context: null,
+    changes: null,
+    lastTurnChanges: null,
+    jobs: [],
+    approvals: [],
+    questions: [],
+  });
   apiMock.listTerminals.mockResolvedValue([]);
   setViewport(1440);
   resetPanelState();
@@ -849,6 +863,93 @@ describe('CodePanel — atualização em tempo real', () => {
     expect(await screen.findByRole('treeitem', { name: 'docs' })).toBeTruthy();
     expect(apiMock.refreshWorkspaceTree).toHaveBeenCalledTimes(2);
     expect(apiMock.refreshWorkspaceTree).toHaveBeenLastCalledWith('ws-1', []);
+  });
+
+  it('reloads the Changes snapshot after an ignore-rule overflow batch', async () => {
+    useChatStore.setState({
+      conversations: [conversation({ workspaceId: 'ws-1' })],
+      activeId: 'conv-1',
+    });
+    useCodeStore.setState({
+      byConversation: {
+        'conv-1': {
+          ...emptyCodeSession('conv-1'),
+          changes: {
+            turnId: 'turn-1',
+            files: [
+              { path: '.env.example', kind: 'created', added: 1, removed: 0, origin: 'git', staged: false },
+              { path: '.env.local', kind: 'created', added: 1, removed: 0, origin: 'git', staged: false },
+            ],
+            added: 2,
+            removed: 0,
+          },
+          lastTurnChanges: null,
+        },
+      },
+    });
+    apiMock.listWorkspaces.mockResolvedValue([workspace()]);
+    apiMock.refreshWorkspaceTree.mockResolvedValue({
+      files: [],
+      dirs: {},
+      gitStatus: {
+        isRepo: true,
+        root: 'C:/projetos/zylara',
+        branch: 'main',
+        staged: [],
+        unstaged: [],
+        untracked: ['.env.example', '.env.local'],
+        conflicted: [],
+      },
+    });
+    apiMock.getWorkspaceChanges.mockResolvedValue([
+      { path: '.env.example', kind: 'created', added: 1, removed: 0, diff: null },
+    ]);
+
+    render(<CodePanel />);
+    expect(await screen.findByTitle('.env.example')).toBeTruthy();
+    await waitFor(() => expect(watchEvents.handlers.length).toBe(1));
+
+    apiMock.refreshWorkspaceTree.mockResolvedValue({
+      files: [],
+      dirs: {},
+      gitStatus: {
+        isRepo: true,
+        root: 'C:/projetos/zylara',
+        branch: 'main',
+        staged: [],
+        unstaged: [],
+        untracked: ['.env.example'],
+        conflicted: [],
+      },
+    });
+    apiMock.getCodeSessionState.mockResolvedValue({
+      conversationId: 'conv-1',
+      permissionMode: 'autonomous',
+      planMode: false,
+      todos: [],
+      context: null,
+      changes: {
+        turnId: 'turn-1',
+        files: [
+          { path: '.env.example', kind: 'created', added: 1, removed: 0, origin: 'git', staged: false },
+        ],
+        added: 1,
+        removed: 0,
+      },
+      lastTurnChanges: null,
+      jobs: [],
+      approvals: [],
+      questions: [],
+    });
+    act(() => {
+      watchEvents.handlers[0]?.({
+        payload: { workspaceId: 'ws-1', paths: ['.gitignore'], overflow: true },
+      });
+    });
+
+    await waitFor(() => expect(screen.queryByTitle('.env.local')).toBeNull());
+    expect(screen.getByTitle('.env.example')).toBeTruthy();
+    expect(apiMock.refreshWorkspaceTree).toHaveBeenCalledTimes(2);
   });
 
   it('não liga o watcher com o painel fechado', async () => {

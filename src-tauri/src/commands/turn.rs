@@ -10,6 +10,8 @@ use crate::events::TurnEvent;
 use crate::harness::{self, EventEmitter, HarnessDeps};
 use crate::state::AppState;
 
+use super::turn_events::{sanitize_event_batch, TurnEventRecord};
+
 /// Persists every turn event and mirrors it on the global event bus. The bus
 /// is the only live transport: a reloaded renderer reattaches from the same
 /// journal, and the renderer watchdog can replay it whenever a message is lost.
@@ -189,30 +191,34 @@ pub fn list_active_turns(state: State<'_, AppState>) -> Vec<ActiveTurnInfo> {
         .collect()
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TurnEventRecord {
-    pub turn_id: String,
-    pub seq: u64,
-    pub event: serde_json::Value,
-}
-
 #[tauri::command]
-pub fn list_turn_events(
+pub async fn list_turn_events(
     state: State<'_, AppState>,
     turn_id: String,
     after_seq: Option<u64>,
 ) -> Result<Vec<TurnEventRecord>, String> {
     let events = state
         .db
-        .list_turn_events(&turn_id, after_seq)
+        .list_turn_events_for_conversation(&turn_id, after_seq, None)
         .map_err(|error| format!("{error:#}"))?;
-    Ok(events
+    let records: Vec<TurnEventRecord> = events
         .into_iter()
         .map(|(seq, event)| TurnEventRecord {
             turn_id: turn_id.clone(),
             seq,
             event,
         })
-        .collect())
+        .collect();
+    let conversation_id = records
+        .iter()
+        .find_map(|record| record.event.get("conversationId").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .or_else(|| state.db.turn_event_conversation_id(&turn_id).ok().flatten());
+    let workspace_root = conversation_id
+        .as_deref()
+        .and_then(|conversation_id| state.db.get_conversation(conversation_id).ok().flatten())
+        .and_then(|conversation| conversation.workspace_id)
+        .and_then(|workspace_id| state.db.get_workspace(&workspace_id).ok().flatten())
+        .map(|workspace| std::path::PathBuf::from(&workspace.path));
+    Ok(sanitize_event_batch(records, workspace_root.as_deref()).await)
 }

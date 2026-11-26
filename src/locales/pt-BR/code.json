@@ -977,7 +977,7 @@
       },
       "uncommitted": {
         "title": "Nenhuma alteração pendente",
-        "description": "As edições do agente e as mudanças do git aparecem aqui."
+        "description": "Arquivos ocultos não ignorados aparecem aqui; arquivos ignorados pelo Git ficam fora da lista."
       }
     },
     "loadCommitError": "Não foi possível carregar o commit.",

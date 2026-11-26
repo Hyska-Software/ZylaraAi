@@ -13,7 +13,7 @@ use std::process::{ExitStatus, Stdio};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::sync::CancellationToken;
@@ -130,6 +130,8 @@ pub struct ExecRequest {
     pub timeout: Duration,
     pub cancel: CancellationToken,
     pub max_output_bytes: usize,
+    /// Optional stdin payload. `None` keeps stdin closed for existing callers.
+    pub stdin: Option<Vec<u8>>,
 }
 
 /// Resultado de uma execução.
@@ -190,7 +192,11 @@ pub async fn run(
     command
         .args(&req.args)
         .current_dir(&req.cwd)
-        .stdin(Stdio::null())
+        .stdin(if req.stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .env_clear();
@@ -208,6 +214,24 @@ pub async fn run(
             &[("program", &req.program), ("error", &e.to_string())],
         ))
     })?;
+    let stdin_task = if let Some(payload) = req.stdin {
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| ExecError::spawn("stdin pipe unavailable"))?;
+        Some(tokio::spawn(async move {
+            let result = stdin.write_all(&payload).await;
+            // Dropping the pipe sends EOF even when `shutdown` is a no-op on
+            // the platform (needed by `git check-ignore --stdin`).
+            drop(stdin);
+            if let Err(error) = result {
+                eprintln!("zylara: stdin write failed: {error}");
+            }
+        }))
+    } else {
+        None
+    };
+
     let pid = child.id().unwrap_or(0);
     // Windows: coloca o processo em um Job Object com KILL_ON_JOB_CLOSE. Fechar
     // o handle no cancelamento/timeout mata a árvore inteira de forma confiável
@@ -266,6 +290,11 @@ pub async fn run(
 
     let (stdout, stdout_truncated) = join_stream(stdout_task).await;
     let (stderr, stderr_truncated) = join_stream(stderr_task).await;
+    if let Some(task) = stdin_task {
+        if let Err(error) = task.await {
+            eprintln!("zylara: stdin task failed: {error}");
+        }
+    }
 
     Ok(ExecOutput {
         exit_code: status.and_then(|s| s.code()),
@@ -899,6 +928,7 @@ mod tests {
             timeout,
             cancel: CancellationToken::new(),
             max_output_bytes: cap,
+            stdin: None,
         }
     }
 
@@ -1100,9 +1130,33 @@ mod tests {
             timeout: Duration::from_secs(20),
             cancel: CancellationToken::new(),
             max_output_bytes: 64 * 1024,
+            stdin: None,
         };
         let output = run(req, None).await.expect("executar");
         assert!(output.stdout.contains("valor-ok"), "stdout: {:?}", output.stdout);
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn forwards_stdin_payload_to_the_child() {
+        if !shell_available() {
+            eprintln!("shell ausente no PATH: teste ignorado");
+            return;
+        }
+        let temp = tempfile::tempdir().expect("tempdir");
+        let req = ExecRequest {
+            program: "git".to_string(),
+            args: vec!["hash-object".to_string(), "--stdin".to_string()],
+            cwd: temp.path().to_path_buf(),
+            env: sanitized_env(&[]),
+            timeout: Duration::from_secs(20),
+            cancel: CancellationToken::new(),
+            max_output_bytes: 64 * 1024,
+            stdin: Some(b"hello\0world\n".to_vec()),
+        };
+        let output = run(req, None).await.expect("executar");
+        assert_eq!(output.exit_code, Some(0));
+        assert!(!output.stdout.trim().is_empty());
     }
 
     #[test]

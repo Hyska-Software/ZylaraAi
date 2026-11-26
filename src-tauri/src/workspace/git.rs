@@ -8,12 +8,14 @@
 #![allow(dead_code)]
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::ffi::OsString;
+use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
 use tokio_util::sync::CancellationToken;
 
 use super::exec::{self, ExecError, ExecOutput, ExecRequest};
+use crate::domain::ChangesSummary;
 
 const GIT_TIMEOUT: Duration = Duration::from_secs(30);
 /// Network operations (fetch/pull/push) need more slack than local commands.
@@ -107,6 +109,163 @@ pub async fn has_head(root: &Path) -> bool {
         run_git_capture(root, &["rev-parse", "--verify", "--quiet", "HEAD"], TEXT_CAP).await,
         Ok(output) if output.exit_code == Some(0)
     )
+}
+
+/// Workspace-relative paths that Git currently treats as ignored.
+///
+/// `git check-ignore` is the source of truth for nested ignore files, global
+/// excludes, negations and worktrees. It also keeps tracked/indexed paths
+/// visible. Any Git or path error fails open so review never disappears just
+/// because the optional Git integration is unavailable.
+pub async fn ignored_paths(
+    workspace_root: &Path,
+    repo_root: &Path,
+    paths: &[String],
+) -> HashSet<String> {
+    if paths.is_empty() {
+        return HashSet::new();
+    }
+    let Some(workspace) = lexical_absolute(workspace_root) else {
+        return HashSet::new();
+    };
+    let Some(repo) = lexical_absolute(repo_root) else {
+        return HashSet::new();
+    };
+    let mut candidates: Vec<(String, OsString)> = Vec::new();
+    let mut seen = HashSet::new();
+    for path in paths {
+        if path.is_empty() || path.contains('\0') {
+            continue;
+        }
+        let raw = Path::new(path);
+        if raw.is_absolute() {
+            continue;
+        }
+        let normalized = match normalize_relative(raw) {
+            Some(path) => path,
+            None => continue,
+        };
+        let key = normalized.to_string_lossy().replace('\\', "/");
+        if !seen.insert(key.clone()) {
+            continue;
+        }
+        let absolute = workspace.join(&normalized);
+        let Ok(relative) = absolute.strip_prefix(&repo) else {
+            continue;
+        };
+        if relative.as_os_str().is_empty() {
+            continue;
+        }
+        candidates.push((key, relative.as_os_str().to_os_string()));
+    }
+    if candidates.is_empty() {
+        return HashSet::new();
+    }
+
+    let mut stdin = Vec::new();
+    for (_, relative) in &candidates {
+        stdin.extend_from_slice(relative.as_encoded_bytes());
+        stdin.push(0);
+    }
+    let mut request = git_request(
+        &repo,
+        &["check-ignore", "-z", "--stdin", "-v", "--"],
+        STATUS_CAP,
+    );
+    request.stdin = Some(stdin);
+    let output = match exec::run(request, None).await {
+        Ok(output) => output,
+        Err(error) => {
+            eprintln!("zylara: git check-ignore unavailable: {error}");
+            return HashSet::new();
+        }
+    };
+    if output.timed_out || output.cancelled || output.truncated {
+        eprintln!("zylara: git check-ignore incomplete; keeping changes visible");
+        return HashSet::new();
+    }
+    if output.exit_code == Some(1) {
+        return HashSet::new();
+    }
+    if output.exit_code != Some(0) {
+        eprintln!(
+            "zylara: git check-ignore failed; keeping changes visible: {}",
+            output.stderr.trim()
+        );
+        return HashSet::new();
+    }
+
+    let tokens: Vec<&str> = output.stdout.split('\0').collect();
+    let mut ignored_names: HashSet<OsString> = HashSet::new();
+    for fields in tokens.chunks_exact(4) {
+        // With `-v`, a last-matching negation (`!pattern`) is printed too, but
+        // it means the path is NOT ignored.
+        if !fields[2].starts_with('!') && !fields[3].is_empty() {
+            ignored_names.insert(OsString::from(fields[3]));
+        }
+    }
+    candidates
+        .into_iter()
+        .filter(|(_, relative)| ignored_names.contains(relative))
+        .map(|(key, _)| key)
+        .collect()
+}
+
+/// Recomputes summary totals after removing paths hidden by Git ignore rules.
+pub async fn filter_changes_summary(
+    mut summary: ChangesSummary,
+    workspace_root: &Path,
+) -> ChangesSummary {
+    let paths: Vec<String> = summary.files.iter().map(|file| file.path.clone()).collect();
+    let repo_root = detect(workspace_root).await;
+    let root = repo_root.root.as_deref().unwrap_or(workspace_root);
+    let ignored = ignored_paths(workspace_root, root, &paths).await;
+    if ignored.is_empty() {
+        return summary;
+    }
+    summary.files.retain(|file| !ignored.contains(&file.path));
+    summary.added = summary.files.iter().map(|file| file.added).sum();
+    summary.removed = summary.files.iter().map(|file| file.removed).sum();
+    summary
+}
+
+fn lexical_absolute(path: &Path) -> Option<PathBuf> {
+    if !path.is_absolute() {
+        return None;
+    }
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => out.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::Normal(part) => out.push(part),
+        }
+    }
+    Some(out)
+}
+
+fn normalize_relative(path: &Path) -> Option<PathBuf> {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => return None,
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !out.pop() {
+                    return None;
+                }
+            }
+            Component::Normal(part) => out.push(part),
+        }
+    }
+    if out.as_os_str().is_empty() {
+        None
+    } else {
+        Some(out)
+    }
 }
 
 /// `true` quando o caminho está no índice (arquivo rastreado pelo git).
@@ -751,6 +910,7 @@ fn network_request(root: &Path, args: &[&str]) -> ExecRequest {
         timeout: NETWORK_TIMEOUT,
         cancel: CancellationToken::new(),
         max_output_bytes: TEXT_CAP,
+        stdin: None,
     }
 }
 
@@ -1506,6 +1666,7 @@ fn git_request(root: &Path, args: &[&str], cap: usize) -> ExecRequest {
         timeout: GIT_TIMEOUT,
         cancel: CancellationToken::new(),
         max_output_bytes: cap,
+        stdin: None,
     }
 }
 
@@ -1736,6 +1897,123 @@ mod tests {
     use super::test_support::{git_available, git_stdout, run_git, setup_repo};
     use super::*;
     use std::fs;
+
+    #[tokio::test]
+    async fn check_ignore_batch_keeps_dotfiles_and_tracked_paths_visible() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        if setup_repo(temp.path()).is_none() {
+            return;
+        }
+        fs::write(
+            temp.path().join(".gitignore"),
+            ".env\n.env.*\n!.env.example\n*.log\n!keep.log\nignored/\n",
+        )
+        .expect("gitignore");
+        fs::create_dir_all(temp.path().join("ignored")).expect("ignored dir");
+        for path in [
+            ".env",
+            ".env.local",
+            ".env.example",
+            "debug.log",
+            "keep.log",
+            "ignored/a.txt",
+            "visible.txt",
+            ".github/workflows/ci.yml",
+        ] {
+            let full = temp.path().join(path);
+            if let Some(parent) = full.parent() {
+                fs::create_dir_all(parent).expect("parent");
+            }
+            fs::write(full, "content\n").expect("file");
+        }
+        // Tracked/indexed paths remain visible even when a later rule matches.
+        fs::write(
+            temp.path().join(".gitignore"),
+            "a.txt\n.env\n.env.local\n*.log\n!keep.log\n",
+        )
+        .expect("tracked ignore rule");
+
+        let paths = vec![
+            ".env".to_string(),
+            ".env.local".to_string(),
+            ".env.example".to_string(),
+            "debug.log".to_string(),
+            "keep.log".to_string(),
+            "a.txt".to_string(),
+            "visible.txt".to_string(),
+            ".github/workflows/ci.yml".to_string(),
+        ];
+        let ignored = ignored_paths(temp.path(), temp.path(), &paths).await;
+        assert_eq!(
+            ignored,
+            HashSet::from([
+                ".env".to_string(),
+                ".env.local".to_string(),
+                "debug.log".to_string(),
+            ])
+        );
+
+        // Force-staged ignored paths are part of the index and stay visible.
+        assert!(run_git(temp.path(), &["add", "-f", ".env.local"]));
+        assert!(!ignored_paths(temp.path(), temp.path(), &[".env.local".to_string()])
+            .await
+            .contains(".env.local"));
+    }
+
+    #[tokio::test]
+    async fn check_ignore_supports_nested_rules_deleted_paths_and_subdirectory_workspaces() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        if setup_repo(temp.path()).is_none() {
+            return;
+        }
+        fs::create_dir_all(temp.path().join("apps/web")).expect("web dir");
+        fs::write(temp.path().join("apps/web/.gitignore"), "generated/\n").expect("nested ignore");
+        let deleted = "apps/web/generated/deleted.txt";
+        let visible = "apps/web/visible.txt";
+        let ignored = ignored_paths(
+            &temp.path().join("apps/web"),
+            temp.path(),
+            &[deleted.to_string(), visible.to_string(), "../outside.txt".to_string()],
+        )
+        .await;
+        assert_eq!(ignored, HashSet::from([deleted.to_string()]));
+        assert!(ignored_paths(temp.path(), temp.path(), &["../outside.txt".to_string()])
+            .await
+            .is_empty());
+        let non_repo = tempfile::tempdir().expect("non repo");
+        assert!(ignored_paths(non_repo.path(), non_repo.path(), &[".env".to_string()])
+            .await
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn filter_changes_summary_removes_ignored_paths_and_recomputes_totals() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        if setup_repo(temp.path()).is_none() {
+            return;
+        }
+        fs::write(temp.path().join(".gitignore"), ".env\n!.env.example\n").expect("gitignore");
+        let file = |path: &str, added: u32| crate::domain::FileChangeSummary {
+            path: path.to_string(),
+            kind: crate::domain::FileChangeKind::Created,
+            added,
+            removed: 1,
+            origin: Some("session".to_string()),
+            staged: false,
+        };
+        let summary = crate::domain::ChangesSummary {
+            turn_id: Some("turn-1".to_string()),
+            files: vec![file(".env", 9), file(".env.example", 2)],
+            added: 11,
+            removed: 2,
+        };
+        let visible = filter_changes_summary(summary, temp.path()).await;
+        assert_eq!(visible.files.len(), 1);
+        assert_eq!(visible.files[0].path, ".env.example");
+        assert_eq!(visible.added, 2);
+        assert_eq!(visible.removed, 1);
+        assert_eq!(visible.turn_id.as_deref(), Some("turn-1"));
+    }
 
     #[tokio::test]
     async fn detects_status_and_untracked() {

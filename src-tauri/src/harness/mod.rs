@@ -4398,8 +4398,19 @@ pub async fn run_turn(
 
     // Fecho do turno Code: alterações do turno e auditoria.
     if profile == TurnProfile::Code {
-        let turn_changes =
+        let workspace_root = conversation
+            .workspace_id
+            .as_deref()
+            .and_then(|workspace_id| deps.db.get_workspace(workspace_id).ok().flatten())
+            .map(|workspace| PathBuf::from(&workspace.path));
+        let raw_changes =
             code::session::turn_changes(&deps.db, &conversation.id, &tool_turn_id);
+        let turn_changes = match (raw_changes, workspace_root) {
+            (Some(raw), Some(root)) => {
+                Some(crate::workspace::git::filter_changes_summary(raw, &root).await)
+            }
+            (raw, _) => raw,
+        };
         let files_changed = turn_changes
             .as_ref()
             .map(|summary| u32::try_from(summary.files.len()).unwrap_or(u32::MAX))

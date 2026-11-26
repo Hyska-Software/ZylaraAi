@@ -443,6 +443,7 @@ mod tests {
             timeout: Duration::ZERO,
             cancel: CancellationToken::new(),
             max_output_bytes: 1024 * 1024,
+            stdin: None,
         }
     }
 

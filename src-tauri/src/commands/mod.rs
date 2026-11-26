@@ -28,5 +28,6 @@ pub mod skills;
 pub mod terminal;
 pub mod themes;
 pub mod turn;
+pub mod turn_events;
 pub mod update;
 pub mod workspace;

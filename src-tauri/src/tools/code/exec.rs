@@ -1527,7 +1527,7 @@ fn preserve_bom(content: &str, before: Option<&[u8]>) -> String {
 
 /// Aplica a mutação já calculada: grava atômico, registra journal/observação,
 /// emite `FileChanged` e devolve o conteúdo para o modelo.
-fn commit_mutation(
+async fn commit_mutation(
     ctx: &ToolCtx,
     path: &Path,
     relative: &str,
@@ -1548,6 +1548,10 @@ fn commit_mutation(
         ));
     }
     let store = journal::ObjectStore::new(ctx.data_dir.join("checkpoints").join("objects"));
+    let root = match workspace_root(ctx) {
+        Ok(root) => root,
+        Err(outcome) => return Err(outcome),
+    };
     // Sem o checkpoint não existe reversão: falhar antes da troca evita um
     // journal apontando para um objeto ausente.
     let before_hash = match before {
@@ -1625,15 +1629,21 @@ fn commit_mutation(
     if let Some(observed) = &ctx.observed {
         observed.record(&ctx.conversation_id, path, after);
     }
-    ctx.emit_event(crate::events::TurnEvent::FileChanged {
-        change: FileChange {
-            path: relative.to_string(),
-            kind,
-            added,
-            removed,
-            diff: if diff.is_empty() { None } else { Some(diff.clone()) },
-        },
-    });
+
+    let ignored = crate::workspace::git::detect(&root).await;
+    let repo_root = ignored.root.as_deref().unwrap_or(&root);
+    let ignored = crate::workspace::git::ignored_paths(&root, repo_root, &[relative.to_string()]).await;
+    if !ignored.contains(relative) {
+        ctx.emit_event(crate::events::TurnEvent::FileChanged {
+            change: FileChange {
+                path: relative.to_string(),
+                kind,
+                added,
+                removed,
+                diff: if diff.is_empty() { None } else { Some(diff.clone()) },
+            },
+        });
+    }
 
     let header = match kind {
         FileChangeKind::Created => crate::i18n::t_args(
@@ -1740,6 +1750,7 @@ async fn with_post_write_hooks(ctx: &ToolCtx, relative: &str, content: String) -
             timeout: std::time::Duration::from_secs(120),
             cancel: ctx.cancel.clone(),
             max_output_bytes: 16 * 1024,
+            stdin: None,
         };
         match exec::run(request, None).await {
             Ok(output) => {
@@ -1871,7 +1882,7 @@ async fn write_file(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
     }
     let normalized = preserve_bom(&normalize_eol(&content, existing.as_deref()), existing.as_deref());
     let after = normalized.into_bytes();
-    let committed = commit_mutation(ctx, &path, &relative, existing.as_deref(), &after, kind);
+    let committed = commit_mutation(ctx, &path, &relative, existing.as_deref(), &after, kind).await;
     // Os hooks rodam shell arbitrário (formatador): o lock é solto antes para
     // não bloquear as outras sessões do mesmo workspace.
     drop(guard);
@@ -2026,8 +2037,7 @@ async fn edit_file(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
     };
     let after_text = preserve_bom(&normalize_eol(&after_text, Some(&before)), Some(&before));
     let after = after_text.into_bytes();
-    let committed =
-        commit_mutation(ctx, &path, &relative, Some(&before), &after, FileChangeKind::Modified);
+    let committed = commit_mutation(ctx, &path, &relative, Some(&before), &after, FileChangeKind::Modified).await;
     // Hooks pós-escrita rodam shell arbitrário: soltam o lock antes.
     drop(guard);
     match committed {
@@ -2473,6 +2483,7 @@ async fn run_command(ctx: &ToolCtx, args: &Value) -> ToolOutcome {
         timeout: Duration::from_millis(timeout_ms as u64),
         cancel: ctx.cancel.child_token(),
         max_output_bytes: 1024 * 1024,
+        stdin: None,
     };
 
     let Some(jobs) = ctx.jobs.clone() else {
@@ -4273,6 +4284,63 @@ mod tests {
         assert_eq!(journal[0].path, "src/novo.ts");
         assert!(event_types(&fixture.recorder).contains(&"file_changed".to_string()));
         assert!(fixture.root.join("src/novo.ts").exists());
+    }
+
+    #[tokio::test]
+    async fn ignored_untracked_writes_stay_in_the_journal_without_a_panel_event() {
+        if !crate::workspace::git::test_support::git_available() {
+            eprintln!("git ausente no PATH: teste ignorado");
+            return;
+        }
+        let fixture = Fixture::new();
+        assert!(crate::workspace::git::test_support::run_git(
+            &fixture.root,
+            &["init", "-b", "main"],
+        ));
+        // Use non-secret-looking paths so the approval gate does not block the
+        // test; visibility is decided by git ignore rules, not path names.
+        fixture.write(".gitignore", "dist/\n");
+        let ctx = fixture.ctx();
+
+        let ignored = call(
+            &ctx,
+            "write_file",
+            json!({ "path": "dist/generated.js", "content": "export {};\n" }),
+        )
+        .await;
+        assert!(!ignored.is_error, "{}", ignored.content);
+        assert!(fixture.root.join("dist/generated.js").exists());
+        assert_eq!(
+            ignored.presentation.as_ref().expect("presentation")["kind"],
+            "file_change"
+        );
+
+        let visible = call(
+            &ctx,
+            "write_file",
+            json!({ "path": ".github/workflows/ci.yml", "content": "name: ci\n" }),
+        )
+        .await;
+        assert!(!visible.is_error, "{}", visible.content);
+
+        let journal = fixture
+            .db
+            .list_file_journal_for_turn(fixture.conv(), "turn-1")
+            .expect("journal");
+        assert_eq!(journal.len(), 2);
+        let changes = event_types(&fixture.recorder)
+            .into_iter()
+            .filter(|kind| kind == "file_changed")
+            .count();
+        assert_eq!(changes, 1, "only the non-ignored dotfile reaches the panel");
+
+        let root = fixture.root.clone();
+        let summary = session::turn_changes(&fixture.db, fixture.conv(), "turn-1").expect("summary");
+        let visible = crate::workspace::git::filter_changes_summary(summary, &root).await;
+        assert_eq!(visible.files.len(), 1);
+        assert_eq!(visible.files[0].path, ".github/workflows/ci.yml");
+        assert_eq!(visible.added, 1);
+        assert_eq!(visible.removed, 0);
     }
 
     #[tokio::test]

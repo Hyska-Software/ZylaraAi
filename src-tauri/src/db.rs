@@ -4631,14 +4631,27 @@ impl Db {
         turn_id: &str,
         after_seq: Option<u64>,
     ) -> Result<Vec<(u64, serde_json::Value)>> {
+        self.list_turn_events_for_conversation(turn_id, after_seq, None)
+    }
+
+    pub fn list_turn_events_for_conversation(
+        &self,
+        turn_id: &str,
+        after_seq: Option<u64>,
+        conversation_id: Option<&str>,
+    ) -> Result<Vec<(u64, serde_json::Value)>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
             "SELECT seq, event_json FROM turn_events WHERE turn_id = ?1 AND seq > ?2 \
+             AND (?3 IS NULL OR conversation_id = ?3) \
              ORDER BY seq LIMIT 5000",
         )?;
-        let rows = stmt.query_map(params![turn_id, after_seq.unwrap_or(0) as i64], |row| {
-            Ok((row.get::<_, i64>(0)? as u64, row.get::<_, String>(1)?))
-        })?;
+        let rows = stmt.query_map(
+            params![turn_id, after_seq.unwrap_or(0) as i64, conversation_id],
+            |row| {
+                Ok((row.get::<_, i64>(0)? as u64, row.get::<_, String>(1)?))
+            },
+        )?;
         let mut events = Vec::new();
         for row in rows {
             let (seq, raw) = row?;
@@ -4647,6 +4660,18 @@ impl Db {
             }
         }
         Ok(events)
+    }
+
+    pub fn turn_event_conversation_id(&self, turn_id: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock();
+        let conversation = conn
+            .query_row(
+                "SELECT conversation_id FROM turn_events WHERE turn_id = ?1 LIMIT 1",
+                [turn_id],
+                |row| row.get::<_, String>(0),
+            )
+            .ok();
+        Ok(conversation)
     }
 
     pub fn prune_turn_events(&self, before: i64) -> Result<u64> {

@@ -588,21 +588,28 @@ async fn write_file(
     tokio::fs::write(&path, content.as_bytes())
         .await
         .with_context(|| format!("{INVALID_PARAMS}write failed"))?;
-    emitter(app, conversation_id, &row.id).emit(TurnEvent::FileChanged {
-        change: FileChange {
-            path: crate::acp::mapping::clean_text(
-                &path.strip_prefix(&root).unwrap_or(&path).to_string_lossy(),
-            ),
-            kind: if existed {
-                FileChangeKind::Modified
-            } else {
-                FileChangeKind::Created
+    let relative = crate::acp::mapping::clean_text(
+        &path.strip_prefix(&root).unwrap_or(&path).to_string_lossy(),
+    )
+    .replace('\\', "/");
+    let repo = crate::workspace::git::detect(&root).await;
+    let repo_root = repo.root.as_deref().unwrap_or(&root);
+    let ignored = crate::workspace::git::ignored_paths(&root, repo_root, &[relative.clone()]).await;
+    if !ignored.contains(&relative) {
+        emitter(app, conversation_id, &row.id).emit(TurnEvent::FileChanged {
+            change: FileChange {
+                path: relative,
+                kind: if existed {
+                    FileChangeKind::Modified
+                } else {
+                    FileChangeKind::Created
+                },
+                added: content.lines().count() as u32,
+                removed: 0,
+                diff: None,
             },
-            added: content.lines().count() as u32,
-            removed: 0,
-            diff: None,
-        },
-    });
+        });
+    }
     Ok(json!({}))
 }
 
@@ -680,6 +687,7 @@ async fn terminal_create(
                 .and_then(Value::as_u64)
                 .unwrap_or(1_048_576)
                 .min(16 * 1024 * 1024) as usize,
+            stdin: None,
         },
         None,
     )

@@ -977,7 +977,7 @@
       },
       "uncommitted": {
         "title": "No pending changes",
-        "description": "The agent's edits and the git changes appear here."
+        "description": "Non-ignored hidden files appear here; files ignored by Git stay out of the list."
       }
     },
     "loadCommitError": "Could not load the commit.",

@@ -454,6 +454,14 @@ pub fn resolve(root: &Path, requested: &str, mode: Access) -> Result<PathBuf, Fs
   (`revert/performed`).
 - Diferença entre **Alterações da sessão** (journal) e **Alterações do git** (working tree): a UI
   mostra as duas com origem marcada (`sessão` / `git` / `ambos`); o commit usa o working tree real.
+- **Política de visibilidade do painel Alterações:** um path untracked/não indexado é oculto quando
+  `git check-ignore` o reporta como ignorado pelas regras atuais (nested `.gitignore`,
+  `.git/info/exclude`, global excludes e negações incluídos). Paths tracked/indexed/force-added,
+  conflitos e deleções tracked permanecem visíveis. Dotfiles e atributo oculto do SO nunca ocultam
+  um path por si só. Aplicar em `collect_changes`, `latest_turn_changes`, fecho do turno,
+  `FileChanged` ao vivo (FS e ACP) e replay de `turn_events`. Journal, checkpoints, tool results e
+  eventos persistidos continuam brutos para auditoria/revert — o filtro é só de apresentação.
+  Git ausente, timeout ou erro de path → fail open (manter o path visível).
 
 ### 7.5 Watcher
 
@@ -465,6 +473,9 @@ pub fn resolve(root: &Path, requested: &str, mode: Access) -> Result<PathBuf, Fs
 - Eventos → invalidação de cache da árvore + `zylara:workspace-changed` (coalescido, no máximo
   1/segundo) para a UI atualizar árvore/status sem reload. Se o repo for grande (> 20k arquivos),
   watch apenas os diretórios visíveis e recarregar sob demanda (decisão de performance na fase 2).
+- Qualquer mudança em um `.gitignore` (raiz ou aninhado) reconstrói o matcher após o debounce e
+  marca o lote com `overflow = true`. Isso impede que um matcher congelado suprima justamente o
+  evento que faria uma linha ignorada desaparecer (ou uma negação reaparecer) no painel.
 - Nunca confiar no watcher para correção: toda leitura de estado (status/diff) é refeita no backend
   quando a UI pede; o evento é só um "avise-se".
 
@@ -543,6 +554,13 @@ pub struct ExecRequest {
   usuário vê no terminal, e o CLI cobre worktrees/config/hooks. Risco: git ausente/antigo →
   degradação explícita. (Confirmar com `workspace-runtime-options.md`; se o spike mostrar que
   `status`/`diff` via CLI é lento em repos grandes, otimizar com cache por mtime/índice.)
+- `git check-ignore -z --stdin -v --` responde a visibilidade em lote (um processo por snapshot ou
+  página de replay, nunca um por path). A saída `-v` é `source\0line\0pattern\0pathname\0`.
+  Exit 1 = nenhum path ignorado; timeout/cancelamento/erro = fail open. Paths de journal/eventos
+  são workspace-relative e são convertidos para repo-relative com `rev-parse --show-toplevel`;
+  paths de `status`/numstat são repo-relative e convertidos de volta para exibição quando o
+  workspace é subdiretório do repo.
+- Commit/review nunca dependem do filtro: índice e working tree continuam autoritativos.
 - **Commit**: staging selecionado ou **"tudo"** (nesse alvo o comando roda `git add -A` antes do
   `commit -m`, incluindo modificados, novos e deletados); mensagem obrigatória (não vazia), convenção
   detectada do repo (Commitlint/Conventional Commits se configurado); rodar hooks do git (usuário

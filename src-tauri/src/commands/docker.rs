@@ -90,6 +90,7 @@ async fn docker(
             timeout,
             cancel: CancellationToken::new(),
             max_output_bytes: 2 * 1024 * 1024,
+            stdin: None,
         },
         None,
     )

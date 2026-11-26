@@ -326,6 +326,33 @@ describe('ChangesPanel', () => {
     expect(rowButton('src/main.rs').textContent).toContain('src/main.rs');
   });
 
+  it('shows non-ignored dotfiles in the Changes list and pending badge', () => {
+    render(
+      <ChangesPanel
+        workspaceId="ws-1"
+        gitStatus={status({
+          staged: [],
+          unstaged: [
+            { path: '.env.example', status: 'M' },
+            { path: '.github/workflows/ci.yml', status: 'M' },
+          ],
+          untracked: ['.envrc'],
+        })}
+        sessionChanges={[
+          { path: '.env.example', kind: 'modified', added: 2, removed: 1, origin: 'git' },
+          { path: '.github/workflows/ci.yml', kind: 'modified', added: 1, removed: 0, origin: 'git' },
+          { path: '.envrc', kind: 'created', added: 3, removed: 0, origin: 'git' },
+        ]}
+      />,
+    );
+
+    expect(rowButton('.env.example')).toBeTruthy();
+    expect(rowButton('.github/workflows/ci.yml')).toBeTruthy();
+    expect(rowButton('.envrc')).toBeTruthy();
+    expect(screen.getByText('3 arquivos')).toBeTruthy();
+    expect(screen.getByTitle('Linhas adicionadas e removidas').textContent).toBe('+6 −1');
+  });
+
   it('opens the known session diff in place and goes back', async () => {
     render(<ChangesPanel workspaceId="ws-1" gitStatus={status()} sessionChanges={sessionChanges} />);
     fireEvent.click(rowButton('src/b.ts'));
@@ -487,7 +514,7 @@ describe('ChangesPanel', () => {
       />,
     );
     expect(screen.getByText('Nenhuma alteração pendente')).toBeTruthy();
-    expect(screen.getByText('As edições do agente e as mudanças do git aparecem aqui.')).toBeTruthy();
+    expect(screen.getByText('Arquivos ocultos não ignorados aparecem aqui; arquivos ignorados pelo Git ficam fora da lista.')).toBeTruthy();
   });
 
   it('warns about merge conflicts and blocks the commit', () => {

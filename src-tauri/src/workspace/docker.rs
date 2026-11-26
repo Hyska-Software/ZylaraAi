@@ -146,6 +146,7 @@ async fn probe(data_dir: &Path) -> Option<String> {
             timeout: PROBE_TIMEOUT,
             cancel: CancellationToken::new(),
             max_output_bytes: 64 * 1024,
+            stdin: None,
         },
         None,
     )

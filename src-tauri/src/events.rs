@@ -3,13 +3,13 @@
 //! Serialised as `{ "type": "...", ...camelCaseFields }` and delivered on the
 //! `zylara:turn-event` bus envelope `{ turnId, seq, conversationId, event }`.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     Artifact, CacheSample, ChatMessage, Citation, ToolCallRecord, TurnResult, UsageInfo,
 };
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
     tag = "type",
     rename_all = "snake_case",
