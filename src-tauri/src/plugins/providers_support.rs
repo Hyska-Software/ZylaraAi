@@ -167,6 +167,9 @@ fn to_provider(plugin: &super::LoadedPlugin, contribution: &super::ProviderContr
         category: None,
         origin: Some("plugin".to_string()),
         origin_label: Some(plugin.manifest.name.clone()),
+        transport: crate::catalog::ProviderTransport::Http,
+        acp: None,
+        icon_svg: None,
     }
 }
 

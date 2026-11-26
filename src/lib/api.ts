@@ -3,6 +3,13 @@
  */
 import { Channel, invoke } from '@tauri-apps/api/core';
 import type {
+  AcpAgentView,
+  AcpAuthAction,
+  AcpAuthView,
+  AcpCapabilities,
+  AcpCustomAgentInput,
+  AcpRegistryAgent,
+  AcpSessionView,
   Agent,
   AgentAvatar,
   AgentChannel,
@@ -210,6 +217,31 @@ export const api = {
     invoke<CatalogView>('delete_custom_provider', { providerId }),
   testCustomProvider: (providerId: string) =>
     invoke<ProviderValidation>('test_custom_provider', { providerId }),
+
+  /* -------- ACP agents (Agent Client Protocol) -------- */
+  acpListRegistry: () => invoke<AcpRegistryAgent[]>('acp_list_registry'),
+  acpRefreshRegistry: (force = false) =>
+    invoke<AcpRegistryAgent[]>('acp_refresh_registry', { force }),
+  acpInstallAgent: (registryId: string, acceptCommand: boolean) =>
+    invoke<AcpAgentView>('acp_install_agent', { registryId, acceptCommand }),
+  acpAddCustomAgent: (input: AcpCustomAgentInput) =>
+    invoke<AcpAgentView>('acp_add_custom_agent', { ...input }),
+  acpRemoveAgent: (agentId: string) => invoke<void>('acp_remove_agent', { agentId }),
+  acpSetTrusted: (agentId: string, trusted: boolean, capabilities: AcpCapabilities) =>
+    invoke<AcpAgentView>('acp_set_trusted', { agentId, trusted, capabilities }),
+  acpAuthStatus: (agentId: string) =>
+    invoke<AcpAuthView>('acp_auth_status', { agentId }),
+  acpAuth: (agentId: string, action: AcpAuthAction) =>
+    invoke<AcpAuthView>('acp_auth', { agentId, action }),
+  acpTestAgent: (agentId: string) =>
+    invoke<ProviderValidation>('acp_test_agent', { agentId }),
+  acpListSessions: () => invoke<AcpSessionView[]>('acp_list_sessions'),
+  acpCloseSession: (conversationId: string, providerId: string) =>
+    invoke<void>('acp_close_session', { conversationId, providerId }),
+  acpStderr: (conversationId: string) => invoke<string>('acp_stderr', { conversationId }),
+  acpEnableAgent: (agentId: string, enabled: boolean) =>
+    invoke<AcpAgentView>('acp_enable_agent', { agentId, enabled }),
+  acpRescanDevices: () => invoke<AcpAgentView[]>('acp_rescan_devices'),
 
   /* -------- OpenAI ChatGPT plan auth (two-phase login) -------- */
   openaiLoginStart: (providerId: string, forceConsent = false) =>

@@ -244,6 +244,8 @@ pub struct AppState {
     pub governor: Arc<crate::concurrency::ConcurrencyGovernor>,
     /// Third-party plugins: install/lifecycle, contributions, broker and tools.
     pub plugins: Arc<crate::plugins::PluginManager>,
+    /// Third-party ACP agents and their live sessions.
+    pub acp: Arc<crate::acp::AcpManager>,
     dynamic_models: RwLock<HashMap<String, DynamicModels>>,
     turns: TurnRegistry,
     close_intent: CloseIntent,
@@ -267,6 +269,7 @@ impl AppState {
             &settings,
             crate::plugins::forced_safe_mode_from_args(),
         )?;
+        crate::acp::init_app_handle(app);
         let state = Self {
             started_at: crate::domain::now_ms(),
             db,
@@ -284,6 +287,7 @@ impl AppState {
             governor: crate::concurrency::ConcurrencyGovernor::new(),
             jobs: Arc::new(crate::jobs::JobRegistry::new()),
             plugins,
+            acp: crate::acp::init_manager(),
             dynamic_models: RwLock::new(HashMap::new()),
             turns: TurnRegistry::new(),
             close_intent: CloseIntent::default(),
@@ -361,7 +365,13 @@ impl AppState {
     /// Bundled catalog plus user-defined and declarative plugin providers.
     pub fn catalog_with_plugins(&self) -> CatalogFile {
         let mut catalog = self.catalog.clone();
-        for provider in self.plugins.providers().into_iter().chain(self.custom_providers()) {
+        for provider in self
+            .plugins
+            .providers()
+            .into_iter()
+            .chain(self.custom_providers())
+            .chain(self.acp_providers())
+        {
             if !catalog.providers.iter().any(|known| known.id == provider.id) {
                 catalog.providers.push(provider);
             }
@@ -374,6 +384,142 @@ impl AppState {
         crate::providers::custom::list(&self.db)
     }
 
+    fn catalog_reasoning_for_acp_model(
+        model_id: &str,
+    ) -> (bool, Vec<crate::catalog::ReasoningOption>) {
+        let Ok(catalog) = crate::catalog::CatalogFile::load() else {
+            return (false, Vec::new());
+        };
+        let bare = model_id.rsplit('/').next().unwrap_or(model_id);
+        for provider in catalog.providers {
+            if let Some(model) = provider
+                .models
+                .iter()
+                .find(|model| model.id == model_id || model.id == bare)
+            {
+                return (model.reasoning, model.reasoning_options.clone());
+            }
+        }
+        (false, Vec::new())
+    }
+    /// ACP agents are catalog providers with a subprocess transport.
+    pub fn acp_providers(&self) -> Vec<crate::catalog::ProviderInfo> {
+        let Ok(rows) = self.db.acp_agents() else {
+            return Vec::new();
+        };
+        rows.into_iter()
+            .filter(|row| row.enabled)
+            .map(|row| {
+                let discovered = crate::acp::reasoning_options_for_row(&row);
+                let models = self
+                    .db
+                    .acp_models(&row.id)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|model| {
+                        let (reasoning, reasoning_options) = if discovered.is_empty() {
+                            Self::catalog_reasoning_for_acp_model(&model.model_id)
+                        } else {
+                            (true, discovered.clone())
+                        };
+                        crate::catalog::ModelInfo {
+                            id: model.model_id,
+                            name: model.name,
+                            family: row.id.clone(),
+                            protocols: vec!["acp".to_string()],
+                            reasoning,
+                            reasoning_options,
+                            attachment: false,
+                            modalities: crate::catalog::Modalities {
+                                input: vec!["text".to_string()],
+                                output: vec!["text".to_string()],
+                            },
+                            context_window: 128_000,
+                            max_output: 16_000,
+                            cost: None,
+                            release_date: None,
+                            knowledge: None,
+                            open_weights: false,
+                            description: model.description,
+                            tags: Vec::new(),
+                            status: "stable".to_string(),
+                            estimated: true,
+                            cache: None,
+                        }
+                    })
+                    .collect();
+                crate::acp::to_provider(&row, models)
+            })
+            .collect()
+    }
+
+    pub fn acp_provider(&self, provider_id: &str) -> Option<crate::catalog::ProviderInfo> {
+        Self::acp_provider_from_db(&self.db, provider_id)
+    }
+
+
+pub(crate) fn acp_provider_from_db(
+    db: &crate::db::Db,
+    provider_id: &str,
+) -> Option<crate::catalog::ProviderInfo> {
+    if !crate::acp::is_acp_id(provider_id) {
+        return None;
+    }
+    let row = db.acp_agent(provider_id).ok()??;
+    if !row.enabled {
+        return None;
+    }
+    let models = db.acp_models(provider_id).unwrap_or_default();
+    let discovered = crate::acp::reasoning_options_for_row(&row);
+    let mut provider = crate::acp::to_provider(&row, Vec::new());
+    provider.models = models
+        .into_iter()
+        .map(|model| {
+            let (reasoning, reasoning_options) = if discovered.is_empty() {
+                AppState::catalog_reasoning_for_acp_model(&model.model_id)
+            } else {
+                (true, discovered.clone())
+            };
+            crate::catalog::ModelInfo {
+                id: model.model_id,
+                name: model.name,
+                family: provider_id.to_string(),
+                protocols: vec!["acp".to_string()],
+                reasoning,
+                reasoning_options,
+                attachment: false,
+                modalities: crate::catalog::Modalities {
+                    input: vec!["text".to_string()],
+                    output: vec!["text".to_string()],
+                },
+                context_window: 128_000,
+                max_output: 16_000,
+                cost: None,
+                release_date: None,
+                knowledge: None,
+                open_weights: false,
+                description: model.description,
+                tags: Vec::new(),
+                status: "stable".to_string(),
+                estimated: true,
+                cache: None,
+            }
+        })
+        .collect();
+    Some(provider)
+}
+
+pub(crate) fn acp_model_from_db(
+    db: &crate::db::Db,
+    provider_id: &str,
+    model_id: &str,
+) -> Option<crate::catalog::ModelInfo> {
+    Self::acp_provider_from_db(db, provider_id)?
+        .models
+        .into_iter()
+        .find(|model| model.id == model_id)
+}
+
     /// One user-defined provider by id. Gated on the namespace so bundled and
     /// plugin lookups never touch the database.
     pub fn custom_provider(&self, provider_id: &str) -> Option<crate::catalog::ProviderInfo> {
@@ -383,12 +529,13 @@ impl AppState {
         crate::providers::custom::get(&self.db, provider_id)
     }
 
-    /// Provider lookup across the bundled catalog, user providers and plugins.
+    /// Provider lookup across bundled, custom, ACP and plugin providers.
     pub fn provider(&self, provider_id: &str) -> Option<crate::catalog::ProviderInfo> {
         self.catalog
             .provider(provider_id)
             .cloned()
             .or_else(|| self.custom_provider(provider_id))
+            .or_else(|| self.acp_provider(provider_id))
             .or_else(|| self.plugins.provider(provider_id))
     }
 
@@ -439,6 +586,7 @@ impl AppState {
                     .into_iter()
                     .find(|model| model.id == model_id)
             })
+            .or_else(|| Self::acp_model_from_db(&self.db, provider_id, model_id))
             .or_else(|| {
                 self.plugins
                     .provider(provider_id)?
@@ -596,6 +744,86 @@ pub fn ensure_dirs(app: &AppHandle) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{CloseIntent, TurnRegistry};
+
+    #[test]
+    fn acp_model_lookup_reads_agent_discovered_models() {
+        use crate::acp::{AcpAgentRow, AcpModelRow};
+        use crate::db::Db;
+
+        let db = Db::open_in_memory().expect("in-memory db");
+        let row = AcpAgentRow {
+            id: "acp__opencode".into(),
+            registry_id: Some("opencode".into()),
+            name: "OpenCode".into(),
+            version: "2.4.1".into(),
+            description: String::new(),
+            homepage: None,
+            repository: None,
+            license: None,
+            icon_path: None,
+            source: "detected".into(),
+            thinking_config_json: "{}".into(),
+            kind: "detected".into(),
+            command: "opencode.cmd".into(),
+            args_json: r#"["acp"]"#.into(),
+            env_json: "{}".into(),
+            env_secret_names_json: "[]".into(),
+            install_dir: None,
+            sha256: None,
+            trusted: true,
+            enabled: true,
+            supports_fs: true,
+            supports_terminal: true,
+            supports_elicitation: true,
+            auth_state: "ready".into(),
+            auth_hint: None,
+            last_error: None,
+            created_at: 0,
+            updated_at: 0,
+        };
+        db.acp_agent_save(&row).expect("save agent");
+        db.acp_models_replace(
+            &row.id,
+            &[AcpModelRow {
+                model_id: "opencode-go/hy4-flash-free".into(),
+                name: "Hy4".into(),
+                description: None,
+                is_default: true,
+                options_json: "{}".into(),
+            }],
+        )
+        .expect("save models");
+
+        let model = super::AppState::acp_model_from_db(
+            &db,
+            "acp__opencode",
+            "opencode-go/hy4-flash-free",
+        )
+        .expect("ACP model must resolve for model changes and turns");
+        assert_eq!(model.name, "Hy4");
+        assert_eq!(model.protocols, vec!["acp".to_string()]);
+        assert!(
+            !model.reasoning_options.is_empty(),
+            "bundled catalog must supply reasoning options before ACP discovery"
+        );
+
+        let mut thinking = row.clone();
+        thinking.thinking_config_json = r#"{"id":"effort","type":"select","values":["none","high","default"],"currentValue":"default"}"#.into();
+        db.acp_agent_save(&thinking).expect("save thinking config");
+        let model = super::AppState::acp_model_from_db(
+            &db,
+            "acp__opencode",
+            "opencode-go/hy4-flash-free",
+        )
+        .expect("model still resolves");
+        assert!(model.reasoning);
+        assert_eq!(
+            model.reasoning_options,
+            vec![crate::catalog::ReasoningOption::Effort {
+                values: vec!["none".into(), "high".into(), "default".into()]
+            }]
+        );
+    }
 
     #[test]
     fn close_intent_is_consumed_once() {

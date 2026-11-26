@@ -63,6 +63,7 @@ import { useAgentStore } from '@/lib/store/agentStore';
 import { useAppStore } from '@/lib/store/appStore';
 import {
   useChatStore,
+  hasSendCredential,
   selectActiveConversationStarted,
   modelLockReason,
   notificationsAllowed,
@@ -71,7 +72,7 @@ import { emptyCodeSession, useCodeStore } from '@/lib/store/codeStore';
 import { useUiStore } from '@/lib/store/uiStore';
 import { catalog } from '@/lib/catalog';
 import { toast } from 'sonner';
-import type { GoalView } from '@/lib/types';
+import type { GoalView, ProviderInfo } from '@/lib/types';
 
 const busSeqByTurn = new Map<string, number>();
 /** Mirrors the Tauri bus envelope for a turn started by this renderer. */
@@ -86,6 +87,49 @@ function emitBus(payload: TurnPayload, event: TurnEvent) {
     event,
   });
 }
+
+describe('hasSendCredential', () => {
+  const http: ProviderInfo = {
+    id: 'opencode-go',
+    name: 'Go',
+    shortName: 'Go',
+    description: '',
+    baseUrl: '',
+    consoleUrl: '',
+    endpoints: {},
+    authEnv: '',
+    defaultModelId: 'm',
+    models: [],
+    notes: [],
+  };
+  const acp: ProviderInfo = {
+    ...http,
+    id: 'acp__demo',
+    transport: 'acp',
+    auth: 'acp',
+    acp: {
+      agentId: 'acp__demo',
+      registryId: 'demo',
+      version: '1',
+      kind: 'binary',
+      authState: 'ready',
+      trusted: true,
+      installed: true,
+    },
+  };
+
+  it('does not require an API key for ACP agents', () => {
+    expect(hasSendCredential(acp, [], [])).toBe(true);
+    expect(hasSendCredential(http, [], [])).toBe(false);
+    expect(
+      hasSendCredential(
+        http,
+        [{ providerId: 'opencode-go', hasKey: true, source: 'settings' }],
+        [],
+      ),
+    ).toBe(true);
+  });
+});
 
 const conversation = (overrides: Partial<Conversation> = {}): Conversation => ({
   id: 'conv-1',

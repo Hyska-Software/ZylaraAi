@@ -21,6 +21,9 @@ import type {
   TurnResult,
   TurnKind,
   UsageInfo,
+  ProviderAuthStatus,
+  ProviderInfo,
+  ProviderKeyStatus,
 } from '../types';
 import { deriveTitle, newId, compareConversationOrder, createSerialRunner } from '../utils';
 import { inputFromAgent } from '../agentInput';
@@ -34,6 +37,20 @@ import { useAppStore } from './appStore';
 import { isCodeEvent, useCodeStore } from './codeStore';
 import { useCacheStore } from './cacheStore';
 import { useUiStore, type LayoutMode } from './uiStore';
+
+/// ACP agents own their credentials; the backend reports `auth_required`
+/// during the turn instead of requiring an API key in Settings.
+export function hasSendCredential(
+  provider: ProviderInfo,
+  keys: readonly ProviderKeyStatus[] | undefined,
+  auth: readonly ProviderAuthStatus[] | undefined,
+): boolean {
+  if (provider.transport === 'acp' || provider.acp) return true;
+  return (
+    Boolean(keys?.find((entry) => entry.providerId === provider.id)?.hasKey) ||
+    auth?.find((entry) => entry.providerId === provider.id)?.state === 'signed-in'
+  );
+}
 
 const runReorder = createSerialRunner();
 
@@ -1490,6 +1507,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
             error: event.error ?? current.error ?? null,
           }));
           break;
+        case 'notice':
+          // ACP notices are out-of-band information, never message content.
+          break;
+        case 'config_option_updated':
+          // A new session option can add or remove models in the shared selector.
+          void useAppStore.getState().reloadCatalog();
+          break;
         default:
           break;
       }
@@ -2746,19 +2770,14 @@ export const useChatStore = create<ChatState>()((set, get) => {
       // Never start a turn whose provider has no credential: show the same
       // actionable CTA the settings screen offers (API key or ChatGPT login).
       const activeProvider = app.providers?.find((provider) => provider.id === selection.providerId);
-      if (activeProvider) {
-        const key = app.keys?.find((entry) => entry.providerId === selection.providerId);
-        const auth = app.auth?.find((entry) => entry.providerId === selection.providerId);
-        const ready = Boolean(key?.hasKey) || auth?.state === 'signed-in';
-        if (!ready) {
-          toast.error(t('chat:toasts.connectCredential'), {
-            description:
-              activeProvider.auth === 'oauth'
-                ? t('chat:toasts.connectCredentialOauth')
-                : t('chat:toasts.connectCredentialApiKey'),
-          });
-          return false;
-        }
+      if (activeProvider && !hasSendCredential(activeProvider, app.keys, app.auth)) {
+        toast.error(t('chat:toasts.connectCredential'), {
+          description:
+            activeProvider.auth === 'oauth'
+              ? t('chat:toasts.connectCredentialOauth')
+              : t('chat:toasts.connectCredentialApiKey'),
+        });
+        return false;
       }
       let conversationId: string;
       try {
@@ -3099,19 +3118,14 @@ export const useChatStore = create<ChatState>()((set, get) => {
       const activeProvider = app.providers?.find(
         (provider) => provider.id === selection.providerId,
       );
-      if (activeProvider) {
-        const key = app.keys?.find((entry) => entry.providerId === selection.providerId);
-        const auth = app.auth?.find((entry) => entry.providerId === selection.providerId);
-        const ready = Boolean(key?.hasKey) || auth?.state === 'signed-in';
-        if (!ready) {
-          toast.error(t('chat:toasts.connectCredentialGoal'), {
-            description:
-              activeProvider.auth === 'oauth'
-                ? t('chat:toasts.connectCredentialOauth')
-                : t('chat:toasts.connectCredentialApiKey'),
-          });
-          return false;
-        }
+      if (activeProvider && !hasSendCredential(activeProvider, app.keys, app.auth)) {
+        toast.error(t('chat:toasts.connectCredentialGoal'), {
+          description:
+            activeProvider.auth === 'oauth'
+              ? t('chat:toasts.connectCredentialOauth')
+              : t('chat:toasts.connectCredentialApiKey'),
+        });
+        return false;
       }
       const model = modelForRoute(conversation.providerId, conversation.modelId);
       const current = app.selection;
@@ -3273,6 +3287,12 @@ export const useChatStore = create<ChatState>()((set, get) => {
         await loadConversationIntoCache(conversationId);
       }
       const conversation = get().conversations.find((entry) => entry.id === conversationId);
+      if (event.type === 'notice' || event.type === 'config_option_updated') {
+        // No assistant row is involved: keep notices out of history and refresh
+        // the model selector when the agent advertises new config options.
+        if (event.type === 'config_option_updated') void useAppStore.getState().reloadCatalog();
+        return;
+      }
       let stream = selectConversationStream(get(), conversationId);
       if (event.type === 'accepted') {
         // Admitted by Rust without a message row yet: keep the conversation busy

@@ -78,7 +78,12 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 mime_guess = "2"
 include_dir = "0.7"
 url = "2"
-tokio-util = { version = "0.7", features = ["rt"] }
+tokio-util = { version = "0.7", features = ["rt", "compat"] }
+# Agent Client Protocol (ACP) client for third-party agents.
+agent-client-protocol = { version = "=5.6.1", features = ["unstable_protocol_v2"] }
+# Registry archives: .zip already above; .tar.gz needs these direct deps.
+tar = "0.4"
+flate2 = "1"
 tokio-tungstenite = "0.27"
 async-trait = "0.1"
 parking_lot = "0.13"

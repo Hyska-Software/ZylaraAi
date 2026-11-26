@@ -91,6 +91,9 @@ export function selectorProviders(
       usable.has(provider.id) ||
       provider.origin === 'custom' ||
       provider.origin === 'plugin' ||
+      (provider.transport === 'acp' &&
+        provider.acp?.installed === true &&
+        provider.acp.enabled !== false) ||
       provider.id === currentProviderId,
   );
 }

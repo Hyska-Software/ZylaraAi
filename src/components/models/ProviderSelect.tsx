@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui';
+import { ProviderGlyph } from '@/components/settings/ProviderGlyph';
 import { keyStatusFor } from '@/lib/modelMenu';
 import { cn } from '@/lib/utils';
 import type { ProviderAuthStatus, ProviderInfo, ProviderKeyStatus } from '@/lib/types';
@@ -71,7 +72,9 @@ export function ProviderSelect({
           aria-label={ariaLabel ?? t('picker.providersAria')}
           title={
             selected
-              ? providerTabTitle(selected, selectedKey, selectedAuth)
+              ? `${providerTabTitle(selected, selectedKey, selectedAuth)}${
+                  selected.transport === 'acp' ? ` · ${t('picker.acpTitle')}` : ''
+                }`
               : t('picker.allProviders')
           }
           className={cn(
@@ -83,8 +86,11 @@ export function ProviderSelect({
           )}
         >
           {selected ? (
-            <ProviderDot
-              authenticated={providerAuthenticated(selectedKey, selectedAuth)}
+            <ProviderGlyph
+              providerId={selected.id}
+              name={selected.name}
+              iconSvg={selected.iconSvg}
+              size={16}
             />
           ) : null}
           <span className="truncate">
@@ -106,12 +112,25 @@ export function ProviderSelect({
               <DropdownMenuRadioItem
                 key={provider.id}
                 value={provider.id}
-                title={providerTabTitle(provider, providerKey, providerAuthStatus)}
+                title={`${providerTabTitle(provider, providerKey, providerAuthStatus)}${
+                  provider.transport === 'acp' ? ` · ${t('picker.acpTitle')}` : ''
+                }`}
               >
+                <ProviderGlyph
+                  providerId={provider.id}
+                  name={provider.name}
+                  iconSvg={provider.iconSvg}
+                  size={16}
+                />
+                <span className="truncate">{provider.shortName}</span>
+                {provider.transport === 'acp' ? (
+                  <span className="rounded bg-accent-soft px-1 text-[9px] font-semibold uppercase text-accent">
+                    {t('picker.acpBadge')}
+                  </span>
+                ) : null}
                 <ProviderDot
                   authenticated={providerAuthenticated(providerKey, providerAuthStatus)}
                 />
-                <span className="truncate">{provider.shortName}</span>
               </DropdownMenuRadioItem>
             );
           })}

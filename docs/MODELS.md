@@ -2,7 +2,8 @@
 
 Provedores suportados: **OpenCode Go** (assinatura), **OpenCode Zen** (pay-as-you-go
 do OpenCode Console), **OpenAI** (plano ChatGPT via "Sign in with ChatGPT" ou API
-key da plataforma) e **Anthropic** (API oficial, API key). Go/Zen expõem o mesmo
+key da plataforma), **Anthropic** (API oficial, API key) e agentes externos via
+**ACP** (Agent Client Protocol). Go/Zen expõem o mesmo
 gateway com bases diferentes:
 
 | Provedor | Base URL | Autenticação |
@@ -11,6 +12,23 @@ gateway com bases diferentes:
 | OpenCode Zen | `https://opencode.ai/inference` | API key do Console com créditos |
 | OpenAI | `https://api.openai.com/v1` | OAuth "Sign in with ChatGPT" (plano) **ou** API key `sk-…` |
 | Anthropic | `https://api.anthropic.com/v1` | API key `sk-ant-…` do Claude Console (pay-as-you-go) |
+
+### Agentes ACP — Registry e adição manual
+
+`Configurações › Provedores › Agentes ACP` mostra o catálogo oficial
+`https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`. A instalação de um binário
+verifica o `sha256` antes de extrair e exige o comando/args/env explícitos; distribuições `npx`/`uvx`
+usam o gerenciador local e pedem consentimento antes do primeiro launch. Agentes instalados e
+agentes adicionados manualmente já nascem confiáveis, com **File access**, **Terminal access** e
+**Interactive requests** ativados; o painel do agente permite desativar qualquer opção.
+
+Agentes ACP aparecem no **mesmo seletor** dos demais provedores. Seus modelos são descobertos em
+`session/new` via `configOptions` com `category: "model"` e cacheados em `acp_models`; antes de
+cada prompt o adaptador envia `session/set_config_option` com o modelo escolhido. Se o agente não
+expor opções, ele contribui com uma entrada "Padrão do agente". A autenticação é do agente
+(`authMethods`: `agent` ou `terminal`), e nenhum token de login ACP é enviado ao renderer.
+Identidade: `acp__<registry-id>`. Detalhes em `docs/goals/acp-providers/PLAN.md` e na
+[documentação oficial do Registry](https://agentclientprotocol.com/get-started/registry).
 
 Headers obrigatórios/recomendados (Go/Zen):
 

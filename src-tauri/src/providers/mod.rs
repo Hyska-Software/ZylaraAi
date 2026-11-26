@@ -39,6 +39,7 @@ pub enum WireProtocol {
     OpenaiResponses,
     Anthropic,
     Google,
+    Acp,
 }
 
 impl WireProtocol {
@@ -48,6 +49,7 @@ impl WireProtocol {
             Self::OpenaiResponses => "openai-responses",
             Self::Anthropic => "anthropic",
             Self::Google => "google",
+            Self::Acp => "acp",
         }
     }
 
@@ -57,6 +59,7 @@ impl WireProtocol {
             "openai-responses" => Some(Self::OpenaiResponses),
             "anthropic" => Some(Self::Anthropic),
             "google" => Some(Self::Google),
+            "acp" => Some(Self::Acp),
             _ => None,
         }
     }
@@ -404,6 +407,24 @@ pub enum ProviderEvent {
     CacheDigest(crate::domain::PrefixDigest),
     /// Raw assistant payload used for stateless replay in the next step.
     ProviderState(Value),
+    /// Structured plan/compaction/notice/config payloads emitted by ACP agents.
+    /// Existing HTTP adapters never emit them, so the harness mapping is additive.
+    Plan(Value),
+    Compaction(Value),
+    Notice {
+        severity: String,
+        title: String,
+        description: Option<String>,
+    },
+    Meta(Value),
+    /// An agent-owned tool finished. `ToolCallDone` alone only updates the
+    /// local accumulator in the harness; ACP tools are never executed locally.
+    ToolCallFinished {
+        id: String,
+        status: String,
+        result: String,
+        presentation: Option<Value>,
+    },
     /// End of the provider stream.
     Done,
 }
@@ -1375,7 +1396,13 @@ pub(crate) async fn stream_one(
         WireProtocol::OpenaiResponses => openai_responses::stream(http, request, sink).await,
         WireProtocol::Anthropic => anthropic::stream(http, request, sink).await,
         WireProtocol::Google => google::stream(http, request, sink).await,
-    }
+        WireProtocol::Acp => {
+            let app = crate::acp::app_handle().ok_or_else(|| {
+                ProviderError::Other("ACP runtime is not initialized".to_string())
+            })?;
+            crate::acp::client::stream(app, request, sink).await
+        }
+}
 }
 
 /* ------------------------------------------------------------------ */
@@ -1583,6 +1610,11 @@ mod smoke {
                 ProviderEvent::Done => {
                     result.trace.push("done".to_string());
                 }
+                ProviderEvent::ToolCallFinished { .. }
+                | ProviderEvent::Plan(_)
+                | ProviderEvent::Compaction(_)
+                | ProviderEvent::Notice { .. }
+                | ProviderEvent::Meta(_) => {}
             }
         }
         let outcome = task.await.expect("stream task panicked");

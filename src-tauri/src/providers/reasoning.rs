@@ -118,6 +118,7 @@ pub fn apply(
         WireProtocol::OpenaiResponses => apply_openai_responses(model, request, body),
         WireProtocol::Anthropic => apply_anthropic(model, request, body),
         WireProtocol::Google => apply_google(model, request, body),
+        WireProtocol::Acp => {}
     }
 }
 

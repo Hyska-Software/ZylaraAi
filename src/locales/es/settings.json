@@ -266,6 +266,92 @@
         "models": "Añade al menos un id de modelo."
       }
     },
+    "acp": {
+      "title": "Agentes ACP",
+      "description": "Los agentes externos hablan el Agent Client Protocol, se ejecutan como procesos locales y aparecen en el mismo selector de modelos.",
+      "empty": "Aún no hay agentes ACP instalados.",
+      "browse": "Buscar en el registro",
+      "addCustom": "Añadir agente manualmente",
+      "installed": "Instalado",
+      "source": { "detected": "Detectado en este dispositivo" },
+      "enable": "Activar",
+      "disable": "Desactivar",
+      "rescan": "Buscar en el dispositivo",
+      "models_one": "{{count}} modelo",
+      "models_other": "{{count}} modelos",
+      "auth": {
+        "unknown": "Desconocido",
+        "ready": "Listo",
+        "auth_required": "Es necesario iniciar sesión",
+        "authenticated": "Autenticado",
+        "signed-in": "Conectado",
+        "error": "Error"
+      },
+      "trust": {
+        "label": "Confiar en este agente",
+        "warning": "Los agentes de confianza pueden ejecutar herramientas en este equipo. Concede solo las capacidades necesarias.",
+        "fs": "Acceso a archivos",
+        "terminal": "Acceso a terminal",
+        "elicitation": "Solicitudes interactivas"
+      },
+      "command": "Comando",
+      "args": "Argumentos",
+      "envNames": "Variables de entorno",
+      "lastError": "Último error",
+      "test": "Probar agente",
+      "testOk": "Conectado · {{count}} modelos",
+      "testFailed": "Error de conexión: {{message}}",
+      "signIn": "Iniciar sesión",
+      "signOut": "Cerrar sesión",
+      "remove": "Eliminar agente",
+      "removeTitle": "¿Eliminar {{name}}?",
+      "removeBody": "El agente y su instalación local se eliminan, y sus modelos desaparecen del selector.",
+      "removeConfirm": "Eliminar",
+      "cancel": "Cancelar",
+      "toasts": {
+        "installed": "{{name}} instalado",
+        "added": "{{name}} añadido",
+        "removed": "{{name}} eliminado",
+        "trusted": "Confianza actualizada para {{name}}",
+        "failed": "{{message}}"
+      },
+      "registry": {
+        "title": "Registro ACP",
+        "description": "Instala un agente del registro oficial. Revisa qué se ejecutará antes de dar tu consentimiento.",
+        "search": "Buscar agentes",
+        "searchPlaceholder": "Buscar por nombre o id…",
+        "empty": "Ningún agente coincide con \"{{query}}\".",
+        "refresh": "Actualizar registro",
+        "license": "Licencia: {{license}}",
+        "repository": "Repositorio",
+        "homepage": "Sitio web",
+        "supported": "Disponible en esta plataforma",
+        "unsupported": "No disponible en esta plataforma",
+        "install": "Instalar",
+        "installed": "Instalado",
+        "consent": "He revisado el comando, los argumentos y las variables de entorno que ejecutará este agente, y los acepto.",
+        "installReason": "Motivo: {{reason}}"
+      },
+      "custom": {
+        "title": "Añadir agente ACP",
+        "description": "Conecta directamente un ejecutable ACP local. No se descarga nada de un registro.",
+        "name": "Nombre",
+        "namePlaceholder": "Mi agente",
+        "command": "Ruta absoluta del comando",
+        "commandPlaceholder": "/usr/local/bin/mi-agente",
+        "args": "Argumentos (uno por línea)",
+        "env": "Variables de entorno (CLAVE=valor, una por línea)",
+        "cwd": "Directorio de trabajo (opcional)",
+        "create": "Añadir agente",
+        "cancel": "Cancelar",
+        "warning": "Añade solo comandos en los que confíes. Se ejecutan con tus privilegios.",
+        "errors": {
+          "name": "Ponle un nombre al agente.",
+          "command": "Indica la ruta completa del ejecutable.",
+          "env": "Las variables deben usar CLAVE=valor."
+        }
+      }
+    },
     "resilience": {
       "title": "Confiabilidad",
       "description": "Tiempos límite y reintentos automáticos compartidos por todos los proveedores. El reintento solo ocurre antes de que cualquier texto o tool call llegue a la pantalla.",

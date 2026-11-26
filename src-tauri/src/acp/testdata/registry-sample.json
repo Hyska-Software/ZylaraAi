@@ -1,0 +1,111 @@
+{
+  "version": "1.0.0",
+  "agents": [
+    {
+      "id": "binary-agent",
+      "name": "Binary Agent",
+      "version": "1.4.0",
+      "description": "Agent distributed as native binaries.",
+      "repository": "https://github.com/example/binary-agent",
+      "website": "https://example.org/binary-agent",
+      "authors": ["Example Team"],
+      "license": "MIT",
+      "license_url": "https://example.org/binary-agent/LICENSE",
+      "icon": "https://cdn.agentclientprotocol.com/registry/v1/latest/binary-agent.svg",
+      "distribution": {
+        "binary": {
+          "windows-x86_64": {
+            "archive": "https://example.org/binary-agent-1.4.0-windows-x86_64.zip",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "cmd": "bin/agent.exe",
+            "args": ["--acp"],
+            "env": { "EXAMPLE_MODE": "acp" }
+          },
+          "linux-x86_64": {
+            "archive": "https://example.org/binary-agent-1.4.0-linux-x86_64.tar.gz",
+            "cmd": "./agent"
+          }
+        }
+      }
+    },
+    {
+      "id": "npx-agent",
+      "name": "NPX Agent",
+      "version": "2.0.0",
+      "description": "Agent distributed through npm.",
+      "license": "Apache-2.0",
+      "distribution": {
+        "npx": {
+          "package": "npx-agent@2.0.0",
+          "args": ["--stdio"]
+        }
+      }
+    },
+    {
+      "id": "uvx-agent",
+      "name": "UVX Agent",
+      "version": "3.0.0",
+      "description": "Agent distributed through PyPI.",
+      "distribution": {
+        "binary": {
+          "darwin-aarch64": {
+            "archive": "https://example.org/uvx-agent-darwin.tar.gz",
+            "cmd": "./uvx-agent"
+          }
+        },
+        "uvx": {
+          "package": "uvx-agent==3.0.0"
+        }
+      }
+    },
+    {
+      "id": "no-target-agent",
+      "name": "Unsupported Agent",
+      "version": "0.9.0",
+      "description": "Agent with no build for a supported platform.",
+      "distribution": {
+        "binary": {
+          "plan9-mips": {
+            "archive": "https://example.org/no-target-plan9.zip",
+            "cmd": "agent"
+          }
+        }
+      }
+    },
+    {
+      "id": "Bad_ID",
+      "name": "Invalid Id",
+      "version": "1.0.0",
+      "description": "Registry ids must be lowercase slugs.",
+      "distribution": { "npx": { "package": "bad-id@1.0.0" } }
+    },
+    {
+      "id": "hostile-icon",
+      "name": "Hostile Icon",
+      "version": "1.0.0",
+      "description": "Icons must live on the Registry CDN.",
+      "icon": "https://evil.example.org/icon.svg",
+      "distribution": { "npx": { "package": "hostile-icon@1.0.0" } }
+    },
+    {
+      "id": "bad-version",
+      "name": "Invalid Version",
+      "version": "1.2",
+      "description": "Agent versions must have three numeric components.",
+      "distribution": { "npx": { "package": "bad-version@1.2" } }
+    },
+    {
+      "id": "bad-binary",
+      "name": "Broken Binary",
+      "version": "1.0.0",
+      "description": "A binary distribution without cmd is unusable.",
+      "distribution": {
+        "binary": {
+          "windows-x86_64": {
+            "archive": "https://example.org/broken.zip"
+          }
+        }
+      }
+    }
+  ]
+}

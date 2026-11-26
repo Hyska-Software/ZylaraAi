@@ -1,4 +1,10 @@
 {
+  "acp.defaultModelName": "Agent default",
+  "acp.priorContextLabel": "Context from the previous conversation:",
+  "acp.toolDefaultTitle": "Agent tool",
+  "acp.unknownDomain": "unknown host",
+  "acp.urlNotice": "URL requested: {host} (not opened automatically)",
+  "acp.writeApproval": "Agent wants to write {path}",
   "agents.audit.agentRemoved": "agent removed",
   "agents.avatar.decodeFailed": "AGENT_AVATAR_INVALID: failed to decode the image: {error}",
   "agents.avatar.dimensionsTooLarge": "AGENT_AVATAR_INVALID: the image exceeds 8192 px.",

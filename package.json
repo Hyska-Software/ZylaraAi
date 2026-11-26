@@ -31,7 +31,7 @@
     "brand": "node scripts/build-brand.mjs",
     "verify:models": "node scripts/verify-models.mjs",
     "test": "vitest run",
-    "test:scripts": "node --test scripts/__tests__/catalog-sources.test.mjs scripts/__tests__/plugin-surfaces.test.mjs scripts/__tests__/provider-seeds.test.mjs",
+    "test:scripts": "node --test scripts/__tests__/catalog-sources.test.mjs scripts/__tests__/plugin-surfaces.test.mjs scripts/__tests__/provider-seeds.test.mjs scripts/__tests__/acp-registry.test.mjs",
     "test:installer": "node --test scripts/installer/__tests__/shared.test.mjs scripts/installer/__tests__/config.test.mjs scripts/installer/__tests__/release.test.mjs scripts/installer/__tests__/version.test.mjs scripts/installer/__tests__/unix.test.mjs",
     "test:watch": "vitest",
     "i18n:check": "node scripts/check-i18n.mjs && node scripts/check-ui-copy.mjs && node scripts/check-rust-copy.mjs"

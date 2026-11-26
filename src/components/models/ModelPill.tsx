@@ -221,6 +221,7 @@ export function ModelPill({
   const auth = useAppStore((state) => state.auth);
   const storeProviders = useAppStore((state) => state.providers);
   const sliderEnabled = useAppStore((state) => state.settings.reasoningSliderEnabled ?? false);
+  const refreshAcpThinking = useAppStore((state) => state.refreshAcpThinking);
   const toggleFavorite = useAppStore((state) => state.toggleFavorite);
   const setReasoning = useChatStore((state) => state.setReasoning);
   // Chat locks the model once the conversation starts; a Code session keeps it
@@ -254,6 +255,7 @@ export function ModelPill({
   const hideDetailsTimerRef = useRef<number | null>(null);
   const detailsFrameRef = useRef<number | null>(null);
 
+  const thinkingRefreshedRef = useRef<Set<string>>(new Set());
   const pid = providerId ?? selection.providerId;
   const mid = modelId ?? selection.modelId;
   // The selector lists the curated + connected providers; the merged list also
@@ -276,6 +278,9 @@ export function ModelPill({
 
   const name = model?.name ?? mid ?? t('picker.selectModel');
   const reasoningSupported = Boolean(model && reasoningUi(model).supported);
+  const acpThinkingProbe =
+    providerList.find((provider) => provider.id === pid)?.transport === 'acp' &&
+    !reasoningSupported;
   const effortText = effortSegmentLabel(model, effectiveReasoning);
   const currentKey = mid ? modelKey(pid, mid) : null;
   // The lock explanation changes with the reason: a started Chat conversation
@@ -365,6 +370,17 @@ export function ModelPill({
   const showingThinking = stage === 'thinking' && Boolean(thinkingModel);
   const thinkingLevels =
     sliderEnabled && thinkingModel ? thinkingOptions(thinkingModel, thinkingValue) : [];
+
+  // ACP agents advertise `thought_level` only after a model is selected. If
+  // the stored catalog has no reasoning options yet, re-probe once so the
+  // thinking control can appear in this same session.
+  useEffect(() => {
+    if (stage !== 'thinking' || !thinkingModel) return;
+    if (providerList.find((provider) => provider.id === pid)?.transport !== 'acp') return;
+    if (reasoningUi(thinkingModel).supported || thinkingRefreshedRef.current.has(pid)) return;
+    thinkingRefreshedRef.current.add(pid);
+    void refreshAcpThinking(pid);
+  }, [stage, thinkingModel, pid, providerList, refreshAcpThinking]);
 
   const panelReasoning = activeEntry
     ? reasoningForModel(activeEntry.model, effectiveReasoning)
@@ -518,7 +534,7 @@ export function ModelPill({
   };
 
   const handleThinkingSegment = () => {
-    if (disabled || !reasoningSupported) return;
+    if (disabled || (!reasoningSupported && !acpThinkingProbe)) return;
     if (!open) {
       resetTransientState();
       prepareThinking();
@@ -770,8 +786,7 @@ export function ModelPill({
           <button
             ref={thinkingTriggerRef}
             type="button"
-            disabled={disabled || !reasoningSupported}
-            aria-haspopup="dialog"
+            disabled={disabled || (!reasoningSupported && !acpThinkingProbe)}
             aria-expanded={open && stage === 'thinking'}
             aria-label={t('picker.selectThinking', { value: effortText })}
             title={reasoningSupported ? effortText : t('thinking.noReasoningHint')}

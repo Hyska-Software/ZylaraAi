@@ -335,6 +335,9 @@ fn row_to_provider(row: &CustomProviderRow) -> Option<ProviderInfo> {
         category: None,
         origin: Some("custom".to_string()),
         origin_label: Some("Custom provider".to_string()),
+        transport: crate::catalog::ProviderTransport::Http,
+        acp: None,
+        icon_svg: None,
     })
 }
 

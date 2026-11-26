@@ -215,7 +215,8 @@ envio).
 
 `workspaces.path` aponta para uma pasta real do usuário (nada é copiado para o app-data);
 `conversations.workspace_id` é nulo em sessões sem workspace, e `conversations.agent_kind`
-(`zylara`) deixa a porta aberta para agentes externos via ACP no futuro.
+(`zylara` ou `acp:<registry-id>`) identifica o motor da sessão; agentes externos via ACP são
+suportados em `src-tauri/src/acp/**` (§7).
 `conversations.permission_mode` (`read_only` | `review` | `edit` | `autonomous`) é o modo de
 permissões da sessão de código; o Chat ignora os modos. Cada sessão guarda o próprio modo (o
 chip do composer troca por sessão) e as **novas sessões do Code** nascem com
@@ -250,7 +251,7 @@ Formato (resumo):
 
 O frontend importa o catálogo estaticamente (render instantâneo) e o backend o embute com `include_str!`; ambos leem o mesmo arquivo.
 
-## 7. Provedores (4 protocolos)
+## 7. Provedores (4 protocolos HTTP + transporte ACP)
 
 | Provedor | Base URL | Protocolos | Autenticação |
 | --- | --- | --- | --- |
@@ -258,6 +259,19 @@ O frontend importa o catálogo estaticamente (render instantâneo) e o backend o
 | OpenCode Zen | `https://opencode.ai/inference` | idem | API key |
 | OpenAI | `https://api.openai.com/v1` | openai-responses | OAuth ChatGPT (plano) ou API key |
 | Anthropic | `https://api.anthropic.com/v1` | anthropic | API key `sk-ant-…` (pay-as-you-go) |
+
+### Agentes ACP (Agent Client Protocol)
+
+Além dos quatro protocolos HTTP, `ProviderInfo.transport = "acp"` identifica um agente externo
+instalado do [ACP Registry](https://agentclientprotocol.com/get-started/registry) (ou adicionado
+manualmente) que roda como subprocesso e fala JSON-RPC over stdio. O módulo `src-tauri/src/acp/**`
+busca o catálogo oficial, verifica sha256/arquivos, guarda o agente e a sessão em SQLite e traduz
+`session/update` para os mesmos `ProviderEvent` dos adaptadores HTTP — o harness, os eventos e a
+UI permanecem idênticos. Modelos vêm de `configOptions` (`category: "model"`) e são mesclados em
+`catalogView.catalog.providers[].models`, alimentando o **mesmo** seletor (`ModelPill`/
+`ModelPickerDialog`). Auth e ferramentas pertencem ao agente; Zylara apenas observa o estado e
+responde `session/request_permission` com o fluxo de aprovação existente. IDs: `acp__<registry-id>`.
+Detalhes, segurança e fases: `docs/goals/acp-providers/PLAN.md`.
 
 Os endpoints de cada protocolo vêm do mapa `endpoints` do catálogo (não há
 caminhos fixos no código dos adaptadores; o Google usa o placeholder `{model}` e

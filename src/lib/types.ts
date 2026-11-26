@@ -10,7 +10,7 @@ import type { AppLocale } from './i18n/languages';
 /* Catalog                                                             */
 /* ------------------------------------------------------------------ */
 
-export type WireProtocol = 'openai-chat' | 'openai-responses' | 'anthropic' | 'google';
+export type WireProtocol = 'openai-chat' | 'openai-responses' | 'anthropic' | 'google' | 'acp';
 export type ModelStatus = 'stable' | 'beta' | 'free' | 'unavailable';
 
 export interface ReasoningOptionToggle {
@@ -85,7 +85,7 @@ export interface ModelInfo {
 }
 
 /** How a provider is authenticated. Defaults to `api-key` for older catalogs. */
-export type ProviderAuth = 'api-key' | 'oauth';
+export type ProviderAuth = 'api-key' | 'oauth' | 'acp';
 
 /**
  * Wire-request constraints. `chatgpt-plan` applies the OpenAI plan-usage
@@ -139,12 +139,27 @@ export interface ProviderInfo {
   cache?: CacheInfo | null;
   /** Package-relative asset or image URL used instead of the built-in glyph. */
   icon?: string | null;
+  /** Validated monochrome SVG from the ACP Registry (inline glyph). */
+  iconSvg?: string | null;
   /** Group of the "See more providers" dialog (`lab`, `aggregator`, `host`). */
   category?: string | null;
   /** `custom` for user-defined providers, `plugin` for contributed ones. */
-  origin?: 'custom' | 'plugin' | null;
+  origin?: 'custom' | 'plugin' | 'acp' | null;
   /** Human label for the origin (plugin name, "Custom provider"). */
   originLabel?: string | null;
+  /** ACP transport metadata; absent for HTTP providers. */
+  transport?: 'http' | 'acp';
+  acp?: {
+    agentId: string;
+    registryId: string | null;
+    version: string;
+    kind: string;
+    authState: string;
+    trusted: boolean;
+    installed: boolean;
+    /** Absent in older payloads; treat as active. */
+    enabled?: boolean;
+  };
 }
 
 /** Payload of `save_custom_provider` (Settings → Providers → Add provider). */
@@ -170,6 +185,101 @@ export interface CustomProviderModelInput {
   maxOutput?: number;
   reasoning?: boolean;
   attachment?: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* ACP agents (Agent Client Protocol)                                  */
+/* ------------------------------------------------------------------ */
+
+/** One entry of the signed ACP registry (no command is executed here). */
+export interface AcpRegistryAgent {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  homepage?: string | null;
+  repository?: string | null;
+  license?: string | null;
+  iconUrl?: string | null;
+  /** Validated monochrome Registry SVG; null falls back to initials. */
+  iconSvg?: string | null;
+  distributions: string[];
+  platforms: string[];
+  installed: boolean;
+  supported: boolean;
+  installReason?: string | null;
+}
+
+/** Installed ACP agent as exposed by the backend (no secret env values). */
+export interface AcpAgentView {
+  id: string;
+  registryId?: string | null;
+  name: string;
+  version: string;
+  description: string;
+  kind: string;
+  command: string;
+  /** registry (managed install) | manual | detected on this device. */
+  source: 'registry' | 'manual' | 'detected';
+  args: string[];
+  envNames: string[];
+  trusted: boolean;
+  enabled: boolean;
+  authState: string;
+  authHint?: string | null;
+  modelCount: number;
+  supportsFs: boolean;
+  supportsTerminal: boolean;
+  supportsElicitation: boolean;
+  /** Validated monochrome Registry SVG; null falls back to initials. */
+  iconSvg?: string | null;
+  lastError?: string | null;
+}
+
+/** `acceptCommand` is the explicit consent to execute the registry command. */
+export interface AcpInstallRequest {
+  registryId: string;
+  acceptCommand: boolean;
+}
+
+export interface AcpCustomAgentInput {
+  name: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  cwd?: string | null;
+}
+
+export interface AcpAuthMethod {
+  id: string;
+  name: string;
+  description?: string | null;
+  kind: string;
+}
+
+export interface AcpAuthView {
+  agentId: string;
+  state: string;
+  methods: AcpAuthMethod[];
+  hint?: string | null;
+}
+
+export type AcpAuthAction =
+  | { kind: 'login' | 'terminalLogin'; methodId: string }
+  | { kind: 'logout' };
+
+/** Client capabilities the user grants to a trusted ACP agent. */
+export interface AcpCapabilities {
+  fs: boolean;
+  terminal: boolean;
+  elicitation: boolean;
+}
+
+export interface AcpSessionView {
+  conversationId: string;
+  providerId: string;
+  sessionId: string;
+  protocolVersion: string;
 }
 
 export interface CatalogFile {
@@ -1990,6 +2100,11 @@ export type TurnEvent =
   | { type: 'done'; result: TurnResult }
   | { type: 'cancelled' }
   | { type: 'error'; message: string; code?: string; hint?: string; retryable?: boolean; attempts?: number }
+  /* -------- ACP (agentes externos) -------- */
+  | { type: 'notice'; severity: string; title: string; description?: string }
+  | { type: 'config_option_updated'; configId: string; value: unknown }
+  | { type: 'acp_plan'; plan: unknown }
+  | { type: 'acp_compaction'; data: unknown }
   /* -------- harness de código (docs/goals/code-harness/HARNESS.md §12) -------- */
   | { type: 'approval_requested'; approval: ApprovalRequest }
   | { type: 'approval_resolved'; approvalId: string; decision: ApprovalDecision; scope?: ApprovalScope }
@@ -2592,6 +2707,8 @@ export interface CatalogView {
   keys: ProviderKeyStatus[];
   auth?: ProviderAuthStatus[];
   remoteRefreshedAt?: number | null;
+  /** Installed agent details (when the backend exposes them with the catalog). */
+  acpAgents?: AcpAgentView[];
 }
 
 /* ------------------------------------------------------------------ */

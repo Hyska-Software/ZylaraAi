@@ -58,6 +58,7 @@ import {
 } from '@/components/ui';
 import { ProviderGlyph } from './ProviderGlyph';
 import { CustomProviderDialog } from './CustomProviderDialog';
+import { AcpAgentPanel } from './AcpAgentPanel';
 import { SettingRow, SettingsBlock, SettingsSection } from './shared';
 
 type TestState =
@@ -298,6 +299,7 @@ function ProviderRow({
         providerId={provider.id}
         name={provider.name}
         icon={provider.icon}
+        iconSvg={provider.iconSvg}
         size={20}
         className="mt-0.5"
       />
@@ -462,7 +464,9 @@ export function ProvidersTab() {
     void saveSettings(patch(clamped));
   };
 
-  const providerList: ProviderInfo[] = storeProviders.length ? storeProviders : catalogProviders();
+  const providerList: ProviderInfo[] = (storeProviders.length ? storeProviders : catalogProviders()).filter(
+    (provider) => provider.transport !== 'acp',
+  );
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -1431,6 +1435,8 @@ export function ProvidersTab() {
           </p>
         )}
       </section>
+
+      <AcpAgentPanel />
 
       <div>
         <Button

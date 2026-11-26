@@ -21,6 +21,11 @@ Uma sessão nasce em um layout e não vaza para os outros. A única exceção é
 
 Arquivos principais:
 
+- `src-tauri/src/acp/**` — runtime de agentes ACP externos (Registry + subprocesso JSON-RPC);
+  uma persona aponta para um agente ACP escolhendo `provider_id = 'acp__<registry-id>'` no
+  seletor normal, e a thread registra `conversations.agent_kind = 'acp:<registry-id>'`. O modelo
+  do agente é escolhido no **mesmo** seletor do composer — não existe seletor ACP separado
+  (detalhes em `docs/goals/acp-providers/PLAN.md` D13).
 - `src/components/agents/**` — sidebar, home, editor, memória, rotinas, canais,
   templates e construtor por IA.
 - `src/lib/store/agentStore.ts` — catálogo de personas.

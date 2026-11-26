@@ -224,6 +224,22 @@ pub enum TurnEvent {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error: Option<String>,
     },
+    /// Live user-facing notice from an ACP agent. Not part of message history.
+    Notice {
+        severity: String,
+        title: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+    },
+    /// An ACP session configuration option changed (model, mode, ...).
+    ConfigOptionUpdated {
+        config_id: String,
+        value: serde_json::Value,
+    },
+    /// ACP agent plan payload (entries/status), projected as structured data.
+    AcpPlan { plan: serde_json::Value },
+    /// ACP compaction state/summary (not a harness context compaction).
+    AcpCompaction { data: serde_json::Value },
 }
 
 #[cfg(test)]

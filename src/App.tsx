@@ -460,6 +460,26 @@ export default function App() {
     };
   }, []);
 
+  // Boot-time ACP device scan can finish after the renderer has mounted.
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listen('zylara:acp-detection-updated', () => {
+      if (!disposed) void useAppStore.getState().reloadCatalog();
+    })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {
+        /* event bridge unavailable outside Tauri */
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
   // Chat and Code have separate session lists; switching layouts restores each
   // layout's own active session instead of leaking the other one.
   useLayoutEffect(() => {

@@ -212,6 +212,8 @@
     "planBadgeTitle": "Modelos incluidos en tu plan de ChatGPT",
     "allProviders": "Todos los proveedores",
     "providersAria": "Proveedores",
+    "acpBadge": "ACP",
+    "acpTitle": "Agente ACP",
     "resultsAria": "Resultados de búsqueda de modelos",
     "providerModelsAria": "Modelos del proveedor",
     "detailsAria": "Detalles del modelo",

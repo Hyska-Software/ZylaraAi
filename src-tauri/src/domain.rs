@@ -1827,6 +1827,10 @@ pub struct CatalogView {
     pub auth: Vec<ProviderAuthStatus>,
     #[serde(default)]
     pub remote_refreshed_at: Option<i64>,
+    /// Installed ACP agents (Settings › Providers › ACP agents). Absent in
+    /// older payloads; the renderer falls back to `catalog.providers[].acp`.
+    #[serde(default)]
+    pub acp_agents: Vec<crate::acp::AcpAgentView>,
 }
 
 /* ------------------------------------------------------------------ */

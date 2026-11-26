@@ -10,6 +10,12 @@ import {
   findProviderIn,
 } from '../catalog';
 import type {
+  AcpAgentView,
+  AcpAuthAction,
+  AcpAuthView,
+  AcpCapabilities,
+  AcpCustomAgentInput,
+  AcpRegistryAgent,
   AppInfo,
   LoginChallenge,
   ModelSelection,
@@ -21,6 +27,102 @@ import type {
   Settings,
   SettingsView,
 } from '../types';
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function upsertAgent(agents: AcpAgentView[], view: AcpAgentView): AcpAgentView[] {
+  const index = agents.findIndex((agent) => agent.id === view.id);
+  if (index < 0) return [...agents, view];
+  const next = agents.slice();
+  next[index] = view;
+  return next;
+}
+
+/** Agent id used by the backend for registry installs. */
+function registryAgentId(registryId: string): string {
+  return `acp__${registryId}`;
+}
+
+/**
+ * Fallback for backends that do not ship `CatalogView.acpAgents` yet: combine
+ * the installed registry entries with the ACP providers in the catalog. The
+ * full `AcpAgentView` (command, args, capabilities) is restored as soon as the
+ * backend returns one from `acp_set_trusted`/`acp_auth`.
+ */
+function deriveAcpAgents(
+  registry: readonly AcpRegistryAgent[],
+  providers: readonly ProviderInfo[],
+  previous: readonly AcpAgentView[],
+): AcpAgentView[] {
+  const byId = new Map(previous.map((agent) => [agent.id, agent]));
+  const fromProvider = (provider: ProviderInfo, entry?: AcpRegistryAgent): AcpAgentView => {
+    const id = provider.acp?.agentId ?? registryAgentId(entry?.id ?? provider.id);
+    const old = byId.get(id);
+    return {
+      id,
+      registryId: provider.acp?.registryId ?? entry?.id ?? null,
+      name: old?.name ?? provider.name,
+      version: provider.acp?.version ?? entry?.version ?? '',
+      description: old?.description ?? entry?.description ?? provider.description,
+      kind: old?.kind ?? provider.acp?.kind ?? 'registry',
+      source: old?.source ?? 'registry',
+      command: old?.command ?? '',
+      args: old?.args ?? [],
+      envNames: old?.envNames ?? [],
+      trusted: provider.acp?.trusted ?? old?.trusted ?? false,
+      enabled: old?.enabled ?? true,
+      authState: provider.acp?.authState ?? old?.authState ?? 'unknown',
+      authHint: old?.authHint ?? null,
+      modelCount: provider.models.length || old?.modelCount || 0,
+      supportsFs: old?.supportsFs ?? false,
+      supportsTerminal: old?.supportsTerminal ?? false,
+      supportsElicitation: old?.supportsElicitation ?? false,
+      lastError: old?.lastError ?? null,
+    };
+  };
+  const agents: AcpAgentView[] = [];
+  for (const entry of registry) {
+    if (!entry.installed) continue;
+    const provider = providers.find(
+      (item) =>
+        item.transport === 'acp' &&
+        (item.acp?.registryId === entry.id || item.id === registryAgentId(entry.id)),
+    );
+    if (provider) agents.push(fromProvider(provider, entry));
+    else {
+      const old = byId.get(registryAgentId(entry.id));
+      agents.push({
+        id: registryAgentId(entry.id),
+        registryId: entry.id,
+        name: old?.name ?? entry.name,
+        version: entry.version,
+        description: old?.description ?? entry.description,
+        kind: old?.kind ?? 'registry',
+        source: old?.source ?? 'registry',
+        command: old?.command ?? '',
+        args: old?.args ?? [],
+        envNames: old?.envNames ?? [],
+        trusted: old?.trusted ?? false,
+        enabled: old?.enabled ?? true,
+        authState: old?.authState ?? 'unknown',
+        authHint: old?.authHint ?? null,
+        modelCount: old?.modelCount ?? 0,
+        supportsFs: old?.supportsFs ?? false,
+        supportsTerminal: old?.supportsTerminal ?? false,
+        supportsElicitation: old?.supportsElicitation ?? false,
+        lastError: old?.lastError ?? null,
+      });
+    }
+  }
+  for (const provider of providers) {
+    if (provider.transport !== 'acp' || !provider.acp?.installed) continue;
+    if (agents.some((agent) => agent.id === provider.acp!.agentId)) continue;
+    agents.push(fromProvider(provider));
+  }
+  return agents;
+}
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
@@ -74,6 +176,10 @@ interface AppState {
   selection: ModelSelection;
   favorites: string[];
   error: string | null;
+
+  /** Signed registry snapshot (never executes a command by itself). */
+  acpRegistry: AcpRegistryAgent[];
+  acpAgents: AcpAgentView[];
   catalogRefreshedAt: number | null;
   /** Pending ChatGPT login attempt (URL is shown so it can be reopened). */
   loginChallenge: LoginChallenge | null;
@@ -106,13 +212,38 @@ interface AppState {
   setError: (error: string | null) => void;
 
   /* -------- ChatGPT plan auth -------- */
-  authStatus: (providerId: string) => ProviderAuthStatus | undefined;
+  authStatus: {
+    /** OAuth/ChatGPT status (legacy one-argument call). */
+    (providerId: string): ProviderAuthStatus | undefined;
+    /** ACP auth probe, selected explicitly to keep the legacy call synchronous. */
+    (agentId: string, options: { acp: true }): Promise<AcpAuthView>;
+  };
   /** Whether the active provider can send a turn (API key or OAuth token). */
   providerReady: (providerId: string) => boolean;
   startChatGptLogin: (providerId: string, forceConsent?: boolean) => Promise<LoginChallenge>;
   awaitChatGptLogin: (attemptId: string) => Promise<ProviderAuthStatus>;
   cancelChatGptLogin: (attemptId: string) => Promise<void>;
   refreshAuth: () => Promise<void>;
+
+  /* -------- ACP agents -------- */
+  loadRegistry: () => Promise<AcpRegistryAgent[]>;
+  refreshRegistry: (force?: boolean) => Promise<AcpRegistryAgent[]>;
+  installAgent: (registryId: string, acceptCommand: boolean) => Promise<AcpAgentView>;
+  addCustomAgent: (input: AcpCustomAgentInput) => Promise<AcpAgentView>;
+  removeAgent: (agentId: string) => Promise<void>;
+  setTrusted: (
+    agentId: string,
+    trusted: boolean,
+    capabilities: AcpCapabilities,
+  ) => Promise<AcpAgentView>;
+  enableAgent: (agentId: string, enabled: boolean) => Promise<AcpAgentView>;
+  rescanDevices: () => Promise<AcpAgentView[]>;
+  /** Re-probe an ACP agent to pick up its thinking config option. */
+  refreshAcpThinking: (agentId: string) => Promise<void>;
+  /** ACP auth probe; the legacy one-argument call remains the OAuth status. */
+  acpAuthStatus: (agentId: string) => Promise<AcpAuthView>;
+  acpAuthAction: (agentId: string, action: AcpAuthAction) => Promise<AcpAuthView>;
+  testAgent: (agentId: string) => Promise<ProviderValidation>;
   signOutProvider: (providerId: string) => Promise<void>;
 }
 
@@ -143,6 +274,8 @@ export const useAppStore = create<AppState>()(
       selection: defaultSelection(DEFAULT_SETTINGS),
       favorites: ['glm-5.3-flash', 'claude-haiku-5-5', 'gpt-6-luna', 'kimi-k3'],
       error: null,
+      acpRegistry: [],
+      acpAgents: [],
       catalogRefreshedAt: null,
       loginChallenge: null,
 
@@ -306,6 +439,7 @@ export const useAppStore = create<AppState>()(
             providers,
             keys: catalogView.keys,
             auth: catalogView.auth ?? get().auth,
+            acpAgents: catalogView.acpAgents ?? get().acpAgents,
             selection: {
               providerId: provider?.id ?? fallback.providerId,
               modelId,
@@ -327,6 +461,7 @@ export const useAppStore = create<AppState>()(
             providers: catalogView.catalog.providers,
             keys: catalogView.keys,
             auth: catalogView.auth ?? get().auth,
+            acpAgents: catalogView.acpAgents ?? get().acpAgents,
             catalogRefreshedAt: catalogView.remoteRefreshedAt ?? Date.now(),
           });
         } catch (error) {
@@ -341,6 +476,7 @@ export const useAppStore = create<AppState>()(
           providers,
           keys: catalogView.keys,
           auth: catalogView.auth ?? get().auth,
+          acpAgents: catalogView.acpAgents ?? get().acpAgents,
           catalogRefreshedAt: catalogView.remoteRefreshedAt ?? Date.now(),
         });
         return providers;
@@ -348,11 +484,208 @@ export const useAppStore = create<AppState>()(
 
       validateProvider: (providerId) => api.validateProvider(providerId),
 
-      authStatus: (providerId) => get().auth.find((entry) => entry.providerId === providerId),
+      /* -------- ACP agents -------- */
+      loadRegistry: async () => {
+        if (typeof api.acpListRegistry !== 'function') return get().acpRegistry;
+        try {
+          // The registry command may backfill icons for older installs; read
+          // the catalog only afterwards so the UI gets the updated SVGs.
+          const registry = await api.acpListRegistry();
+          const catalogView = await api.getCatalog();
+          set({
+            acpRegistry: registry,
+            acpAgents:
+              catalogView.acpAgents ??
+              deriveAcpAgents(registry, catalogView.catalog.providers, get().acpAgents),
+          });
+          return registry;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          return get().acpRegistry;
+        }
+      },
+
+      refreshRegistry: async (force = false) => {
+        if (typeof api.acpRefreshRegistry !== 'function') return get().acpRegistry;
+        try {
+          const registry = await api.acpRefreshRegistry(force);
+          const catalogView = await api.getCatalog();
+          set({
+            acpRegistry: registry,
+            acpAgents:
+              catalogView.acpAgents ??
+              deriveAcpAgents(registry, catalogView.catalog.providers, get().acpAgents),
+          });
+          return registry;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          return get().acpRegistry;
+        }
+      },
+
+      installAgent: async (registryId, acceptCommand) => {
+        try {
+          const view = await api.acpInstallAgent(registryId, acceptCommand);
+          set((state) => ({
+            acpAgents: upsertAgent(state.acpAgents, view),
+            acpRegistry: state.acpRegistry.map((entry) =>
+              entry.id === registryId ? { ...entry, installed: true } : entry,
+            ),
+          }));
+          await get().reloadCatalog();
+          return view;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+      addCustomAgent: async (input) => {
+        try {
+          const view = await api.acpAddCustomAgent(input);
+          set((state) => ({ acpAgents: upsertAgent(state.acpAgents, view) }));
+          await get().reloadCatalog();
+          return view;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+      removeAgent: async (agentId) => {
+        try {
+          await api.acpRemoveAgent(agentId);
+          const removed = get().acpAgents.find((entry) => entry.id === agentId);
+          const registryId = removed?.registryId ?? agentId.replace(/^acp__/, '');
+          set((state) => ({
+            acpAgents: state.acpAgents.filter((entry) => entry.id !== agentId),
+            acpRegistry: state.acpRegistry.map((entry) =>
+              entry.id === registryId ? { ...entry, installed: false } : entry,
+            ),
+          }));
+          await get().reloadCatalog();
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+      setTrusted: async (agentId, trusted, capabilities) => {
+        try {
+          const view = await api.acpSetTrusted(agentId, trusted, capabilities);
+          set((state) => ({ acpAgents: upsertAgent(state.acpAgents, view) }));
+          await get().reloadCatalog();
+          return view;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+      enableAgent: async (agentId, enabled) => {
+        try {
+          const view = await api.acpEnableAgent(agentId, enabled);
+          set((state) => ({ acpAgents: upsertAgent(state.acpAgents, view) }));
+          await get().reloadCatalog();
+          return view;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+      rescanDevices: async () => {
+        try {
+          const agents = await api.acpRescanDevices();
+          set({ acpAgents: agents });
+          await get().reloadCatalog();
+          return agents;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+
+      refreshAcpThinking: async (agentId) => {
+        try {
+          await api.acpAuthStatus(agentId);
+          await get().reloadCatalog();
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+        }
+      },
+      acpAuthStatus: async (agentId) => {
+        try {
+          const view = await api.acpAuthStatus(agentId);
+          set((state) => ({
+            acpAgents: state.acpAgents.map((agent) =>
+              agent.id === agentId
+                ? { ...agent, authState: view.state, authHint: view.hint ?? null }
+                : agent,
+            ),
+          }));
+          return view;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+      acpAuthAction: async (agentId, action) => {
+        try {
+          const view = await api.acpAuth(agentId, action);
+          set((state) => ({
+            acpAgents: state.acpAgents.map((agent) =>
+              agent.id === agentId
+                ? { ...agent, authState: view.state, authHint: view.hint ?? null }
+                : agent,
+            ),
+          }));
+          await get().reloadCatalog();
+          return view;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+      testAgent: async (agentId) => {
+        try {
+          const result = await api.acpTestAgent(agentId);
+          set((state) => ({
+            acpAgents: state.acpAgents.map((agent) =>
+              agent.id === agentId
+                ? { ...agent, lastError: result.ok ? null : result.message ?? null }
+                : agent,
+            ),
+          }));
+          return result;
+        } catch (cause) {
+          set({ error: errorMessage(cause) });
+          throw cause;
+        }
+      },
+
+      authStatus: ((providerId: string, options?: { acp?: true }) => {
+        if (options?.acp) return get().acpAuthStatus(providerId);
+        return get().auth.find((entry) => entry.providerId === providerId);
+      }) as AppState['authStatus'],
 
       providerReady: (providerId) => {
         const provider = get().providers.find((entry) => entry.id === providerId);
         if (!provider) return false;
+        const agent = get().acpAgents.find((entry) => entry.id === providerId);
+        if (provider.transport === 'acp' || provider.acp || agent) {
+          const installed = provider.acp?.installed ?? Boolean(agent);
+          const authState = provider.acp?.authState ?? agent?.authState ?? 'unknown';
+          return (
+            installed &&
+            (authState === 'ready' ||
+              authState === 'authenticated' ||
+              authState === 'signed-in')
+          );
+        }
         const key = get().keys.find((entry) => entry.providerId === providerId);
         if (key?.hasKey) return true;
         return Boolean(get().authStatus(providerId)?.state === 'signed-in');

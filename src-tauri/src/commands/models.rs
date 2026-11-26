@@ -639,8 +639,25 @@ pub fn catalog_view(app: &AppHandle, state: &AppState) -> CatalogView {
         keys: config::all_key_status(app, &provider_ids),
         auth: crate::oauth::statuses(app, &state.catalog),
         remote_refreshed_at: refreshed_at(state),
+        acp_agents: state
+            .db
+            .acp_agents()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|row| {
+                crate::acp::to_view(
+                    &row,
+                    state
+                        .db
+                        .acp_models(&row.id)
+                        .map(|m| m.len() as u32)
+                        .unwrap_or(0),
+                )
+            })
+            .collect(),
     }
 }
+
 
 #[tauri::command]
 pub fn get_catalog(app: AppHandle, state: State<'_, AppState>) -> CatalogView {
@@ -698,6 +715,12 @@ pub async fn refresh_catalog(
     let providers = state.catalog_with_plugins().providers;
     let mut refreshed = false;
     for provider in providers {
+        if matches!(
+            provider.transport,
+            crate::catalog::ProviderTransport::Acp
+        ) {
+            continue;
+        }
         if !provider.endpoints.contains_key("models") {
             continue;
         }

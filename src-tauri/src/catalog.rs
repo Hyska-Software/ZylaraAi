@@ -20,7 +20,7 @@ pub struct CatalogFile {
     pub providers: Vec<ProviderInfo>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderInfo {
     pub id: String,
@@ -79,6 +79,26 @@ pub struct ProviderInfo {
     /// Human label for the origin (plugin name, "Custom provider").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin_label: Option<String>,
+    /// Transport used to serve turns. Bundled/custom/plugin providers are HTTP.
+    #[serde(default)]
+    pub transport: ProviderTransport,
+    /// ACP agent metadata; only present when `transport == acp`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acp: Option<crate::acp::AcpProviderInfo>,
+    /// Validated monochrome SVG for ACP agents (Registry icon), rendered by the
+    /// same provider glyph used by HTTP providers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_svg: Option<String>,
+}
+
+/// How a provider serves completions. HTTP covers the four wire adapters; ACP
+/// delegates the whole turn to a local agent subprocess.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProviderTransport {
+    #[default]
+    Http,
+    Acp,
 }
 
 /// Prompt-cache capabilities of a provider or a model override. `min_tokens:
@@ -126,7 +146,9 @@ impl ProviderInfo {
     pub fn request_profile(&self, auth: ProviderAuth) -> RequestProfile {
         match auth {
             ProviderAuth::Oauth => self.request_profiles.oauth.unwrap_or_default(),
-            ProviderAuth::ApiKey => self.request_profiles.api_key.unwrap_or_default(),
+            ProviderAuth::ApiKey | ProviderAuth::Acp => {
+                self.request_profiles.api_key.unwrap_or_default()
+            }
         }
     }
 
@@ -158,6 +180,8 @@ pub enum ProviderAuth {
     ApiKey,
     /// Sign in with ChatGPT (OAuth) with an API-key fallback.
     Oauth,
+    /// The ACP agent owns authentication; Zylara only observes its state.
+    Acp,
 }
 
 /// Wire-request constraints. `Standard` sends the full neutral request body;

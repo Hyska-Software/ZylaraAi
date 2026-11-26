@@ -1,4 +1,10 @@
 {
+  "acp.defaultModelName": "Padrão do agente",
+  "acp.priorContextLabel": "Contexto da conversa anterior:",
+  "acp.toolDefaultTitle": "Ferramenta do agente",
+  "acp.unknownDomain": "domínio desconhecido",
+  "acp.urlNotice": "URL solicitada: {host} (não aberta automaticamente)",
+  "acp.writeApproval": "Agente quer escrever {path}",
   "agents.audit.agentRemoved": "agente removido",
   "agents.avatar.decodeFailed": "AGENT_AVATAR_INVALID: falha ao decodificar a imagem: {error}",
   "agents.avatar.dimensionsTooLarge": "AGENT_AVATAR_INVALID: a imagem passa de 8192 px.",

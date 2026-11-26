@@ -109,6 +109,8 @@ pub enum Credential {
     ApiKey(String),
     /// OAuth access token of the connected ChatGPT account.
     Bearer(String),
+    /// ACP agents own their credentials; no token crosses into the provider layer.
+    Acp,
 }
 
 impl Credential {
@@ -116,6 +118,7 @@ impl Credential {
     pub fn token(&self) -> &str {
         match self {
             Self::ApiKey(token) | Self::Bearer(token) => token,
+            Self::Acp => "",
         }
     }
 
@@ -124,6 +127,7 @@ impl Credential {
         match self {
             Self::ApiKey(_) => ProviderAuth::ApiKey,
             Self::Bearer(_) => ProviderAuth::Oauth,
+            Self::Acp => ProviderAuth::Acp,
         }
     }
 
@@ -302,6 +306,9 @@ async fn resolve_credential(
     deps: &HarnessDeps,
     provider: &ProviderInfo,
 ) -> anyhow::Result<Credential> {
+    if matches!(provider.transport, crate::catalog::ProviderTransport::Acp) {
+        return Ok(Credential::Acp);
+    }
     if let Some(forced) = deps.credential_override.clone() {
         return Ok(forced.into_credential());
     }
@@ -705,6 +712,47 @@ async fn run_stream_attempt(
                     ProviderEvent::CacheDigest(digest) => attempt.digest = Some(digest),
                     ProviderEvent::ProviderState(state) => attempt.state = Some(state),
                     ProviderEvent::Done => {}
+                    ProviderEvent::Plan(value) => emit(on_event, TurnEvent::AcpPlan { plan: value }),
+                    ProviderEvent::Compaction(value) => {
+                        emit(on_event, TurnEvent::AcpCompaction { data: value });
+                    }
+                    ProviderEvent::Notice { severity, title, description } => {
+                        emit(on_event, TurnEvent::Notice { severity, title, description });
+                    }
+                    ProviderEvent::Meta(value) => {
+                        let config_id = value
+                            .get("configId")
+                            .and_then(|v| v.as_str())
+                            .or_else(|| value.get("id").and_then(|v| v.as_str()))
+                            .unwrap_or("")
+                            .to_string();
+                        if !config_id.is_empty() {
+                            emit(
+                                on_event,
+                                TurnEvent::ConfigOptionUpdated {
+                                    config_id,
+                                    value: value
+                                        .get("currentValue")
+                                        .cloned()
+                                        .unwrap_or(serde_json::Value::Null),
+                                },
+                            );
+                        }
+                    }
+                    ProviderEvent::ToolCallFinished { id, status, result, presentation } => {
+                        emit(
+                            on_event,
+                            TurnEvent::ToolCallFinished {
+                                id,
+                                status,
+                                result,
+                                summary: None,
+                                citations: Vec::new(),
+                                presentation,
+                                finished_at: crate::domain::now_ms(),
+                            },
+                        );
+                    }
                 }
                 if dirty {
                     let due = match last_checkpoint {
@@ -2039,6 +2087,20 @@ pub async fn run_turn(
             }
         }
     };
+    // ACP sessions record which external agent owns the thread. This is the
+    // `agentKind` seam reserved in docs/goals/code-harness/GOAL.md P8; HTTP
+    // providers keep their existing `zylara` value untouched.
+    if matches!(provider.transport, crate::catalog::ProviderTransport::Acp) {
+        let registry_id = provider
+            .id
+            .strip_prefix(crate::acp::ID_PREFIX)
+            .unwrap_or(&provider.id);
+        let kind = format!("acp:{registry_id}");
+        if conversation.agent_kind != kind {
+            deps.db
+                .set_conversation_agent_kind(&conversation.id, &kind)?;
+        }
+    }
 
     /* ---------------------------------------------------------------- */
     /* 1b. Goal round: validate and open **before** persisting anything   */
@@ -6131,6 +6193,7 @@ mod tests {
             category: None,
             origin: None,
             origin_label: None,
+            ..Default::default()
         }
     }
 
@@ -6481,6 +6544,7 @@ mod agent_loop_tests {
             category: None,
             origin: None,
             origin_label: None,
+            ..Default::default()
         };
         CatalogFile {
             version: 1,
@@ -6589,6 +6653,7 @@ mod agent_loop_tests {
             category: None,
             origin: None,
             origin_label: None,
+            ..Default::default()
         }
     }
 
@@ -6740,6 +6805,7 @@ mod agent_loop_tests {
             category: None,
             origin: None,
             origin_label: None,
+            ..Default::default()
         }
     }
 
@@ -13344,6 +13410,7 @@ mod agent_loop_tests {
             category: None,
             origin: None,
             origin_label: None,
+            ..Default::default()
         };
         CatalogFile {
             version: 1,

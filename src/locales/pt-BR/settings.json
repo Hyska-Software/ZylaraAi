@@ -266,6 +266,92 @@
         "models": "Adicione pelo menos um id de modelo."
       }
     },
+    "acp": {
+      "title": "Agentes ACP",
+      "description": "Agentes externos falam o Agent Client Protocol, rodam como processos locais e aparecem no mesmo seletor de modelo.",
+      "empty": "Nenhum agente ACP instalado ainda.",
+      "browse": "Buscar no registro",
+      "addCustom": "Adicionar agente manualmente",
+      "installed": "Instalado",
+      "source": { "detected": "Detectado neste dispositivo" },
+      "enable": "Ativar",
+      "disable": "Desativar",
+      "rescan": "Verificar dispositivo",
+      "models_one": "{{count}} modelo",
+      "models_other": "{{count}} modelos",
+      "auth": {
+        "unknown": "Desconhecido",
+        "ready": "Pronto",
+        "auth_required": "É preciso entrar",
+        "authenticated": "Autenticado",
+        "signed-in": "Conectado",
+        "error": "Erro"
+      },
+      "trust": {
+        "label": "Confiar neste agente",
+        "warning": "Agentes confiáveis podem executar ferramentas nesta máquina. Conceda apenas as capacidades necessárias.",
+        "fs": "Acesso a arquivos",
+        "terminal": "Acesso ao terminal",
+        "elicitation": "Solicitações interativas"
+      },
+      "command": "Comando",
+      "args": "Argumentos",
+      "envNames": "Variáveis de ambiente",
+      "lastError": "Último erro",
+      "test": "Testar agente",
+      "testOk": "Conectado · {{count}} modelos",
+      "testFailed": "Falha na conexão: {{message}}",
+      "signIn": "Entrar",
+      "signOut": "Sair",
+      "remove": "Remover agente",
+      "removeTitle": "Remover {{name}}?",
+      "removeBody": "O agente e sua instalação local são removidos, e seus modelos desaparecem do seletor.",
+      "removeConfirm": "Remover",
+      "cancel": "Cancelar",
+      "toasts": {
+        "installed": "{{name}} instalado",
+        "added": "{{name}} adicionado",
+        "removed": "{{name}} removido",
+        "trusted": "Confiança atualizada para {{name}}",
+        "failed": "{{message}}"
+      },
+      "registry": {
+        "title": "Registro ACP",
+        "description": "Instale um agente do registro oficial. Revise o que será executado antes de consentir.",
+        "search": "Buscar agentes",
+        "searchPlaceholder": "Buscar por nome ou id…",
+        "empty": "Nenhum agente corresponde a \"{{query}}\".",
+        "refresh": "Atualizar registro",
+        "license": "Licença: {{license}}",
+        "repository": "Repositório",
+        "homepage": "Site",
+        "supported": "Disponível nesta plataforma",
+        "unsupported": "Indisponível nesta plataforma",
+        "install": "Instalar",
+        "installed": "Instalado",
+        "consent": "Revisei o comando, os argumentos e as variáveis de ambiente que este agente executará e os aceito.",
+        "installReason": "Motivo: {{reason}}"
+      },
+      "custom": {
+        "title": "Adicionar agente ACP",
+        "description": "Conecte um executável ACP local diretamente. Nada é baixado de um registro.",
+        "name": "Nome",
+        "namePlaceholder": "Meu agente",
+        "command": "Caminho absoluto do comando",
+        "commandPlaceholder": "/usr/local/bin/meu-agente",
+        "args": "Argumentos (um por linha)",
+        "env": "Variáveis de ambiente (CHAVE=valor, uma por linha)",
+        "cwd": "Diretório de trabalho (opcional)",
+        "create": "Adicionar agente",
+        "cancel": "Cancelar",
+        "warning": "Adicione apenas comandos em que confia. Eles rodam com os privilégios do seu usuário.",
+        "errors": {
+          "name": "Dê um nome ao agente.",
+          "command": "Informe o caminho completo do executável.",
+          "env": "As variáveis devem usar CHAVE=valor."
+        }
+      }
+    },
     "resilience": {
       "title": "Confiabilidade",
       "description": "Timeouts e retentativas automáticas compartilhados por todos os provedores. O retry só acontece antes de qualquer texto ou tool call chegar à tela.",

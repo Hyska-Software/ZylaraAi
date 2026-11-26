@@ -266,6 +266,92 @@
         "models": "Add at least one model id."
       }
     },
+    "acp": {
+      "title": "ACP agents",
+      "description": "External agents speak the Agent Client Protocol, run as local processes, and appear in the same model picker.",
+      "empty": "No ACP agents installed yet.",
+      "browse": "Browse registry",
+      "addCustom": "Add agent manually",
+      "installed": "Installed",
+      "source": { "detected": "Detected on this device" },
+      "enable": "Enable",
+      "disable": "Disable",
+      "rescan": "Rescan device",
+      "models_one": "{{count}} model",
+      "models_other": "{{count}} models",
+      "auth": {
+        "unknown": "Unknown",
+        "ready": "Ready",
+        "auth_required": "Sign-in required",
+        "authenticated": "Authenticated",
+        "signed-in": "Signed in",
+        "error": "Error"
+      },
+      "trust": {
+        "label": "Trust this agent",
+        "warning": "Trusted agents can run tools on this machine. Grant only the capabilities you need.",
+        "fs": "File access",
+        "terminal": "Terminal access",
+        "elicitation": "Interactive requests"
+      },
+      "command": "Command",
+      "args": "Arguments",
+      "envNames": "Environment variables",
+      "lastError": "Last error",
+      "test": "Test agent",
+      "testOk": "Connected · {{count}} models",
+      "testFailed": "Connection failed: {{message}}",
+      "signIn": "Sign in",
+      "signOut": "Sign out",
+      "remove": "Remove agent",
+      "removeTitle": "Remove {{name}}?",
+      "removeBody": "The agent and its local installation are removed, and its models disappear from the picker.",
+      "removeConfirm": "Remove",
+      "cancel": "Cancel",
+      "toasts": {
+        "installed": "{{name}} installed",
+        "added": "{{name}} added",
+        "removed": "{{name}} removed",
+        "trusted": "Trust settings updated for {{name}}",
+        "failed": "{{message}}"
+      },
+      "registry": {
+        "title": "ACP Registry",
+        "description": "Install an agent from the official registry. Review what will run before consenting.",
+        "search": "Search agents",
+        "searchPlaceholder": "Search by name or id…",
+        "empty": "No agent matches \"{{query}}\".",
+        "refresh": "Refresh registry",
+        "license": "License: {{license}}",
+        "repository": "Repository",
+        "homepage": "Website",
+        "supported": "Available on this platform",
+        "unsupported": "Not available on this platform",
+        "install": "Install",
+        "installed": "Installed",
+        "consent": "I reviewed the command, arguments and environment variables this agent will run, and I accept them.",
+        "installReason": "Reason: {{reason}}"
+      },
+      "custom": {
+        "title": "Add ACP agent",
+        "description": "Connect a local ACP executable directly. Nothing is downloaded from a registry.",
+        "name": "Name",
+        "namePlaceholder": "My agent",
+        "command": "Absolute command path",
+        "commandPlaceholder": "/usr/local/bin/my-agent",
+        "args": "Arguments (one per line)",
+        "env": "Environment variables (KEY=value, one per line)",
+        "cwd": "Working directory (optional)",
+        "create": "Add agent",
+        "cancel": "Cancel",
+        "warning": "Only add commands you trust. They run with your user privileges.",
+        "errors": {
+          "name": "Give the agent a name.",
+          "command": "Give the full path to the executable.",
+          "env": "Environment entries must use KEY=value."
+        }
+      }
+    },
     "resilience": {
       "title": "Reliability",
       "description": "Deadlines and automatic retries shared by every provider. Retries only happen before any text or tool call reaches the screen.",

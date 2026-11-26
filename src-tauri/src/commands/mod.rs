@@ -2,6 +2,7 @@
 //! module is owned by one subsystem.
 
 pub mod agents;
+pub mod acp;
 pub mod agent_hooks;
 pub mod browser;
 pub mod channels;

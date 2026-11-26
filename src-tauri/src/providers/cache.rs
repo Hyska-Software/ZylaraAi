@@ -234,6 +234,19 @@ fn protocol_defaults(
             // OpenCode gateway may still report its own `cache_write_*`.
             reports_write: opencode_gateway,
         },
+        // ACP agents own their context/cache strategy; Zylara never injects
+        // wire cache fields into their requests.
+        WireProtocol::Acp => CacheCapabilities {
+            mode: CacheMode::None,
+            min_tokens: None,
+            block_tokens: 1,
+            ttl_options: &[],
+            supports_key: false,
+            supports_retention: false,
+            supports_explicit_breakpoints: false,
+            reports_read: false,
+            reports_write: false,
+        },
     }
 }
 
@@ -423,6 +436,7 @@ pub fn plan_with_caps(
         }
         // Gemini has only the implicit cache in the `generateContent` path.
         WireProtocol::Google => None,
+        WireProtocol::Acp => None,
     }
 }
 
@@ -575,6 +589,7 @@ pub fn apply(protocol: WireProtocol, plan: Option<&CachePlan>, body: &mut Value)
         WireProtocol::OpenaiChat | WireProtocol::OpenaiResponses => apply_openai(plan, body),
         // Gemini implicit cache: no request field to add.
         WireProtocol::Google => {}
+        WireProtocol::Acp => {}
     }
 }
 
@@ -769,6 +784,7 @@ pub fn normalize_usage(protocol: WireProtocol, provider_id: &str, raw: &Value) -
             normalize_openai(protocol, usage, gateway)
         }
         WireProtocol::Google => normalize_google(usage, gateway),
+        WireProtocol::Acp => normalize_openai(protocol, usage, gateway),
     }
 }
 
@@ -1287,6 +1303,9 @@ fn wire_segments<'a>(
                     segments.push((SegmentKind::Message, Cow::Borrowed(content)));
                 }
             }
+        }
+        WireProtocol::Acp => {
+            // ACP agents do not expose a neutral wire body; no cache segments.
         }
     }
     segments

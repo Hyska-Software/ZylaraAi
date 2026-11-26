@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS agents (
   workspace_id      TEXT,
   permission_mode   TEXT NOT NULL DEFAULT 'edit',
   docker_image      TEXT,
+  acp_agent_id      TEXT,
   computer_environment TEXT NOT NULL DEFAULT 'auto',
   archived_at       INTEGER,
   created_at        INTEGER NOT NULL,
@@ -796,6 +797,70 @@ CREATE TABLE IF NOT EXISTS custom_providers (
   created_at         INTEGER NOT NULL,
   updated_at         INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS acp_agents (
+  id TEXT PRIMARY KEY,
+  registry_id TEXT,
+  name TEXT NOT NULL,
+  version TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  homepage TEXT, repository TEXT, license TEXT,
+  icon_path TEXT,
+  kind TEXT NOT NULL DEFAULT 'manual',
+  source TEXT NOT NULL DEFAULT 'registry',
+  command TEXT NOT NULL,
+  args_json TEXT NOT NULL DEFAULT '[]',
+  env_json TEXT NOT NULL DEFAULT '{}',
+  env_secret_names_json TEXT NOT NULL DEFAULT '[]',
+  install_dir TEXT,
+  sha256 TEXT,
+  trusted INTEGER NOT NULL DEFAULT 1,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  supports_fs INTEGER NOT NULL DEFAULT 1,
+  supports_terminal INTEGER NOT NULL DEFAULT 1,
+  supports_elicitation INTEGER NOT NULL DEFAULT 1,
+  thinking_config_json TEXT NOT NULL DEFAULT '{}',
+  auth_state TEXT NOT NULL DEFAULT 'unknown',
+  auth_hint TEXT,
+  last_error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS acp_sessions (
+  conversation_id TEXT NOT NULL,
+  provider_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  protocol_version INTEGER NOT NULL DEFAULT 1,
+  cwd TEXT NOT NULL DEFAULT '',
+  config_state_json TEXT NOT NULL DEFAULT '{}',
+  capabilities_json TEXT NOT NULL DEFAULT '{}',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (conversation_id, provider_id)
+);
+CREATE TABLE IF NOT EXISTS acp_models (
+  provider_id TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  options_json TEXT NOT NULL DEFAULT '{}',
+  discovered_at INTEGER NOT NULL,
+  PRIMARY KEY (provider_id, model_id)
+);
+CREATE TABLE IF NOT EXISTS acp_registry_cache (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS acp_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id TEXT,
+  provider_id TEXT,
+  kind TEXT NOT NULL,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_acp_models_provider ON acp_models(provider_id);
 CREATE TABLE IF NOT EXISTS plugin_store_cache (
   key                TEXT PRIMARY KEY,
   etag               TEXT,
@@ -2966,6 +3031,13 @@ impl Db {
         migrate_workspaces_schema(conn)?;
         // Avatares: emoji legado vira `avatar_json` e a coluna antiga é removida.
         migrate_agents_avatar_schema(conn)?;
+        // ACP: personas can pin an external agent. Additive for existing databases.
+        ensure_column(
+            conn,
+            "agents",
+            "acp_agent_id",
+            "ALTER TABLE agents ADD COLUMN acp_agent_id TEXT",
+        )?;
         // Biblioteca: `favorite` + `conversation_id` nullable (uploads do usuário).
         migrate_artifacts_schema(conn)?;
         // Canais: anexos por mensagem (coluna JSON aditiva).
@@ -2977,10 +3049,290 @@ impl Db {
         migrate_cache_state_schema(conn)?;
         // Compactação: resumos locais e payloads nativos com a rota que os gerou.
         migrate_session_summaries_schema(conn)?;
+        // One-time ACP default change: agents installed before capabilities were
+        // enabled by default get all four switches on. Later user changes are
+        // preserved because the marker prevents this from running again.
+        let defaults_applied: std::result::Result<String, rusqlite::Error> = conn.query_row(
+            "SELECT value FROM meta WHERE key='acp_defaults_v1'",
+            [],
+            |row| row.get(0),
+        );
+        if defaults_applied.is_err() {
+            conn.execute_batch(
+                "UPDATE acp_agents SET trusted=1, supports_fs=1, supports_terminal=1,
+                        supports_elicitation=1;
+                 INSERT OR REPLACE INTO meta(key, value) VALUES ('acp_defaults_v1', '1');",
+            )?;
+        }
+        ensure_column(
+            conn,
+            "acp_agents",
+            "source",
+            "ALTER TABLE acp_agents ADD COLUMN source TEXT NOT NULL DEFAULT 'registry'",
+        )?;
+        ensure_column(
+            conn,
+            "acp_agents",
+            "thinking_config_json",
+            "ALTER TABLE acp_agents ADD COLUMN thinking_config_json TEXT NOT NULL DEFAULT '{}'",
+        )?;
         // Mensagens `streaming` de um processo morto: preserva o parcial e
         // fecha como canceladas (best-effort: falha não impede o boot).
         if let Err(error) = Self::recover_interrupted_messages(conn) {
             eprintln!("zylara: falha ao reconciliar mensagens interrompidas: {error:#}");
+        }
+        Ok(())
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* ACP agents, sessions and discovered models                          */
+    /* ------------------------------------------------------------------ */
+
+    pub fn acp_agents(&self) -> Result<Vec<crate::acp::AcpAgentRow>> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT id, registry_id, name, version, description, homepage, repository, license,
+                    icon_path, kind, command, args_json, env_json, env_secret_names_json,
+                    install_dir, sha256, trusted, enabled, supports_fs, supports_terminal,
+                    supports_elicitation, auth_state, auth_hint, last_error, created_at, updated_at, source, thinking_config_json
+             FROM acp_agents ORDER BY name",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(crate::acp::AcpAgentRow {
+                id: row.get(0)?,
+                registry_id: row.get(1)?,
+                name: row.get(2)?,
+                version: row.get(3)?,
+                description: row.get(4)?,
+                homepage: row.get(5)?,
+                repository: row.get(6)?,
+                license: row.get(7)?,
+                icon_path: row.get(8)?,
+                kind: row.get(9)?,
+                command: row.get(10)?,
+                args_json: row.get(11)?,
+                env_json: row.get(12)?,
+                env_secret_names_json: row.get(13)?,
+                install_dir: row.get(14)?,
+                sha256: row.get(15)?,
+                trusted: row.get::<_, i64>(16)? != 0,
+                enabled: row.get::<_, i64>(17)? != 0,
+                supports_fs: row.get::<_, i64>(18)? != 0,
+                supports_terminal: row.get::<_, i64>(19)? != 0,
+                supports_elicitation: row.get::<_, i64>(20)? != 0,
+                auth_state: row.get(21)?,
+                auth_hint: row.get(22)?,
+                last_error: row.get(23)?,
+                created_at: row.get(24)?,
+                updated_at: row.get(25)?,
+                source: row.get(26)?,
+                thinking_config_json: row.get(27)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, rusqlite::Error>>()
+            .map_err(anyhow::Error::from)
+    }
+
+    pub fn acp_agent(&self, id: &str) -> Result<Option<crate::acp::AcpAgentRow>> {
+        Ok(self
+            .acp_agents()?
+            .into_iter()
+            .find(|agent| agent.id == id))
+    }
+
+    pub fn acp_agent_save(&self, row: &crate::acp::AcpAgentRow) -> Result<()> {
+        let conn = self.connection();
+        conn.execute(
+            "INSERT INTO acp_agents (
+                id, registry_id, name, version, description, homepage, repository, license,
+                icon_path, kind, command, args_json, env_json, env_secret_names_json,
+                install_dir, sha256, trusted, enabled, supports_fs, supports_terminal,
+                supports_elicitation, auth_state, auth_hint, last_error, created_at, updated_at, source, thinking_config_json
+             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25,?26,?27,?28)
+             ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name, version=excluded.version, description=excluded.description,
+                homepage=excluded.homepage, repository=excluded.repository, license=excluded.license,
+                icon_path=excluded.icon_path, kind=excluded.kind, command=excluded.command,
+                args_json=excluded.args_json, env_json=excluded.env_json,
+                env_secret_names_json=excluded.env_secret_names_json, install_dir=excluded.install_dir,
+                sha256=excluded.sha256, trusted=excluded.trusted, enabled=excluded.enabled,
+                supports_fs=excluded.supports_fs, supports_terminal=excluded.supports_terminal,
+                supports_elicitation=excluded.supports_elicitation, auth_state=excluded.auth_state,
+                auth_hint=excluded.auth_hint, last_error=excluded.last_error, updated_at=excluded.updated_at,
+                source=excluded.source, thinking_config_json=excluded.thinking_config_json",
+            rusqlite::params![
+                row.id, row.registry_id, row.name, row.version, row.description, row.homepage,
+                row.repository, row.license, row.icon_path, row.kind, row.command, row.args_json,
+                row.env_json, row.env_secret_names_json, row.install_dir, row.sha256,
+                row.trusted as i64, row.enabled as i64, row.supports_fs as i64,
+                row.supports_terminal as i64, row.supports_elicitation as i64, row.auth_state,
+                row.auth_hint, row.last_error, row.created_at, row.updated_at, row.source,
+                row.thinking_config_json,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn acp_agent_delete(&self, id: &str) -> Result<bool> {
+        let conn = self.connection();
+        let removed = conn.execute("DELETE FROM acp_agents WHERE id=?1", rusqlite::params![id])?;
+        let _ = conn.execute("DELETE FROM acp_models WHERE provider_id=?1", rusqlite::params![id]);
+        let _ = conn.execute("DELETE FROM acp_sessions WHERE provider_id=?1", rusqlite::params![id]);
+        Ok(removed > 0)
+    }
+
+    pub fn acp_session(
+        &self,
+        conversation_id: &str,
+        provider_id: &str,
+    ) -> Result<Option<crate::acp::AcpSessionRow>> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT conversation_id, provider_id, session_id, protocol_version, cwd,
+                    config_state_json, capabilities_json, created_at, updated_at
+             FROM acp_sessions WHERE conversation_id=?1 AND provider_id=?2",
+        )?;
+        let mut rows = stmt.query(rusqlite::params![conversation_id, provider_id])?;
+        match rows.next()? {
+            None => Ok(None),
+            Some(row) => Ok(Some(crate::acp::AcpSessionRow {
+                conversation_id: row.get(0)?,
+                provider_id: row.get(1)?,
+                session_id: row.get(2)?,
+                protocol_version: row.get(3)?,
+                cwd: row.get(4)?,
+                config_state_json: row.get(5)?,
+                capabilities_json: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })),
+        }
+    }
+
+    pub fn acp_session_save(&self, row: &crate::acp::AcpSessionRow) -> Result<()> {
+        let conn = self.connection();
+        conn.execute(
+            "INSERT INTO acp_sessions (
+                conversation_id, provider_id, session_id, protocol_version, cwd,
+                config_state_json, capabilities_json, created_at, updated_at
+             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
+             ON CONFLICT(conversation_id, provider_id) DO UPDATE SET
+                session_id=excluded.session_id, protocol_version=excluded.protocol_version,
+                cwd=excluded.cwd, config_state_json=excluded.config_state_json,
+                capabilities_json=excluded.capabilities_json, updated_at=excluded.updated_at",
+            rusqlite::params![
+                row.conversation_id, row.provider_id, row.session_id, row.protocol_version,
+                row.cwd, row.config_state_json, row.capabilities_json, row.created_at,
+                row.updated_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn acp_session_delete(&self, conversation_id: &str, provider_id: &str) -> Result<()> {
+        let conn = self.connection();
+        conn.execute(
+            "DELETE FROM acp_sessions WHERE conversation_id=?1 AND provider_id=?2",
+            rusqlite::params![conversation_id, provider_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn acp_models(&self, provider_id: &str) -> Result<Vec<crate::acp::AcpModelRow>> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare(
+            "SELECT model_id, name, description, is_default, options_json
+             FROM acp_models WHERE provider_id=?1 ORDER BY is_default DESC, name",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![provider_id], |row| {
+            Ok(crate::acp::AcpModelRow {
+                model_id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                is_default: row.get::<_, i64>(3)? != 0,
+                options_json: row.get(4)?,
+            })
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, rusqlite::Error>>()
+            .map_err(anyhow::Error::from)
+    }
+
+    pub fn acp_models_replace(
+        &self,
+        provider_id: &str,
+        models: &[crate::acp::AcpModelRow],
+    ) -> Result<()> {
+        let mut conn = self.connection();
+        let tx = conn.transaction()?;
+        tx.execute(
+            "DELETE FROM acp_models WHERE provider_id=?1",
+            rusqlite::params![provider_id],
+        )?;
+        for model in models {
+            tx.execute(
+                "INSERT INTO acp_models (provider_id, model_id, name, description, is_default, options_json, discovered_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7)",
+                rusqlite::params![
+                    provider_id, model.model_id, model.name, model.description,
+                    model.is_default as i64, model.options_json, crate::domain::now_ms(),
+                ],
+            )?;
+        }
+        tx.commit().map_err(anyhow::Error::from)
+    }
+
+    pub fn acp_cache_get(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.connection();
+        let mut stmt = conn.prepare("SELECT value FROM acp_registry_cache WHERE key=?1")?;
+        let mut rows = stmt.query(rusqlite::params![key])?;
+        match rows.next()? {
+            None => Ok(None),
+            Some(row) => Ok(Some(row.get(0)?)),
+        }
+    }
+
+    pub fn acp_cache_set(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.connection();
+        conn.execute(
+            "INSERT INTO acp_registry_cache (key, value, fetched_at) VALUES (?1,?2,?3)
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value, fetched_at=excluded.fetched_at",
+            rusqlite::params![key, value, crate::domain::now_ms()],
+        )?;
+        Ok(())
+    }
+
+    pub fn acp_event_append(
+        &self,
+        conversation_id: Option<&str>,
+        provider_id: Option<&str>,
+        kind: &str,
+        payload: serde_json::Value,
+    ) -> Result<()> {
+        let conn = self.connection();
+        conn.execute(
+            "INSERT INTO acp_events (conversation_id, provider_id, kind, payload_json, created_at)
+             VALUES (?1,?2,?3,?4,?5)",
+            rusqlite::params![
+                conversation_id,
+                provider_id,
+                kind,
+                payload.to_string(),
+                crate::domain::now_ms(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn acp_clear_all(&self) -> Result<()> {
+        let conn = self.connection();
+        for table in [
+            "acp_agents",
+            "acp_sessions",
+            "acp_models",
+            "acp_registry_cache",
+            "acp_events",
+        ] {
+            conn.execute(&format!("DELETE FROM {table}"), [])?;
         }
         Ok(())
     }

@@ -12,6 +12,7 @@
 //! - `process_env`: environment hygiene for child processes (loader/AppImage/git)
 
 mod agents;
+mod acp;
 mod catalog;
 mod commands;
 mod computer;
@@ -59,16 +60,6 @@ pub fn run() {
         return;
     }
 
-    // A second launch never starts another app: it wakes the running instance,
-    // which is the only way back while the window is hidden in the tray.
-    if crate::tray::another_instance_running() {
-        if crate::tray::request_activation() {
-            return;
-        }
-        // Never leave the user with nothing: boot a window instead. The
-        // single-instance plugin still forwards and exits when it can.
-        eprintln!("zylara: another instance is running but could not be signalled");
-    }
 
     run_app(context);
 }
@@ -88,6 +79,7 @@ pub(crate) fn begin_graceful_exit(app_handle: &tauri::AppHandle) {
             std::time::Duration::from_millis(2_000),
         )
         .await;
+        crate::acp::client::close_all().await;
         app_handle.exit(0);
     });
 }
@@ -152,6 +144,12 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             let state = crate::state::AppState::init(app.handle())
                 .expect("failed to initialize Zylara state");
             app.manage(state);
+            // Discover ACP agents already installed on the device and probe
+            // their login state in the background; failures are non-fatal.
+            let acp_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                crate::acp::detect::boot_scan(&acp_handle).await;
+            });
             let settings = crate::config::load_settings(app.handle());
             if let Err(error) = crate::tray::init(app.handle(), &settings) {
                 // A missing notification area must not prevent the app from
@@ -293,6 +291,20 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             commands::browser::browser_take_control,
             commands::diagnostics::platform_diagnostics,
             commands::models::get_catalog,
+            commands::acp::acp_list_registry,
+            commands::acp::acp_refresh_registry,
+            commands::acp::acp_install_agent,
+            commands::acp::acp_add_custom_agent,
+            commands::acp::acp_remove_agent,
+            commands::acp::acp_set_trusted,
+            commands::acp::acp_auth_status,
+            commands::acp::acp_auth,
+            commands::acp::acp_test_agent,
+            commands::acp::acp_list_sessions,
+            commands::acp::acp_close_session,
+            commands::acp::acp_stderr,
+            commands::acp::acp_enable_agent,
+            commands::acp::acp_rescan_devices,
             commands::models::save_custom_provider,
             commands::models::delete_custom_provider,
             commands::models::refresh_catalog,
@@ -574,7 +586,9 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             if let Some(state) = app_handle.try_state::<state::AppState>() {
                 state.terminals.close_all();
             }
-            crate::computer::browser::global().map(|browser| browser.close_all());
+            tauri::async_runtime::spawn(async {
+                crate::acp::client::close_all().await;
+            });
         }
         _ => {}
     });

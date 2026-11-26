@@ -14,6 +14,8 @@ export interface ProviderGlyphProps {
   title?: string;
   /** Declarative icon name (plugin/user provider); falls back to initials. */
   icon?: string | null;
+  /** Validated monochrome SVG supplied by the ACP Registry (installed agents). */
+  iconSvg?: string | null;
 }
 
 /**
@@ -21,6 +23,23 @@ export interface ProviderGlyphProps {
  * provider name initials when the collection has no mark for it. Always
  * decorative: the provider name is rendered next to it.
  */
+function safeInlineSvg(svg: string | null | undefined): string | null {
+  if (!svg) return null;
+  const lower = svg.toLowerCase();
+  if (
+    !lower.includes('<svg')
+    || lower.includes('<script')
+    || lower.includes('javascript:')
+    || lower.includes('foreignobject')
+    || lower.includes('onload=')
+    || lower.includes('onerror=')
+    || svg.includes('#')
+  ) {
+    return null;
+  }
+  return svg;
+}
+
 export function ProviderGlyph({
   providerId,
   name,
@@ -28,12 +47,31 @@ export function ProviderGlyph({
   className,
   title,
   icon: iconName,
+  iconSvg,
 }: ProviderGlyphProps) {
   const icon = providerIconFor(providerId);
+  const inlineSvg = safeInlineSvg(iconSvg);
   // A contributed icon (lucide name from `contributes.providers[].icon` or a
   // user-defined provider) wins over the bundled brand map.
   const Contributed = iconName ? pluginIcon(iconName) : null;
 
+
+  if (inlineSvg) {
+    return (
+      <span
+        aria-hidden
+        title={title}
+        style={{ width: size, height: size }}
+        className={cn(
+          'inline-flex shrink-0 select-none items-center justify-center text-foreground',
+          '[&>svg]:block [&>svg]:h-full [&>svg]:w-full',
+          className,
+        )}
+        // Validated twice: Registry CI rules plus backend/frontend allowlist.
+        dangerouslySetInnerHTML={{ __html: inlineSvg }}
+      />
+    );
+  }
   if (Contributed) {
     return (
       <span

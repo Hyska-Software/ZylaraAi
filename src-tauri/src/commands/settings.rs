@@ -124,6 +124,9 @@ pub fn set_provider_key(
                 &[("provider_id", &provider_id)],
             )
         })?;
+    if matches!(provider.transport, crate::catalog::ProviderTransport::Acp) {
+        return Err("ACP_AGENT_OWNED_AUTH".to_string());
+    }
     let key = normalize_provider_key(&provider, key)?;
     // `config` rewrites the whole v2 file, so the OAuth block is preserved.
     config::set_api_key(&app, &provider_id, key.as_deref()).map_err(to_error)?;
@@ -238,6 +241,8 @@ pub fn reset_app_data(app: AppHandle, state: State<'_, AppState>) -> Result<(), 
     // logins e refreshes pendentes: nada recria credenciais no meio do reset (N4).
     config::reset_credentials_with(&app, || state.cancel_oauth()).map_err(to_error)?;
     state.clear_dynamic_models();
+    let _ = crate::commands::acp::clear_state(&state);
+    let _ = clear_dir(&config::data_dir(&app).map_err(to_error)?.join("acp"));
     let data_dir = config::data_dir(&app).map_err(to_error)?;
     for sub in ["attachments", "artifacts", "themes"] {
         clear_dir(&data_dir.join(sub)).map_err(|error| {
@@ -434,6 +439,9 @@ pub async fn validate_provider(
                 &[("provider_id", &provider_id)],
             )
         })?;
+    if matches!(provider.transport, crate::catalog::ProviderTransport::Acp) {
+        return crate::commands::acp::acp_test_agent(provider_id, app, state).await;
+    }
     let url = models_endpoint(&provider);
 
     // Credential order (PLAN §2.4): a usable OAuth registration (plan usage +
