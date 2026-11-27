@@ -1,10 +1,19 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, Copy, FileExclamationPoint } from 'lucide-react';
 import { Highlight } from 'prism-react-renderer';
 import { Spinner } from '@/components/ui';
 import { parseUnifiedDiff, type DiffLine, type DiffLineKind } from '@/lib/diff';
+import {
+  normalizeEditorFontFamily,
+  normalizeEditorFontSize,
+  normalizeEditorLineHeight,
+  normalizeEditorTabSize,
+  normalizeEditorTheme,
+} from '@/lib/editorSettings';
 import { prism, SYNTAX_THEME } from '@/lib/highlight';
+import { useAppStore, useThemeStore } from '@/lib/store';
+import { editorThemeStyle } from '@/lib/theme/editorTheme';
 import { cn, copyText } from '@/lib/utils';
 import { toast } from 'sonner';
 import { languageForPath } from './FilePreview';
@@ -44,6 +53,29 @@ export function DiffView({ path, diff, loading, error, binary = false, className
   const [copied, setCopied] = useState(false);
   const [expandedHunks, setExpandedHunks] = useState<ReadonlySet<number>>(() => new Set());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settings = useAppStore((state) => state.settings);
+  const activeTheme = useThemeStore((state) =>
+    state.themes.find((entry) => entry.id === state.activeId),
+  );
+  const editorTheme = normalizeEditorTheme(settings.editorTheme);
+  const editorFontSize = normalizeEditorFontSize(settings.editorFontSize);
+  const editorLineHeight = normalizeEditorLineHeight(settings.editorLineHeight);
+  const editorTabSize = normalizeEditorTabSize(settings.editorTabSize);
+  const editorFontFamily = normalizeEditorFontFamily(settings.editorFontFamily);
+  const showLineNumbers = settings.editorLineNumbers !== false;
+  const viewerStyle = useMemo(
+    () => editorThemeStyle(activeTheme, editorTheme),
+    [activeTheme, editorTheme],
+  );
+  const codeStyle = useMemo<CSSProperties>(
+    () => ({
+      fontSize: `${editorFontSize}px`,
+      lineHeight: editorLineHeight,
+      tabSize: editorTabSize,
+      ...(editorFontFamily ? { fontFamily: editorFontFamily } : {}),
+    }),
+    [editorFontSize, editorLineHeight, editorTabSize, editorFontFamily],
+  );
 
   const parsed = useMemo(() => parseUnifiedDiff(diff ?? ''), [diff]);
   const isBinary = binary || parsed.binary;
@@ -95,7 +127,7 @@ export function DiffView({ path, diff, loading, error, binary = false, className
   };
 
   return (
-    <div className={cn('flex h-full min-h-0 flex-col', className)}>
+    <div className={cn('flex h-full min-h-0 flex-col', className)} style={viewerStyle}>
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
         <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground" title={path}>
           {path}
@@ -158,7 +190,8 @@ export function DiffView({ path, diff, loading, error, binary = false, className
         <div
           role="group"
           aria-label={t('code:diff.groupAria', { path })}
-          className="min-h-0 flex-1 overflow-auto py-1 font-mono text-[12px] leading-[1.7]"
+          className="min-h-0 flex-1 overflow-auto py-1 font-mono"
+          style={codeStyle}
         >
           {parsed.meta.map((line, index) => (
             <div key={`meta-${index}`} className="truncate px-3 text-[11.5px] text-foreground-subtle">
@@ -187,6 +220,7 @@ export function DiffView({ path, diff, loading, error, binary = false, className
                     key={`${hunkIndex}-${lineIndex}`}
                     line={line}
                     language={highlightEnabled ? language : 'text'}
+                    showLineNumbers={showLineNumbers}
                   />
                 ))}
 
@@ -224,9 +258,11 @@ const LINE_STYLES: Record<DiffLineKind, string> = {
 const DiffLineRow = memo(function DiffLineRow({
   line,
   language,
+  showLineNumbers,
 }: {
   line: DiffLine;
   language: string;
+  showLineNumbers: boolean;
 }) {
   const numberClass =
     'w-10 shrink-0 select-none pr-2 text-right text-[10.5px] tabular-nums text-foreground-subtle';
@@ -242,12 +278,16 @@ const DiffLineRow = memo(function DiffLineRow({
 
   return (
     <div className={cn('flex min-h-[20px] items-start', LINE_STYLES[line.kind])}>
-      <span aria-hidden className={numberClass}>
-        {line.oldNumber ?? ''}
-      </span>
-      <span aria-hidden className={numberClass}>
-        {line.newNumber ?? ''}
-      </span>
+      {showLineNumbers ? (
+        <>
+          <span aria-hidden className={numberClass}>
+            {line.oldNumber ?? ''}
+          </span>
+          <span aria-hidden className={numberClass}>
+            {line.newNumber ?? ''}
+          </span>
+        </>
+      ) : null}
       <span aria-hidden className="w-4 shrink-0 select-none text-center text-foreground-subtle">
         {prefix}
       </span>

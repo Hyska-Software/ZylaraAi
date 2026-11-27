@@ -5,6 +5,9 @@
  * catalog in `data/catalog.json`). Keep both sides in sync.
  */
 import type { AppLocale } from './i18n/languages';
+import type { EditorThemeMode } from './editorSettings';
+
+export type { EditorThemeMode } from './editorSettings';
 
 /* ------------------------------------------------------------------ */
 /* Catalog                                                             */
@@ -2423,6 +2426,18 @@ export interface Settings {
   terminalFontFamily?: string;
   /** Terminal font size in px (8–32). */
   terminalFontSize?: number;
+  /** File viewer palette: follow the host theme or force a light/dark palette. */
+  editorTheme?: EditorThemeMode;
+  /** Custom font stack for file/diff viewers; empty = the bundled mono stack. */
+  editorFontFamily?: string;
+  /** File/diff viewer font size in px (8–28). */
+  editorFontSize?: number;
+  /** File/diff viewer line height multiplier (1.2–2.2). */
+  editorLineHeight?: number;
+  /** Spaces shown per tab character in file/diff viewers (1–8). */
+  editorTabSize?: number;
+  /** Show the line-number gutter in file/diff viewers. */
+  editorLineNumbers?: boolean;
   includeAttachments: boolean;
   autoTitle: boolean;
   /** Opt-in: permite ao agente executar código (`run_code`). */

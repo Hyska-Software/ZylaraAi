@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import type { Settings } from '@/lib/types';
 
 const utilsMocks = vi.hoisted(() => ({ copyText: vi.fn(async () => true) }));
 const toastMocks = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
@@ -11,6 +12,7 @@ vi.mock('@/lib/utils', async (importOriginal) => {
 });
 vi.mock('sonner', () => ({ toast: toastMocks }));
 
+import { useAppStore } from '@/lib/store';
 import { DiffView } from './DiffView';
 
 const SMALL_DIFF = [
@@ -50,6 +52,17 @@ afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   utilsMocks.copyText.mockResolvedValue(true);
+  useAppStore.setState({
+    settings: {
+      ...useAppStore.getState().settings,
+      editorTheme: 'app',
+      editorFontFamily: '',
+      editorFontSize: 12,
+      editorLineHeight: 1.7,
+      editorTabSize: 2,
+      editorLineNumbers: true,
+    },
+  });
 });
 
 describe('DiffView', () => {
@@ -133,6 +146,50 @@ describe('DiffView', () => {
   it('does not render the diff meta lines as changes', () => {
     render(<DiffView path="src/app.ts" diff={SMALL_DIFF} />);
     expect(screen.queryByText('+4')).toBeNull();
+    expect(screen.getByText('+1')).toBeTruthy();
+  });
+
+  function setEditor(overrides: Partial<Settings>) {
+    useAppStore.setState({
+      settings: { ...useAppStore.getState().settings, ...overrides },
+    });
+  }
+
+  it('applies the persisted typography to the diff group', () => {
+    setEditor({
+      editorFontFamily: 'Fira Code, monospace',
+      editorFontSize: 16,
+      editorLineHeight: 1.8,
+      editorTabSize: 3,
+    });
+
+    render(<DiffView path="src/app.ts" diff={SMALL_DIFF} />);
+    const group = screen.getByRole('group', { name: 'Diff de src/app.ts' }) as HTMLElement;
+
+    expect(group.style.fontSize).toBe('16px');
+    expect(group.style.lineHeight).toBe('1.8');
+    expect(group.style.tabSize).toBe('3');
+    expect(group.style.fontFamily.replaceAll('"', '')).toBe('Fira Code, monospace');
+  });
+
+  it('scopes a forced palette to the diff viewer', () => {
+    setEditor({ editorTheme: 'light' });
+
+    const { container } = render(<DiffView path="src/app.ts" diff={SMALL_DIFF} />);
+    const root = container.firstElementChild as HTMLElement;
+
+    expect(root.style.getPropertyValue('--background')).toBe('#ffffff');
+    expect(root.style.colorScheme).toBe('light');
+  });
+
+  it('hides line numbers but keeps the diff signs', () => {
+    setEditor({ editorLineNumbers: false });
+
+    render(<DiffView path="src/app.ts" diff={SMALL_DIFF} />);
+    const group = screen.getByRole('group', { name: 'Diff de src/app.ts' });
+
+    expect(group.querySelectorAll('.tabular-nums').length).toBe(0);
+    expect(diffLine('src/app.ts', 'const b = 3;').parentElement?.textContent).toContain('+');
     expect(screen.getByText('+1')).toBeTruthy();
   });
 });

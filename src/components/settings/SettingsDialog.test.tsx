@@ -81,6 +81,16 @@ describe('SettingsDialog — aba controlada pelo uiStore (deep-link da paleta)',
     expect(await screen.findByText('Aparência do terminal')).not.toBeNull();
   });
 
+  it('opens the Editor tab with the file viewer settings', async () => {
+    const user = userEvent.setup();
+    render(<SettingsDialog />);
+
+    await user.click(tab('Editor'));
+
+    expect(useUiStore.getState().settingsTab).toBe('editor');
+    expect(await screen.findByText('Visualizador de arquivos')).not.toBeNull();
+  });
+
   it('opens the Experimental tab with the opt-in switches', async () => {
     const user = userEvent.setup();
     render(<SettingsDialog />);

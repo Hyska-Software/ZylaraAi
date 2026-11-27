@@ -89,6 +89,7 @@
     "general": "Tema, idioma y tamaño del texto",
     "themes": "Temas instalados y paquetes",
     "terminal": "Fuente y tamaño del terminal",
+    "editor": "Fuente, tema y números de línea del visor",
     "providers": "Claves de API y estado de los proveedores",
     "model": "Modelo y modo de pensamiento predeterminados",
     "instructions": "Instrucciones del sistema",

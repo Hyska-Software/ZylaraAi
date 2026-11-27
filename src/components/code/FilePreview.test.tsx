@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { WorkspaceFileContent } from '@/lib/types';
+import type { Settings, WorkspaceFileContent } from '@/lib/types';
 
 const utilsMocks = vi.hoisted(() => ({ copyText: vi.fn(async () => true) }));
 const toastMocks = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
@@ -25,7 +25,7 @@ vi.mock('@/lib/pdf', () => ({
   isPdfRenderCancelled: pdfMocks.isPdfRenderCancelled,
 }));
 
-import { useUiStore } from '@/lib/store';
+import { useAppStore, useUiStore } from '@/lib/store';
 import { FilePreview, languageForPath } from './FilePreview';
 
 function content(overrides: Partial<WorkspaceFileContent> = {}): WorkspaceFileContent {
@@ -64,6 +64,17 @@ beforeEach(() => {
   pdfMocks.isPdfRenderCancelled.mockReturnValue(false);
   // Preferência global do workbench (persistida no store).
   useUiStore.setState({ codeFileWrap: false });
+  useAppStore.setState({
+    settings: {
+      ...useAppStore.getState().settings,
+      editorTheme: 'app',
+      editorFontFamily: '',
+      editorFontSize: 12,
+      editorLineHeight: 1.7,
+      editorTabSize: 2,
+      editorLineNumbers: true,
+    },
+  });
 });
 
 describe('FilePreview', () => {
@@ -612,6 +623,61 @@ describe('FilePreview — Markdown', () => {
 
     expect(screen.queryByRole('radiogroup', { name: MD_GROUP })).toBeNull();
     expect(screen.getByLabelText('Conteúdo de src/app.ts')).toBeTruthy();
+  });
+});
+
+describe('FilePreview — Editor settings', () => {
+  function setEditor(overrides: Partial<Settings>) {
+    useAppStore.setState({
+      settings: { ...useAppStore.getState().settings, ...overrides },
+    });
+  }
+
+  it('applies the persisted font family, size, line height and tab width', () => {
+    setEditor({
+      editorFontFamily: 'Fira Code, monospace',
+      editorFontSize: 18,
+      editorLineHeight: 1.9,
+      editorTabSize: 4,
+    });
+
+    render(<FilePreview content={content()} />);
+    const pre = screen.getByLabelText('Conteúdo de src/app.ts') as HTMLPreElement;
+
+    expect(pre.style.fontSize).toBe('18px');
+    expect(pre.style.lineHeight).toBe('1.9');
+    expect(pre.style.tabSize).toBe('4');
+    expect(pre.style.fontFamily.replaceAll('"', '')).toBe('Fira Code, monospace');
+  });
+
+  it('scopes a forced dark palette to the viewer', () => {
+    setEditor({ editorTheme: 'dark' });
+
+    const { container } = render(<FilePreview content={content()} />);
+    const root = container.firstElementChild as HTMLElement;
+
+    expect(root.style.getPropertyValue('--background')).toBe('#17171a');
+    expect(root.style.getPropertyValue('--foreground')).toBe('#ececf1');
+    expect(root.style.colorScheme).toBe('dark');
+  });
+
+  it('hides line numbers but keeps diff markers', () => {
+    setEditor({ editorLineNumbers: false });
+
+    render(
+      <FilePreview
+        content={content({ text: 'const total = 1;\nconst total = 3;\n' })}
+        diff={'@@ -1,2 +1,2 @@\n const total = 1;\n-const total = 2;\n+const total = 3;'}
+      />,
+    );
+    const pre = screen.getByLabelText('Conteúdo de src/app.ts');
+
+    expect(pre.querySelectorAll('.tabular-nums').length).toBe(0);
+    expect(pre.querySelector('[data-diff-deleted]')).toBeTruthy();
+    expect(pre.querySelector('[data-diff-tone="modified"]')?.textContent).toContain(
+      'const total = 3',
+    );
+    expect(screen.getByRole('note', { name: '1 linha removida aqui' })).toBeTruthy();
   });
 });
 

@@ -6,6 +6,7 @@
 import {
   Bot,
   Database,
+  FileCode2,
   FlaskConical,
   Info,
   KeyRound,
@@ -28,6 +29,7 @@ export const SETTINGS_TAB_ICONS: SettingsTabIconMap = {
   themes: Palette,
   design: Wand2,
   terminal: SquareTerminal,
+  editor: FileCode2,
   providers: KeyRound,
   model: Sparkles,
   instructions: ScrollText,

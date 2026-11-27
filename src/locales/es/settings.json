@@ -88,6 +88,55 @@
       "aria": "Tamaño de la fuente del terminal"
     }
   },
+  "editor": {
+    "appearance": {
+      "title": "Visor de archivos",
+      "description": "Tipografía y paleta de las vistas de archivo y diff en el layout Code."
+    },
+    "reading": {
+      "title": "Lectura",
+      "description": "Espaciado, columnas y ajuste de las vistas de archivo y diff."
+    },
+    "theme": {
+      "label": "Tema del visor",
+      "description": "Seguir el tema de la app o forzar una paleta clara/oscura en las vistas de archivo y diff.",
+      "app": "Seguir la app",
+      "light": "Claro",
+      "dark": "Oscuro",
+      "aria": "Tema del visor de archivos"
+    },
+    "fontFamily": {
+      "label": "Familia de la fuente",
+      "description": "Lista CSS de font-family. Déjalo vacío para usar el JetBrains Mono incluido.",
+      "placeholder": "JetBrains Mono Variable",
+      "aria": "Familia de la fuente del visor de archivos"
+    },
+    "fontSize": {
+      "label": "Tamaño de la fuente",
+      "description": "Tamaño de los caracteres en las vistas de archivo y diff.",
+      "aria": "Tamaño de la fuente del visor de archivos"
+    },
+    "lineHeight": {
+      "label": "Altura de línea",
+      "description": "Espaciado entre líneas en las vistas de archivo y diff.",
+      "aria": "Altura de línea del visor de archivos"
+    },
+    "tabSize": {
+      "label": "Ancho de tabulación",
+      "description": "Espacios mostrados para un carácter de tabulación.",
+      "aria": "Ancho de tabulación del visor de archivos"
+    },
+    "lineNumbers": {
+      "label": "Números de línea",
+      "description": "Mostrar la columna de números junto al código.",
+      "aria": "Mostrar números de línea en las vistas de archivo y diff"
+    },
+    "wrap": {
+      "label": "Ajuste de línea",
+      "description": "Ajustar líneas largas en vez de desplazarse horizontalmente. También disponible en la barra del visor.",
+      "aria": "Ajustar líneas largas en las vistas de archivo"
+    }
+  },
   "trayPrompt": {
     "title": "¿Mantener Zylara en segundo plano?",
     "description": "Al cerrar la ventana, Zylara puede permanecer en la bandeja del sistema para que el trabajo de los agentes siga en segundo plano. Puedes cambiarlo más tarde en Ajustes → General.",
@@ -197,6 +246,7 @@
     "themes": "Temas",
     "design": "Diseño",
     "terminal": "Terminal",
+    "editor": "Editor",
     "providers": "Proveedores",
     "model": "Modelo predeterminado",
     "instructions": "Instrucciones",

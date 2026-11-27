@@ -88,6 +88,55 @@
       "aria": "Tamanho da fonte do terminal"
     }
   },
+  "editor": {
+    "appearance": {
+      "title": "Visualizador de arquivos",
+      "description": "Fonte e paleta das visualizações de arquivo e diff no layout Code."
+    },
+    "reading": {
+      "title": "Leitura",
+      "description": "Espaçamento, colunas e quebra das visualizações de arquivo e diff."
+    },
+    "theme": {
+      "label": "Tema do visualizador",
+      "description": "Siga o tema do app ou force uma paleta clara/escura nas visualizações de arquivo e diff.",
+      "app": "Seguir o app",
+      "light": "Claro",
+      "dark": "Escuro",
+      "aria": "Tema do visualizador de arquivos"
+    },
+    "fontFamily": {
+      "label": "Família da fonte",
+      "description": "Lista CSS de font-family. Deixe vazio para usar o JetBrains Mono embutido.",
+      "placeholder": "JetBrains Mono Variable",
+      "aria": "Família da fonte do visualizador de arquivos"
+    },
+    "fontSize": {
+      "label": "Tamanho da fonte",
+      "description": "Tamanho dos caracteres nas visualizações de arquivo e diff.",
+      "aria": "Tamanho da fonte do visualizador de arquivos"
+    },
+    "lineHeight": {
+      "label": "Altura da linha",
+      "description": "Espaçamento entre linhas nas visualizações de arquivo e diff.",
+      "aria": "Altura da linha do visualizador de arquivos"
+    },
+    "tabSize": {
+      "label": "Largura da tabulação",
+      "description": "Espaços exibidos para um caractere de tabulação.",
+      "aria": "Largura da tabulação do visualizador de arquivos"
+    },
+    "lineNumbers": {
+      "label": "Números de linha",
+      "description": "Mostrar a coluna de números ao lado do código.",
+      "aria": "Mostrar números de linha nas visualizações de arquivo e diff"
+    },
+    "wrap": {
+      "label": "Quebra de linha",
+      "description": "Quebrar linhas longas em vez de rolar horizontalmente. Também disponível na barra do visualizador.",
+      "aria": "Quebrar linhas longas nas visualizações de arquivo"
+    }
+  },
   "trayPrompt": {
     "title": "Manter o Zylara rodando em segundo plano?",
     "description": "Ao fechar a janela, o Zylara pode continuar na bandeja do sistema para que os trabalhos dos agentes sigam em segundo plano. Você pode mudar isso depois em Configurações → Geral.",
@@ -197,6 +246,7 @@
     "themes": "Temas",
     "design": "Design",
     "terminal": "Terminal",
+    "editor": "Editor",
     "providers": "Provedores",
     "model": "Modelo padrão",
     "instructions": "Instruções",

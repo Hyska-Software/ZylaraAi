@@ -1478,6 +1478,18 @@ pub struct Settings {
     pub terminal_font_family: String,
     /// Integrated terminal font size in px (TERMINAL_FONT_SIZE_MIN..=MAX).
     pub terminal_font_size: u32,
+    /// File viewer palette: `app`, `light` or `dark`.
+    pub editor_theme: String,
+    /// Custom CSS font stack for file/diff viewers; empty = bundled mono stack.
+    pub editor_font_family: String,
+    /// File/diff viewer font size in px (EDITOR_FONT_SIZE_MIN..=MAX).
+    pub editor_font_size: u32,
+    /// File/diff viewer line height multiplier (EDITOR_LINE_HEIGHT_MIN..=MAX).
+    pub editor_line_height: f32,
+    /// Spaces shown per tab character in file/diff viewers (1..=8).
+    pub editor_tab_size: u32,
+    /// Show the line-number gutter in file/diff viewers.
+    pub editor_line_numbers: bool,
     pub include_attachments: bool,
     pub auto_title: bool,
     /// Opt-in: permite ao agente executar código (`run_code`) no computador.
@@ -1670,6 +1682,12 @@ impl Default for Settings {
             font_scale: 1.0,
             terminal_font_family: String::new(),
             terminal_font_size: default_terminal_font_size(),
+            editor_theme: "app".into(),
+            editor_font_family: String::new(),
+            editor_font_size: 12,
+            editor_line_height: 1.7,
+            editor_tab_size: 2,
+            editor_line_numbers: true,
             include_attachments: true,
             auto_title: true,
             code_execution_enabled: false,

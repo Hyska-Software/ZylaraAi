@@ -25,6 +25,7 @@ import {
 import { AboutTab } from './AboutTab';
 import { AgentsTab } from './AgentsTab';
 import { DataTab } from './DataTab';
+import { EditorTab } from './EditorTab';
 import { ExperimentalTab } from './ExperimentalTab';
 import { GeneralTab } from './GeneralTab';
 import { InstructionsTab } from './InstructionsTab';
@@ -179,6 +180,9 @@ export function SettingsDialog() {
                   </TabsContent>
                   <TabsContent value="terminal">
                     <TerminalTab />
+                  </TabsContent>
+                  <TabsContent value="editor">
+                    <EditorTab />
                   </TabsContent>
                   <TabsContent value="providers">
                     <ProvidersTab />

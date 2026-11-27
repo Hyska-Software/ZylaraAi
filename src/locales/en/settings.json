@@ -88,6 +88,55 @@
       "aria": "Terminal font size"
     }
   },
+  "editor": {
+    "appearance": {
+      "title": "File viewer",
+      "description": "Typography and palette of file and diff views in the Code layout."
+    },
+    "reading": {
+      "title": "Reading",
+      "description": "Line spacing, gutters and wrapping for file and diff views."
+    },
+    "theme": {
+      "label": "Viewer theme",
+      "description": "Follow the app theme or force a light/dark palette for file and diff views.",
+      "app": "Follow app",
+      "light": "Light",
+      "dark": "Dark",
+      "aria": "File viewer theme"
+    },
+    "fontFamily": {
+      "label": "Font family",
+      "description": "CSS font-family list. Leave empty to use the bundled JetBrains Mono stack.",
+      "placeholder": "JetBrains Mono Variable",
+      "aria": "File viewer font family"
+    },
+    "fontSize": {
+      "label": "Font size",
+      "description": "Character size in file and diff views.",
+      "aria": "File viewer font size"
+    },
+    "lineHeight": {
+      "label": "Line height",
+      "description": "Spacing between lines in file and diff views.",
+      "aria": "File viewer line height"
+    },
+    "tabSize": {
+      "label": "Tab width",
+      "description": "Spaces shown for a tab character.",
+      "aria": "File viewer tab width"
+    },
+    "lineNumbers": {
+      "label": "Line numbers",
+      "description": "Show the line-number gutter next to the source.",
+      "aria": "Show line numbers in file and diff views"
+    },
+    "wrap": {
+      "label": "Word wrap",
+      "description": "Wrap long lines instead of scrolling horizontally. Also available in the viewer toolbar.",
+      "aria": "Wrap long lines in file views"
+    }
+  },
   "trayPrompt": {
     "title": "Keep Zylara running in the background?",
     "description": "When you close the window, Zylara can stay in the system tray so background agent work keeps going. You can change this later in Settings → General.",
@@ -197,6 +246,7 @@
     "themes": "Themes",
     "design": "Design",
     "terminal": "Terminal",
+    "editor": "Editor",
     "providers": "Providers",
     "model": "Default model",
     "instructions": "Instructions",

@@ -1,4 +1,12 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight,
@@ -14,8 +22,16 @@ import {
 import { Badge, Button, IconButton, SegmentedControl, Spinner, Tooltip } from '@/components/ui';
 import { Markdown } from '@/components/chat/Markdown';
 import { buildInlineDiff, type InlineDiff } from '@/lib/diff';
+import {
+  normalizeEditorFontFamily,
+  normalizeEditorFontSize,
+  normalizeEditorLineHeight,
+  normalizeEditorTabSize,
+  normalizeEditorTheme,
+} from '@/lib/editorSettings';
 import { languageLabel, normalizeLanguage, prism, SYNTAX_THEME } from '@/lib/highlight';
-import { useUiStore } from '@/lib/store';
+import { useAppStore, useThemeStore, useUiStore } from '@/lib/store';
+import { editorThemeStyle } from '@/lib/theme/editorTheme';
 import { cn, copyText, formatBytes } from '@/lib/utils';
 import type { WorkspaceFileContent } from '@/lib/types';
 import { Highlight } from 'prism-react-renderer';
@@ -96,6 +112,29 @@ export function FilePreview({
      `uiStore`): vale para todas as abas de arquivo, não só para a atual. */
   const codeFileWrap = useUiStore((state) => state.codeFileWrap);
   const setCodeFileWrap = useUiStore((state) => state.setCodeFileWrap);
+  const settings = useAppStore((state) => state.settings);
+  const activeTheme = useThemeStore((state) =>
+    state.themes.find((entry) => entry.id === state.activeId),
+  );
+  const editorTheme = normalizeEditorTheme(settings.editorTheme);
+  const editorFontSize = normalizeEditorFontSize(settings.editorFontSize);
+  const editorLineHeight = normalizeEditorLineHeight(settings.editorLineHeight);
+  const editorTabSize = normalizeEditorTabSize(settings.editorTabSize);
+  const editorFontFamily = normalizeEditorFontFamily(settings.editorFontFamily);
+  const showLineNumbers = settings.editorLineNumbers !== false;
+  const viewerStyle = useMemo(
+    () => editorThemeStyle(activeTheme, editorTheme),
+    [activeTheme, editorTheme],
+  );
+  const codeStyle = useMemo<CSSProperties>(
+    () => ({
+      fontSize: `${editorFontSize}px`,
+      lineHeight: editorLineHeight,
+      tabSize: editorTabSize,
+      ...(editorFontFamily ? { fontFamily: editorFontFamily } : {}),
+    }),
+    [editorFontSize, editorLineHeight, editorTabSize, editorFontFamily],
+  );
 
   useEffect(
     () => () => {
@@ -301,7 +340,7 @@ export function FilePreview({
   }
 
   return (
-    <div className={cn('flex h-full min-h-0 flex-col', className)}>
+    <div className={cn('flex h-full min-h-0 flex-col', className)} style={viewerStyle}>
       <PreviewHeader path={content.path}>
         {isMarkdown ? (
           <SegmentedControl
@@ -378,7 +417,8 @@ export function FilePreview({
             {({ tokens, getLineProps, getTokenProps }) => (
               <pre
                 aria-label={t('code:preview.contentAria', { path: content.path })}
-                className="min-w-full py-2 font-mono text-[12px] leading-[1.7]"
+                className="min-w-full py-2 font-mono"
+                style={codeStyle}
               >
                 {tokens.map((line, lineIndex) => {
                   const lineProps = getLineProps({ line });
@@ -394,7 +434,9 @@ export function FilePreview({
                         : undefined;
                   return (
                     <Fragment key={lineIndex}>
-                      {removedCount ? <DeletedLines count={removedCount} /> : null}
+                      {removedCount ? (
+                        <DeletedLines count={removedCount} showLineNumbers={showLineNumbers} />
+                      ) : null}
                       <div
                         {...lineProps}
                         data-diff-tone={tone}
@@ -407,7 +449,8 @@ export function FilePreview({
                         <span
                           aria-hidden
                           className={cn(
-                            'sticky left-0 flex w-14 shrink-0 select-none items-center',
+                            'sticky left-0 flex shrink-0 select-none items-center',
+                            showLineNumbers ? 'w-14' : 'w-4',
                             /* Mesmo fundo da linha para o gutter não cortar a faixa. */
                             toneClass ?? 'bg-background',
                           )}
@@ -425,9 +468,11 @@ export function FilePreview({
                           >
                             {tone === 'added' ? '+' : tone === 'modified' ? '~' : ''}
                           </span>
-                          <span className="w-10 shrink-0 pr-3 text-right text-[11px] tabular-nums text-foreground-subtle">
-                            {lineNumber}
-                          </span>
+                          {showLineNumbers ? (
+                            <span className="w-10 shrink-0 pr-3 text-right text-[11px] tabular-nums text-foreground-subtle">
+                              {lineNumber}
+                            </span>
+                          ) : null}
                         </span>
                         <span
                           className={cn(
@@ -450,6 +495,7 @@ export function FilePreview({
                 {inlineMarks?.deletions.get(lines.length + 1) ? (
                   <DeletedLines
                     count={inlineMarks.deletions.get(lines.length + 1) ?? 0}
+                    showLineNumbers={showLineNumbers}
                   />
                 ) : null}
               </pre>
@@ -522,7 +568,13 @@ function DiffSummary({
 }
 
 /** A red arrow at a deletion point; the removed text is never rendered. */
-function DeletedLines({ count }: { count: number }) {
+function DeletedLines({
+  count,
+  showLineNumbers,
+}: {
+  count: number;
+  showLineNumbers: boolean;
+}) {
   const { t } = useTranslation('code');
   return (
     <div
@@ -531,11 +583,21 @@ function DeletedLines({ count }: { count: number }) {
       data-diff-deleted={count}
       className="flex min-h-[18px] items-center bg-danger-soft text-danger"
     >
-      <span aria-hidden className="sticky left-0 flex w-14 shrink-0 items-center bg-danger-soft">
+      <span
+        aria-hidden
+        className={cn(
+          'sticky left-0 flex shrink-0 items-center bg-danger-soft',
+          showLineNumbers ? 'w-14' : 'w-4',
+        )}
+      >
         <span className="flex w-4 shrink-0 justify-center">
           <ArrowRight className="size-3.5" strokeWidth={2} />
         </span>
-        <span className="w-10 shrink-0 pr-3 text-right text-[10.5px] tabular-nums">−{count}</span>
+        {showLineNumbers ? (
+          <span className="w-10 shrink-0 pr-3 text-right text-[10.5px] tabular-nums">
+            −{count}
+          </span>
+        ) : null}
       </span>
     </div>
   );

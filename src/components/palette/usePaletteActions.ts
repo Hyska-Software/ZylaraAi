@@ -84,6 +84,8 @@ function settingsTabDescription(id: SettingsTabId): string {
       return t('palette:settingsTabDescriptions.themes');
     case 'terminal':
       return t('palette:settingsTabDescriptions.terminal');
+    case 'editor':
+      return t('palette:settingsTabDescriptions.editor');
     case 'providers':
       return t('palette:settingsTabDescriptions.providers');
     case 'model':

@@ -89,6 +89,7 @@
     "general": "Theme, language and text size",
     "themes": "Installed themes and packages",
     "terminal": "Terminal font and size",
+    "editor": "File viewer font, theme and line numbers",
     "providers": "API keys and provider status",
     "model": "Default model and thinking mode",
     "instructions": "System instructions",

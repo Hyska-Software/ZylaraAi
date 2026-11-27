@@ -69,6 +69,16 @@ pub const TERMINAL_FONT_SIZE_MAX: u32 = 32;
 /// Longest accepted custom terminal font-family string.
 pub const TERMINAL_FONT_FAMILY_MAX_CHARS: usize = 200;
 
+/// File-viewer typography bounds; mirrored by `src/lib/editorSettings.ts`.
+pub const EDITOR_FONT_SIZE_MIN: u32 = 8;
+pub const EDITOR_FONT_SIZE_MAX: u32 = 28;
+pub const EDITOR_LINE_HEIGHT_MIN: f32 = 1.2;
+pub const EDITOR_LINE_HEIGHT_MAX: f32 = 2.2;
+pub const EDITOR_TAB_SIZE_MIN: u32 = 1;
+pub const EDITOR_TAB_SIZE_MAX: u32 = 8;
+/// Longest accepted custom file-viewer font-family string.
+pub const EDITOR_FONT_FAMILY_MAX_CHARS: usize = 200;
+
 /// Retenção dos arquivos de spill (saída completa de tools) do harness de
 /// código, em dias. Fora da faixa, o valor é clampado.
 pub const SPILL_RETENTION_MIN_DAYS: u32 = 1;
@@ -159,6 +169,30 @@ fn normalize_settings(mut settings: Settings) -> Settings {
     settings.terminal_font_size = settings
         .terminal_font_size
         .clamp(TERMINAL_FONT_SIZE_MIN, TERMINAL_FONT_SIZE_MAX);
+
+    if !matches!(settings.editor_theme.as_str(), "app" | "light" | "dark") {
+        settings.editor_theme = defaults.editor_theme;
+    }
+    settings.editor_font_family = settings
+        .editor_font_family
+        .trim()
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(EDITOR_FONT_FAMILY_MAX_CHARS)
+        .collect();
+    settings.editor_font_size = settings
+        .editor_font_size
+        .clamp(EDITOR_FONT_SIZE_MIN, EDITOR_FONT_SIZE_MAX);
+    if !settings.editor_line_height.is_finite() {
+        settings.editor_line_height = defaults.editor_line_height;
+    }
+    settings.editor_line_height =
+        (settings.editor_line_height.clamp(EDITOR_LINE_HEIGHT_MIN, EDITOR_LINE_HEIGHT_MAX) * 10.0)
+            .round()
+            / 10.0;
+    settings.editor_tab_size = settings
+        .editor_tab_size
+        .clamp(EDITOR_TAB_SIZE_MIN, EDITOR_TAB_SIZE_MAX);
 
     if !matches!(settings.theme.as_str(), "light" | "dark" | "system") {
         settings.theme = defaults.theme;
@@ -2059,6 +2093,61 @@ mod tests {
         let settings = parse_settings_json("{}").expect("parse empty settings");
         assert_eq!(settings.terminal_font_family, "");
         assert_eq!(settings.terminal_font_size, 12);
+    }
+
+    #[test]
+    fn editor_settings_default_to_app_palette_and_current_typography() {
+        let settings = parse_settings_json("{}").expect("parse empty settings");
+        assert_eq!(settings.editor_theme, "app");
+        assert_eq!(settings.editor_font_family, "");
+        assert_eq!(settings.editor_font_size, 12);
+        assert_eq!(settings.editor_line_height, 1.7);
+        assert_eq!(settings.editor_tab_size, 2);
+        assert!(settings.editor_line_numbers);
+    }
+
+    #[test]
+    fn normalizes_editor_settings_from_disk_and_renderer() {
+        let settings = Settings {
+            editor_theme: "system".into(),
+            editor_font_family: "  Fira Code\n  ".into(),
+            editor_font_size: 99,
+            editor_line_height: f32::NAN,
+            editor_tab_size: 0,
+            ..Settings::default()
+        };
+        let normalized = normalize_settings(settings);
+        assert_eq!(normalized.editor_theme, "app");
+        assert_eq!(normalized.editor_font_family, "Fira Code");
+        assert_eq!(normalized.editor_font_size, EDITOR_FONT_SIZE_MAX);
+        assert_eq!(normalized.editor_line_height, 1.7);
+        assert_eq!(normalized.editor_tab_size, EDITOR_TAB_SIZE_MIN);
+
+        let legacy = parse_settings_json(r#"{"theme":"dark"}"#).expect("parse legacy settings");
+        assert_eq!(normalize_settings(legacy).editor_theme, "app");
+
+        let parser = parse_settings_json(
+            r#"{"editorTheme":"dark","editorFontSize":4,"editorLineHeight":9,"editorTabSize":42,"editorLineNumbers":false}"#,
+        )
+        .expect("parse editor settings");
+        let normalized = normalize_settings(parser);
+        assert_eq!(normalized.editor_theme, "dark");
+        assert_eq!(normalized.editor_font_size, EDITOR_FONT_SIZE_MIN);
+        assert_eq!(normalized.editor_line_height, EDITOR_LINE_HEIGHT_MAX);
+        assert_eq!(normalized.editor_tab_size, EDITOR_TAB_SIZE_MAX);
+        assert!(!normalized.editor_line_numbers);
+
+        let raw = serialize_settings_json(&normalized).expect("serialize settings");
+        let value: serde_json::Value = serde_json::from_str(&raw).expect("json");
+        assert_eq!(value["editorTheme"], "dark");
+        assert_eq!(value["editorFontSize"], u64::from(EDITOR_FONT_SIZE_MIN));
+        assert!(
+            (value["editorLineHeight"].as_f64().unwrap_or(0.0) - f64::from(EDITOR_LINE_HEIGHT_MAX))
+                .abs()
+                < 0.0001
+        );
+        assert_eq!(value["editorTabSize"], u64::from(EDITOR_TAB_SIZE_MAX));
+        assert_eq!(value["editorLineNumbers"], false);
     }
 
     #[test]
