@@ -20,11 +20,11 @@ export interface LayoutModeSwitchProps {
 }
 
 /**
- * Icon-only layout selector for the sidebar footer: the trigger shows the
- * current layout's icon and opens a plain list of icon-only items. Labels stay
- * in `aria-label`/`title` for screen readers and tooltips. The choice is
- * persisted with the rest of the UI state. With a single enabled layout there
- * is nothing to switch, so the control disappears.
+ * Layout selector for the sidebar footer: the trigger shows only the current
+ * layout's icon and opens a plain list where each enabled layout appears with
+ * its icon and translated name. The choice is persisted with the rest of the UI
+ * state. With a single enabled layout there is nothing to switch, so the
+ * control disappears.
  */
 export function LayoutModeSwitch({ className, size = 'md', onSelect }: LayoutModeSwitchProps) {
   const { t } = useTranslation('common');
@@ -51,7 +51,7 @@ export function LayoutModeSwitch({ className, size = 'md', onSelect }: LayoutMod
           <CurrentIcon aria-hidden className="size-4" />
         </IconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="end" aria-label={t('layouts.menuLabel')} className="min-w-0">
+      <DropdownMenuContent side="top" align="end" aria-label={t('layouts.menuLabel')}>
         {visibleModes.map(({ value, labelKey, titleKey, icon: Icon }) => {
           const active = layoutMode === value;
           return (
@@ -66,10 +66,12 @@ export function LayoutModeSwitch({ className, size = 'md', onSelect }: LayoutMod
               }}
               icon={<Icon aria-hidden className="size-4" />}
               className={cn(
-                'size-8 justify-center p-0 [&>span]:hidden',
+                'justify-start',
                 active && 'bg-accent-soft text-accent [&_svg]:text-accent',
               )}
-            />
+            >
+              {t(labelKey)}
+            </DropdownMenuItem>
           );
         })}
       </DropdownMenuContent>

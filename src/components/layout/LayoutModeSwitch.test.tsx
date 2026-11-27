@@ -41,10 +41,11 @@ describe('LayoutModeSwitch', () => {
     expect(icon?.getAttribute('class')).toContain('size-4');
   });
 
-  it('lists the enabled layouts as icon-only items with accessible names and hints', async () => {
+  it('lists the enabled layouts with icon and label, keeping the trigger icon-only', async () => {
     const user = userEvent.setup();
     render(<LayoutModeSwitch />);
 
+    const footerButton = trigger();
     const menu = await openMenu(user);
     const items = within(menu).getAllByRole('menuitem');
     expect(items).toHaveLength(3);
@@ -59,8 +60,9 @@ describe('LayoutModeSwitch', () => {
       expect(item.getAttribute('aria-label')).toBe(name);
       expect(item.getAttribute('title')).toBe(title);
       expect(item.getAttribute('aria-current')).toBe(current);
-      expect(item.textContent).toBe('');
+      expect(item.textContent).toBe(name);
       expect(item.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+      expect(footerButton.textContent).toBe('');
     });
   });
 
