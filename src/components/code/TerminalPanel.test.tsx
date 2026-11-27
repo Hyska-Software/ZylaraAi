@@ -84,7 +84,7 @@ vi.mock('sonner', () => ({ toast: toastMock }));
 
 import { useAppStore, useChatStore, useUiStore } from '@/lib/store';
 import { TerminalPanel } from './TerminalPanel';
-import { __resetTerminalManagerForTests } from './terminalManager';
+import { __resetTerminalManagerForTests, terminalManager } from './terminalManager';
 import { TERMINAL_DEFAULT_FONT_FAMILY } from './terminalTheme';
 
 class ResizeObserverStub {
@@ -271,6 +271,27 @@ describe('TerminalPanel', () => {
 
     await waitFor(() => expect(apiMock.closeTerminal).toHaveBeenCalledWith('term-1'));
     expect(screen.queryByRole('tab', { name: 'Terminal 1' })).toBeNull();
+  });
+
+  it('reordena abas de terminal com Alt+Arrow e atualiza a ordem do manager', async () => {
+    render(<TerminalPanel conversationId="conv-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir terminal' }));
+    await screen.findByRole('tab', { name: 'Terminal 1' });
+    fireEvent.click(screen.getByRole('button', { name: 'Novo terminal' }));
+    const second = await screen.findByRole('tab', { name: 'Terminal 2' });
+    fireEvent.keyDown(second, { key: 'ArrowLeft', altKey: true });
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab').map((node) => node.textContent)).toEqual([
+        'Terminal 2',
+        'Terminal 1',
+      ]),
+    );
+    expect(terminalManager.getSnapshot('panel').tabs.map((tab) => tab.id)).toEqual([
+      'term-2',
+      'term-1',
+    ]);
   });
 
   it('mostra apenas o host ativo e troca com a aba', async () => {

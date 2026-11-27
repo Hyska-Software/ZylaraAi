@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import { PluginDockPanel } from '@/components/plugins/ui/PluginDockPanel';
 import { setPluginSnapshot } from '@/lib/plugins/registry';
@@ -117,6 +117,7 @@ beforeEach(() => {
   useUiStore.setState({
     layoutMode: 'chat',
     pluginDockTab: { chat: PANEL_KEY, code: null, agent: null },
+    pluginDockTabOrder: { chat: [], code: [], agent: [] },
     pluginDockClosed: { chat: false, code: false, agent: false },
   });
 });
@@ -143,6 +144,27 @@ describe('PluginDockPanel', () => {
     mount([insightPanel, { ...insightPanel, order: 20 }]);
     render(<PluginDockPanel layout="chat" tabKey={PANEL_KEY} />);
     expect(screen.getAllByRole('tab', { name: 'Insights' })).toHaveLength(1);
+  });
+
+  it('reorders dock plugin tabs with Alt+Arrow and persists the order per layout', () => {
+    mount([insightPanel, { ...insightPanel, id: 'other', title: 'Other' }]);
+    render(<PluginDockPanel layout="chat" tabKey={PANEL_KEY} />);
+
+    act(() => {
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Insights' }), {
+        key: 'ArrowRight',
+        altKey: true,
+      });
+    });
+
+    const pluginTabs = screen
+      .getAllByRole('tab')
+      .filter((node) => node.getAttribute('aria-label') !== 'Artefatos');
+    expect(pluginTabs.map((node) => node.textContent)).toEqual(['Other', 'Insights']);
+    expect(useUiStore.getState().pluginDockTabOrder.chat).toEqual([
+      'com.acme.insights:panel:other',
+      PANEL_KEY,
+    ]);
   });
 
   it('returns to the artifacts dock from the host tab', () => {

@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   clampSidebarWidth,
   clampSidePanelWidth,
+  AGENT_PANEL_TAB_ORDER_DEFAULT,
   CODE_PANEL_TAB_ORDER_DEFAULT,
+  normalizeAgentPanelTabOrder,
   normalizeCodePanelOpenTabs,
   normalizeCodePanelTabOrder,
   SIDEBAR_WIDTH_DEFAULT,
@@ -734,5 +736,56 @@ describe('uiStore — ordem das abas do Code', () => {
 
     expect(useUiStore.getState().codePanelTabOrder).toEqual(['terminal', 'files', 'changes']);
     expect(useUiStore.getState().codeTabOrder).toEqual(['c-2']);
+  });
+
+  it('normalizes the agent panel tab order', () => {
+    expect(normalizeAgentPanelTabOrder(['data', 'data', 'nope', 'screen'])).toEqual([
+      'data',
+      'screen',
+      'routines',
+      'browser',
+    ]);
+    expect(normalizeAgentPanelTabOrder(undefined)).toEqual([...AGENT_PANEL_TAB_ORDER_DEFAULT]);
+  });
+
+  it('stores plugin tab orders per layout, sanitized', () => {
+    useUiStore.getState().setPluginDockTabOrder('chat', [' b ', 'a', 'b', '']);
+    useUiStore.getState().setPluginSidebarTabOrder('agent', ['plugin:tab']);
+
+    expect(useUiStore.getState().pluginDockTabOrder.chat).toEqual(['b', 'a']);
+    expect(useUiStore.getState().pluginDockTabOrder.code).toEqual([]);
+    expect(useUiStore.getState().pluginSidebarTabOrder.agent).toEqual(['plugin:tab']);
+  });
+
+  it('repairs agent and plugin tab orders on rehydrate', async () => {
+    window.localStorage.setItem(
+      'zylara.ui',
+      JSON.stringify({
+        version: 0,
+        state: {
+          agentPanelTabOrder: ['data', 'data', 'nope', 'browser'],
+          pluginDockTabOrder: { chat: [' a ', '', 'a', 'b'], code: 'bad', agent: ['z'] },
+          pluginSidebarTabOrder: { chat: ['x'], code: [], agent: 42 },
+        },
+      }),
+    );
+    await useUiStore.persist.rehydrate();
+
+    expect(useUiStore.getState().agentPanelTabOrder).toEqual([
+      'data',
+      'browser',
+      'screen',
+      'routines',
+    ]);
+    expect(useUiStore.getState().pluginDockTabOrder).toEqual({
+      chat: ['a', 'b'],
+      code: [],
+      agent: ['z'],
+    });
+    expect(useUiStore.getState().pluginSidebarTabOrder).toEqual({
+      chat: ['x'],
+      code: [],
+      agent: [],
+    });
   });
 });

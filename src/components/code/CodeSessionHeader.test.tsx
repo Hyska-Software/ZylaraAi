@@ -71,6 +71,7 @@ const terminalMock = vi.hoisted(() => {
     open: vi.fn(async () => 'term-1' as string | null),
     activate: vi.fn(),
     close: vi.fn(async () => undefined),
+    reorderTabs: vi.fn(),
   };
   return {
     manager,
@@ -205,6 +206,20 @@ function appInfo(): AppInfo {
 }
 
 const tab = (name: string): HTMLElement => screen.getByRole('tab', { name });
+
+function rect(top: number, height: number, left: number, right: number): DOMRect {
+  return {
+    top,
+    bottom: top + height,
+    left,
+    right,
+    width: right - left,
+    height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
 
 /** Radix DropdownMenu opens on pointerdown, not click (see other tests). */
 function openMenu(trigger: HTMLElement): void {
@@ -808,6 +823,95 @@ describe('CodeSessionHeader — teclado e painel', () => {
     expect(useChatStore.getState().activeId).toBe('c-1');
   });
 
+  it('reordena abas de arquivo, diff e commits com Alt+Arrow e persiste a ordem', async () => {
+    useChatStore.setState({
+      conversations: [conversation({ id: 'c-1', title: 'Sessão aberta' })],
+      activeId: 'c-1',
+    });
+    render(<CodeSessionHeader />);
+    await waitFor(() => expect(tab('Sessão aberta')).toBeTruthy());
+    act(() => {
+      useUiStore.getState().openCodeFile({ workspaceId: 'ws-1', path: 'a.ts' });
+      useUiStore.getState().openCodeFile({ workspaceId: 'ws-1', path: 'b.ts' });
+      useUiStore.getState().openCodeDiff({ workspaceId: 'ws-1', path: 'diff.ts', staged: false });
+      useUiStore.getState().openCodeCommits('ws-1');
+    });
+    const fileTab = await screen.findByRole('tab', { name: 'Arquivo a.ts' });
+    fireEvent.keyDown(fileTab, { key: 'ArrowRight', altKey: true });
+
+    expect(screen.getAllByRole('tab').map((node) => node.textContent)).toEqual([
+      'Sessão aberta',
+      'b.ts',
+      'a.ts',
+      'Diff',
+      'Commits',
+    ]);
+    const order = useUiStore.getState().codeTabOrder;
+    expect(order.indexOf(order.find((id) => id.includes('b.ts')) ?? '')).toBeLessThan(
+      order.indexOf(order.find((id) => id.includes('a.ts')) ?? ''),
+    );
+    expect(terminalMock.manager.reorderTabs).toHaveBeenCalledWith([]);
+  });
+
+  it('move uma aba de arquivo por arrasto até depois do diff e do commits', async () => {
+    useChatStore.setState({
+      conversations: [conversation({ id: 'c-1', title: 'Sessão aberta' })],
+      activeId: 'c-1',
+    });
+    render(<CodeSessionHeader />);
+    await waitFor(() => expect(tab('Sessão aberta')).toBeTruthy());
+    act(() => {
+      useUiStore.getState().openCodeFile({ workspaceId: 'ws-1', path: 'a.ts' });
+      useUiStore.getState().openCodeFile({ workspaceId: 'ws-1', path: 'b.ts' });
+      useUiStore.getState().openCodeDiff({ workspaceId: 'ws-1', path: 'diff.ts', staged: false });
+      useUiStore.getState().openCodeCommits('ws-1');
+    });
+    const rendered = await waitFor(() => {
+      const all = screen.getAllByRole('tab');
+      expect(all.map((node) => node.textContent)).toEqual([
+        'Sessão aberta',
+        'a.ts',
+        'b.ts',
+        'Diff',
+        'Commits',
+      ]);
+      return all;
+    });
+    screen.getByRole('tablist', { name: 'Abas abertas' }).getBoundingClientRect = () =>
+      rect(0, 32, 0, 1000);
+    rendered.forEach((node, index) => {
+      node.getBoundingClientRect = () => rect(0, 32, index * 100, index * 100 + 80);
+    });
+
+    fireEvent.pointerDown(rendered[1], { button: 0, clientX: 40, clientY: 10 });
+    fireEvent.pointerMove(window, { clientX: 450, clientY: 10 });
+    fireEvent.pointerUp(window, { clientX: 450, clientY: 10 });
+
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab').map((node) => node.textContent)).toEqual([
+        'Sessão aberta',
+        'b.ts',
+        'Diff',
+        'Commits',
+        'a.ts',
+      ]),
+    );
+    const order = useUiStore.getState().codeTabOrder;
+    expect(order[order.length - 1]).toContain('a.ts');
+  });
+
+  it('mantém a aba Nova sessão fixa na frente ao reordenar abas de contexto', async () => {
+    render(<CodeSessionHeader />);
+    await waitFor(() => expect(tab('Nova sessão')).toBeTruthy());
+    act(() => {
+      useUiStore.getState().openCodeDiff({ workspaceId: 'ws-1', path: 'a.ts', staged: false });
+    });
+    const diffTab = await screen.findByRole('tab', { name: 'Diff de a.ts' });
+    fireEvent.keyDown(diffTab, { key: 'ArrowLeft', altKey: true });
+
+    expect(screen.getAllByRole('tab')[0]).toBe(tab('Nova sessão'));
+  });
+
   it('o botão do painel alterna codePanelOpen e expõe aria-pressed', () => {
     render(<CodeSessionHeader />);
 
@@ -1024,6 +1128,33 @@ describe('CodeSessionHeader - abas de subagente', () => {
     expect(useUiStore.getState().codeSubagentTabs).toHaveLength(1);
     expect(useUiStore.getState().codeSubagentTab?.conversationId).toBe('child-2');
     expect(screen.queryByRole('tab', { name: 'Subagente Mapear o módulo' })).toBeNull();
+  });
+
+  it('reordena abas de subagente com Alt+Arrow e persiste a ordem', async () => {
+    render(<CodeSessionHeader />);
+    await waitFor(() => expect(tab('Sessão aberta')).toBeTruthy());
+    act(() => {
+      useUiStore.getState().openCodeSubagent({
+        conversationId: 'child-1',
+        taskCallId: 'task-1',
+        subagentType: 'explore',
+        description: 'Mapear o módulo',
+      });
+      useUiStore.getState().openCodeSubagent({
+        conversationId: 'child-2',
+        taskCallId: 'task-2',
+        subagentType: 'review',
+        description: 'Revisar o diff',
+      });
+    });
+
+    const first = await screen.findByRole('tab', { name: 'Subagente Mapear o módulo' });
+    const second = await screen.findByRole('tab', { name: 'Subagente Revisar o diff' });
+    fireEvent.keyDown(first, { key: 'ArrowRight', altKey: true });
+
+    const rendered = screen.getAllByRole('tab');
+    expect(rendered.indexOf(second)).toBeLessThan(rendered.indexOf(first));
+    expect(useUiStore.getState().codeTabOrder[1]).toContain('child-2');
   });
 });
 

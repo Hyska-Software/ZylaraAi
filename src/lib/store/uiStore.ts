@@ -256,6 +256,47 @@ function normalizeTabOrder(value: unknown): string[] {
 /** Tabs of the agent right sidebar. */
 export type AgentPanelTab = 'screen' | 'routines' | 'browser' | 'data';
 
+/** Factory order of the agent right sidebar tabs. */
+export const AGENT_PANEL_TAB_ORDER_DEFAULT: readonly AgentPanelTab[] = [
+  'screen',
+  'routines',
+  'browser',
+  'data',
+];
+
+/** Keeps a stored agent panel order inside the known ids, appending what is missing. */
+export function normalizeAgentPanelTabOrder(value: unknown): AgentPanelTab[] {
+  const valid = new Set<AgentPanelTab>(AGENT_PANEL_TAB_ORDER_DEFAULT);
+  const order: AgentPanelTab[] = [];
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry !== 'string' || !valid.has(entry as AgentPanelTab)) continue;
+      const tab = entry as AgentPanelTab;
+      if (!order.includes(tab)) order.push(tab);
+    }
+  }
+  for (const tab of AGENT_PANEL_TAB_ORDER_DEFAULT) {
+    if (!order.includes(tab)) order.push(tab);
+  }
+  return order;
+}
+
+/** Empty per-layout order for plugin-owned tab strips. */
+export function emptyPluginTabOrder(): Record<LayoutMode, string[]> {
+  return { chat: [], code: [], agent: [] };
+}
+
+/** Normalizes a persisted per-layout plugin order, dropping invalid entries. */
+function normalizePluginTabOrderByLayout(value: unknown): Record<LayoutMode, string[]> {
+  const result = emptyPluginTabOrder();
+  if (!value || typeof value !== 'object') return result;
+  const stored = value as Record<string, unknown>;
+  for (const layout of ['chat', 'code', 'agent'] as const) {
+    result[layout] = normalizeTabOrder(stored[layout]);
+  }
+  return result;
+}
+
 /** Which panel owns the agent layout's right dock. */
 export type AgentRightPanel = 'agent' | 'workspace';
 
@@ -377,12 +418,14 @@ interface UiState {
   codePanelOpenTabs: CodePanelTab[];
   /** Persisted order of the Code right panel tabs (drag-and-drop). */
   codePanelTabOrder: CodePanelTab[];
-  /** Persisted order of the movable center tabs (sessions + center terminals). */
+  /** Persisted order of all movable center tabs (sessions, terminals and context tabs). */
   codeTabOrder: string[];
   /** Whether the agent layout shows its right sidebar. */
   agentPanelOpen: boolean;
   /** Active tab of the agent right sidebar. */
   agentPanelTab: AgentPanelTab;
+  /** Persisted order of the agent right sidebar tabs (drag-and-drop). */
+  agentPanelTabOrder: AgentPanelTab[];
   /** Which panel owns the agent right dock (agent sidebar or workspace tools). */
   agentRightPanel: AgentRightPanel;
   /** Workspace ativo do layout Code (`null` = nenhum/nenhuma pasta aberta). */
@@ -416,6 +459,10 @@ interface UiState {
   pluginDockTab: Record<LayoutMode, string | null>;
   /** Plugin sidebar content tab open in each layout (null = none). */
   pluginSidebarTab: Record<LayoutMode, string | null>;
+  /** Persisted user order of plugin dock tabs, keyed by layout. */
+  pluginDockTabOrder: Record<LayoutMode, string[]>;
+  /** Persisted user order of plugin sidebar tabs, keyed by layout. */
+  pluginSidebarTabOrder: Record<LayoutMode, string[]>;
   /** A takeover panel was explicitly dismissed in this layout. */
   pluginDockClosed: Record<LayoutMode, boolean>;
   activeArtifactId: string | null;
@@ -506,11 +553,13 @@ interface UiState {
   closeCodePanelTab: (tab: CodePanelTab) => void;
   /** Persists the drag-and-drop order of the Code right panel tabs. */
   setCodePanelTabOrder: (order: readonly CodePanelTab[]) => void;
-  /** Persists the drag-and-drop order of the movable center tabs. */
+  /** Persists the drag-and-drop order of all movable center tabs. */
   setCodeTabOrder: (order: readonly string[]) => void;
   setAgentPanelOpen: (open: boolean) => void;
   toggleAgentPanel: () => void;
   setAgentPanelTab: (tab: AgentPanelTab) => void;
+  /** Persists the drag-and-drop order of the agent right sidebar tabs. */
+  setAgentPanelTabOrder: (order: readonly AgentPanelTab[]) => void;
   setAgentRightPanel: (panel: AgentRightPanel) => void;
   /** Define o workspace ativo do layout Code (persistido). */
   setActiveWorkspace: (workspaceId: string | null) => void;
@@ -548,6 +597,10 @@ interface UiState {
   dismissPluginDockTakeover: (layout?: LayoutMode) => void;
   /** Opens/closes a plugin content tab inside a layout sidebar. */
   setPluginSidebarTab: (layout: LayoutMode, key: string | null) => void;
+  /** Persists the drag-and-drop order of plugin dock tabs in one layout. */
+  setPluginDockTabOrder: (layout: LayoutMode, order: readonly string[]) => void;
+  /** Persists the drag-and-drop order of plugin sidebar tabs in one layout. */
+  setPluginSidebarTabOrder: (layout: LayoutMode, order: readonly string[]) => void;
   /** Opens the panel on the artifact preview (or the list when there is none). */
   openArtifactPanel: (artifactId?: string | null) => void;
   /** Opens the panel on the generated-artifact list. */
@@ -648,6 +701,7 @@ export const useUiStore = create<UiState>()(
       codeTabOrder: [],
       agentPanelOpen: true,
       agentPanelTab: 'screen',
+      agentPanelTabOrder: [...AGENT_PANEL_TAB_ORDER_DEFAULT],
       agentRightPanel: 'agent',
       activeWorkspaceId: null,
       openSessionsByWorkspace: {},
@@ -665,6 +719,8 @@ export const useUiStore = create<UiState>()(
       activeView: 'chat',
       pluginPages: { chat: null, code: null, agent: null },
       pluginSidebarTab: { chat: null, code: null, agent: null },
+      pluginDockTabOrder: emptyPluginTabOrder(),
+      pluginSidebarTabOrder: emptyPluginTabOrder(),
       pluginDockTab: { chat: null, code: null, agent: null },
       pluginDockClosed: { chat: false, code: false, agent: false },
       activeArtifactId: null,
@@ -983,12 +1039,14 @@ export const useUiStore = create<UiState>()(
       toggleAgentPanel: () => set((state) => ({ agentPanelOpen: !state.agentPanelOpen })),
       setAgentPanelTab: (agentPanelTab) =>
         set((state) => ({
-          agentPanelTab: ['screen', 'routines', 'browser', 'data'].includes(agentPanelTab)
+          agentPanelTab: AGENT_PANEL_TAB_ORDER_DEFAULT.includes(agentPanelTab)
             ? agentPanelTab
             : 'screen',
           pluginDockTab: { ...state.pluginDockTab, agent: null },
           pluginPages: { ...state.pluginPages, agent: null },
         })),
+      setAgentPanelTabOrder: (order) =>
+        set({ agentPanelTabOrder: normalizeAgentPanelTabOrder(order) }),
       setAgentRightPanel: (agentRightPanel) =>
         set((state) => ({
           agentRightPanel: agentRightPanel === 'workspace' ? 'workspace' : 'agent',
@@ -1080,6 +1138,20 @@ export const useUiStore = create<UiState>()(
       setPluginSidebarTab: (layout, key) =>
         set((state) => ({
           pluginSidebarTab: { ...state.pluginSidebarTab, [layout]: key },
+        })),
+      setPluginDockTabOrder: (layout, order) =>
+        set((state) => ({
+          pluginDockTabOrder: {
+            ...state.pluginDockTabOrder,
+            [layout]: normalizeTabOrder(order),
+          },
+        })),
+      setPluginSidebarTabOrder: (layout, order) =>
+        set((state) => ({
+          pluginSidebarTabOrder: {
+            ...state.pluginSidebarTabOrder,
+            [layout]: normalizeTabOrder(order),
+          },
         })),
       dismissPluginDockTakeover: (layout) =>
         set((state) => {
@@ -1179,6 +1251,7 @@ export const useUiStore = create<UiState>()(
         codeTabOrder: state.codeTabOrder,
         agentPanelOpen: state.agentPanelOpen,
         agentPanelTab: state.agentPanelTab,
+        agentPanelTabOrder: state.agentPanelTabOrder,
         agentRightPanel: state.agentRightPanel,
         sidebarOpen: state.sidebarOpen,
         sidebarWidth: state.sidebarWidth,
@@ -1189,6 +1262,8 @@ export const useUiStore = create<UiState>()(
         codeFileWrap: state.codeFileWrap,
         pluginPages: state.pluginPages,
         pluginDockTab: state.pluginDockTab,
+        pluginDockTabOrder: state.pluginDockTabOrder,
+        pluginSidebarTabOrder: state.pluginSidebarTabOrder,
       }),
       /**
        * Rehydrated layouts may carry an out-of-range width (manually edited
@@ -1246,11 +1321,12 @@ export const useUiStore = create<UiState>()(
             typeof stored.agentPanelOpen === 'boolean'
               ? stored.agentPanelOpen
               : current.agentPanelOpen,
-          agentPanelTab: ['screen', 'routines', 'browser', 'data'].includes(
-            stored.agentPanelTab as string,
-          )
+          agentPanelTab: AGENT_PANEL_TAB_ORDER_DEFAULT.includes(stored.agentPanelTab as AgentPanelTab)
             ? (stored.agentPanelTab as AgentPanelTab)
             : current.agentPanelTab,
+          agentPanelTabOrder: normalizeAgentPanelTabOrder(stored.agentPanelTabOrder),
+          pluginDockTabOrder: normalizePluginTabOrderByLayout(stored.pluginDockTabOrder),
+          pluginSidebarTabOrder: normalizePluginTabOrderByLayout(stored.pluginSidebarTabOrder),
           agentRightPanel:
             stored.agentRightPanel === 'workspace' ? 'workspace' : current.agentRightPanel,
           sidebarWidth: clampSidebarWidth(stored.sidebarWidth ?? current.sidebarWidth),

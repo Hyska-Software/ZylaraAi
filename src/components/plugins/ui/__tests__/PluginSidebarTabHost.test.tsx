@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import {
   PluginSidebarTabHost,
@@ -100,9 +100,26 @@ function record(): PluginRecord {
   } as unknown as PluginRecord;
 }
 
+function secondRecord(): PluginRecord {
+  const copy = JSON.parse(JSON.stringify(record())) as PluginRecord;
+  copy.id = 'com.acme.second';
+  copy.name = 'Acme Second';
+  copy.manifest.id = copy.id;
+  copy.manifest.name = copy.name;
+  const tab = copy.manifest.contributes.ui.sidebarTabs?.[0];
+  if (tab) {
+    tab.id = 'second';
+    tab.title = 'Second';
+  }
+  return copy;
+}
+
 beforeEach(() => {
   cleanup();
-  useUiStore.setState({ pluginSidebarTab: { chat: null, code: null, agent: null } });
+  useUiStore.setState({
+    pluginSidebarTab: { chat: null, code: null, agent: null },
+    pluginSidebarTabOrder: { chat: [], code: [], agent: [] },
+  });
   usePluginUiPrefs.setState({ enabled: true, disabled: [] });
   setPluginSnapshot({
     plugins: [record()],
@@ -125,6 +142,35 @@ describe('PluginSidebarTabStrip', () => {
   it('ignores layouts the tab does not declare', () => {
     const { container } = render(<PluginSidebarTabStrip layout="code" />);
     expect(container.childElementCount).toBe(0);
+  });
+
+  it('reorders plugin tabs with Alt+Arrow and persists the order per layout', () => {
+    setPluginSnapshot({
+      plugins: [record(), secondRecord()],
+      safeMode: false,
+      pluginsEnabled: true,
+      allowTrusted: false,
+      devMode: false,
+      configFingerprint: 'test',
+    });
+    render(<PluginSidebarTabStrip layout="chat" />);
+
+    act(() => {
+      fireEvent.keyDown(screen.getByRole('tab', { name: 'Notes' }), {
+        key: 'ArrowRight',
+        altKey: true,
+      });
+    });
+
+    expect(screen.getAllByRole('tab').map((node) => node.textContent)).toEqual([
+      'Second',
+      'Notes',
+    ]);
+    expect(useUiStore.getState().pluginSidebarTabOrder.chat).toEqual([
+      'com.acme.second:sidebar:second',
+      TAB_KEY,
+    ]);
+    expect(useUiStore.getState().pluginSidebarTabOrder.code).toEqual([]);
   });
 });
 

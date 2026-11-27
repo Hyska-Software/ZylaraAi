@@ -472,6 +472,29 @@ class TerminalManager {
     });
   }
 
+  /**
+   * Reorders the given live terminals within the global order. Terminals from
+   * the other surface keep their slots, so a drag in one strip never reshuffles
+   * the other strip beyond the terminals actually moved.
+   */
+  reorderTabs(ids: readonly string[]): void {
+    const runtime = this.runtime;
+    const moving = [...new Set(ids)].filter((id) => runtime.instances.has(id));
+    if (moving.length < 2) return;
+    const slots: number[] = [];
+    for (let index = 0; index < runtime.order.length; index += 1) {
+      if (moving.includes(runtime.order[index])) slots.push(index);
+    }
+    if (slots.length === 0) return;
+    const next = [...runtime.order];
+    for (let index = 0; index < slots.length; index += 1) {
+      next[slots[index]] = moving[index] ?? next[slots[index]];
+    }
+    if (next.every((id, index) => id === runtime.order[index])) return;
+    runtime.order = next;
+    this.notify(runtime);
+  }
+
   async close(id: string): Promise<void> {
     const runtime = this.runtime;
     const instance = runtime.instances.get(id);

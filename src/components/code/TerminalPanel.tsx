@@ -24,8 +24,11 @@ import { Slot } from '@/components/plugins/ui/Slot';
 import {
   Button,
   IconButton,
+  SortableList,
   Spinner,
   Tooltip,
+  sortableDropClassHorizontal,
+  type SortableListApi,
 } from '@/components/ui';
 import { useAppStore } from '@/lib/store';
 import { THEME_APPLIED_EVENT } from '@/lib/theme/apply';
@@ -189,79 +192,110 @@ export function TerminalPanel({
       {showTabStrip ? (
         <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border px-2">
         <Slot name="code.terminal.toolbar" owner={{ layout: 'code' }} />
-        <div
-          ref={tabStripRef}
-          role="tablist"
-          aria-label={t('code:terminal.tabsAria')}
-          onMouseDown={(event) => {
-            // Suppress WebView2 autoscroll on middle click.
-            if (event.button === 1) event.preventDefault();
-          }}
-          className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+        <SortableList
+          ids={tabs.map((tab) => tab.id)}
+          label={t('code:terminal.tabsAria')}
+          itemLabel={(id) => tabs.find((tab) => tab.id === id)?.title ?? id}
+          orientation="horizontal"
+          onReorder={(ids) => terminalManager.reorderTabs(ids)}
         >
-          {tabs.map((tab) => {
-            const selected = activeId === tab.id;
-            return (
-              <div
-                key={tab.id}
-                role="presentation"
-                onAuxClick={(event) => {
-                  if (event.button !== 1) return;
-                  event.preventDefault();
-                  closeTab(tab);
-                }}
-                className={cn(
-                  'flex h-7 max-w-40 shrink-0 items-center rounded-lg text-[12px] transition-colors duration-150',
-                  selected
-                    ? 'bg-surface-active text-foreground'
-                    : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
-                )}
-              >
-                <button
-                  ref={(node) => {
-                    if (node) tabRefs.current.set(tab.id, node);
-                    else tabRefs.current.delete(tab.id);
-                  }}
-                  type="button"
-                  role="tab"
-                  id={`terminal-tab-${tab.id}`}
-                  aria-selected={selected}
-                  aria-controls={outputId}
-                  tabIndex={selected ? 0 : -1}
-                  title={tab.cwd ? t('code:terminal.tabTitleWithCwd', { title: terminalTabLabel(tab), cwd: tab.cwd }) : terminalTabLabel(tab)}
-                  onClick={() => selectTab(tab.id)}
-                  onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
-                  className="flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-l-lg pl-2 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                >
-                  <SquareTerminal
-                    aria-hidden
+          {(sortable: SortableListApi) => (
+            <div
+              ref={(node) => {
+                tabStripRef.current = node;
+                sortable.containerRef.current = node;
+              }}
+              role="tablist"
+              aria-label={t('code:terminal.tabsAria')}
+              onMouseDown={(event) => {
+                // Suppress WebView2 autoscroll on middle click.
+                if (event.button === 1) event.preventDefault();
+              }}
+              className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+            >
+              {tabs.map((tab) => {
+                const selected = activeId === tab.id;
+                const itemProps = sortable.itemProps(tab.id);
+                return (
+                  <div
+                    key={tab.id}
+                    role="presentation"
+                    {...sortable.dropProps(tab.id)}
+                    onAuxClick={(event) => {
+                      if (event.button !== 1) return;
+                      event.preventDefault();
+                      closeTab(tab);
+                    }}
                     className={cn(
-                      'size-3.5 shrink-0',
-                      tab.running ? 'text-foreground-subtle' : 'text-warning',
+                      'flex h-7 max-w-40 shrink-0 items-center rounded-lg text-[12px] transition-colors duration-150',
+                      selected
+                        ? 'bg-surface-active text-foreground'
+                        : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
+                      sortableDropClassHorizontal,
                     )}
-                    strokeWidth={1.75}
-                  />
-                  <span className="min-w-0 truncate">{tab.title}</span>
-                  {!tab.running ? (
-                    <span
-                      aria-hidden
-                      className="ml-0.5 inline-flex size-1.5 shrink-0 rounded-full bg-warning"
-                    />
-                  ) : null}
-                </button>
-                <button
-                  type="button"
-                  aria-label={t('code:terminal.closeTabAria', { title: tab.title })}
-                  title={t('code:terminal.closeTabTitle')}
-                  onClick={() => closeTab(tab)}
-                  className="mr-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-foreground-subtle transition-colors duration-150 hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                >
-                  <X aria-hidden className="size-3.5" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      id={`terminal-tab-${tab.id}`}
+                      aria-selected={selected}
+                      aria-controls={outputId}
+                      tabIndex={selected ? 0 : -1}
+                      title={
+                        tab.cwd
+                          ? t('code:terminal.tabTitleWithCwd', {
+                              title: terminalTabLabel(tab),
+                              cwd: tab.cwd,
+                            })
+                          : terminalTabLabel(tab)
+                      }
+                      {...itemProps}
+                      ref={(node) => {
+                        itemProps.ref(node);
+                        if (node) tabRefs.current.set(tab.id, node);
+                        else tabRefs.current.delete(tab.id);
+                      }}
+                      onClick={() => selectTab(tab.id)}
+                      onKeyDown={(event) => {
+                        itemProps.onKeyDown(event);
+                        if (!event.defaultPrevented) handleTabKeyDown(event, tab.id);
+                      }}
+                      className={cn(
+                        'flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-l-lg pl-2 pr-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                        !sortable.disabled && 'cursor-grab active:cursor-grabbing',
+                      )}
+                    >
+                      <SquareTerminal
+                        aria-hidden
+                        className={cn(
+                          'size-3.5 shrink-0',
+                          tab.running ? 'text-foreground-subtle' : 'text-warning',
+                        )}
+                        strokeWidth={1.75}
+                      />
+                      <span className="min-w-0 truncate">{tab.title}</span>
+                      {!tab.running ? (
+                        <span
+                          aria-hidden
+                          className="ml-0.5 inline-flex size-1.5 shrink-0 rounded-full bg-warning"
+                        />
+                      ) : null}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t('code:terminal.closeTabAria', { title: tab.title })}
+                      title={t('code:terminal.closeTabTitle')}
+                      onClick={() => closeTab(tab)}
+                      className="mr-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-foreground-subtle transition-colors duration-150 hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                    >
+                      <X aria-hidden className="size-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SortableList>
 
         <div className="flex shrink-0 items-center gap-0.5">
           {active ? (

@@ -469,3 +469,44 @@ describe('AgentPanel — animação do painel lateral', () => {
     });
   });
 });
+
+describe('AgentPanel — ordem das abas', () => {
+  beforeEach(() => {
+    useUiStore.setState({
+      activeAgentId: agent.id,
+      activeChannelId: null,
+      agentPanelOpen: true,
+      agentRightPanel: 'agent',
+      agentPanelTab: 'screen',
+      agentPanelTabOrder: ['screen', 'routines', 'browser', 'data'],
+    });
+  });
+
+  it('reordena as abas com Alt+Arrow e persiste a ordem', () => {
+    render(<AgentPanel />);
+    const screenTab = screenGetTab('Tela');
+
+    fireEvent.keyDown(screenTab, { key: 'ArrowRight', altKey: true });
+
+    expect(screenGetAllTabs().map((node) => node.textContent)).toEqual([
+      'Rotinas',
+      'Tela',
+      'Navegador',
+      'Dados',
+    ]);
+    expect(useUiStore.getState().agentPanelTabOrder).toEqual([
+      'routines',
+      'screen',
+      'browser',
+      'data',
+    ]);
+  });
+});
+
+function screenGetTab(name: string): HTMLElement {
+  return screen.getByRole('tab', { name });
+}
+
+function screenGetAllTabs(): HTMLElement[] {
+  return screen.getAllByRole('tab');
+}

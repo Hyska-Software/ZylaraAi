@@ -24,7 +24,13 @@ import { PluginDockTabStrip } from '@/components/plugins/ui/PluginDockTabStrip';
 import { dockTabsForLayout, isRedundantDockTabAction } from '@/lib/plugins/ui/dock';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
-import { IconButton, Tooltip } from '@/components/ui';
+import {
+  IconButton,
+  SortableList,
+  Tooltip,
+  sortableDropClassHorizontal,
+  type SortableListApi,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import {
   SIDE_PANEL_WIDTH_DEFAULT,
@@ -39,10 +45,16 @@ import {
 } from '@/lib/store';
 import { resolveSidePanelLayout, useViewportWidth } from '@/lib/sidePanel';
 import type { Agent, AgentChannel, Conversation } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, sortStableByOrder } from '@/lib/utils';
 import { TASK_ATTENTION_STATUSES } from './agentTaskStatus';
 
-const PANEL_TABS: ReadonlyArray<{ id: AgentPanelTab; labelKey: string; icon: LucideIcon }> = [
+interface AgentPanelTabDef {
+  id: AgentPanelTab;
+  labelKey: string;
+  icon: LucideIcon;
+}
+
+const PANEL_TABS: ReadonlyArray<AgentPanelTabDef> = [
   { id: 'screen', labelKey: 'panel.tabs.screen', icon: Monitor },
   { id: 'routines', labelKey: 'panel.tabs.routines', icon: CalendarClock },
   { id: 'browser', labelKey: 'panel.tabs.browser', icon: Globe2 },
@@ -68,6 +80,8 @@ export function AgentPanel() {
   const open = useUiStore((state) => state.agentPanelOpen);
   const tab = useUiStore((state) => state.agentPanelTab);
   const setTab = useUiStore((state) => state.setAgentPanelTab);
+  const tabOrder = useUiStore((state) => state.agentPanelTabOrder);
+  const setTabOrder = useUiStore((state) => state.setAgentPanelTabOrder);
   const pluginDock = useUiStore((state) => state.pluginDockTab.agent);
   const ui = usePluginUi();
   const disabledPluginUi = usePluginUiPrefs((state) => state.disabled);
@@ -181,9 +195,15 @@ export function AgentPanel() {
     setPreviewWidth(null);
   };
 
-  const visibleTabs = channel
-    ? ([{ id: 'data', labelKey: 'panel.channelTab', icon: Database }] as const)
-    : PANEL_TABS;
+  const visibleTabs: AgentPanelTabDef[] = channel
+    ? [{ id: 'data', labelKey: 'panel.channelTab', icon: Database }]
+    : sortStableByOrder(
+        PANEL_TABS.map((entry) => entry.id),
+        tabOrder,
+      ).flatMap((id) => {
+        const entry = PANEL_TABS.find((candidate) => candidate.id === id);
+        return entry ? [entry] : [];
+      });
   const activeTab = channel ? 'data' : tab;
   const compactTabs = layout.width < 430;
 
@@ -241,48 +261,76 @@ export function AgentPanel() {
       onDismiss={() => setOpen(false)}
     >
       <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
-        <div
-          role="tablist"
-          aria-label={t('panel.tabsAria')}
-          className="flex min-w-0 flex-1 items-center gap-0.5"
+        <SortableList
+          ids={visibleTabs.map((entry) => entry.id)}
+          label={t('panel.tabsAria')}
+          itemLabel={(id) =>
+            t((visibleTabs.find((entry) => entry.id === id)?.labelKey ?? 'panel.tabs.screen') as never)
+          }
+          orientation="horizontal"
+          disabled={visibleTabs.length < 2}
+          onReorder={(ids) =>
+            setTabOrder([...ids, ...tabOrder.filter((id) => !ids.includes(id))] as AgentPanelTab[])
+          }
         >
-          {visibleTabs.map((entry) => {
-            const selected = activeTab === entry.id;
-            const label = t(entry.labelKey as never);
-            const Icon = entry.icon;
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                role="tab"
-                id={`agent-panel-tab-${entry.id}`}
-                aria-selected={selected}
-                aria-controls={PANEL_BODY_ID}
-                tabIndex={selected ? 0 : -1}
-                ref={(node) => {
-                  if (node) tabRefs.current.set(entry.id, node);
-                  else tabRefs.current.delete(entry.id);
-                }}
-                onClick={() => selectTab(entry.id)}
-                onKeyDown={(event) => handleTabKeyDown(event, entry.id)}
-                aria-label={label}
-                title={label}
-                className={cn(
-                  'flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium',
-                  'transition-colors duration-150',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-                  selected
-                    ? 'bg-surface-active text-foreground'
-                    : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
-                  compactTabs && 'px-2',
-                )}
-              >
-                <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
-                {compactTabs ? null : label}
-              </button>
-            );
-          })}
-        </div>
+          {(sortable: SortableListApi) => (
+            <div
+              role="tablist"
+              aria-label={t('panel.tabsAria')}
+              className="flex min-w-0 flex-1 items-center gap-0.5"
+            >
+              {visibleTabs.map((entry) => {
+                const selected = activeTab === entry.id;
+                const label = t(entry.labelKey as never);
+                const Icon = entry.icon;
+                const itemProps = sortable.itemProps(entry.id);
+                return (
+                  <div
+                    key={entry.id}
+                    role="presentation"
+                    {...sortable.dropProps(entry.id)}
+                    className={cn('shrink-0', sortableDropClassHorizontal)}
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      id={`agent-panel-tab-${entry.id}`}
+                      aria-selected={selected}
+                      aria-controls={PANEL_BODY_ID}
+                      tabIndex={selected ? 0 : -1}
+                      {...itemProps}
+                      ref={(node) => {
+                        itemProps.ref(node);
+                        if (node) tabRefs.current.set(entry.id, node);
+                        else tabRefs.current.delete(entry.id);
+                      }}
+                      onClick={() => selectTab(entry.id)}
+                      onKeyDown={(event) => {
+                        itemProps.onKeyDown(event);
+                        if (!event.defaultPrevented) handleTabKeyDown(event, entry.id);
+                      }}
+                      aria-label={label}
+                      title={label}
+                      className={cn(
+                        'flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium',
+                        'transition-colors duration-150',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+                        selected
+                          ? 'bg-surface-active text-foreground'
+                          : 'text-foreground-muted hover:bg-surface-hover hover:text-foreground',
+                        compactTabs && 'px-2',
+                        !sortable.disabled && 'cursor-grab active:cursor-grabbing',
+                      )}
+                    >
+                      <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
+                      {compactTabs ? null : label}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SortableList>
         <PluginDockTabStrip layout="agent" compact={compactTabs} />
         <Slot
           name="agent.panel.tabs"

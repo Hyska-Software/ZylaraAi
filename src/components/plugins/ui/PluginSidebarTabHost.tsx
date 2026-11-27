@@ -5,13 +5,20 @@
  * either a trusted React component or a sandboxed `entry` iframe. The host keeps
  * its own navigation; plugin tabs are an additive region.
  */
-import { useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 
+import {
+  SortableList,
+  sortableDropClassHorizontal,
+  type SortableListApi,
+} from '@/components/ui';
 import { useChatStore } from '@/lib/store/chatStore';
 import { useUiStore, type LayoutMode } from '@/lib/store/uiStore';
 import { pluginLabel } from '@/lib/plugins/registry';
 import { pluginIcon as iconForPlugin } from '@/lib/plugins/icons';
+import { sortStableByOrder } from '@/lib/utils';
 import { runPluginHostAction } from '@/lib/plugins/ui/hostActions';
 import { PluginFrame } from '@/lib/plugins/frame';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
@@ -92,46 +99,90 @@ export function PluginSidebarTabHost({ layout, className }: PluginSidebarTabHost
 
 /** Strip of plugin tab buttons for a sidebar. */
 export function PluginSidebarTabStrip({ layout }: { layout: LayoutMode }) {
+  const { t } = useTranslation('plugins');
   const ui = usePluginUi();
   const prefs = usePluginUiPrefs();
   const activeKey = useUiStore((state) => state.pluginSidebarTab[layout] ?? null);
-  const tabs = (ui.sidebarTabs ?? []).filter(
-    (entry) => entry.sidebars.includes(layout) && !prefs.disabled.includes(entry.key),
+  const tabOrder = useUiStore((state) => state.pluginSidebarTabOrder[layout]);
+  const setTabOrder = useUiStore((state) => state.setPluginSidebarTabOrder);
+  const tabs = useMemo(
+    () =>
+      (ui.sidebarTabs ?? []).filter(
+        (entry) => entry.sidebars.includes(layout) && !prefs.disabled.includes(entry.key),
+      ),
+    [ui.sidebarTabs, prefs.disabled, layout],
   );
-  if (!prefs.enabled || tabs.length === 0) return null;
+  const orderedTabs = useMemo(
+    () =>
+      sortStableByOrder(
+        tabs.map((entry) => entry.key),
+        tabOrder,
+      ).flatMap((key) => {
+        const entry = tabs.find((candidate) => candidate.key === key);
+        return entry ? [entry] : [];
+      }),
+    [tabs, tabOrder],
+  );
+  if (!prefs.enabled || orderedTabs.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-1 px-2 pb-1" role="tablist">
-      {tabs.map((tab) => {
-        const active = tab.key === activeKey;
-        const Icon = iconForPlugin(tab.icon);
-        const title = pluginLabel(tab.plugin, tab.titleKey, tab.title);
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            title={title}
-            aria-label={title}
-            onClick={() =>
-              useUiStore.getState().setPluginSidebarTab(layout, active ? null : tab.key)
-            }
-            className={
-              active
-                ? 'inline-flex items-center gap-1.5 rounded-lg bg-accent-soft px-2 py-1 text-[12px] font-medium text-foreground'
-                : 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground'
-            }
-          >
-            <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
-            <span className="max-w-[9rem] truncate">{title}</span>
-            {tab.badge ? (
-              <span className="rounded-full bg-surface-active px-1.5 text-[10px] text-foreground-muted">
-                {tab.badge}
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
+    <SortableList
+      ids={orderedTabs.map((entry) => entry.key)}
+      label={t('host.sidebarTabs')}
+      itemLabel={(key) => {
+        const entry = orderedTabs.find((candidate) => candidate.key === key);
+        return entry ? pluginLabel(entry.plugin, entry.titleKey, entry.title) : key;
+      }}
+      orientation="horizontal"
+      disabled={orderedTabs.length < 2}
+      onReorder={(ids) => setTabOrder(layout, ids)}
+    >
+      {(sortable: SortableListApi) => (
+        <div
+          ref={sortable.containerRef}
+          className="scrollbar-none flex items-center gap-1 overflow-x-auto px-2 pb-1"
+          role="tablist"
+        >
+          {orderedTabs.map((tab) => {
+            const active = tab.key === activeKey;
+            const Icon = iconForPlugin(tab.icon);
+            const title = pluginLabel(tab.plugin, tab.titleKey, tab.title);
+            const itemProps = sortable.itemProps(tab.key);
+            return (
+              <div
+                key={tab.key}
+                role="presentation"
+                {...sortable.dropProps(tab.key)}
+                className={sortableDropClassHorizontal}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  title={title}
+                  aria-label={title}
+                  {...itemProps}
+                  onClick={() =>
+                    useUiStore.getState().setPluginSidebarTab(layout, active ? null : tab.key)
+                  }
+                  className={
+                    active
+                      ? 'inline-flex items-center gap-1.5 rounded-lg bg-accent-soft px-2 py-1 text-[12px] font-medium text-foreground'
+                      : 'inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground'
+                  }
+                >
+                  <Icon aria-hidden className="size-3.5" strokeWidth={1.75} />
+                  <span className="max-w-[9rem] truncate">{title}</span>
+                  {tab.badge ? (
+                    <span className="rounded-full bg-surface-active px-1.5 text-[10px] text-foreground-muted">
+                      {tab.badge}
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </SortableList>
   );
 }
