@@ -548,7 +548,7 @@ function WorkspaceRow({
       </div>
 
       {expanded && canExpand ? (
-        <div className="mb-1 ml-4 mt-0.5 border-l border-border pl-1.5">
+        <div className="mb-1 ml-4 mt-0.5 pl-1.5">
           <SortableList
             ids={visibleSessions.map((conversation) => conversation.id)}
             label={t('code:sidebar.workspace.sessionsAria', { name: workspace.name })}
