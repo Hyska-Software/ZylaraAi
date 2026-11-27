@@ -163,7 +163,7 @@ export function pickBranchBase(
 function emptyCopyFor(
   filter: ChangesFilter,
   hasWorkspace: boolean,
-): { title: string; description: string } {
+): { title: string; description?: string } {
   if (!hasWorkspace) {
     return {
       title: t('code:changes.empty.noWorkspace.title'),
@@ -200,7 +200,6 @@ function emptyCopyFor(
     default:
       return {
         title: t('code:changes.empty.uncommitted.title'),
-        description: t('code:changes.empty.uncommitted.description'),
       };
   }
 }
@@ -1009,9 +1008,11 @@ export function ChangesPanel({
           <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-6 py-8 text-center">
             <FileDiff aria-hidden className="size-5 text-foreground-subtle" strokeWidth={1.75} />
             <p className="text-[12.5px] font-medium text-foreground">{emptyCopy.title}</p>
-            <p className="max-w-64 text-[12px] leading-relaxed text-foreground-muted">
-              {emptyCopy.description}
-            </p>
+            {emptyCopy.description ? (
+              <p className="max-w-64 text-[12px] leading-relaxed text-foreground-muted">
+                {emptyCopy.description}
+              </p>
+            ) : null}
             {isRepo && !filterReadOnly ? (
               <Button
                 variant="secondary"

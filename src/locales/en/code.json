@@ -1018,8 +1018,7 @@
         "description": "Changes since the common ancestor with that branch appear here."
       },
       "uncommitted": {
-        "title": "No pending changes",
-        "description": "Non-ignored hidden files appear here; files ignored by Git stay out of the list."
+        "title": "No pending changes"
       }
     },
     "loadCommitError": "Could not load the commit.",

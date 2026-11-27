@@ -33,6 +33,7 @@ export function ComposerActivity({ active, reduceMotion }: ComposerActivityProps
   const chatExecutionAnimationEnabled = useAppStore(
     (state) => state.settings.chatExecutionAnimationEnabled,
   );
+  const borderRadiusEnabled = useAppStore((state) => state.settings.borderRadiusEnabled);
   useLayoutEffect(() => {
     if (!chatExecutionAnimationEnabled) return;
     const host = hostRef.current;
@@ -48,8 +49,11 @@ export function ComposerActivity({ active, reduceMotion }: ComposerActivityProps
       const measuredRadius = computed
         ? Number.parseFloat(computed.borderTopLeftRadius)
         : Number.NaN;
-      const radius =
-        Number.isFinite(measuredRadius) && measuredRadius > 0
+      // Flat-corners mode makes the measured radius 0; honour that instead of
+      // treating a square corner as "not measured" and falling back to round.
+      const radius = !borderRadiusEnabled
+        ? 0
+        : Number.isFinite(measuredRadius) && measuredRadius >= 0
           ? measuredRadius
           : DEFAULT_RADIUS;
       setBox((previous) =>
@@ -63,15 +67,30 @@ export function ComposerActivity({ active, reduceMotion }: ComposerActivityProps
     };
 
     measure();
+    // The app flips `flat-borders` (and theme radius tokens) in a parent effect
+    // that runs after this layout effect, so watch the root to catch the change.
+    const rootObserver =
+      typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver(measure);
+    rootObserver?.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
     // jsdom (unit tests) does not implement ResizeObserver; the initial measure
     // is enough for the component to render there.
-    if (typeof ResizeObserver === 'undefined') return;
+    if (typeof ResizeObserver === 'undefined') {
+      return () => rootObserver?.disconnect();
+    }
     const observer = new ResizeObserver(measure);
     observer.observe(host);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      rootObserver?.disconnect();
+    };
     // Re-measure when a turn starts so a font-scale change is picked up even if
     // the composer box happened to keep the same size.
-  }, [active, chatExecutionAnimationEnabled]);
+  }, [active, chatExecutionAnimationEnabled, borderRadiusEnabled]);
 
   if (!chatExecutionAnimationEnabled) return null;
 

@@ -514,7 +514,11 @@ describe('ChangesPanel', () => {
       />,
     );
     expect(screen.getByText('Nenhuma alteração pendente')).toBeTruthy();
-    expect(screen.getByText('Arquivos ocultos não ignorados aparecem aqui; arquivos ignorados pelo Git ficam fora da lista.')).toBeTruthy();
+    expect(
+      screen.queryByText(
+        'Arquivos ocultos não ignorados aparecem aqui; arquivos ignorados pelo Git ficam fora da lista.',
+      ),
+    ).toBeNull();
   });
 
   it('warns about merge conflicts and blocks the commit', () => {

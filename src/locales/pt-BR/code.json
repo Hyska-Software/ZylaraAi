@@ -1018,8 +1018,7 @@
         "description": "As alterações desde o ponto comum com essa branch aparecem aqui."
       },
       "uncommitted": {
-        "title": "Nenhuma alteração pendente",
-        "description": "Arquivos ocultos não ignorados aparecem aqui; arquivos ignorados pelo Git ficam fora da lista."
+        "title": "Nenhuma alteração pendente"
       }
     },
     "loadCommitError": "Não foi possível carregar o commit.",

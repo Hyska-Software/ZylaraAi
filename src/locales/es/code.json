@@ -1018,8 +1018,7 @@
         "description": "Los cambios desde el ancestro común con esa rama aparecen aquí."
       },
       "uncommitted": {
-        "title": "Ningún cambio pendiente",
-        "description": "Los archivos ocultos no ignorados aparecen aquí; los archivos ignorados por Git quedan fuera de la lista."
+        "title": "Ningún cambio pendiente"
       }
     },
     "loadCommitError": "No se pudo cargar el commit.",
