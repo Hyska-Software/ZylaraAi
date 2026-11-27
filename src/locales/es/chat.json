@@ -164,6 +164,16 @@
     "openPageAria": "Abrir {{title}} en el navegador",
     "toolLabel": "{{verb}} {{detail}}",
     "toolLabelPlain": "{{verb}}",
+    "summary": {
+      "commands_one": "ejecutó {{count}} comando",
+      "commands_other": "ejecutó {{count}} comandos",
+      "reads_one": "leyó {{count}} archivo",
+      "reads_other": "leyó {{count}} archivos",
+      "searches_one": "buscó {{count}} vez",
+      "searches_other": "buscó {{count}} veces",
+      "other_one": "usó {{count}} otra herramienta",
+      "other_other": "usó {{count}} otras herramientas"
+    },
     "families": {
       "shell": "Shell",
       "checks": "Verificaciones",

@@ -51,6 +51,11 @@
       "description": "El bloque de razonamiento y pasos del agente empieza cerrado y no se abre solo durante la transmisión. Puedes expandirlo en cualquier momento.",
       "aria": "Razonamiento contraído por defecto"
     },
+    "detailedAgentSteps": {
+      "label": "Pasos detallados del agente",
+      "description": "Muestra la cronología expandida con detalles por llamada en lugar de la lista compacta de acciones con desplazamiento en el chat.",
+      "aria": "Pasos detallados del agente"
+    },
     "context": {
       "title": "Contexto",
       "description": "Cuando la conversación se acerca a la ventana del modelo, los mensajes antiguos se resumen y el trabajo reciente se mantiene íntegro."

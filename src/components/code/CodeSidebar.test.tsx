@@ -424,7 +424,7 @@ describe('CodeSidebar — Workspaces reais', () => {
 
   it('mostra prévia, hora e status concluído nas sessões do Code', async () => {
     const today = new Date();
-    today.setHours(17, 56, 0, 0);
+    today.setHours(0, 1, 0, 0);
     mocks.listWorkspaces.mockResolvedValue([workspace()]);
     useChatStore.setState({
       conversations: [
@@ -444,7 +444,7 @@ describe('CodeSidebar — Workspaces reais', () => {
     const row = await screen.findByRole('button', { name: 'Visão geral do projeto' });
     expect(within(row).getByText('App desktop local-first (Tauri 2 +...)')).toBeTruthy();
     expect(within(row).getByText('Concluída')).toBeTruthy();
-    expect(within(row).getByText('17:56')).toBeTruthy();
+    expect(within(row).getByText('00:01')).toBeTruthy();
     expect(within(row).getByTitle('DeepSeek V4.1 Flash')).toBeTruthy();
     expect(row.className).not.toContain('pr-8');
     expect(row.parentElement?.querySelector('.bg-linear-to-l')).toBeTruthy();

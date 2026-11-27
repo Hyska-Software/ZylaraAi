@@ -174,6 +174,19 @@ export function GeneralTab() {
         </SettingRow>
 
         <SettingRow
+          label={t('general.detailedAgentSteps.label')}
+          description={t('general.detailedAgentSteps.description')}
+        >
+          <Switch
+            checked={settings.detailedAgentStepsEnabled === true}
+            onCheckedChange={(checked) =>
+              void saveSettings({ detailedAgentStepsEnabled: checked })
+            }
+            aria-label={t('general.detailedAgentSteps.aria')}
+          />
+        </SettingRow>
+
+        <SettingRow
           label={t('general.keepInTray.label')}
           description={t('general.keepInTray.description')}
         >

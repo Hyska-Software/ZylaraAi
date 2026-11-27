@@ -51,6 +51,11 @@
       "description": "O bloco de raciocínio e passos do agente começa fechado e não abre sozinho durante o streaming. Você pode expandi-lo a qualquer momento.",
       "aria": "Raciocínio recolhido por padrão"
     },
+    "detailedAgentSteps": {
+      "label": "Passos detalhados do agente",
+      "description": "Mostra a linha do tempo expandida com detalhes por chamada em vez da lista compacta de ações com rolagem no chat.",
+      "aria": "Passos detalhados do agente"
+    },
     "context": {
       "title": "Contexto",
       "description": "Quando a conversa se aproxima da janela do modelo, mensagens antigas são resumidas e o trabalho recente é mantido integralmente."

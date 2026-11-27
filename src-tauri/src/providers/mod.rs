@@ -1108,9 +1108,12 @@ pub(crate) async fn post_json(
         ));
     }
     serde_json::from_str::<Value>(&text).map_err(|error| {
-        ProviderError::Other(format!(
-            "resposta não-JSON de {}: {error}",
-            config.provider_name
+        ProviderError::Other(crate::i18n::t_args(
+            "providers.errors.nonJsonResponse",
+            &[
+                ("provider", &config.provider_name.to_string()),
+                ("error", &error.to_string()),
+            ],
         ))
     })
 }

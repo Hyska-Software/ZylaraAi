@@ -7381,11 +7381,12 @@ impl Db {
         summary: NewSessionSummary<'_>,
     ) -> anyhow::Result<SessionSummary> {
         if summary.from_seq < 1 || summary.to_seq < summary.from_seq {
-            return Err(anyhow::anyhow!(
-                "faixa de compactação inválida: {}..{}",
-                summary.from_seq,
-                summary.to_seq
-            ));
+            let from = summary.from_seq.to_string();
+            let to = summary.to_seq.to_string();
+            return Err(anyhow::anyhow!(crate::i18n::t_args(
+                "db.errors.invalidSummaryRange",
+                &[("from", &from), ("to", &to)]
+            )));
         }
         let summary = SessionSummary {
             id: uuid::Uuid::new_v4().to_string(),

@@ -1467,6 +1467,9 @@ pub struct Settings {
     /// Mantém o bloco de raciocínio/passos do assistente recolhido por padrão
     /// (não abre sozinho durante o streaming; o usuário pode expandir).
     pub thinking_collapsed_by_default: bool,
+    /// When true, chat keeps the expanded agent-step timeline with per-call
+    /// details instead of the compact scrollable action list.
+    pub detailed_agent_steps_enabled: bool,
     /// Opt-in: replaces the reasoning selector with a sliding level control.
     pub reasoning_slider_enabled: bool,
     pub font_scale: f32,
@@ -1662,6 +1665,7 @@ impl Default for Settings {
             show_token_usage: true,
             reduce_motion: false,
             thinking_collapsed_by_default: false,
+            detailed_agent_steps_enabled: false,
             reasoning_slider_enabled: false,
             font_scale: 1.0,
             terminal_font_family: String::new(),
@@ -3075,6 +3079,21 @@ mod tests {
 
         let json = serde_json::to_value(&disabled).expect("serialize settings");
         assert_eq!(json["chatExecutionAnimationEnabled"], false);
+    }
+
+    #[test]
+    fn settings_detailed_agent_steps_defaults_to_false_and_uses_camel_case() {
+        // The compact chat view is the default, including for older settings files.
+        let settings: Settings = serde_json::from_str("{}").expect("Settings with defaults");
+        assert!(!settings.detailed_agent_steps_enabled);
+
+        let enabled: Settings = serde_json::from_str(r#"{"detailedAgentStepsEnabled":true}"#)
+            .expect("enable detailed agent steps");
+        assert!(enabled.detailed_agent_steps_enabled);
+
+        let json = serde_json::to_value(&enabled).expect("serialize settings");
+        assert_eq!(json["detailedAgentStepsEnabled"], true);
+        assert!(json.get("detailed_agent_steps_enabled").is_none());
     }
 
     /// Auth-status DTOs are renderer-facing: they may carry account labels and

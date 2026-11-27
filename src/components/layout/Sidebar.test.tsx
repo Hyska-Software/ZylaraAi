@@ -426,7 +426,7 @@ describe('Sidebar — reordenação por teclado', () => {
 describe('Sidebar — mais informações nas linhas de conversa', () => {
   it('mostra prévia, hora e status concluído por padrão', () => {
     const today = new Date();
-    today.setHours(17, 56, 0, 0);
+    today.setHours(0, 1, 0, 0);
     useChatStore.setState({
       conversations: [
         conversation({
@@ -444,7 +444,7 @@ describe('Sidebar — mais informações nas linhas de conversa', () => {
     const row = screen.getByRole('button', { name: 'Visão geral do projeto' });
     expect(row.textContent).toContain('App desktop local-first (Tauri 2 +...)');
     expect(row.textContent).toContain('Concluída');
-    expect(row.textContent).toContain('17:56');
+    expect(row.textContent).toContain('00:01');
     expect(within(row).getByTitle('DeepSeek V4.1 Flash')).toBeTruthy();
     expect(row.className).not.toContain('pr-8');
     expect(row.parentElement?.querySelector('.bg-linear-to-l')).toBeTruthy();

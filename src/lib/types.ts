@@ -2413,6 +2413,11 @@ export interface Settings {
    * pode expandi-lo manualmente a qualquer momento.
    */
   thinkingCollapsedByDefault: boolean;
+  /**
+   * Opt-in: keeps the expanded agent-step timeline in chat instead of the
+   * compact scrollable action list. Absent means false (compact is the default).
+   */
+  detailedAgentStepsEnabled?: boolean;
   fontScale: number;
   /** Custom font stack for the code terminal; empty = the bundled JetBrains Mono stack. */
   terminalFontFamily?: string;

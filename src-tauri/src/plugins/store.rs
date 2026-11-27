@@ -221,7 +221,7 @@ impl PluginManager {
         if let Some(object) = value.as_object_mut() {
             object.remove("signature");
         }
-        let canonical = serde_json::to_vec(&value)?;
+        let canonical = super::signature::canonical_json_bytes(&value)?;
         let verified = super::signature::verify_registry(&canonical, &signature)
             .context("PLUGIN_REGISTRY_SIGNATURE_INVALID: registry signature does not match")?;
         let registry_publisher = format!("registry:{url}");

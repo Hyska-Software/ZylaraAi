@@ -40,6 +40,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
     showTokenUsage: true,
     reduceMotion: false,
     thinkingCollapsedByDefault: false,
+    detailedAgentStepsEnabled: false,
     fontScale: 1,
     includeAttachments: true,
     autoTitle: true,
@@ -115,6 +116,54 @@ describe('GeneralTab — raciocínio recolhido por padrão', () => {
       );
     });
     expect(useAppStore.getState().settings.thinkingCollapsedByDefault).toBe(false);
+  });
+});
+
+describe('GeneralTab — passos detalhados do agente', () => {
+  function detailedStepsSwitch(): HTMLButtonElement {
+    return screen.getByRole('switch', {
+      name: 'Passos detalhados do agente',
+    }) as HTMLButtonElement;
+  }
+
+  it('is off by default and describes the compact chat view', () => {
+    render(<GeneralTab />);
+
+    expect(screen.getByText('Passos detalhados do agente')).toBeTruthy();
+    expect(
+      screen.getByText(/linha do tempo expandida com detalhes por chamada/),
+    ).toBeTruthy();
+    expect(detailedStepsSwitch().getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('saves detailedAgentStepsEnabled when toggled', async () => {
+    render(<GeneralTab />);
+
+    fireEvent.click(detailedStepsSwitch());
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ detailedAgentStepsEnabled: true }),
+      );
+    });
+    expect(useAppStore.getState().settings.detailedAgentStepsEnabled).toBe(true);
+  });
+
+  it('shows checked when enabled and saves false when turned off', async () => {
+    useAppStore.setState({
+      settings: settings({ detailedAgentStepsEnabled: true }),
+    });
+
+    render(<GeneralTab />);
+    expect(detailedStepsSwitch().getAttribute('aria-checked')).toBe('true');
+
+    fireEvent.click(detailedStepsSwitch());
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ detailedAgentStepsEnabled: false }),
+      );
+    });
   });
 });
 

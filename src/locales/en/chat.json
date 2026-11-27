@@ -164,6 +164,16 @@
     "openPageAria": "Open {{title}} in the browser",
     "toolLabel": "{{verb}} {{detail}}",
     "toolLabelPlain": "{{verb}}",
+    "summary": {
+      "commands_one": "ran {{count}} command",
+      "commands_other": "ran {{count}} commands",
+      "reads_one": "read {{count}} file",
+      "reads_other": "read {{count}} files",
+      "searches_one": "searched {{count}} time",
+      "searches_other": "searched {{count}} times",
+      "other_one": "used {{count}} other tool",
+      "other_other": "used {{count}} other tools"
+    },
     "families": {
       "shell": "Shell",
       "checks": "Checks",

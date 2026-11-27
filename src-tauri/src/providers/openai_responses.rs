@@ -199,13 +199,27 @@ pub(crate) fn compact_body(request: &CompletionRequest) -> Value {
 /// `output` carries the opaque (encrypted) compaction item to replay verbatim.
 pub(crate) fn parse_compact_response(value: &Value) -> anyhow::Result<Value> {
     if value.get("object").and_then(Value::as_str) != Some("response.compaction") {
-        anyhow::bail!("resposta de compactação sem object=response.compaction: {value}");
+        anyhow::bail!(
+            "{}",
+            crate::i18n::t_args(
+                "providers.errors.compactionMissingObject",
+                &[("value", &value.to_string())]
+            )
+        );
     }
     let output = value
         .get("output")
         .and_then(Value::as_array)
         .filter(|items| !items.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("resposta de compactação sem output: {value}"))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "{}",
+                crate::i18n::t_args(
+                    "providers.errors.compactionMissingOutput",
+                    &[("value", &value.to_string())]
+                )
+            )
+        })?;
     Ok(json!({"object": "response.compaction", "output": output}))
 }
 

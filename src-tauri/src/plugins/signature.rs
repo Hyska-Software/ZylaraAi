@@ -11,6 +11,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 pub const SIGNATURE_PATH: &str = "META-INF/signature.json";
@@ -151,6 +152,30 @@ pub fn verify_package(
         public_key: signature.public_key.clone(),
         fingerprint: key_fingerprint(&public_key),
     })
+}
+
+/// Canonical JSON bytes for registry signatures: object keys are sorted
+/// recursively, matching `canonicalJson` in `scripts/plugin/cli.mjs`.
+pub fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>> {
+    fn sort_keys(value: &Value) -> Value {
+        match value {
+            Value::Object(map) => {
+                let mut entries: Vec<(String, Value)> = map
+                    .iter()
+                    .map(|(key, value)| (key.clone(), sort_keys(value)))
+                    .collect();
+                entries.sort_by(|left, right| left.0.cmp(&right.0));
+                let mut sorted = Map::new();
+                for (key, value) in entries {
+                    sorted.insert(key, value);
+                }
+                Value::Object(sorted)
+            }
+            Value::Array(items) => Value::Array(items.iter().map(sort_keys).collect()),
+            _ => value.clone(),
+        }
+    }
+    Ok(serde_json::to_vec(&sort_keys(value))?)
 }
 
 /// Verifies a detached registry signature over canonical JSON bytes.

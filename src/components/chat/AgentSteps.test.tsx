@@ -18,11 +18,23 @@ function setThinkingCollapsedByDefault(value: boolean): void {
   });
 }
 
-beforeEach(() => setThinkingCollapsedByDefault(false));
+/** The detailed timeline is opt-in; compact is the product default. */
+function setDetailedAgentSteps(value: boolean): void {
+  useAppStore.setState({
+    settings: { ...useAppStore.getState().settings, detailedAgentStepsEnabled: value },
+  });
+}
+
+beforeEach(() => {
+  setThinkingCollapsedByDefault(false);
+  // Existing detailed-view assertions run with the opt-in switch enabled.
+  setDetailedAgentSteps(true);
+});
 
 afterEach(() => {
   cleanup();
   setThinkingCollapsedByDefault(false);
+  setDetailedAgentSteps(false);
   useUiStore.setState({ layoutMode: 'chat' });
 });
 
@@ -1310,5 +1322,106 @@ describe('AgentSteps — execução separada por resposta (Code e Agentes)', () 
     expect(
       screen.getByText('Given this is a large project, maybe I should use teammates.'),
     ).toBeTruthy();
+  });
+});
+
+describe('AgentSteps — visualização compacta padrão no chat', () => {
+  function compactMessage(): ChatMessage {
+    return message({
+      reasoning: 'Vou inspecionar.',
+      toolCalls: [
+        tool({ id: 'cmd', name: 'run_command', arguments: '{"command":"pnpm test"}' }),
+        tool({ id: 'read-a', name: 'read_file', arguments: '{"path":"src/a.ts"}' }),
+        tool({ id: 'read-b', name: 'read_file', arguments: '{"path":"src/b.ts"}' }),
+        tool({ id: 'search', name: 'search_text', arguments: '{"pattern":"trace"}' }),
+        tool({ id: 'tasks', name: 'todo_write', arguments: '{"todos":[]}' }),
+      ],
+      trace: [{ reasoning: 'Vou inspecionar.', toolCalls: 5 }],
+    });
+  }
+
+  it('summarizes actions and shows every call in a capped scrollable list', async () => {
+    setDetailedAgentSteps(false);
+    const user = userEvent.setup();
+    render(<AgentSteps streaming={false} phase={null} message={compactMessage()} />);
+
+    const header = screen.getByRole('button', {
+      name: /Executou 1 comando, leu 2 arquivos, pesquisou 1 vez e usou 1 outra ferramenta/,
+    });
+    expect(header.getAttribute('aria-expanded')).toBe('false');
+
+    await user.click(header);
+    const region = screen.getByRole('region', { name: /Executou 1 comando/ });
+    expect(region.className).toContain('max-h-80');
+    expect(region.className).toContain('overflow-y-auto');
+    expect(within(region).getAllByRole('listitem')).toHaveLength(6);
+    expect(
+      within(region).getByRole('listitem', { name: 'Executou pnpm test' }),
+    ).toBeTruthy();
+    expect(within(region).getByRole('listitem', { name: 'Leu src/a.ts' })).toBeTruthy();
+    expect(within(region).getByRole('listitem', { name: 'Leu src/b.ts' })).toBeTruthy();
+    expect(within(region).queryByText('Leu 2 arquivos')).toBeNull();
+  });
+
+  it('keeps the reasoning expandable and the height cap active while streaming', async () => {
+    setDetailedAgentSteps(false);
+    const user = userEvent.setup();
+    render(
+      <AgentSteps
+        streaming
+        phase="reasoning"
+        startedAt={Date.now() - 1_000}
+        message={message({
+          reasoning: 'Analisando.',
+          toolCalls: [],
+          trace: [{ reasoning: 'Analisando.', toolCalls: 0 }],
+          status: 'streaming',
+        })}
+      />,
+    );
+
+    const region = screen.getByRole('region', { name: /Pensando/ });
+    expect(region.className).toContain('max-h-80');
+    await user.click(screen.getByRole('button', { name: 'Pensou', expanded: false }));
+    expect(screen.getByText('Analisando.')).toBeTruthy();
+  });
+
+  it('restores the detailed timeline when the setting is enabled', async () => {
+    setDetailedAgentSteps(true);
+    const user = userEvent.setup();
+    render(
+      <AgentSteps
+        streaming={false}
+        phase={null}
+        message={message({
+          reasoning: 'Vou pesquisar.',
+          toolCalls: [SEARCH, FETCH],
+          trace: [{ reasoning: 'Vou pesquisar.', toolCalls: 2 }],
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Raciocínio' }));
+    expect(screen.getByText('Encontrou 2 páginas web')).toBeTruthy();
+    expect(screen.queryByRole('region')).toBeNull();
+  });
+
+  it('keeps the detailed view in the Code layout even with the setting off', async () => {
+    setDetailedAgentSteps(false);
+    useUiStore.setState({ layoutMode: 'code' });
+    const user = userEvent.setup();
+    render(
+      <AgentSteps
+        streaming={false}
+        phase={null}
+        message={message({
+          toolCalls: [SEARCH],
+          trace: [{ toolCalls: 1 }],
+        })}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { expanded: false }));
+    expect(screen.getByText('Encontrou 2 páginas web')).toBeTruthy();
   });
 });

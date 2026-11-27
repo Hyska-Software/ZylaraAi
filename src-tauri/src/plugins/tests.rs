@@ -768,7 +768,7 @@ fn registry_checks_updates_without_trusting_the_index_alone() {
         }],
         "revoked": []
     });
-    let canonical = serde_json::to_vec(&registry).unwrap();
+    let canonical = signature::canonical_json_bytes(&registry).unwrap();
     let signature = signature::sign_registry(&canonical, "registry-2026", &registry_key);
     registry["signature"] = serde_json::to_value(signature).unwrap();
     let registry_path = temp.path().join("registry.json");

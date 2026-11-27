@@ -14,7 +14,7 @@
 
 use std::collections::HashSet;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::domain::{RiskClass, ToolCallRecord};
 use crate::policy::PolicyDecision;
@@ -212,9 +212,27 @@ pub fn repeat_reminder(call: &ToolCallRecord, count: u32) -> String {
 /// JSON inválido cai no texto bruto aparado (nunca panica: os argumentos vêm
 /// do modelo e podem estar malformados).
 fn normalize_arguments(raw: &str) -> String {
+    fn sorted(value: &Value) -> Value {
+        match value {
+            Value::Object(map) => {
+                let mut entries: Vec<(String, Value)> = map
+                    .iter()
+                    .map(|(key, value)| (key.clone(), sorted(value)))
+                    .collect();
+                entries.sort_by(|left, right| left.0.cmp(&right.0));
+                let mut result = Map::new();
+                for (key, value) in entries {
+                    result.insert(key, value);
+                }
+                Value::Object(result)
+            }
+            Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+            _ => value.clone(),
+        }
+    }
     let trimmed = raw.trim();
     match serde_json::from_str::<Value>(trimmed) {
-        Ok(value) => serde_json::to_string(&value).unwrap_or_else(|_| trimmed.to_string()),
+        Ok(value) => serde_json::to_string(&sorted(&value)).unwrap_or_else(|_| trimmed.to_string()),
         Err(_) => trimmed.to_string(),
     }
 }

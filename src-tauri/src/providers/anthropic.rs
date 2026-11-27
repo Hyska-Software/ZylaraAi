@@ -172,7 +172,13 @@ pub(crate) fn compaction_body(request: &CompletionRequest) -> Value {
 /// Returns the assistant replay state and the readable summary text.
 pub(crate) fn parse_compaction_response(value: &Value) -> anyhow::Result<(Value, String)> {
     if value.get("stop_reason").and_then(Value::as_str) != Some("compaction") {
-        anyhow::bail!("resposta de compactação com stop_reason inesperado: {value}");
+        anyhow::bail!(
+            "{}",
+            crate::i18n::t_args(
+                "providers.errors.compactionUnexpectedStopReason",
+                &[("value", &value.to_string())]
+            )
+        );
     }
     let block = value
         .get("content")
@@ -187,7 +193,13 @@ pub(crate) fn parse_compaction_response(value: &Value) -> anyhow::Result<(Value,
             }
         })
         .ok_or_else(|| {
-            anyhow::anyhow!("resposta de compactação exige exatamente um bloco compaction: {value}")
+            anyhow::anyhow!(
+                "{}",
+                crate::i18n::t_args(
+                    "providers.errors.compactionRequiresOneBlock",
+                    &[("value", &value.to_string())]
+                )
+            )
         })?;
     let text = block
         .get("content")
@@ -198,7 +210,13 @@ pub(crate) fn parse_compaction_response(value: &Value) -> anyhow::Result<(Value,
         .and_then(Value::as_str)
         .unwrap_or_default();
     if text.trim().is_empty() || signature.trim().is_empty() {
-        anyhow::bail!("bloco de compactação sem content/signature: {value}");
+        anyhow::bail!(
+            "{}",
+            crate::i18n::t_args(
+                "providers.errors.compactionMissingContentOrSignature",
+                &[("value", &value.to_string())]
+            )
+        );
     }
     Ok((
         json!({"role": "assistant", "content": [block]}),

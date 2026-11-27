@@ -2284,6 +2284,27 @@ mod tests {
     }
 
     #[test]
+    fn detailed_agent_steps_default_to_compact_and_round_trip_with_camel_case() {
+        // The compact Chat view is the factory default.
+        let defaults: Settings = serde_json::from_str("{}").expect("Settings with defaults");
+        assert!(!defaults.detailed_agent_steps_enabled);
+
+        // Existing settings.json files without the field keep the new default.
+        let legacy: Settings = serde_json::from_str(r#"{"thinkingCollapsedByDefault":true}"#)
+            .expect("legacy settings without the new field");
+        assert!(!legacy.detailed_agent_steps_enabled);
+
+        let enabled: Settings = serde_json::from_str(r#"{"detailedAgentStepsEnabled":true}"#)
+            .expect("deserialize renderer settings");
+        let normalized = normalize_settings(enabled);
+        assert!(normalized.detailed_agent_steps_enabled);
+
+        let value = serde_json::to_value(&normalized).expect("serialize settings");
+        assert_eq!(value["detailedAgentStepsEnabled"], true);
+        assert!(value.get("detailed_agent_steps_enabled").is_none());
+    }
+
+    #[test]
     fn reasoning_slider_setting_round_trips_and_defaults_to_off() {
         let parsed: Settings = serde_json::from_str(r#"{"reasoningSliderEnabled":true}"#)
             .expect("deserialize settings from renderer");

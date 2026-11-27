@@ -207,6 +207,10 @@ function bulletTexts(root: HTMLElement): string[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // This regression asserts the detailed timeline, now an opt-in preference.
+  useAppStore.setState({
+    settings: { ...useAppStore.getState().settings, detailedAgentStepsEnabled: true },
+  });
   mocks.listWorkspaces.mockResolvedValue([]);
   mocks.getWorkspace.mockResolvedValue(null);
   mocks.getCodeSessionState.mockResolvedValue(null);
@@ -225,7 +229,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   __resetWorkspacesForTests();
-  useAppStore.setState({ providers: [], auth: [], keys: [], selection: INITIAL_SELECTION });
+  useAppStore.setState({
+    providers: [],
+    auth: [],
+    keys: [],
+    selection: INITIAL_SELECTION,
+    settings: { ...useAppStore.getState().settings, detailedAgentStepsEnabled: false },
+  });
   useUiStore.setState({
     layoutMode: 'chat',
     codeView: 'session',

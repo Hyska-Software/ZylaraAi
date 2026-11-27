@@ -42,11 +42,14 @@ import { Spinner } from '@/components/ui';
 import {
   buildAgentResponseBlocks,
   buildAgentTrace,
+  buildCompactTurnRows,
   countTraceTools,
   describeTraceActivity,
   hasTraceReasoning,
+  summarizeCompactTurn,
   type AgentResponseBlock,
   type AgentTraceEntry,
+  type CompactTurnRow,
   type PageLink,
   type ToolGroup,
 } from '@/lib/agentTrace';
@@ -295,6 +298,93 @@ function TraceEntryRows({
   );
 }
 
+/** Compact one-line action row. Full output/diff stays in the detailed view. */
+function CompactToolRow({ row }: { row: Extract<CompactTurnRow, { kind: 'tool' }> }) {
+  const Icon = TOOL_ICONS[row.toolName] ?? Wrench;
+  const running = row.status === 'running';
+  const failed = row.status === 'error';
+  return (
+    <li aria-label={row.label} className="min-w-0">
+      <div className="flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-0.5">
+        <Icon
+          aria-hidden
+          className={cn(
+            'size-3.5 shrink-0',
+            running
+              ? 'text-accent'
+              : failed
+                ? 'text-danger'
+                : 'text-foreground-subtle',
+          )}
+        />
+        <span className="shrink-0 text-[12px] font-semibold text-foreground">
+          {row.verb}
+        </span>
+        {row.detail ? (
+          <code
+            title={row.detail}
+            className="min-w-0 truncate font-mono text-[11.5px] text-foreground-muted"
+          >
+            {row.detail}
+          </code>
+        ) : null}
+        {running ? (
+          <Spinner size="xs" className="ml-auto shrink-0 text-foreground-subtle" />
+        ) : null}
+        {failed ? (
+          <TriangleAlert
+            aria-hidden
+            className="ml-auto size-3.5 shrink-0 text-danger"
+          />
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+/** Chronological, height-capped action list used by default in chat. */
+function CompactTraceRows({
+  rows,
+  streaming,
+  phase,
+}: {
+  rows: CompactTurnRow[];
+  streaming: boolean;
+  phase: AgentStepsPhase | null;
+}) {
+  let lastReasoningIndex = -1;
+  rows.forEach((row, index) => {
+    if (row.kind === 'reasoning') lastReasoningIndex = index;
+  });
+
+  return (
+    <ol className="flex flex-col gap-0.5">
+      {rows.map((row, index) =>
+        row.kind === 'reasoning' ? (
+          <ComponentSlot
+            key={row.id}
+            name="chat.message.reasoning"
+            fallback={ReasoningRow as unknown as ComponentType<Record<string, unknown>>}
+            props={{
+              text: row.text,
+              durationMs: null,
+              streaming: streaming && phase === 'reasoning' && index === lastReasoningIndex,
+            }}
+          />
+        ) : (
+          <Slot
+            key={row.id}
+            name="chat.message.tool"
+            entryKey={row.toolName}
+            owner={{ tool: row.tool }}
+            fallback={<CompactToolRow row={row} />}
+          />
+        ),
+      )}
+    </ol>
+  );
+}
+
 /**
  * The "thinking space" of an assistant turn (DESIGN §6.3): a single
  * collapsible timeline that interleaves the model's reasoning with the steps
@@ -330,6 +420,20 @@ export function AgentSteps({ message, streaming, phase, startedAt, className }: 
   // título agregado fala em "Trabalhou por …". No Chat o bloco resume apenas o
   // raciocínio do modelo → "Pensou por …" (DESIGN §6.3).
   const layoutMode = useUiStore((state) => state.layoutMode);
+  const detailedSteps = useAppStore(
+    (state) => state.settings.detailedAgentStepsEnabled === true,
+  );
+  // Only chat switches to the compact, height-capped action list by default;
+  // Code and Agentes keep their detailed transcript.
+  const compact = layoutMode === 'chat' && !detailedSteps;
+  const compactRows = useMemo(
+    () => (compact ? buildCompactTurnRows(entries) : []),
+    [compact, entries],
+  );
+  const compactSummary = useMemo(
+    () => (compact ? summarizeCompactTurn(entries) : null),
+    [compact, entries],
+  );
   const collapsedByDefault =
     useAppStore((state) => state.settings.thinkingCollapsedByDefault) ||
     layoutMode === 'agent';
@@ -381,17 +485,42 @@ export function AgentSteps({ message, streaming, phase, startedAt, className }: 
   const duration = formatThinkingDuration(
     streaming ? liveElapsed : (message.usage?.durationMs ?? null),
   );
+  // The compact header summarizes the actions by family using the same wording
+  // as the detailed rows. While the turn runs, the live label stays in charge.
+  const summaryParts: string[] = [];
+  if (compactSummary) {
+    if (compactSummary.commands > 0) {
+      summaryParts.push(t('trace.summary.commands', { count: compactSummary.commands }));
+    }
+    if (compactSummary.reads > 0) {
+      summaryParts.push(t('trace.summary.reads', { count: compactSummary.reads }));
+    }
+    if (compactSummary.searches > 0) {
+      summaryParts.push(t('trace.summary.searches', { count: compactSummary.searches }));
+    }
+    if (compactSummary.other > 0) {
+      summaryParts.push(t('trace.summary.other', { count: compactSummary.other }));
+    }
+  }
+  const compactTitle =
+    summaryParts.length > 0
+      ? new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' })
+          .format(summaryParts)
+          .replace(/^./, (char) => char.toLocaleUpperCase(i18n.language))
+      : null;
   const title = working
     ? running && phase === 'tool'
       ? t('trace.toolsRunning')
       : t('trace.thinking')
-    : hasReasoning
-      ? duration
-        ? t(layoutMode === 'code' ? 'trace.workedFor' : 'trace.thoughtFor', { duration })
-        : t('trace.reasoning')
-      : toolCount > 0
-        ? t('trace.steps', { count: toolCount })
-        : t('trace.reasoning');
+    : compact && compactTitle
+      ? compactTitle
+      : hasReasoning
+        ? duration
+          ? t(layoutMode === 'code' ? 'trace.workedFor' : 'trace.thoughtFor', { duration })
+          : t('trace.reasoning')
+        : toolCount > 0
+          ? t('trace.steps', { count: toolCount })
+          : t('trace.reasoning');
   const shimmer = working && !reduceMotion;
 
   return (
@@ -438,12 +567,20 @@ export function AgentSteps({ message, streaming, phase, startedAt, className }: 
 
       <Collapsible.Content>
         <div
+          role={compact ? 'region' : undefined}
+          aria-label={compact ? title : undefined}
           className={cn(
             'mt-2.5 pl-0.5',
-            !streaming && 'max-h-80 overflow-y-auto overscroll-contain pr-1',
+            compact || !streaming
+              ? 'max-h-80 overflow-y-auto overscroll-contain pr-1'
+              : null,
           )}
         >
-          <TraceEntryRows entries={entries} streaming={streaming} phase={phase} />
+          {compact ? (
+            <CompactTraceRows rows={compactRows} streaming={streaming} phase={phase} />
+          ) : (
+            <TraceEntryRows entries={entries} streaming={streaming} phase={phase} />
+          )}
         </div>
       </Collapsible.Content>
       </Collapsible.Root>

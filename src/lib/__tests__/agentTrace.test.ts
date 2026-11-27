@@ -2,15 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAgentResponseBlocks,
   buildAgentTrace,
+  buildCompactTurnRows,
   countTraceTools,
   describeCodeTool,
   describeTraceActivity,
   hasTraceReasoning,
   hasTraceText,
+  summarizeCompactTurn,
   toolActivityLabel,
   toolFamilyLabel,
   type AgentResponseBlock,
   type AgentTraceEntry,
+  type CompactTurnRow,
   type ToolGroup,
 } from '@/lib/agentTrace';
 import type { ToolCallRecord, TraceStep } from '@/lib/types';
@@ -1043,5 +1046,85 @@ describe('hasTraceText / toolFamilyLabel', () => {
     expect(toolFamilyLabel('run_command')).toBe('Shell');
     expect(toolFamilyLabel('edit_file')).toBe('Editar');
     expect(toolFamilyLabel('minha_tool_nova')).toBe('minha tool nova');
+  });
+});
+
+describe('compact Chat turn view model', () => {
+  it('keeps one row per call in chronological order, expanding adjacent groups', () => {
+    const tools = [
+      tool({ id: 'r1', name: 'read_file', arguments: '{"path":"src/a.ts"}' }),
+      tool({ id: 'r2', name: 'read_file', arguments: '{"path":"src/b.ts"}' }),
+      tool({ id: 's1', name: 'search_text', arguments: '{"pattern":"trace"}' }),
+    ];
+    const entries = buildAgentTrace({
+      reasoning: 'Vou inspecionar.',
+      toolCalls: tools,
+      trace: [{ reasoning: 'Vou inspecionar.', toolCalls: 3 }],
+    });
+
+    const rows: CompactTurnRow[] = buildCompactTurnRows(entries);
+    expect(rows.map((row) => row.id)).toEqual(['reasoning-0', 'r1', 'r2', 's1']);
+    expect(rows[0]).toMatchObject({
+      kind: 'reasoning',
+      label: 'Pensou',
+      detail: 'Vou inspecionar.',
+    });
+    expect(rows[1]).toMatchObject({
+      kind: 'tool',
+      toolName: 'read_file',
+      label: 'Leu src/a.ts',
+      detail: 'src/a.ts',
+      status: 'done',
+    });
+    expect(rows[3].label).toBe('Buscou “trace”');
+  });
+
+  it('uses existing activity phrases for calls without a target and keeps the status', () => {
+    const entries = buildAgentTrace({
+      reasoning: '',
+      toolCalls: [
+        tool({ id: 'w1', name: 'web_search', arguments: '{"query":"rust"}', status: 'running' }),
+      ],
+      trace: [],
+    });
+    expect(buildCompactTurnRows(entries)[0]).toMatchObject({
+      label: 'Pesquisando na web',
+      detail: 'rust',
+      status: 'running',
+    });
+  });
+
+  it('counts tool calls by family without counting results or reasoning', () => {
+    const tools = [
+      tool({ name: 'run_command', arguments: '{"command":"pnpm test"}' }),
+      tool({ name: 'read_file', arguments: '{"path":"src/a.ts"}' }),
+      tool({ name: 'read_tool_output', arguments: '{"job_id":"j1"}' }),
+      tool({ name: 'search_files', arguments: '{"pattern":"**/*.rs"}' }),
+      tool({ name: 'web_search', result: SEARCH_RESULTS }),
+      tool({ name: 'todo_write', arguments: '{"todos":[]}' }),
+    ];
+    const entries = buildAgentTrace({
+      reasoning: 'Raciocínio longo',
+      toolCalls: tools,
+      trace: [{ reasoning: 'Raciocínio longo', toolCalls: tools.length }],
+    });
+    expect(summarizeCompactTurn(entries)).toEqual({
+      commands: 1,
+      reads: 2,
+      searches: 2,
+      other: 1,
+    });
+  });
+
+  it('still flattens legacy messages without a persisted trace', () => {
+    const entries = buildAgentTrace({
+      reasoning: 'Sem trace',
+      toolCalls: [tool({ id: 'legacy', name: 'list_dir', arguments: '{"path":"docs"}' })],
+      trace: undefined,
+    });
+    expect(buildCompactTurnRows(entries).map((row) => row.id)).toEqual([
+      'reasoning-0',
+      'legacy',
+    ]);
   });
 });

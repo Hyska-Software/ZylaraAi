@@ -258,8 +258,10 @@ impl Normalizer<'_> {
         if spec.typ == "keyvalue" {
             if !props.get("items").map(Value::is_array).unwrap_or(false) {
                 if let Some(Value::Object(pairs)) = props.get("items").cloned() {
-                    let items: Vec<Value> = pairs
-                        .iter()
+                    let mut sorted_pairs: Vec<(&String, &Value)> = pairs.iter().collect();
+                    sorted_pairs.sort_by(|left, right| left.0.cmp(right.0));
+                    let items: Vec<Value> = sorted_pairs
+                        .into_iter()
                         .map(|(label, value)| {
                             let mut item = Map::new();
                             item.insert("label".to_string(), Value::String(label.clone()));

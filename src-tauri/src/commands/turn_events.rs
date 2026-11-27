@@ -155,8 +155,20 @@ mod tests {
                 3,
                 TurnEvent::Done {
                     result: serde_json::from_value(serde_json::json!({
-                        "userMessage": {},
-                        "assistantMessage": {}
+                        "userMessage": {
+                            "id": "user-1",
+                            "conversationId": "conv-1",
+                            "role": "user",
+                            "status": "complete",
+                            "createdAt": 0
+                        },
+                        "assistantMessage": {
+                            "id": "assistant-1",
+                            "conversationId": "conv-1",
+                            "role": "assistant",
+                            "status": "complete",
+                            "createdAt": 0
+                        }
                     }))
                     .expect("turn result"),
                 },

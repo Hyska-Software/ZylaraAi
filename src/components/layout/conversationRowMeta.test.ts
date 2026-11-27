@@ -116,7 +116,7 @@ describe('conversationRowTime', () => {
 
   it('shows clock time for other conversations from today', () => {
     const today = new Date();
-    today.setHours(17, 56, 0, 0);
+    today.setHours(0, 1, 0, 0);
     expect(conversationRowTime(today.getTime())).toMatch(/^\d{2}:\d{2}$/);
   });
 

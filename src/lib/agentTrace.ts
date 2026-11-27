@@ -106,6 +106,96 @@ export function countTraceTools(entries: AgentTraceEntry[]): number {
   );
 }
 
+/** One rendered row of the compact, scrollable Chat turn view. */
+export type CompactTurnRow =
+  | {
+      id: string;
+      kind: 'reasoning';
+      /** Raw Markdown, kept so expanding the row still shows the full step. */
+      text: string;
+      /** Existing localized verb/activity phrase — never a new tool name. */
+      label: string;
+      /** One-line preview used by the compact row. */
+      detail: string | null;
+    }
+  | {
+      id: string;
+      kind: 'tool';
+      /** Full record so plugin slots receive the same owner as the detailed view. */
+      tool: ToolCallRecord;
+      toolName: string;
+      /** Verb only, for the compact row header. */
+      verb: string;
+      /** Full existing label (verb + detail), used for accessibility. */
+      label: string;
+      detail: string | null;
+      status: ToolCallRecord['status'];
+    };
+
+/** Call counts behind the compact Chat header. Reasoning is not a tool call. */
+export interface CompactTurnSummary {
+  commands: number;
+  reads: number;
+  searches: number;
+  other: number;
+}
+
+const COMPACT_COMMAND_TOOLS = new Set(['run_command']);
+const COMPACT_READ_TOOLS = new Set(['read_file', 'read_tool_output']);
+const COMPACT_SEARCH_TOOLS = new Set(['web_search', 'search_files', 'search_text']);
+
+/**
+ * Flattens a trace into one row per reasoning block and per tool call, in the
+ * original order. Adjacent groups are expanded so every action stays visible in
+ * the scrollable list; no result page or output is counted here.
+ */
+export function buildCompactTurnRows(entries: AgentTraceEntry[]): CompactTurnRow[] {
+  const rows: CompactTurnRow[] = [];
+  entries.forEach((entry, index) => {
+    if (entry.kind === 'reasoning') {
+      rows.push({
+        id: `reasoning-${index}`,
+        kind: 'reasoning',
+        text: entry.text,
+        label: t('chat:trace.thought'),
+        detail: oneLinePreview(entry.text, 96),
+      });
+      return;
+    }
+    for (const tool of entry.group.tools) {
+      const meta = describeCodeTool(tool);
+      const verb = meta.detail ? meta.verb : toolActivityLabel(tool.name);
+      const detail = meta.detail ?? toolPreview(tool);
+      rows.push({
+        id: tool.id,
+        kind: 'tool',
+        tool,
+        toolName: tool.name,
+        verb,
+        label: meta.detail ? meta.label : verb,
+        detail,
+        status: tool.status,
+      });
+    }
+  });
+  return rows;
+}
+
+/** Counts tool calls by family for the finished compact header. */
+export function summarizeCompactTurn(entries: AgentTraceEntry[]): CompactTurnSummary {
+  const summary: CompactTurnSummary = { commands: 0, reads: 0, searches: 0, other: 0 };
+  for (const entry of entries) {
+    if (entry.kind !== 'tools') continue;
+    for (const tool of entry.group.tools) {
+      if (COMPACT_COMMAND_TOOLS.has(tool.name)) summary.commands += 1;
+      else if (COMPACT_READ_TOOLS.has(tool.name)) summary.reads += 1;
+      else if (COMPACT_SEARCH_TOOLS.has(tool.name)) summary.searches += 1;
+      else summary.other += 1;
+    }
+  }
+  return summary;
+}
+
 /** True when the timeline has at least one reasoning block. */
 export function hasTraceReasoning(entries: AgentTraceEntry[]): boolean {
   return entries.some((entry) => entry.kind === 'reasoning');
@@ -333,9 +423,9 @@ export function describeTraceActivity(entries: AgentTraceEntry[]): TraceActivity
 }
 
 /** Collapses Markdown/line breaks into a single preview line. */
-function oneLinePreview(text: string): string | null {
+function oneLinePreview(text: string, maxChars = 220): string | null {
   const flat = text.replace(/\s+/g, ' ').trim();
-  return flat ? truncate(flat, 220) : null;
+  return flat ? truncate(flat, maxChars) : null;
 }
 
 /** Target of a tool call (command, path, query, URL…), one line. */

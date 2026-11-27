@@ -51,6 +51,11 @@
       "description": "The reasoning and agent-step block starts closed and does not open by itself while streaming. You can expand it at any time.",
       "aria": "Reasoning collapsed by default"
     },
+    "detailedAgentSteps": {
+      "label": "Detailed agent steps",
+      "description": "Shows the expanded step timeline with per-call details instead of the compact scrollable action list in chat.",
+      "aria": "Detailed agent steps"
+    },
     "context": {
       "title": "Context",
       "description": "When the conversation approaches the model window, older messages are summarized and recent work is kept verbatim."
