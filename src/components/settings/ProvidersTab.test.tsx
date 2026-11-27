@@ -668,3 +668,24 @@ describe('ProvidersTab — Ver mais provedores', () => {
     );
   });
 });
+
+describe('ProvidersTab — seção de confiabilidade', () => {
+  it('abre e recolhe a seção inteira ao clicar no cabeçalho', async () => {
+    await renderTab();
+    const user = userEvent.setup();
+    const toggle = screen.getByRole('button', { name: /Confiabilidade/ });
+    const headersTimeout = () =>
+      screen.queryByRole('spinbutton', { name: 'Timeout dos headers (s)' });
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(headersTimeout()).toBeNull();
+
+    await user.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(headersTimeout()).not.toBeNull();
+
+    await user.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(headersTimeout()).toBeNull();
+  });
+});

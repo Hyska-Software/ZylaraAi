@@ -60,7 +60,7 @@ import {
 import { ProviderGlyph } from './ProviderGlyph';
 import { CustomProviderDialog } from './CustomProviderDialog';
 import { AcpAgentPanel } from './AcpAgentPanel';
-import { SettingRow, SettingsBlock, SettingsSection } from './shared';
+import { CollapsibleSettingsSection, SettingRow, SettingsBlock, SettingsSection } from './shared';
 
 type TestState =
   | { status: 'ok'; latencyMs: number | null; models: number }
@@ -1485,7 +1485,7 @@ export function ProvidersTab() {
         </DialogContent>
       </Dialog>
 
-      <SettingsSection
+      <CollapsibleSettingsSection
         title={t('providers.resilience.title')}
         description={t('providers.resilience.description')}
       >
@@ -1747,7 +1747,7 @@ export function ProvidersTab() {
             />
           </SettingRow>
         </SettingsBlock>
-      </SettingsSection>
+      </CollapsibleSettingsSection>
 
       <p className="text-[11px] leading-relaxed text-foreground-subtle">
         {t('providers.privacyFooter')}

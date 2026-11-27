@@ -1,4 +1,6 @@
+import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function SettingsSection({
@@ -21,6 +23,59 @@ export function SettingsSection({
         ) : null}
       </div>
       <div className="rounded-xl bg-surface px-4 py-2">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/** Settings section whose whole header toggles the visibility of its content. */
+export function CollapsibleSettingsSection({
+  title,
+  description,
+  children,
+  defaultOpen = false,
+  className,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const contentId = useId();
+
+  return (
+    <section className={cn('flex flex-col gap-2', className)}>
+      <h3>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={contentId}
+          onClick={() => setOpen((current) => !current)}
+          className="flex w-full items-start gap-2 rounded-lg py-0.5 text-left transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-semibold tracking-tight text-foreground">
+              {title}
+            </span>
+            {description ? (
+              <span className="mt-0.5 block text-xs leading-relaxed text-foreground-muted">
+                {description}
+              </span>
+            ) : null}
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn(
+              'mt-0.5 size-4 shrink-0 text-foreground-muted transition-transform duration-150',
+              open && 'rotate-180',
+            )}
+          />
+        </button>
+      </h3>
+      <div id={contentId} hidden={!open} className="rounded-xl bg-surface px-4 py-2">
         {children}
       </div>
     </section>
