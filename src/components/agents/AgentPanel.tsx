@@ -6,7 +6,6 @@ import {
   Database,
   Globe2,
   Monitor,
-  PanelRightClose,
   Settings,
   type LucideIcon,
 } from 'lucide-react';
@@ -374,11 +373,6 @@ export function AgentPanel() {
                 {activityCount > 9 ? '9+' : activityCount}
               </span>
             ) : null}
-          </IconButton>
-        </Tooltip>
-        <Tooltip content={t('panel.collapse')} side="bottom">
-          <IconButton label={t('panel.collapse')} size="sm" onClick={() => setOpen(false)}>
-            <PanelRightClose className="size-4" />
           </IconButton>
         </Tooltip>
       </div>

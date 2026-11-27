@@ -449,8 +449,9 @@ describe('AgentPanel — animação do painel lateral', () => {
     render(<AgentPanel />);
     expect(panel()).toBeTruthy();
     expect(backdrop()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Recolher painel' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Recolher painel' }));
+    act(() => useUiStore.getState().setAgentPanelOpen(false));
 
     await waitFor(() => expect(panel()).toBeNull());
   });

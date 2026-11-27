@@ -7,7 +7,6 @@ import {
   FolderOpen,
   GitBranch,
   History,
-  PanelRightClose,
   Plus,
   RefreshCw,
   SquareTerminal,
@@ -228,7 +227,6 @@ export function CodePanel() {
   const activePluginDock = pluginTabs.some((entry) => entry.key === pluginDock)
     ? pluginDock
     : null;
-  const setOpen = useUiStore((state) => state.setCodePanelOpen);
   const openCodeDiff = useUiStore((state) => state.openCodeDiff);
   const openCodeCommits = useUiStore((state) => state.openCodeCommits);
   const openCodeFile = useUiStore((state) => state.openCodeFile);
@@ -852,11 +850,6 @@ export function CodePanel() {
             onClick={() => void refreshAll()}
           >
             <RefreshCw aria-hidden className="size-3.5" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip content={t('code:panel.collapse')} side="bottom">
-          <IconButton label={t('code:panel.collapse')} size="sm" onClick={() => setOpen(false)}>
-            <PanelRightClose className="size-4" />
           </IconButton>
         </Tooltip>
       </div>

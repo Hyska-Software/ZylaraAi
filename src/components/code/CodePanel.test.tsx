@@ -459,10 +459,12 @@ describe('CodePanel — abas Arquivos / Alterações', () => {
     expect(useUiStore.getState().codePanelTab).toBe('files');
   });
 
-  it('recolhe o painel e persiste o estado', async () => {
+  it('has no collapse button and persists the visibility state', async () => {
     render(<CodePanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Recolher painel' }));
+    expect(screen.queryByRole('button', { name: 'Recolher painel' })).toBeNull();
+
+    act(() => useUiStore.getState().setCodePanelOpen(false));
 
     expect(useUiStore.getState().codePanelOpen).toBe(false);
     await waitFor(() => expect(panel()).toBeNull());
