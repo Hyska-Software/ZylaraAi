@@ -440,3 +440,18 @@ describe('AgentSidebar — canais reordenáveis', () => {
     );
   });
 });
+
+describe('AgentSidebar — footer layout selector', () => {
+  it('places the layout selector after the settings row', () => {
+    useUiStore.setState({
+      enabledLayouts: { chat: true, code: true, agent: true },
+      layoutMode: 'agent',
+    });
+    render(<AgentSidebar />);
+
+    const settings = screen.getByRole('button', { name: 'Configurações' });
+    const selector = screen.getByRole('button', { name: 'Modo do aplicativo' });
+    expect(settings.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(selector.className).toContain('size-8');
+  });
+});

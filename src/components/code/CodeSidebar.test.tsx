@@ -800,13 +800,13 @@ describe('CodeSidebar — menu do workspace', () => {
 });
 
 describe('CodeSidebar — rodapé', () => {
-  it('abre Configurações e mostra a versão do app', () => {
+  it('abre Configurações sem exibir a versão no rodapé', () => {
     renderSidebar();
 
+    expect(screen.getByRole('button', { name: 'Modo do aplicativo' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Configurações/ }));
 
     expect(useUiStore.getState().settingsOpen).toBe(true);
-    expect(screen.getByText('v0.1.0')).toBeTruthy();
   });
 
   it('fecha o drawer compacto depois das ações', async () => {
@@ -1020,5 +1020,18 @@ describe('CodeSidebar — estado de expansão persistido', () => {
 
     expect(await screen.findByRole('button', { name: 'Sessão 14' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Mostrar mais/ })).toBeNull();
+  });
+});
+
+describe('CodeSidebar — footer layout selector', () => {
+  it('replaces the version indicator with the layout selector on the settings row', () => {
+    useAppStore.setState({ appInfo: { ...appInfo(), version: '9.9.9' } });
+    useUiStore.setState({ enabledLayouts: { chat: true, code: true, agent: true } });
+    renderSidebar();
+
+    const settings = screen.getByRole('button', { name: 'Configurações' });
+    const selector = screen.getByRole('button', { name: 'Modo do aplicativo' });
+    expect(settings.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.body.textContent).not.toContain('v9.9.9');
   });
 });

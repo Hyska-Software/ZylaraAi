@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { ChatMessage, Conversation, Settings } from '@/lib/types';
+import type { AppInfo, ChatMessage, Conversation, Settings } from '@/lib/types';
 
 const mocks = vi.hoisted(() => ({
   createConversation: vi.fn(),
@@ -514,5 +514,20 @@ describe('Sidebar — mais informações nas linhas de conversa', () => {
     render(<Sidebar />);
 
     expect(screen.getByRole('button', { name: 'Com falha' }).textContent).toContain('Falhou');
+  });
+});
+
+describe('Sidebar — footer layout selector', () => {
+  it('replaces the version indicator with the layout selector on the settings row', () => {
+    useAppStore.setState({
+      appInfo: { ...(useAppStore.getState().appInfo ?? {}), version: '9.9.9' } as AppInfo,
+    });
+    useUiStore.setState({ enabledLayouts: { chat: true, code: true, agent: true } });
+    render(<Sidebar />);
+
+    const settings = screen.getByRole('button', { name: 'Configurações' });
+    const selector = screen.getByRole('button', { name: 'Modo do aplicativo' });
+    expect(settings.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.body.textContent).not.toContain('v9.9.9');
   });
 });

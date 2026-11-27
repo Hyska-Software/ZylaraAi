@@ -79,6 +79,7 @@ import { usePluginUi } from '@/lib/plugins/ui/registry';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { navEntries, openNavTarget } from '@/lib/plugins/ui/nav';
 import type { SortableListApi } from '@/components/ui';
+import { LayoutModeSwitch } from '@/components/layout/LayoutModeSwitch';
 import {
   selectActiveAgents,
   selectPinnedAgents,
@@ -1350,14 +1351,17 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
         <Slot name="sidebar.nav.after" owner={{ layout: 'agent' }} />
         <PluginSidebarTabStrip layout="agent" />
         <PluginSidebarTabHost layout="agent" />
-        <button
-          type="button"
-          onClick={() => openSettings()}
-          className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-[12px] text-foreground-muted hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-        >
-          <Settings className="size-3.5" />
-          {t('sidebar.settings')}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => openSettings()}
+            className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-[12px] text-foreground-muted hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          >
+            <Settings className="size-3.5" />
+            <span className="truncate">{t('sidebar.settings')}</span>
+          </button>
+          <LayoutModeSwitch size="sm" onSelect={onClose} />
+        </div>
       </div>
 
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>

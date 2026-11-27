@@ -8,7 +8,6 @@ import { cn, modKey } from '@/lib/utils';
 import { BrandMark } from '@/components/chat/BrandMark';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
-import { LayoutModeSwitch } from './LayoutModeSwitch';
 import { PlanUsageChip } from './PlanUsageChip';
 import { UpdateChip } from './UpdateChip';
 
@@ -34,10 +33,8 @@ const CONTROL_BASE =
  * is account-level and lives here, next to the global actions. The update pill
  * sits in the top-right corner, immediately before the window controls.
  *
- * The Chat | Code layout switch sits centered between the brand and the global
- * actions, like the reference pill (docs/goals/chat-code-layout/PLAN.md §3.1).
- * The three-column grid keeps it truly centered without letting either side
- * overlap it on narrower windows.
+ * The layout selector lives in the sidebar footer, not in the title bar; this
+ * two-column grid leaves the chrome free for the brand and global actions.
  */
 export function TitleBar() {
   const { t } = useTranslation('common');
@@ -111,7 +108,7 @@ export function TitleBar() {
       data-tauri-drag-region
       onDoubleClick={handleDragDoubleClick}
       className={cn(
-        'drag-region relative z-30 grid h-14 shrink-0 select-none grid-cols-[1fr_auto_1fr]',
+        'drag-region relative z-30 grid h-14 shrink-0 select-none grid-cols-2',
         'items-center gap-2 bg-surface pl-2 pr-1',
       )}
     >
@@ -144,10 +141,6 @@ export function TitleBar() {
         />
 
         <div data-tauri-drag-region className="h-full min-w-0 flex-1" />
-      </div>
-
-      <div className="no-drag justify-self-center">
-        <LayoutModeSwitch />
       </div>
 
       <div className="no-drag flex min-w-0 items-center justify-end gap-2" data-tauri-drag-region>

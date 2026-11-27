@@ -1,115 +1,77 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion } from 'motion/react';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuLabel,
+  DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
+  type IconButtonSize,
 } from '@/components/ui';
 import { LAYOUT_MODES } from '@/lib/layoutModes';
 import { useUiStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import { useReduceMotion } from './hooks';
+
+export interface LayoutModeSwitchProps {
+  className?: string;
+  /** Button height; sidebar rows are 36px in Chat/Code and 32px in Agents. */
+  size?: IconButtonSize;
+  /** Called after switching so a compact drawer can dismiss itself. */
+  onSelect?: () => void;
+}
 
 /**
- * Chat | Code | Agentes segmented control shown centered in the title bar
- * (docs/goals/chat-code-layout/PLAN.md §3.1). It is the only entry point to the
- * Code workbench, so it stays visible for every enabled layout and its choice is
- * persisted with the rest of the UI state. Right-clicking the pill opens the
- * visibility menu; when only one layout is enabled the control disappears.
+ * Icon-only layout selector for the sidebar footer: the trigger shows the
+ * current layout's icon and opens a plain list of icon-only items. Labels stay
+ * in `aria-label`/`title` for screen readers and tooltips. The choice is
+ * persisted with the rest of the UI state. With a single enabled layout there
+ * is nothing to switch, so the control disappears.
  */
-export function LayoutModeSwitch({ className }: { className?: string }) {
+export function LayoutModeSwitch({ className, size = 'md', onSelect }: LayoutModeSwitchProps) {
   const { t } = useTranslation('common');
   const layoutMode = useUiStore((state) => state.layoutMode);
   const enabledLayouts = useUiStore((state) => state.enabledLayouts);
   const setLayoutMode = useUiStore((state) => state.setLayoutMode);
-  const setLayoutEnabled = useUiStore((state) => state.setLayoutEnabled);
-  const reduceMotion = useReduceMotion();
-  const [menuPoint, setMenuPoint] = useState<{ x: number; y: number } | null>(null);
 
   const visibleModes = LAYOUT_MODES.filter((mode) => enabledLayouts[mode.value]);
-  // With a single visible layout there is nothing to switch: hide the control
-  // entirely (the layout is still chosen from Settings).
   if (visibleModes.length <= 1) return null;
 
+  const current = LAYOUT_MODES.find((mode) => mode.value === layoutMode) ?? visibleModes[0];
+  const CurrentIcon = current.icon;
+
   return (
-    <DropdownMenu
-      open={menuPoint !== null}
-      onOpenChange={(open) => {
-        if (!open) setMenuPoint(null);
-      }}
-    >
-      <div
-        role="group"
-        aria-label={t('layouts.groupAria')}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          setMenuPoint({ x: event.clientX, y: event.clientY });
-        }}
-        className={cn(
-          'relative inline-flex items-center gap-0.5 rounded-full bg-surface-hover p-0.5',
-          className,
-        )}
-      >
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          label={t('layouts.groupAria')}
+          title={t(current.titleKey)}
+          size={size}
+          variant="ghost"
+          className={cn('shrink-0', className)}
+        >
+          <CurrentIcon aria-hidden className="size-4" />
+        </IconButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="end" aria-label={t('layouts.menuLabel')} className="min-w-0">
         {visibleModes.map(({ value, labelKey, titleKey, icon: Icon }) => {
           const active = layoutMode === value;
-          const label = t(labelKey);
           return (
-            <button
+            <DropdownMenuItem
               key={value}
-              type="button"
+              aria-label={t(labelKey)}
               title={t(titleKey)}
-              aria-label={label}
-              aria-pressed={active}
-              onClick={() => setLayoutMode(value)}
+              aria-current={active ? 'true' : undefined}
+              onSelect={() => {
+                setLayoutMode(value);
+                onSelect?.();
+              }}
+              icon={<Icon aria-hidden className="size-4" />}
               className={cn(
-                'relative flex h-8 w-12 items-center justify-center rounded-full',
-                'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-                active ? 'text-foreground' : 'text-foreground-muted hover:text-foreground',
+                'size-8 justify-center p-0 [&>span]:hidden',
+                active && 'bg-accent-soft text-accent [&_svg]:text-accent',
               )}
-            >
-              {active ? (
-                <motion.span
-                  layoutId="layout-mode-active"
-                  aria-hidden
-                  className="absolute inset-0 rounded-full bg-surface-raised shadow-sm dark:bg-surface-active"
-                  transition={{ duration: reduceMotion ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
-                />
-              ) : null}
-              <Icon aria-hidden className="relative size-4" />
-            </button>
+            />
           );
         })}
-        {/* Invisible 1px anchor at the pointer: Radix positions the menu there.
-            Its text names the menu through the trigger's aria-labelledby. */}
-        <DropdownMenuTrigger asChild>
-          <span
-            aria-hidden
-            className="pointer-events-none fixed size-px overflow-hidden opacity-0"
-            style={{ left: menuPoint?.x ?? 0, top: menuPoint?.y ?? 0 }}
-          >
-            {t('layouts.menuLabel')}
-          </span>
-        </DropdownMenuTrigger>
-      </div>
-      <DropdownMenuContent
-        side="bottom"
-        align="start"
-        sideOffset={4}
-        onCloseAutoFocus={(event) => event.preventDefault()}
-      >
-        <DropdownMenuLabel>{t('layouts.menuLabel')}</DropdownMenuLabel>
-        {LAYOUT_MODES.map(({ value, labelKey }) => (
-          <DropdownMenuCheckboxItem
-            key={value}
-            checked={enabledLayouts[value]}
-            onCheckedChange={(checked) => setLayoutEnabled(value, checked === true)}
-          >
-            {t(labelKey)}
-          </DropdownMenuCheckboxItem>
-        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

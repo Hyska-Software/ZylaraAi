@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 
 const windowMock = vi.hoisted(() => ({
   isMaximized: vi.fn(async () => false),
@@ -133,28 +133,13 @@ describe('TitleBar', () => {
     expect(screen.queryByText('Plano ChatGPT')).toBeNull();
   });
 
-  it('mostra o seletor Chat | Code centralizado no chrome', async () => {
+  it('does not mount the layout selector in the title bar', async () => {
     render(<TitleBar />);
 
     await waitFor(() => expect(windowMock.isMaximized).toHaveBeenCalled());
 
-    const group = screen.getByRole('group', { name: 'Modo do aplicativo' });
-    const header = screen.getByRole('banner');
-    expect(header.contains(group)).toBe(true);
-    // A coluna do seletor é centralizada na grade de três colunas da title bar.
-    expect(group.parentElement?.className).toContain('justify-self-center');
-
-    expect(screen.getByRole('button', { name: 'Chat' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Code' }).getAttribute('aria-pressed')).toBe('false');
-  });
-
-  it('ativa o layout Code pelo seletor da title bar', async () => {
-    render(<TitleBar />);
-
-    await waitFor(() => expect(windowMock.isMaximized).toHaveBeenCalled());
-
-    fireEvent.click(screen.getByRole('button', { name: 'Code' }));
-
-    expect(useUiStore.getState().layoutMode).toBe('code');
+    expect(screen.queryByRole('group', { name: 'Modo do aplicativo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Modo do aplicativo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Code' })).toBeNull();
   });
 });

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
-import { useAppStore, useUiStore } from '@/lib/store';
+import { useUiStore } from '@/lib/store';
 import { LayoutModeSwitch } from './LayoutModeSwitch';
 
 beforeEach(() => {
@@ -10,84 +11,84 @@ beforeEach(() => {
     layoutMode: 'chat',
     enabledLayouts: { chat: true, code: true, agent: true },
   });
-  useAppStore.setState({
-    settings: { ...useAppStore.getState().settings, reduceMotion: true },
-  });
 });
 
 afterEach(() => {
   cleanup();
 });
 
-function switchGroup(): HTMLElement {
-  return screen.getByRole('group', { name: 'Modo do aplicativo' });
+function trigger(): HTMLElement {
+  return screen.getByRole('button', { name: 'Modo do aplicativo' });
+}
+
+async function openMenu(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+  await user.click(trigger());
+  return screen.findByRole('menu');
 }
 
 describe('LayoutModeSwitch', () => {
-  it('renders the group and the three modes, marking the active one', () => {
+  it('shows only the current layout icon in the footer trigger', () => {
     render(<LayoutModeSwitch />);
 
-    expect(switchGroup()).toBeTruthy();
+    const button = trigger();
+    expect(button.textContent).toBe('');
+    expect(button.getAttribute('title')).toBe('Layout de conversa');
+    expect(button.getAttribute('aria-haspopup')).toBe('menu');
 
-    const chat = screen.getByRole('button', { name: 'Chat' });
-    const code = screen.getByRole('button', { name: 'Code' });
-    const agents = screen.getByRole('button', { name: 'Agentes' });
-    expect(chat.getAttribute('aria-pressed')).toBe('true');
-    expect(code.getAttribute('aria-pressed')).toBe('false');
-    expect(agents.getAttribute('aria-pressed')).toBe('false');
+    const icon = button.querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+    expect(icon?.getAttribute('class')).toContain('size-4');
   });
 
-  it('uses icons instead of visible labels, keeping accessible names and hints', () => {
+  it('lists the enabled layouts as icon-only items with accessible names and hints', async () => {
+    const user = userEvent.setup();
     render(<LayoutModeSwitch />);
 
-    const chat = screen.getByRole('button', { name: 'Chat' });
-    const code = screen.getByRole('button', { name: 'Code' });
+    const menu = await openMenu(user);
+    const items = within(menu).getAllByRole('menuitem');
+    expect(items).toHaveLength(3);
 
-    expect(chat.textContent).toBe('');
-    expect(code.textContent).toBe('');
-    expect(chat.getAttribute('title')).toBe('Layout de conversa');
-    expect(code.getAttribute('title')).toBe('Layout de código');
-
-    for (const button of [chat, code]) {
-      const icon = button.querySelector('svg');
-      expect(icon).not.toBeNull();
-      expect(icon?.getAttribute('aria-hidden')).toBe('true');
-      expect(icon?.getAttribute('class')).toContain('size-4');
-    }
+    const expected = [
+      ['Chat', 'Layout de conversa', 'true'],
+      ['Code', 'Layout de código', null],
+      ['Agentes', 'Layout de agentes', null],
+    ];
+    expected.forEach(([name, title, current], index) => {
+      const item = items[index];
+      expect(item.getAttribute('aria-label')).toBe(name);
+      expect(item.getAttribute('title')).toBe(title);
+      expect(item.getAttribute('aria-current')).toBe(current);
+      expect(item.textContent).toBe('');
+      expect(item.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    });
   });
 
-  it('switches the layout mode and persists the choice', () => {
+  it('switches the layout mode, persists the choice and updates the trigger', async () => {
+    const user = userEvent.setup();
     render(<LayoutModeSwitch />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Code' }));
+    const menu = await openMenu(user);
+    await user.click(within(menu).getByRole('menuitem', { name: 'Code' }));
 
     expect(useUiStore.getState().layoutMode).toBe('code');
-    expect(screen.getByRole('button', { name: 'Code' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Chat' }).getAttribute('aria-pressed')).toBe('false');
-
     const raw = window.localStorage.getItem('zylara.ui');
     expect(raw).not.toBeNull();
     const persisted = JSON.parse(raw as string) as { state?: { layoutMode?: string } };
     expect(persisted.state?.layoutMode).toBe('code');
+    expect(trigger().getAttribute('title')).toBe('Layout de código');
   });
 
-  it('returns to the Chat layout', () => {
-    useUiStore.setState({ layoutMode: 'code' });
-    render(<LayoutModeSwitch />);
+  it('calls onSelect after switching so a compact drawer can close', async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(<LayoutModeSwitch onSelect={onSelect} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Chat' }));
+    const menu = await openMenu(user);
+    await user.click(within(menu).getByRole('menuitem', { name: 'Agentes' }));
 
-    expect(useUiStore.getState().layoutMode).toBe('chat');
-  });
-
-  it('switches to Agentes and back without losing the choice', () => {
-    render(<LayoutModeSwitch />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Agentes' }));
     expect(useUiStore.getState().layoutMode).toBe('agent');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Chat' }));
-    expect(useUiStore.getState().layoutMode).toBe('chat');
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
   it('hides the whole control when only one layout is enabled', () => {
@@ -95,59 +96,17 @@ describe('LayoutModeSwitch', () => {
 
     render(<LayoutModeSwitch />);
 
-    expect(screen.queryByRole('group', { name: 'Modo do aplicativo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Modo do aplicativo' })).toBeNull();
   });
 
-  it('renders only the enabled layouts', () => {
+  it('lists only the enabled layouts', async () => {
+    const user = userEvent.setup();
     useUiStore.setState({ enabledLayouts: { chat: true, code: false, agent: true } });
 
     render(<LayoutModeSwitch />);
 
-    expect(screen.getByRole('button', { name: 'Chat' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Agentes' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Code' })).toBeNull();
-  });
-
-  it('opens a right-click menu with every layout and its current state', async () => {
-    useUiStore.setState({ enabledLayouts: { chat: true, code: false, agent: true } });
-    render(<LayoutModeSwitch />);
-
-    fireEvent.contextMenu(switchGroup());
-
-    expect(await screen.findByRole('menu', { name: 'Layouts' })).toBeTruthy();
-    const expected: [string, string][] = [
-      ['Chat', 'true'],
-      ['Code', 'false'],
-      ['Agentes', 'true'],
-    ];
-    for (const [name, checked] of expected) {
-      const item = screen.getByRole('menuitemcheckbox', { name });
-      expect(item.getAttribute('aria-checked')).toBe(checked);
-    }
-  });
-
-  it('disables a layout from the context menu', async () => {
-    render(<LayoutModeSwitch />);
-
-    fireEvent.contextMenu(switchGroup());
-    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Agentes' }));
-
-    expect(useUiStore.getState().enabledLayouts.agent).toBe(false);
-    expect(screen.queryByRole('button', { name: 'Agentes' })).toBeNull();
-  });
-
-  it('disappears and falls back to an enabled layout when the last-but-one is hidden', async () => {
-    useUiStore.setState({
-      layoutMode: 'code',
-      enabledLayouts: { chat: true, code: true, agent: false },
-    });
-    render(<LayoutModeSwitch />);
-
-    fireEvent.contextMenu(switchGroup());
-    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Code' }));
-
-    expect(useUiStore.getState().enabledLayouts).toEqual({ chat: true, code: false, agent: false });
-    expect(useUiStore.getState().layoutMode).toBe('chat');
-    expect(screen.queryByRole('group', { name: 'Modo do aplicativo' })).toBeNull();
+    const menu = await openMenu(user);
+    const items = within(menu).getAllByRole('menuitem');
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual(['Chat', 'Agentes']);
   });
 });

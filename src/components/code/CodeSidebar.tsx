@@ -61,12 +61,7 @@ import {
   PluginSidebarTabStrip,
 } from '@/components/plugins/ui/PluginSidebarTabHost';
 import { pluginIcon } from '@/lib/plugins/icons';
-import {
-  selectConversationStream,
-  useAppStore,
-  useChatStore,
-  useUiStore,
-} from '@/lib/store';
+import { selectConversationStream, useChatStore, useUiStore } from '@/lib/store';
 import { filterConversationsForLayout } from '@/lib/conversations';
 import type { Conversation, Workspace } from '@/lib/types';
 import { cn, compareConversationPosition, copyText } from '@/lib/utils';
@@ -78,6 +73,7 @@ import {
   type ConversationRowTurn,
 } from '@/components/layout/conversationRowMeta';
 import { ConversationRowStatusChip } from '@/components/layout/ConversationRowStatusChip';
+import { LayoutModeSwitch } from '@/components/layout/LayoutModeSwitch';
 import { FamilyAvatar } from '@/components/models/FamilyAvatar';
 import { useIsCompact } from '@/components/layout/hooks';
 import { terminalManager } from './terminalManager';
@@ -787,7 +783,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const activeWorkspaceId = useUiStore((state) => state.activeWorkspaceId);
   const setActiveWorkspace = useUiStore((state) => state.setActiveWorkspace);
-  const appInfo = useAppStore((state) => state.appInfo);
   const pluginPages = useUiStore((state) => state.pluginPages.code);
   const ui = usePluginUi();
   const prefs = usePluginUiPrefs();
@@ -1479,21 +1474,21 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
       </div>
 
       <div className="border-t border-border px-2 py-2">
-        <button
-          type="button"
-          onClick={handleOpenSettings}
-          className={cn(
-            'flex h-9 w-full items-center gap-2 rounded-lg px-2 text-[13px] text-foreground-muted',
-            'transition-colors duration-150 hover:bg-surface-hover hover:text-foreground',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
-          )}
-        >
-          <Settings className="size-4" />
-          <span>{t('code:sidebar.settings')}</span>
-          <span className="ml-auto text-[11px] tabular-nums text-foreground-subtle">
-            {appInfo?.version ? `v${appInfo.version}` : ''}
-          </span>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleOpenSettings}
+            className={cn(
+              'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-[13px] text-foreground-muted',
+              'transition-colors duration-150 hover:bg-surface-hover hover:text-foreground',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+            )}
+          >
+            <Settings className="size-4" />
+            <span className="truncate">{t('code:sidebar.settings')}</span>
+          </button>
+          <LayoutModeSwitch onSelect={onClose} />
+        </div>
         <Slot name="code.sidebar.footer" owner={{ layout: 'code' }} />
       </div>
 
