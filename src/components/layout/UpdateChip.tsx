@@ -1,6 +1,6 @@
 /**
- * Update indicator of the app chrome (DESIGN §5): a compact pill at the end of
- * the layout's 40px chrome row, immediately before the window controls.
+ * Update indicator of the app chrome (DESIGN §5): a compact pill in the
+ * right-hand slot of the sidebar's 40px chrome row.
  *
  * It is the always-visible surface for an available release and also carries
  * live feedback while the download runs. Clicking it opens the full panel with
@@ -119,7 +119,7 @@ export function UpdateChip() {
           aria-haspopup="dialog"
           aria-expanded={open}
           className={cn(
-            'no-drag relative flex h-7 shrink-0 items-center gap-1.5 overflow-hidden rounded-full px-2.5',
+            'no-drag relative flex h-7 max-w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-full px-2.5',
             'text-[11.5px] font-medium leading-none tracking-tight transition-colors duration-150',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
             'motion-reduce:transition-none',
@@ -131,7 +131,7 @@ export function UpdateChip() {
             className={cn('size-3.5 shrink-0', spin && 'animate-spin motion-reduce:animate-none')}
             strokeWidth={1.75}
           />
-          <span className="hidden whitespace-nowrap lg:inline">{label}</span>
+          <span className="hidden min-w-0 truncate lg:inline">{label}</span>
           <ChevronDown aria-hidden className="size-3 shrink-0 opacity-60" strokeWidth={2} />
           {phase === 'downloading' ? (
             <span aria-hidden className="absolute inset-x-1.5 bottom-0 h-0.5 overflow-hidden rounded-full bg-accent/20">
@@ -144,7 +144,7 @@ export function UpdateChip() {
         </button>
       </PopoverTrigger>
       <PopoverContent
-        align="end"
+        align="start"
         sideOffset={8}
         collisionPadding={12}
         aria-label={t('shell.update.popoverAria')}

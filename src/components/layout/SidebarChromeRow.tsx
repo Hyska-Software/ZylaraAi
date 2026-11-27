@@ -1,6 +1,7 @@
 /**
- * Chrome row of the three sidebars (DESIGN §5): app icon + sidebar toggle, and
- * the drawer close button when the sidebar is rendered as a compact overlay.
+ * Chrome row of the three sidebars (DESIGN §5): app icon + sidebar toggle, the
+ * update pill in the right-hand slot, and the drawer close button when the
+ * sidebar is rendered as a compact overlay.
  *
  * It replaces the old title bar's left cluster, so the sidebar itself starts the
  * window's top band and the layout below keeps a single 40px chrome row.
@@ -10,6 +11,7 @@ import { X } from 'lucide-react';
 import { IconButton } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { ChromeBrand, DragSpacer, SidebarToggle } from './ChromeBrand';
+import { UpdateChip } from './UpdateChip';
 import { DRAG_ROW_CLASS, useWindowDragProps } from './windowChrome';
 
 export interface SidebarChromeRowProps {
@@ -36,6 +38,7 @@ export function SidebarChromeRow({ onClose, className }: SidebarChromeRowProps) 
           owns the sidebar visibility. */}
       {onClose ? null : <SidebarToggle />}
       <DragSpacer />
+      <UpdateChip />
       {onClose ? (
         <IconButton
           label={t('shell.sidebar.close')}
