@@ -52,6 +52,9 @@ pub enum Access {
     /// `FS_NOT_A_FILE`). Existe porque listar `.` é uma operação válida.
     ReadDir,
     Write,
+    /// Mutation of an existing file **or** directory (rename/copy/delete/reveal).
+    /// `Write` is intentionally not reused: it rejects existing directories.
+    Mutate,
 }
 
 /// Resolve `requested` contra `root`, garantindo que o resultado não escapa do workspace.
@@ -167,6 +170,17 @@ fn resolve_with_confinement(
                 return Err(FsError::new(
                     FS_NOT_A_FILE,
                     format!("'{requested}' é um diretório"),
+                ));
+            }
+            if candidate.parent().is_none() {
+                return Err(FsError::new(FS_INVALID_PATH, "caminho sem diretório pai"));
+            }
+        }
+        Access::Mutate => {
+            if !candidate.exists() {
+                return Err(FsError::new(
+                    FS_NOT_FOUND,
+                    format!("caminho inexistente: {requested}"),
                 ));
             }
             if candidate.parent().is_none() {
@@ -486,6 +500,26 @@ mod tests {
         fs::write(&target, "conteúdo").expect("escrever");
         let read_back = resolve(&root, "novo/dir/arquivo.txt", Access::Read).expect("leitura");
         assert_eq!(target, read_back);
+    }
+
+    #[test]
+    fn mutate_allows_existing_file_and_directory_but_not_missing() {
+        let (temp, root) = workspace();
+        let file = root.join("a.txt");
+        fs::write(&file, "x").expect("criar arquivo");
+        fs::create_dir_all(root.join("dir")).expect("criar diretório");
+
+        assert_eq!(resolve(&root, "a.txt", Access::Mutate).expect("arquivo"), file);
+        assert_eq!(
+            resolve(&root, "dir", Access::Mutate).expect("diretório"),
+            root.join("dir")
+        );
+        assert_eq!(err_code(resolve(&root, "missing", Access::Mutate)), FS_NOT_FOUND);
+        assert_eq!(
+            err_code(resolve(&root, "../a.txt", Access::Mutate)),
+            FS_OUTSIDE_WORKSPACE
+        );
+        assert!(!temp.path().join("a.txt").exists());
     }
 
     #[test]

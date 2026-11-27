@@ -17,6 +17,7 @@ pub mod docker;
 pub mod exec;
 pub mod git;
 pub mod journal;
+pub mod mutations;
 pub mod project;
 pub mod safe_path;
 pub mod watch;

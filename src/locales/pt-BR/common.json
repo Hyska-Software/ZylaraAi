@@ -240,6 +240,8 @@
       "commitsRegion": "Histórico de commits",
       "diffRegion": "Diff de {{path}}",
       "fileRegion": "Arquivo {{path}}",
+      "fileSideRegion": "Arquivo secundário {{path}}",
+      "closeSideFile": "Fechar arquivo secundário",
       "planRegion": "Plano aprovado da sessão",
       "terminalRegion": "Terminal",
       "backToSession": "Voltar à sessão",

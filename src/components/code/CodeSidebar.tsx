@@ -1270,7 +1270,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
             </p>
           ) : null}
 
-          <div className="mt-1 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
+          <div className="scrollbar-none mt-1 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
             {workspacesLoading && !workspacesLoaded ? (
               <div
                 role="status"
@@ -1442,7 +1442,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
             <div
               id="code-unassigned-sessions"
               hidden={codeUnassignedCollapsed}
-              className="mt-1 max-h-44 overflow-y-auto overscroll-contain pb-1"
+              className="scrollbar-none mt-1 max-h-44 overflow-y-auto overscroll-contain pb-1"
             >
               <SortableList
                 ids={visibleUnassignedSessions.map((conversation) => conversation.id)}

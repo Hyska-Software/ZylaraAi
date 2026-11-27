@@ -447,6 +447,13 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             commands::workspace::unwatch_workspace,
             commands::workspace::search_workspace_files,
             commands::workspace::read_workspace_file,
+            commands::workspace::create_workspace_file,
+            commands::workspace::create_workspace_dir,
+            commands::workspace::rename_workspace_entry,
+            commands::workspace::duplicate_workspace_entry,
+            commands::workspace::delete_workspace_entry,
+            commands::workspace::reveal_workspace_entry,
+            commands::workspace::save_workspace_file,
             /* -------- harness de código: sessão -------- */
             commands::code::get_code_session_state,
             commands::code::set_permission_mode,

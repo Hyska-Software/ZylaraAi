@@ -6,6 +6,7 @@ function reset(): void {
     codeView: 'session',
     codeFileTab: null,
     codeFileTabs: [],
+    secondaryCodeFileTab: null,
     codeFileWrap: false,
     codeDiffTab: null,
   });
@@ -117,6 +118,39 @@ describe('uiStore — arquivos como abas centrais', () => {
     expect(useUiStore.getState().codeView).toBe('file');
     useUiStore.getState().setCodeView('session');
     expect(useUiStore.getState().codeView).toBe('session');
+  });
+
+  it('opens a file to the side and closes only the secondary pane', () => {
+    useUiStore.getState().openCodeFile({ workspaceId: 'ws-1', path: 'a.ts' });
+    useUiStore.getState().openCodeFileToSide({ workspaceId: 'ws-1', path: 'b.ts' });
+
+    expect(useUiStore.getState().secondaryCodeFileTab).toEqual({
+      workspaceId: 'ws-1',
+      path: 'b.ts',
+    });
+    expect(useUiStore.getState().codeFileTab?.path).toBe('a.ts');
+    expect(useUiStore.getState().codeView).toBe('file');
+
+    useUiStore.getState().closeSecondaryCodeFile();
+    expect(useUiStore.getState().secondaryCodeFileTab).toBeNull();
+    expect(useUiStore.getState().codeFileTab?.path).toBe('a.ts');
+  });
+
+  it('a regular open replaces the split editor', () => {
+    useUiStore.getState().openCodeFile({ workspaceId: 'ws-1', path: 'a.ts' });
+    useUiStore.getState().openCodeFileToSide({ workspaceId: 'ws-1', path: 'b.ts' });
+    useUiStore.getState().openCodeFile({ workspaceId: 'ws-1', path: 'c.ts' });
+
+    expect(useUiStore.getState().secondaryCodeFileTab).toBeNull();
+    expect(useUiStore.getState().codeFileTab?.path).toBe('c.ts');
+  });
+
+  it('closing the active tab also closes the secondary pane', () => {
+    useUiStore.getState().openCodeFile({ workspaceId: 'ws-1', path: 'a.ts' });
+    useUiStore.getState().openCodeFileToSide({ workspaceId: 'ws-1', path: 'b.ts' });
+    useUiStore.getState().closeCodeFile({ workspaceId: 'ws-1', path: 'a.ts' });
+
+    expect(useUiStore.getState().secondaryCodeFileTab).toBeNull();
   });
 
   it('a chave da aba é estável por workspace + caminho', () => {

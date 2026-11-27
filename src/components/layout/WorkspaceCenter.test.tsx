@@ -22,6 +22,18 @@ vi.mock('@/components/code', () => ({
       {target.path}
     </div>
   ),
+  CodeFileSplitView: ({
+    primary,
+    secondary,
+  }: {
+    primary: { path: string } | null;
+    secondary: { path: string };
+  }) => (
+    <div data-testid="code-file-split">
+      {primary ? <div data-testid="code-file-view">{primary.path}</div> : null}
+      <div data-testid="code-file-view-secondary">{secondary.path}</div>
+    </div>
+  ),
   CodePlanView: ({ tab }: { tab: { markdown: string } }) => (
     <div data-testid="code-plan-view">{tab.markdown}</div>
   ),
@@ -128,6 +140,7 @@ beforeEach(() => {
     codeDiffTab: null,
     codeCommitsTab: null,
     codeFileTab: null,
+    secondaryCodeFileTab: null,
     codePlanTab: null,
     codeSubagentTabs: [],
     codeSubagentTab: null,
@@ -385,6 +398,21 @@ describe('WorkspaceCenter — aba central de arquivo', () => {
 
     expect(screen.queryByTestId('code-file-view')).toBeNull();
     expect(screen.getByTestId('chat-view').parentElement?.className).not.toContain('hidden');
+  });
+
+  it('renders the split editor when a secondary file is open', () => {
+    useUiStore.setState({
+      layoutMode: 'code',
+      codeView: 'file',
+      codeFileTab: { workspaceId: 'ws-1', path: 'src/app.ts' },
+      secondaryCodeFileTab: { workspaceId: 'ws-1', path: 'src/lib.rs' },
+    });
+
+    render(<WorkspaceCenter />);
+
+    expect(screen.getByTestId('code-file-split')).toBeTruthy();
+    expect(screen.getByTestId('code-file-view').textContent).toContain('src/app.ts');
+    expect(screen.getByTestId('code-file-view-secondary').textContent).toContain('src/lib.rs');
   });
 });
 

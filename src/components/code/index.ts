@@ -25,6 +25,9 @@ export type { CodeDiffViewProps } from './CodeDiffView';
 export { CodeFileView } from './CodeFileView';
 export type { CodeFileViewProps } from './CodeFileView';
 
+export { CodeFileSplitView } from './CodeFileSplitView';
+export type { CodeFileSplitViewProps } from './CodeFileSplitView';
+
 export { CodePlanView } from './CodePlanView';
 export type { CodePlanViewProps } from './CodePlanView';
 

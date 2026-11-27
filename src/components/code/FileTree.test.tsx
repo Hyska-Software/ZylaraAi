@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { useState, type ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { WorkspaceFileEntry } from '@/lib/types';
 import { FileTree } from './FileTree';
 
@@ -291,5 +292,50 @@ describe('FileTree', () => {
     });
 
     expect(screen.getByRole('status', { name: 'Carregando apps' })).toBeTruthy();
+  });
+
+  it('opens the row context menu with the actions for a file', async () => {
+    const onAction = vi.fn();
+    const user = userEvent.setup();
+    renderTree({ onAction });
+
+    fireEvent.contextMenu(row(/app\.ts/));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Abrir ao lado' })).toBeTruthy();
+    expect(within(menu).getByRole('menuitem', { name: 'Baixar' })).toBeTruthy();
+    expect(within(menu).queryByRole('menuitem', { name: 'Nova pasta' })).toBeNull();
+
+    await user.click(within(menu).getByRole('menuitem', { name: 'Copiar caminho relativo' }));
+    expect(onAction).toHaveBeenCalledWith(
+      'copyRelativePath',
+      expect.objectContaining({ path: 'src/app.ts' }),
+    );
+  });
+
+  it('opens the row menu with Shift+F10 and offers creation on folders', async () => {
+    const onAction = vi.fn();
+    renderTree({ onAction });
+
+    fireEvent.focus(row('src'));
+    fireEvent.keyDown(row('src'), { key: 'F10', shiftKey: true });
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Novo arquivo' })).toBeTruthy();
+    expect(within(menu).getByRole('menuitem', { name: 'Nova pasta' })).toBeTruthy();
+    expect(within(menu).queryByRole('menuitem', { name: 'Abrir ao lado' })).toBeNull();
+  });
+
+  it('exposes only creation actions in the header dropdown', async () => {
+    const onAction = vi.fn();
+    const user = userEvent.setup();
+    renderTree({ onAction });
+
+    await user.click(screen.getByRole('button', { name: 'Ações do arquivo' }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Novo arquivo' })).toBeTruthy();
+    expect(within(menu).getByRole('menuitem', { name: 'Nova pasta' })).toBeTruthy();
+    expect(within(menu).queryByRole('menuitem', { name: 'Excluir' })).toBeNull();
+
+    await user.click(within(menu).getByRole('menuitem', { name: 'Novo arquivo' }));
+    expect(onAction).toHaveBeenCalledWith('newFile', null);
   });
 });

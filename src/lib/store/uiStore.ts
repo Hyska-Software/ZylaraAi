@@ -390,6 +390,8 @@ interface UiState {
   codeFileTabs: CodeFileTab[];
   /** Aba de arquivo ativa (`null` = nenhuma; sempre presente em `codeFileTabs`). */
   codeFileTab: CodeFileTab | null;
+  /** Right-hand file of the split editor opened by "Open to the side" (volatile). */
+  secondaryCodeFileTab: CodeFileTab | null;
   /** Plano aprovado exibido como aba central (`null` = nenhum/aba fechada). */
   codePlanTab: CodePlanTab | null;
   /** Subagent chats abertos como abas centrais, na ordem de abertura. */
@@ -515,6 +517,10 @@ interface UiState {
    * ativa a vizinha; sem abas restantes, o centro volta para a sessão.
    */
   closeCodeFile: (target?: CodeFileTab) => void;
+  /** Opens a file in the right-hand pane of the Code split editor. */
+  openCodeFileToSide: (target: CodeFileTab) => void;
+  /** Closes the right-hand pane of the Code split editor. */
+  closeSecondaryCodeFile: () => void;
   /** Abre (ou atualiza) o plano aprovado em uma aba central (`codeView` vira plan). */
   openCodePlan: (target: CodePlanTab) => void;
   /** Fecha a aba do plano; se ela era a ativa, volta para a sessão. */
@@ -705,6 +711,7 @@ export const useUiStore = create<UiState>()(
       codeDiffTab: null,
       codeFileTabs: [],
       codeFileTab: null,
+      secondaryCodeFileTab: null,
       codePlanTab: null,
       codeSubagentTabs: [],
       codeSubagentTab: null,
@@ -821,6 +828,8 @@ export const useUiStore = create<UiState>()(
                um arquivo já aberto apenas o ativa. */
             codeFileTabs: alreadyOpen ? state.codeFileTabs : [...state.codeFileTabs, target],
             codeFileTab: target,
+            /* A regular open replaces the split with a single editor. */
+            secondaryCodeFileTab: null,
             codeView: 'file',
           };
         }),
@@ -842,9 +851,20 @@ export const useUiStore = create<UiState>()(
           return {
             codeFileTabs: remaining,
             codeFileTab: neighbor,
+            secondaryCodeFileTab: null,
             codeView: neighbor === null && state.codeView === 'file' ? 'session' : state.codeView,
           };
         }),
+      openCodeFileToSide: (target) =>
+        set((state) => ({
+          secondaryCodeFileTab: target,
+          codeView: 'file',
+          /* Both panes stay reachable through the same tab strip. */
+          codeFileTabs: state.codeFileTabs.some((tab) => codeFileTabKey(tab) === codeFileTabKey(target))
+            ? state.codeFileTabs
+            : [...state.codeFileTabs, target],
+        })),
+      closeSecondaryCodeFile: () => set({ secondaryCodeFileTab: null }),
       openCodePlan: (target) =>
         set({
           codePlanTab: {

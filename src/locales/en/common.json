@@ -240,6 +240,8 @@
       "commitsRegion": "Commit history",
       "diffRegion": "Diff of {{path}}",
       "fileRegion": "File {{path}}",
+      "fileSideRegion": "Secondary file {{path}}",
+      "closeSideFile": "Close secondary file",
       "planRegion": "Approved plan for the session",
       "terminalRegion": "Terminal",
       "backToSession": "Back to session",

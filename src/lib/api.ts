@@ -594,6 +594,22 @@ export const api = {
     invoke<string[]>('search_workspace_files', { workspaceId, query, limit }),
   readWorkspaceFile: (workspaceId: string, path: string) =>
     invoke<WorkspaceFileContent>('read_workspace_file', { workspaceId, path }),
+  /** Files tab actions — all are explicit user gestures, never agent tools. */
+  createWorkspaceFile: (workspaceId: string, path: string) =>
+    invoke<string>('create_workspace_file', { workspaceId, path }),
+  createWorkspaceDir: (workspaceId: string, path: string) =>
+    invoke<string>('create_workspace_dir', { workspaceId, path }),
+  renameWorkspaceEntry: (workspaceId: string, from: string, to: string) =>
+    invoke<string>('rename_workspace_entry', { workspaceId, from, to }),
+  duplicateWorkspaceEntry: (workspaceId: string, path: string) =>
+    invoke<string>('duplicate_workspace_entry', { workspaceId, path }),
+  deleteWorkspaceEntry: (workspaceId: string, path: string) =>
+    invoke<void>('delete_workspace_entry', { workspaceId, path }),
+  revealWorkspaceEntry: (workspaceId: string, path: string) =>
+    invoke<void>('reveal_workspace_entry', { workspaceId, path }),
+  /** `null` means the native save dialog was cancelled. */
+  saveWorkspaceFile: (workspaceId: string, path: string) =>
+    invoke<string | null>('save_workspace_file', { workspaceId, path }),
 
   /* -------- sessão de código -------- */
   getCodeSessionState: (conversationId: string) =>

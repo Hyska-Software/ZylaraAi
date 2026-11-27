@@ -16,7 +16,8 @@ use crate::domain::{
     WorkspaceFileContent, WorkspaceFileEntry, WorkspaceGitStatus,
 };
 use crate::state::AppState;
-use crate::workspace::{project, safe_path, safe_path::Access};
+use crate::workspace::{access, mutations, project, safe_path, safe_path::Access};
+use tokio_util::sync::CancellationToken;
 
 /// Limite de entradas devolvidas por `list_workspace_files` (a UI avisa quando
 /// trunca; o usuário refina a busca).
@@ -527,6 +528,204 @@ pub async fn list_workspace_files(
         apply_badges(&mut tree, &badges);
     }
     Ok(tree)
+}
+
+/* ------------------------------------------------------------------ */
+/* Files tab mutations (explicit user gestures, never agent tools)      */
+/* ------------------------------------------------------------------ */
+
+/// Maps a stable mutation error code to a localized message for the renderer.
+fn mutation_error(error: mutations::MutationError) -> String {
+    let key = match error.code {
+        "ENTRY_EXISTS" => "workspace.errors.entryExists",
+        "FS_NOT_FOUND" => "workspace.errors.entryMissing",
+        "ENTRY_ROOT" => "workspace.errors.entryRoot",
+        "COPY_LIMIT" => "workspace.errors.copyLimit",
+        "SYMLINK" => "workspace.errors.symlink",
+        "FS_OUTSIDE_WORKSPACE" => "workspace.errors.outsideWorkspace",
+        "FS_EMPTY_PATH" | "FS_INVALID_PATH" | "FS_NOT_A_FILE" => {
+            "workspace.errors.invalidEntry"
+        }
+        _ => "workspace.errors.operationFailed",
+    };
+    crate::i18n::t_args(key, &[("error", &error.message)])
+}
+
+async fn with_mutation_root<F, T>(
+    state: &State<'_, AppState>,
+    workspace_id: &str,
+    operation: F,
+) -> Result<T, String>
+where
+    F: FnOnce(&Path) -> Result<T, mutations::MutationError>,
+{
+    let root = workspace_path(state, workspace_id)?;
+    let cancel = CancellationToken::new();
+    let _guard = access::acquire_mutation(&root, &cancel)
+        .await
+        .map_err(map_err)?;
+    operation(&root).map_err(mutation_error)
+}
+
+#[tauri::command]
+pub async fn create_workspace_file(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+) -> Result<String, String> {
+    with_mutation_root(&state, &workspace_id, |root| {
+        let target = mutations::create_file(root, &path)?;
+        Ok(safe_path::to_relative(root, &target))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn create_workspace_dir(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+) -> Result<String, String> {
+    with_mutation_root(&state, &workspace_id, |root| {
+        let target = mutations::create_dir(root, &path)?;
+        Ok(safe_path::to_relative(root, &target))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn rename_workspace_entry(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    from: String,
+    to: String,
+) -> Result<String, String> {
+    with_mutation_root(&state, &workspace_id, |root| {
+        let target = mutations::rename(root, &from, &to)?;
+        Ok(safe_path::to_relative(root, &target))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn duplicate_workspace_entry(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+) -> Result<String, String> {
+    with_mutation_root(&state, &workspace_id, |root| {
+        let target = mutations::duplicate(root, &path)?;
+        Ok(safe_path::to_relative(root, &target))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_workspace_entry(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+) -> Result<(), String> {
+    with_mutation_root(&state, &workspace_id, |root| mutations::delete(root, &path)).await
+}
+
+#[tauri::command]
+pub fn reveal_workspace_entry(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+) -> Result<(), String> {
+    let root = workspace_path(&state, &workspace_id)?;
+    let target = mutations::resolve_existing(&root, &path).map_err(mutation_error)?;
+    #[cfg(windows)]
+    {
+        // One argument: no shell string interpolation, so a file name with
+        // spaces or metacharacters cannot inject another command.
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", target.display()))
+            .spawn()
+            .map_err(|error| {
+                crate::i18n::t_args(
+                    "workspace.errors.revealFailed",
+                    &[("error", &error.to_string())],
+                )
+            })?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(&target)
+            .spawn()
+            .map_err(|error| {
+                crate::i18n::t_args(
+                    "workspace.errors.revealFailed",
+                    &[("error", &error.to_string())],
+                )
+            })?;
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let parent = target.parent().unwrap_or(&root);
+        app.opener()
+            .open_path(parent.to_string_lossy().to_string(), None::<&str>)
+            .map_err(|error| {
+                crate::i18n::t_args(
+                    "workspace.errors.revealFailed",
+                    &[("error", &error.to_string())],
+                )
+            })?;
+    }
+    let _ = &app;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_workspace_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+) -> Result<Option<String>, String> {
+    let root = workspace_path(&state, &workspace_id)?;
+    let source = mutations::resolve_existing(&root, &path).map_err(mutation_error)?;
+    if source.is_dir() {
+        return Err(crate::i18n::t_args(
+            "workspace.errors.notFile",
+            &[("path", &path)],
+        ));
+    }
+    let file_name = Path::new(&path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("file");
+    let extension = Path::new(file_name)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.to_lowercase())
+        .filter(|extension| !extension.is_empty());
+    let builder = app.dialog().file().set_file_name(file_name);
+    let builder = match extension.as_deref() {
+        Some(extension) => builder.add_filter(extension.to_uppercase(), &[extension]),
+        None => builder,
+    };
+    let Some(selected) = builder.blocking_save_file() else {
+        return Ok(None);
+    };
+    let destination = selected.into_path().map_err(|error| {
+        crate::i18n::t_args(
+            "workspace.errors.invalidPath",
+            &[("error", &error.to_string())],
+        )
+    })?;
+    mutations::save_copy(&source, &destination).map_err(|error| {
+        crate::i18n::t_args(
+            "workspace.errors.saveFailed",
+            &[("error", &error.message)],
+        )
+    })?;
+    Ok(Some(destination.to_string_lossy().to_string()))
 }
 
 /// Root tree (depth 2) plus the fresh children of the directories the panel

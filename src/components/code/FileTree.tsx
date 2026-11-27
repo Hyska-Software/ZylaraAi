@@ -9,10 +9,19 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { IconButton, Input, Spinner, Tooltip } from '@/components/ui';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  IconButton,
+  Input,
+  Spinner,
+  Tooltip,
+} from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import type { WorkspaceFileEntry } from '@/lib/types';
+import { FileActionItems, FileActionsMenuButton, type FileAction } from './FileActionsMenu';
 import { FileIcon } from './FileIcon';
 
 /** Row of the flattened tree rendered by `FileTree`. */
@@ -47,6 +56,8 @@ export interface FileTreeProps {
   onCollapseAll?: () => void;
   /** Diretórios com filhos sendo carregados (lazy expansion); mostra spinner no lugar do chevron. */
   loadingPaths?: ReadonlySet<string>;
+  /** Files tab action from the header or a row context menu (`null` = root). */
+  onAction?: (action: FileAction, entry: WorkspaceFileEntry | null) => void;
   className?: string;
 }
 
@@ -122,12 +133,15 @@ export function FileTree({
   onExpandAll,
   onCollapseAll,
   loadingPaths,
+  onAction,
   className,
 }: FileTreeProps) {
   const { t } = useTranslation('code');
   const [query, setQuery] = useState('');
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [uncontrolledSelected, setUncontrolledSelected] = useState<string | null>(null);
+  const [menuEntry, setMenuEntry] = useState<WorkspaceFileEntry | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
   const allRows = useMemo(() => flatten(entries), [entries]);
@@ -165,6 +179,12 @@ export function FileTree({
     onSelectFile?.(path);
   };
 
+  const openRowMenu = (entry: WorkspaceFileEntry) => {
+    setFocusedPath(entry.path);
+    setMenuEntry(entry);
+    setMenuOpen(true);
+  };
+
   /** Index of the focused row inside `visibleRows` (defaults to the first row). */
   const focusedIndex = () => {
     if (!focusedPath) return -1;
@@ -183,6 +203,12 @@ export function FileTree({
     if (!visibleRows.length) return;
     let index = focusedIndex();
     const current = index >= 0 ? visibleRows[index] : null;
+
+    if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+      if (current) openRowMenu(current.entry);
+      event.preventDefault();
+      return;
+    }
 
     const focusRow = (nextIndex: number) => {
       const row = visibleRows[Math.max(0, Math.min(visibleRows.length - 1, nextIndex))];
@@ -309,6 +335,7 @@ export function FileTree({
             ) : null}
           </div>
         ) : null}
+        {onAction ? <FileActionsMenuButton onSelect={(action) => onAction(action, null)} /> : null}
         {loading ? <Spinner size="xs" label={t('code:tree.loading')} /> : null}
       </div>
 
@@ -357,8 +384,17 @@ export function FileTree({
             const isSelected = !entry.isDir && selected === entry.path;
             const badge = entry.gitStatus ? gitBadge(entry.gitStatus) : null;
             return (
-              <div
+              <DropdownMenu
                 key={entry.path}
+                open={menuOpen && menuEntry?.path === entry.path}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setMenuOpen(false);
+                    setMenuEntry(null);
+                  }
+                }}
+              >
+              <div
                 ref={(node) => {
                   if (node) rowRefs.current.set(entry.path, node);
                   else rowRefs.current.delete(entry.path);
@@ -369,6 +405,10 @@ export function FileTree({
                 aria-expanded={entry.isDir ? hasChildren && isExpanded : undefined}
                 tabIndex={treeTabIndex(entry.path)}
                 onClick={(event) => handleRowClick(event, row)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  openRowMenu(entry);
+                }}
                 onFocus={() => setFocusedPath(entry.path)}
                 style={{ paddingLeft: 8 + depth * 12 }}
                 className={cn(
@@ -420,7 +460,20 @@ export function FileTree({
                     {entry.gitStatus}
                   </span>
                 ) : null}
+                <DropdownMenuTrigger asChild>
+                  <span aria-hidden tabIndex={-1} className="pointer-events-none absolute size-0" />
+                </DropdownMenuTrigger>
               </div>
+              <DropdownMenuContent align="start" className="min-w-56">
+                <FileActionItems
+                  entry={entry}
+                  onSelect={(action) => {
+                    setMenuOpen(false);
+                    onAction?.(action, entry);
+                  }}
+                />
+              </DropdownMenuContent>
+              </DropdownMenu>
             );
           })}
         </div>

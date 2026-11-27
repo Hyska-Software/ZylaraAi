@@ -746,6 +746,46 @@
     "resizer": "Resize files panel"
   },
   "tree": {
+    "menu": {
+      "aria": "File actions",
+      "newFile": "New file",
+      "newFolder": "New folder",
+      "openToSide": "Open to the side",
+      "copyPath": "Copy path",
+      "copyRelativePath": "Copy relative path",
+      "reveal": "Show in Explorer",
+      "download": "Download",
+      "rename": "Rename",
+      "duplicate": "Duplicate",
+      "delete": "Delete"
+    },
+    "dialog": {
+      "newFileTitle": "New file",
+      "newFolderTitle": "New folder",
+      "renameTitle": "Rename",
+      "nameLabel": "Name",
+      "namePlaceholder": "Enter a name",
+      "inLabel": "In {{path}}",
+      "invalidName": "Use a name without slashes or backslashes.",
+      "create": "Create",
+      "renameAction": "Rename",
+      "cancel": "Cancel",
+      "deleteTitle": "Delete {{name}}?",
+      "deleteDescription": "This removes the entry from the workspace and cannot be undone.",
+      "deleteConfirm": "Delete"
+    },
+    "toast": {
+      "created": "Created {{name}}",
+      "renamed": "Renamed to {{name}}",
+      "duplicated": "Duplicated as {{name}}",
+      "deleted": "Deleted {{name}}",
+      "copiedAbsolute": "Absolute path copied",
+      "copiedRelative": "Relative path copied",
+      "copyError": "Could not copy the path",
+      "revealed": "Opened in Explorer",
+      "downloaded": "Downloaded {{name}}",
+      "error": "Could not complete the action"
+    },
     "filterPlaceholder": "Filter files…",
     "filterAria": "Filter files",
     "clearFilter": "Clear filter",

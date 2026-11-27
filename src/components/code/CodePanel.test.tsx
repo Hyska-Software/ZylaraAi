@@ -3,6 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+const copyTextMock = vi.hoisted(() => vi.fn());
+const toastMocks = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+
+vi.mock('@/lib/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/utils')>();
+  return { ...actual, copyText: copyTextMock };
+});
+vi.mock('sonner', () => ({ toast: toastMocks }));
+
 vi.mock('@/lib/api', () => ({
   api: {
     listWorkspaces: vi.fn(),
@@ -30,6 +39,13 @@ vi.mock('@/lib/api', () => ({
     revertFile: vi.fn(),
     getWorkspaceChanges: vi.fn(),
     listTerminals: vi.fn(),
+    createWorkspaceFile: vi.fn(),
+    createWorkspaceDir: vi.fn(),
+    renameWorkspaceEntry: vi.fn(),
+    duplicateWorkspaceEntry: vi.fn(),
+    deleteWorkspaceEntry: vi.fn(),
+    revealWorkspaceEntry: vi.fn(),
+    saveWorkspaceFile: vi.fn(),
   },
 }));
 
@@ -136,6 +152,7 @@ function notRepoStatus(): WorkspaceGitStatus {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  copyTextMock.mockResolvedValue(true);
   watchEvents.handlers.length = 0;
   apiMock.listWorkspaces.mockResolvedValue([]);
   apiMock.listWorkspaceFiles.mockResolvedValue([]);
@@ -162,6 +179,13 @@ beforeEach(() => {
     questions: [],
   });
   apiMock.listTerminals.mockResolvedValue([]);
+  apiMock.createWorkspaceFile.mockResolvedValue('note.md');
+  apiMock.createWorkspaceDir.mockResolvedValue('pasta');
+  apiMock.renameWorkspaceEntry.mockResolvedValue('src/renomeado.ts');
+  apiMock.duplicateWorkspaceEntry.mockResolvedValue('src/app (copy).ts');
+  apiMock.deleteWorkspaceEntry.mockResolvedValue(undefined);
+  apiMock.revealWorkspaceEntry.mockResolvedValue(undefined);
+  apiMock.saveWorkspaceFile.mockResolvedValue(null);
   setViewport(1440);
   resetPanelState();
   usePluginUiPrefs.setState({ ...EMPTY_PREFS });
@@ -1382,5 +1406,104 @@ describe('CodePanel — fechar e reabrir abas', () => {
     fireEvent.click(within(launcher).getByRole('button', { name: 'Arquivos' }));
     expect(screen.getByRole('tab', { name: 'Arquivos' })).toBeTruthy();
     expect(useUiStore.getState().codePanelTab).toBe('files');
+  });
+});
+
+describe('CodePanel — ações do menu Arquivos', () => {
+  beforeEach(() => {
+    useChatStore.setState({
+      conversations: [conversation({ workspaceId: 'ws-1' })],
+      activeId: 'conv-1',
+    });
+    apiMock.listWorkspaces.mockResolvedValue([workspace()]);
+    apiMock.refreshWorkspaceTree.mockResolvedValue({
+      files: [
+        {
+          path: 'src',
+          name: 'src',
+          isDir: true,
+          depth: 0,
+          children: [{ path: 'src/app.ts', name: 'app.ts', isDir: false, depth: 1, size: 20 }],
+        },
+      ],
+      dirs: {},
+      gitStatus: notRepoStatus(),
+    });
+    useUiStore.setState({ codePanelTab: 'files' });
+  });
+
+  const openFileRow = async () => {
+    fireEvent.click(await screen.findByRole('treeitem', { name: 'src' }));
+    return screen.findByRole('treeitem', { name: 'app.ts' });
+  };
+
+  it('creates a file from the header dropdown through the API', async () => {
+    const user = userEvent.setup();
+    render(<CodePanel />);
+    expect(await screen.findByRole('treeitem', { name: 'src' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Ações do arquivo' }));
+    const menu = await screen.findByRole('menu');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Novo arquivo' }));
+    await user.type(await screen.findByRole('textbox', { name: 'Nome' }), 'note.md');
+    await user.click(screen.getByRole('button', { name: 'Criar' }));
+
+    await waitFor(() =>
+      expect(apiMock.createWorkspaceFile).toHaveBeenCalledWith('ws-1', 'note.md'),
+    );
+    expect(toastMocks.success).toHaveBeenCalledWith('note.md criado');
+  });
+
+  it('copies the workspace-relative path from a row context menu', async () => {
+    const user = userEvent.setup();
+    render(<CodePanel />);
+    fireEvent.contextMenu(await openFileRow());
+    const menu = await screen.findByRole('menu');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Copiar caminho relativo' }));
+
+    await waitFor(() => expect(copyTextMock).toHaveBeenCalledWith('src/app.ts'));
+    expect(toastMocks.success).toHaveBeenCalledWith('Caminho relativo copiado');
+  });
+
+  it('opens a file to the side without replacing the primary tab', async () => {
+    const user = userEvent.setup();
+    render(<CodePanel />);
+    fireEvent.contextMenu(await openFileRow());
+    const menu = await screen.findByRole('menu');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Abrir ao lado' }));
+
+    expect(useUiStore.getState().secondaryCodeFileTab).toEqual({
+      workspaceId: 'ws-1',
+      path: 'src/app.ts',
+    });
+  });
+
+  it('asks for confirmation before deleting an entry', async () => {
+    const user = userEvent.setup();
+    render(<CodePanel />);
+    fireEvent.contextMenu(await openFileRow());
+    const menu = await screen.findByRole('menu');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Excluir' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Excluir app.ts?')).toBeTruthy();
+    await user.click(within(dialog).getByRole('button', { name: 'Excluir' }));
+
+    await waitFor(() =>
+      expect(apiMock.deleteWorkspaceEntry).toHaveBeenCalledWith('ws-1', 'src/app.ts'),
+    );
+  });
+
+  it('does not report success when the native save dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    render(<CodePanel />);
+    fireEvent.contextMenu(await openFileRow());
+    const menu = await screen.findByRole('menu');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Baixar' }));
+
+    await waitFor(() =>
+      expect(apiMock.saveWorkspaceFile).toHaveBeenCalledWith('ws-1', 'src/app.ts'),
+    );
+    expect(toastMocks.success).not.toHaveBeenCalled();
   });
 });

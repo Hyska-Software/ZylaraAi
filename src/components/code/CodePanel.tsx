@@ -15,6 +15,12 @@ import {
 } from 'lucide-react';
 import {
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -54,9 +60,11 @@ import type {
   WorkspaceTreeSnapshot,
 } from '@/lib/types';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, copyText } from '@/lib/utils';
 import { ChangesPanel, countPendingChanges } from './ChangesPanel';
 import { BranchPicker } from './BranchPicker';
+import type { FileAction } from './FileActionsMenu';
+import { FileNameDialog, type FileNameDialogMode } from './FileNameDialog';
 import { FileTree } from './FileTree';
 import { GitActionsMenu } from './GitActionsMenu';
 import { TerminalPanel } from './TerminalPanel';
@@ -113,6 +121,18 @@ function findTreeEntry(
     }
   }
   return null;
+}
+
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return fallback;
+}
+
+/** Builds a native absolute path from the stored root and a `/`-separated entry path. */
+function absoluteWorkspacePath(root: string, relative: string): string {
+  const separator = root.includes('\\') ? '\\' : '/';
+  return `${root.replace(/[\\/]+$/, '')}${separator}${relative.split('/').join(separator)}`;
 }
 
 /** Every directory path present in the loaded tree (for the Expand all action). */
@@ -210,7 +230,12 @@ export function CodePanel() {
   const openCodeDiff = useUiStore((state) => state.openCodeDiff);
   const openCodeCommits = useUiStore((state) => state.openCodeCommits);
   const openCodeFile = useUiStore((state) => state.openCodeFile);
+  const openCodeFileToSide = useUiStore((state) => state.openCodeFileToSide);
+  const closeCodeFile = useUiStore((state) => state.closeCodeFile);
+  const closeSecondaryCodeFile = useUiStore((state) => state.closeSecondaryCodeFile);
+  const codeFileTabs = useUiStore((state) => state.codeFileTabs);
   const codeFileTab = useUiStore((state) => state.codeFileTab);
+  const secondaryCodeFileTab = useUiStore((state) => state.secondaryCodeFileTab);
   const expandedPathsByWorkspace = useUiStore((state) => state.codeFileTreeExpandedByWorkspace);
   const toggleFileTreePath = useUiStore((state) => state.toggleCodeFileTreePath);
   const setCodeFileTreeExpanded = useUiStore((state) => state.setCodeFileTreeExpanded);
@@ -254,6 +279,13 @@ export function CodePanel() {
     [panel.gitStatus, sessionChangeFiles],
   );
 
+  const [nameDialog, setNameDialog] = useState<{
+    mode: FileNameDialogMode;
+    parent: string;
+    initialName: string;
+  } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WorkspaceFileEntry | null>(null);
+  const [fileActionBusy, setFileActionBusy] = useState(false);
   /** Width previewed while dragging; `null` means "use the persisted width". */
   const [previewWidth, setPreviewWidth] = useState<number | null>(null);
   /** The "+" dropdown is also opened by right-clicking the tab strip. */
@@ -398,6 +430,157 @@ export function CodePanel() {
     if (snapshot) applySnapshotDirs(snapshot, dirs);
     if (activeId) void refreshSession(activeId);
   }, [lazyChildren, panel, activeId, refreshSession, applySnapshotDirs]);
+
+  const joinEntryPath = (parent: string, name: string) => (parent ? `${parent}/${name}` : name);
+
+  const handleFileAction = useCallback(
+    (action: FileAction, entry: WorkspaceFileEntry | null) => {
+      if (!workspaceId || !workspace) return;
+      if (action === 'newFile' || action === 'newFolder') {
+        setNameDialog({
+          mode: action === 'newFile' ? 'createFile' : 'createDir',
+          parent: entry?.isDir ? entry.path : '',
+          initialName: '',
+        });
+        return;
+      }
+      if (!entry) return;
+      if (action === 'rename') {
+        setNameDialog({ mode: 'rename', parent: entry.path, initialName: entry.name });
+        return;
+      }
+      if (action === 'delete') {
+        setDeleteTarget(entry);
+        return;
+      }
+      if (action === 'openToSide') {
+        openCodeFileToSide({ workspaceId, path: entry.path });
+        return;
+      }
+      if (action === 'copyPath' || action === 'copyRelativePath') {
+        const text =
+          action === 'copyPath'
+            ? absoluteWorkspacePath(workspace.path, entry.path)
+            : entry.path;
+        void copyText(text).then((copied) => {
+          if (copied) {
+            toast.success(
+              t(
+                action === 'copyPath'
+                  ? 'code:tree.toast.copiedAbsolute'
+                  : 'code:tree.toast.copiedRelative',
+              ),
+            );
+          } else {
+            toast.error(t('code:tree.toast.copyError'));
+          }
+        });
+        return;
+      }
+      setFileActionBusy(true);
+      void (async () => {
+        try {
+          if (action === 'reveal') {
+            await api.revealWorkspaceEntry(workspaceId, entry.path);
+            toast.success(t('code:tree.toast.revealed'));
+            return;
+          }
+          if (action === 'download') {
+            const saved = await api.saveWorkspaceFile(workspaceId, entry.path);
+            if (saved) toast.success(t('code:tree.toast.downloaded', { name: entry.name }));
+            return;
+          }
+          const created = await api.duplicateWorkspaceEntry(workspaceId, entry.path);
+          toast.success(t('code:tree.toast.duplicated', { name: created.split('/').pop() ?? created }));
+          await refreshAll();
+        } catch (error) {
+          toast.error(t('code:tree.toast.error'), {
+            description: describeError(error, t('code:tree.toast.error')),
+          });
+        } finally {
+          setFileActionBusy(false);
+        }
+      })();
+    },
+    [openCodeFileToSide, refreshAll, t, workspace, workspaceId],
+  );
+
+  const submitNameDialog = useCallback(
+    async (name: string) => {
+      if (!workspaceId || !nameDialog) return;
+      setFileActionBusy(true);
+      try {
+        if (nameDialog.mode === 'rename') {
+          const oldPath = nameDialog.parent;
+          const parent = oldPath.split('/').slice(0, -1).join('/');
+          await api.renameWorkspaceEntry(workspaceId, oldPath, joinEntryPath(parent, name));
+          const affected = (tab: { workspaceId: string; path: string }) =>
+            tab.workspaceId === workspaceId &&
+            (tab.path === oldPath || tab.path.startsWith(`${oldPath}/`));
+          for (const tab of codeFileTabs) if (affected(tab)) closeCodeFile(tab);
+          if (secondaryCodeFileTab && affected(secondaryCodeFileTab)) closeSecondaryCodeFile();
+          toast.success(t('code:tree.toast.renamed', { name }));
+        } else {
+          const target = joinEntryPath(nameDialog.parent, name);
+          if (nameDialog.mode === 'createFile') await api.createWorkspaceFile(workspaceId, target);
+          else await api.createWorkspaceDir(workspaceId, target);
+          toast.success(t('code:tree.toast.created', { name }));
+        }
+        setNameDialog(null);
+        await refreshAll();
+      } catch (error) {
+        toast.error(t('code:tree.toast.error'), {
+          description: describeError(error, t('code:tree.toast.error')),
+        });
+      } finally {
+        setFileActionBusy(false);
+      }
+    },
+    [
+      closeCodeFile,
+      closeSecondaryCodeFile,
+      codeFileTabs,
+      nameDialog,
+      refreshAll,
+      secondaryCodeFileTab,
+      t,
+      workspaceId,
+    ],
+  );
+
+  const confirmDelete = useCallback(async () => {
+    if (!workspaceId || !deleteTarget) return;
+    setFileActionBusy(true);
+    try {
+      await api.deleteWorkspaceEntry(workspaceId, deleteTarget.path);
+      const affected = (path: string) =>
+        path === deleteTarget.path || path.startsWith(`${deleteTarget.path}/`);
+      for (const tab of codeFileTabs) {
+        if (tab.workspaceId === workspaceId && affected(tab.path)) closeCodeFile(tab);
+      }
+      if (secondaryCodeFileTab?.workspaceId === workspaceId && affected(secondaryCodeFileTab.path)) {
+        closeSecondaryCodeFile();
+      }
+      setDeleteTarget(null);
+      toast.success(t('code:tree.toast.deleted', { name: deleteTarget.name }));
+      await refreshAll();
+    } catch (error) {
+      toast.error(t('code:tree.toast.error'), {
+        description: describeError(error, t('code:tree.toast.error')),
+      });
+    } finally {
+      setFileActionBusy(false);
+    }
+  }, [
+    closeCodeFile,
+    closeSecondaryCodeFile,
+    codeFileTabs,
+    deleteTarget,
+    refreshAll,
+    secondaryCodeFileTab,
+    t,
+    workspaceId,
+  ]);
 
   /**
    * Branch switch/create: the whole tree changes under the panel (a checkout
@@ -796,11 +979,58 @@ export function CodePanel() {
             }}
             onExpandAll={handleExpandAll}
             onCollapseAll={handleCollapseAll}
+            onAction={handleFileAction}
             className="min-h-0 flex-1"
           />
         )}
         </Slot>
       </div>
+
+      <FileNameDialog
+        open={nameDialog !== null}
+        mode={nameDialog?.mode ?? 'createFile'}
+        path={nameDialog?.parent || workspace?.name || ''}
+        initialName={nameDialog?.initialName ?? ''}
+        busy={fileActionBusy}
+        onClose={() => setNameDialog(null)}
+        onSubmit={(name) => void submitNameDialog(name)}
+      />
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !fileActionBusy) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>
+              {t('code:tree.dialog.deleteTitle', { name: deleteTarget?.name ?? '' })}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription className="px-6 pb-4">
+            {t('code:tree.dialog.deleteDescription')}
+          </DialogDescription>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={fileActionBusy}
+              onClick={() => setDeleteTarget(null)}
+            >
+              {t('code:tree.dialog.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              loading={fileActionBusy}
+              onClick={() => void confirmDelete()}
+            >
+              {t('code:tree.dialog.deleteConfirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <PanelResizer
         side="end"

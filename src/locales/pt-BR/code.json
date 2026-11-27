@@ -746,6 +746,46 @@
     "resizer": "Redimensionar painel de arquivos"
   },
   "tree": {
+    "menu": {
+      "aria": "Ações do arquivo",
+      "newFile": "Novo arquivo",
+      "newFolder": "Nova pasta",
+      "openToSide": "Abrir ao lado",
+      "copyPath": "Copiar caminho",
+      "copyRelativePath": "Copiar caminho relativo",
+      "reveal": "Mostrar no Explorer",
+      "download": "Baixar",
+      "rename": "Renomear",
+      "duplicate": "Duplicar",
+      "delete": "Excluir"
+    },
+    "dialog": {
+      "newFileTitle": "Novo arquivo",
+      "newFolderTitle": "Nova pasta",
+      "renameTitle": "Renomear",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Digite um nome",
+      "inLabel": "Em {{path}}",
+      "invalidName": "Use um nome sem barras ou contrabarras.",
+      "create": "Criar",
+      "renameAction": "Renomear",
+      "cancel": "Cancelar",
+      "deleteTitle": "Excluir {{name}}?",
+      "deleteDescription": "Isso remove o item do workspace e não pode ser desfeito.",
+      "deleteConfirm": "Excluir"
+    },
+    "toast": {
+      "created": "{{name}} criado",
+      "renamed": "Renomeado para {{name}}",
+      "duplicated": "Duplicado como {{name}}",
+      "deleted": "{{name}} excluído",
+      "copiedAbsolute": "Caminho absoluto copiado",
+      "copiedRelative": "Caminho relativo copiado",
+      "copyError": "Não foi possível copiar o caminho",
+      "revealed": "Aberto no Explorer",
+      "downloaded": "{{name}} baixado",
+      "error": "Não foi possível concluir a ação"
+    },
     "filterPlaceholder": "Filtrar arquivos…",
     "filterAria": "Filtrar arquivos",
     "clearFilter": "Limpar filtro",

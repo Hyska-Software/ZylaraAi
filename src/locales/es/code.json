@@ -746,6 +746,46 @@
     "resizer": "Redimensionar panel de archivos"
   },
   "tree": {
+    "menu": {
+      "aria": "Acciones del archivo",
+      "newFile": "Nuevo archivo",
+      "newFolder": "Nueva carpeta",
+      "openToSide": "Abrir al lado",
+      "copyPath": "Copiar ruta",
+      "copyRelativePath": "Copiar ruta relativa",
+      "reveal": "Mostrar en el Explorador",
+      "download": "Descargar",
+      "rename": "Renombrar",
+      "duplicate": "Duplicar",
+      "delete": "Eliminar"
+    },
+    "dialog": {
+      "newFileTitle": "Nuevo archivo",
+      "newFolderTitle": "Nueva carpeta",
+      "renameTitle": "Renombrar",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "Escribe un nombre",
+      "inLabel": "En {{path}}",
+      "invalidName": "Usa un nombre sin barras ni contrabarras.",
+      "create": "Crear",
+      "renameAction": "Renombrar",
+      "cancel": "Cancelar",
+      "deleteTitle": "Eliminar {{name}}?",
+      "deleteDescription": "Esto quita la entrada del espacio de trabajo y no se puede deshacer.",
+      "deleteConfirm": "Eliminar"
+    },
+    "toast": {
+      "created": "{{name}} creado",
+      "renamed": "Renombrado a {{name}}",
+      "duplicated": "Duplicado como {{name}}",
+      "deleted": "{{name}} eliminado",
+      "copiedAbsolute": "Ruta absoluta copiada",
+      "copiedRelative": "Ruta relativa copiada",
+      "copyError": "No se pudo copiar la ruta",
+      "revealed": "Abierto en el Explorador",
+      "downloaded": "{{name}} descargado",
+      "error": "No se pudo completar la acción"
+    },
     "filterPlaceholder": "Filtrar archivos…",
     "filterAria": "Filtrar archivos",
     "clearFilter": "Limpiar filtro",

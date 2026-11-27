@@ -237,6 +237,26 @@ describe('CodeSidebar — chrome e ações', () => {
     expect(aside.className).not.toContain('border-r');
   });
 
+  it('hides the workspaces list scrollbar without disabling scrolling', () => {
+    renderSidebar();
+
+    const workspaces = screen.getByRole('region', { name: 'Workspaces' });
+    const scroller = workspaces.querySelector('.overflow-y-auto');
+    expect(scroller).not.toBeNull();
+    expect(scroller?.classList.contains('scrollbar-none')).toBe(true);
+    expect(scroller?.classList.contains('overflow-y-auto')).toBe(true);
+  });
+
+  it('hides the unassigned sessions list scrollbar without disabling scrolling', () => {
+    useChatStore.setState({ conversations: [conversation()] });
+    renderSidebar();
+
+    const scroller = document.getElementById('code-unassigned-sessions');
+    expect(scroller).not.toBeNull();
+    expect(scroller?.classList.contains('scrollbar-none')).toBe(true);
+    expect(scroller?.classList.contains('overflow-y-auto')).toBe(true);
+  });
+
   it('oferece Novo agente, Plugins e Skills na ordem, sem as ações removidas', async () => {
     renderSidebar();
 

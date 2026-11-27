@@ -10,6 +10,7 @@ import { SubagentChatView } from '@/components/agent/SubagentChatView';
 import {
   CodeCommitHistoryView,
   CodeDiffView,
+  CodeFileSplitView,
   CodeFileView,
   CodePlanView,
   CodeSessionHeader,
@@ -95,6 +96,7 @@ export function WorkspaceCenter() {
   const codeView = useUiStore((state) => state.codeView);
   const codeDiffTab = useUiStore((state) => state.codeDiffTab);
   const codeFileTab = useUiStore((state) => state.codeFileTab);
+  const secondaryCodeFileTab = useUiStore((state) => state.secondaryCodeFileTab);
   const codePlanTab = useUiStore((state) => state.codePlanTab);
   const codeCommitsTab = useUiStore((state) => state.codeCommitsTab);
   const codeSubagentTab = useUiStore((state) => state.codeSubagentTab);
@@ -155,7 +157,11 @@ export function WorkspaceCenter() {
   const showSkills = centralHost && (isCode ? codeView === 'skills' : activeView === 'skills');
   const showLibrary = centralHost && !isCode && activeView === 'library';
   const showDiff = centralHost && isCode && codeView === 'diff' && codeDiffTab !== null;
-  const showFile = centralHost && isCode && codeView === 'file' && codeFileTab !== null;
+  const showFile =
+    centralHost &&
+    isCode &&
+    codeView === 'file' &&
+    (codeFileTab !== null || secondaryCodeFileTab !== null);
   const showPlan = centralHost && isCode && codeView === 'plan' && codePlanTab !== null;
   const showGoal = centralHost && isCode && codeView === 'goal' && activeId !== null;
   const showCommits = centralHost && isCode && codeView === 'commits' && codeCommitsTab !== null;
@@ -304,7 +310,15 @@ export function WorkspaceCenter() {
           </AnimatedPanel>
         ) : null}
 
-        {showFile && codeFileTab ? (
+        {showFile && secondaryCodeFileTab ? (
+          <AnimatedPanel key={`file-split:${secondaryCodeFileTab.path}`} reduceMotion={reduceMotion}>
+            <CodeFileSplitView
+              primary={codeFileTab}
+              secondary={secondaryCodeFileTab}
+              className="flex min-h-0 flex-1 flex-col"
+            />
+          </AnimatedPanel>
+        ) : showFile && codeFileTab ? (
           <AnimatedPanel key={`file:${codeFileTab.path}`} reduceMotion={reduceMotion}>
             <div
               id="code-file-panel"
