@@ -104,7 +104,7 @@
     },
     "chatExecutionAnimation": {
       "title": "Chat execution animation",
-      "description": "Turn off to keep the running indicator static while a reply is streaming. The status stays visible without the orbiting highlight.",
+      "description": "Turn off to remove the running indicator entirely. The composer looks the same as when idle.",
       "label": "Animate while replying",
       "aria": "Toggle chat execution animation"
     },

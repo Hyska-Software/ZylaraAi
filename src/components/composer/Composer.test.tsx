@@ -480,15 +480,15 @@ describe('Composer — indicador de execução', () => {
     expect(composerActivity().getAttribute('data-motion')).toBe('reduced');
   });
 
-  it('mantém o indicador estático quando a animação de execução é desativada', () => {
+  it('remove o indicador quando a animação de execução é desativada', () => {
     useAppStore.setState((state) => ({
       settings: { ...state.settings, chatExecutionAnimationEnabled: false },
     }));
     useChatStore.setState({ streaming: streamingState() });
     render(<Composer />);
 
-    expect(composerActivity().getAttribute('data-active')).toBe('true');
-    expect(composerActivity().getAttribute('data-motion')).toBe('reduced');
+    expect(screen.queryByTestId('composer-activity')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Parar resposta' })).toBeTruthy();
   });
 
   it('oferece enfileirar no layout Agentes durante o streaming', async () => {

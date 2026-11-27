@@ -26,6 +26,12 @@ export type MainView = 'chat' | 'skills' | 'library' | 'plugins';
  */
 export type LayoutMode = 'chat' | 'code' | 'agent';
 
+/** Upper bound for persisted "show more" pages in the Code sidebar. */
+const MAX_CODE_SESSION_PAGES = 100;
+
+/** Upper bound for persisted expanded file-tree paths per workspace. */
+const MAX_FILE_TREE_EXPANDED_PATHS = 200;
+
 /** Plugin-owned center page active in one layout. */
 export interface PluginPageTarget {
   pluginId: string;
@@ -436,6 +442,14 @@ interface UiState {
    * fase 1 resolvida em docs/goals/code-harness/WORKBENCH.md §4).
    */
   openSessionsByWorkspace: Record<string, string[]>;
+  /** Workspace ids whose Code sidebar session list is collapsed (persisted). */
+  codeWorkspaceCollapsedById: Record<string, boolean>;
+  /** Expanded directory paths of the Code Files tree, per workspace (persisted). */
+  codeFileTreeExpandedByWorkspace: Record<string, string[]>;
+  /** Collapsed state of the "Sem workspace" session group in the Code sidebar. */
+  codeUnassignedCollapsed: boolean;
+  /** Extra "show more" pages revealed per workspace in the Code sidebar. */
+  codeSessionPagesByWorkspace: Record<string, number>;
   sidebarOpen: boolean;
   /** Persisted width of the desktop sidebar, in px (docs/DESIGN.md §5). */
   sidebarWidth: number;
@@ -569,6 +583,16 @@ interface UiState {
   closeWorkspaceSession: (workspaceId: string, conversationId: string) => string | null;
   /** Substitui a lista de abas de um workspace (sincronização com o backend). */
   setWorkspaceSessions: (workspaceId: string, conversationIds: string[]) => void;
+  /** Toggles the persisted collapsed state of a Code workspace session list. */
+  toggleCodeWorkspaceCollapsed: (workspaceId: string) => void;
+  /** Persists one expanded/collapsed toggle of a Code Files tree directory. */
+  toggleCodeFileTreePath: (workspaceId: string, path: string) => void;
+  /** Replaces the expanded directory list of a Code Files tree (expand/collapse all). */
+  setCodeFileTreeExpanded: (workspaceId: string, paths: readonly string[]) => void;
+  /** Persists the collapsed state of the "Sem workspace" session group. */
+  setCodeUnassignedCollapsed: (collapsed: boolean) => void;
+  /** Reveals one more page of sessions in a Code workspace (persisted). */
+  loadMoreCodeSessions: (workspaceId: string) => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   /** Clamps to `SIDEBAR_WIDTH_MIN`…`SIDEBAR_WIDTH_MAX` and persists the width. */
@@ -705,6 +729,10 @@ export const useUiStore = create<UiState>()(
       agentRightPanel: 'agent',
       activeWorkspaceId: null,
       openSessionsByWorkspace: {},
+      codeWorkspaceCollapsedById: {},
+      codeFileTreeExpandedByWorkspace: {},
+      codeUnassignedCollapsed: false,
+      codeSessionPagesByWorkspace: {},
       sidebarOpen: true,
       sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
       settingsOpen: false,
@@ -1080,6 +1108,57 @@ export const useUiStore = create<UiState>()(
             [workspaceId]: [...new Set(conversationIds)],
           },
         })),
+      toggleCodeWorkspaceCollapsed: (workspaceId) =>
+        set((state) => {
+          if (!workspaceId.trim()) return state;
+          const next = { ...state.codeWorkspaceCollapsedById };
+          if (next[workspaceId]) delete next[workspaceId];
+          else next[workspaceId] = true;
+          return { codeWorkspaceCollapsedById: next };
+        }),
+      toggleCodeFileTreePath: (workspaceId, path) =>
+        set((state) => {
+          const id = workspaceId.trim();
+          const target = path.trim();
+          if (!id || !target) return state;
+          const current = state.codeFileTreeExpandedByWorkspace[id] ?? [];
+          const toggled = current.includes(target)
+            ? current.filter((entry) => entry !== target)
+            : [...current, target];
+          const capped =
+            toggled.length > MAX_FILE_TREE_EXPANDED_PATHS
+              ? toggled.slice(-MAX_FILE_TREE_EXPANDED_PATHS)
+              : toggled;
+          const next = { ...state.codeFileTreeExpandedByWorkspace };
+          if (capped.length === 0) delete next[id];
+          else next[id] = capped;
+          return { codeFileTreeExpandedByWorkspace: next };
+        }),
+      setCodeFileTreeExpanded: (workspaceId, paths) =>
+        set((state) => {
+          const id = workspaceId.trim();
+          if (!id || !Array.isArray(paths)) return state;
+          const clean = [...new Set(paths.map((path) => path.trim()).filter(Boolean))].slice(
+            -MAX_FILE_TREE_EXPANDED_PATHS,
+          );
+          const next = { ...state.codeFileTreeExpandedByWorkspace };
+          if (clean.length === 0) delete next[id];
+          else next[id] = clean;
+          return { codeFileTreeExpandedByWorkspace: next };
+        }),
+      setCodeUnassignedCollapsed: (collapsed) =>
+        set({ codeUnassignedCollapsed: Boolean(collapsed) }),
+      loadMoreCodeSessions: (workspaceId) =>
+        set((state) => {
+          if (!workspaceId.trim()) return state;
+          const current = state.codeSessionPagesByWorkspace[workspaceId] ?? 1;
+          return {
+            codeSessionPagesByWorkspace: {
+              ...state.codeSessionPagesByWorkspace,
+              [workspaceId]: Math.min(current + 1, MAX_CODE_SESSION_PAGES),
+            },
+          };
+        }),
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       setSidebarWidth: (sidebarWidth) => set({ sidebarWidth: clampSidebarWidth(sidebarWidth) }),
@@ -1259,6 +1338,10 @@ export const useUiStore = create<UiState>()(
         sidePanelMode: state.sidePanelMode,
         activeWorkspaceId: state.activeWorkspaceId,
         openSessionsByWorkspace: state.openSessionsByWorkspace,
+        codeWorkspaceCollapsedById: state.codeWorkspaceCollapsedById,
+        codeFileTreeExpandedByWorkspace: state.codeFileTreeExpandedByWorkspace,
+        codeUnassignedCollapsed: state.codeUnassignedCollapsed,
+        codeSessionPagesByWorkspace: state.codeSessionPagesByWorkspace,
         codeFileWrap: state.codeFileWrap,
         pluginPages: state.pluginPages,
         pluginDockTab: state.pluginDockTab,
@@ -1281,6 +1364,45 @@ export const useUiStore = create<UiState>()(
             if (!Array.isArray(ids)) continue;
             const clean = ids.filter((id): id is string => typeof id === 'string' && id.length > 0);
             if (clean.length > 0) mapped[workspaceId] = [...new Set(clean)];
+          }
+          return mapped;
+        };
+        const validCollapsed = (value: unknown): Record<string, boolean> => {
+          if (!value || typeof value !== 'object') return {};
+          const mapped: Record<string, boolean> = {};
+          for (const [workspaceId, collapsed] of Object.entries(value as Record<string, unknown>)) {
+            if (!validWorkspaceId(workspaceId) || collapsed !== true) continue;
+            mapped[workspaceId] = true;
+          }
+          return mapped;
+        };
+        const validExpandedPaths = (value: unknown): Record<string, string[]> => {
+          if (!value || typeof value !== 'object') return {};
+          const mapped: Record<string, string[]> = {};
+          for (const [workspaceId, paths] of Object.entries(value as Record<string, unknown>)) {
+            if (!validWorkspaceId(workspaceId) || !Array.isArray(paths)) continue;
+            const clean = paths
+              .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+              .map((entry) => entry.trim());
+            if (clean.length > 0) {
+              mapped[workspaceId] = [...new Set(clean)].slice(-MAX_FILE_TREE_EXPANDED_PATHS);
+            }
+          }
+          return mapped;
+        };
+        const validSessionPages = (value: unknown): Record<string, number> => {
+          if (!value || typeof value !== 'object') return {};
+          const mapped: Record<string, number> = {};
+          for (const [workspaceId, pages] of Object.entries(value as Record<string, unknown>)) {
+            if (
+              !validWorkspaceId(workspaceId) ||
+              typeof pages !== 'number' ||
+              !Number.isFinite(pages)
+            ) {
+              continue;
+            }
+            const page = Math.floor(pages);
+            if (page >= 1) mapped[workspaceId] = Math.min(page, MAX_CODE_SESSION_PAGES);
           }
           return mapped;
         };
@@ -1334,6 +1456,15 @@ export const useUiStore = create<UiState>()(
           sidePanelMode: stored.sidePanelMode === 'docked' ? 'docked' : 'overlay',
           activeWorkspaceId: validWorkspaceId(stored.activeWorkspaceId),
           openSessionsByWorkspace: validSessions(stored.openSessionsByWorkspace),
+          codeWorkspaceCollapsedById: validCollapsed(stored.codeWorkspaceCollapsedById),
+          codeFileTreeExpandedByWorkspace: validExpandedPaths(
+            stored.codeFileTreeExpandedByWorkspace,
+          ),
+          codeUnassignedCollapsed:
+            typeof stored.codeUnassignedCollapsed === 'boolean'
+              ? stored.codeUnassignedCollapsed
+              : current.codeUnassignedCollapsed,
+          codeSessionPagesByWorkspace: validSessionPages(stored.codeSessionPagesByWorkspace),
           codeFileWrap:
             typeof stored.codeFileWrap === 'boolean' ? stored.codeFileWrap : current.codeFileWrap,
         };

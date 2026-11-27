@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { WorkspaceFileEntry } from '@/lib/types';
@@ -30,14 +30,40 @@ const entries: WorkspaceFileEntry[] = [
   { path: 'blob.qqq', name: 'blob.qqq', isDir: false, depth: 0 },
 ];
 
-function renderTree(overrides: Partial<ComponentProps<typeof FileTree>> = {}) {
+const DEFAULT_EXPANDED = ['src', 'src/components'];
+
+/** Mirrors the container: it owns the expanded set and reacts to `onToggleDir`. */
+function renderTree(
+  overrides: Partial<ComponentProps<typeof FileTree>> = {},
+  initialExpanded: readonly string[] = DEFAULT_EXPANDED,
+) {
   const props = {
     entries,
     onSelectFile: vi.fn(),
     onToggleDir: vi.fn(),
     ...overrides,
   };
-  render(<FileTree {...props} />);
+
+  function Host() {
+    const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(initialExpanded));
+    return (
+      <FileTree
+        {...props}
+        expandedPaths={expanded}
+        onToggleDir={(path) => {
+          props.onToggleDir?.(path);
+          setExpanded((current) => {
+            const next = new Set(current);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            return next;
+          });
+        }}
+      />
+    );
+  }
+
+  render(<Host />);
   return props;
 }
 
@@ -52,6 +78,61 @@ describe('FileTree', () => {
     expect(row('src').getAttribute('aria-expanded')).toBe('true');
     expect(row(/app\.ts/).getAttribute('aria-level')).toBe('2');
     expect(row(/README\.md/)).toBeTruthy();
+  });
+
+  it('renders expand/collapse-all actions and forwards clicks', () => {
+    const onExpandAll = vi.fn();
+    const onCollapseAll = vi.fn();
+    renderTree({ onExpandAll, onCollapseAll });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir todas as pastas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recolher todas as pastas' }));
+    expect(onExpandAll).toHaveBeenCalledTimes(1);
+    expect(onCollapseAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the bulk actions when there are no directories', () => {
+    renderTree({
+      entries: [{ path: 'README.md', name: 'README.md', isDir: false, depth: 0 }],
+      onExpandAll: vi.fn(),
+      onCollapseAll: vi.fn(),
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Expandir todas as pastas' }).hasAttribute('disabled'),
+    ).toBe(true);
+    expect(
+      screen.getByRole('button', { name: 'Recolher todas as pastas' }).hasAttribute('disabled'),
+    ).toBe(true);
+  });
+
+  it('starts with every directory collapsed', () => {
+    renderTree({}, []);
+    expect(row('src').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('treeitem', { name: /app\.ts/ })).toBeNull();
+    expect(screen.queryByRole('treeitem', { name: /components/ })).toBeNull();
+    // Root-level files stay visible.
+    expect(row(/README\.md/)).toBeTruthy();
+  });
+
+  it('keeps expansion controlled by the container', () => {
+    const onToggleDir = vi.fn();
+    const props: ComponentProps<typeof FileTree> = {
+      entries,
+      expandedPaths: new Set(['src']),
+      onToggleDir,
+    };
+    const { rerender } = render(<FileTree {...props} />);
+
+    fireEvent.click(row('src'));
+    expect(onToggleDir).toHaveBeenCalledWith('src');
+    // Without a prop update from the container nothing changes locally.
+    expect(row('src').getAttribute('aria-expanded')).toBe('true');
+    expect(row(/app\.ts/)).toBeTruthy();
+
+    rerender(<FileTree {...props} expandedPaths={new Set()} />);
+    expect(row('src').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('treeitem', { name: /app\.ts/ })).toBeNull();
   });
 
   it('expands/collapses a directory and notifies the container', () => {
@@ -95,6 +176,24 @@ describe('FileTree', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Limpar filtro' }));
     expect(screen.getByRole('treeitem', { name: /README\.md/ })).toBeTruthy();
+  });
+
+  it('finds nested files under collapsed folders without changing expansion', () => {
+    const props = renderTree({ totalCount: 5000 }, []);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filtrar arquivos' }), {
+      target: { value: 'BUTTON' },
+    });
+    expect(screen.getByRole('treeitem', { name: /Button\.tsx/ })).toBeTruthy();
+    expect(props.onToggleDir).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtro' }));
+    expect(screen.queryByRole('treeitem', { name: /Button\.tsx/ })).toBeNull();
+    expect(row('src').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('does not show the truncated counter only because folders are collapsed', () => {
+    renderTree({}, []);
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('uses the real colored file-type icon on files and keeps lucide folders', () => {
@@ -170,7 +269,6 @@ describe('FileTree', () => {
     expect(screen.getByText('Não foi possível ler a pasta')).toBeTruthy();
     expect(screen.getByText('Acesso negado à pasta.')).toBeTruthy();
   });
-});
 
   it('pede carregamento ao abrir um diretório ainda sem filhos (lazy)', () => {
     const props = renderTree({
@@ -194,3 +292,4 @@ describe('FileTree', () => {
 
     expect(screen.getByRole('status', { name: 'Carregando apps' })).toBeTruthy();
   });
+});

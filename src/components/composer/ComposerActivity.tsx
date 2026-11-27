@@ -33,9 +33,8 @@ export function ComposerActivity({ active, reduceMotion }: ComposerActivityProps
   const chatExecutionAnimationEnabled = useAppStore(
     (state) => state.settings.chatExecutionAnimationEnabled,
   );
-  const staticRing = reduceMotion || !chatExecutionAnimationEnabled;
-
   useLayoutEffect(() => {
+    if (!chatExecutionAnimationEnabled) return;
     const host = hostRef.current;
     if (!host) return;
 
@@ -72,7 +71,9 @@ export function ComposerActivity({ active, reduceMotion }: ComposerActivityProps
     return () => observer.disconnect();
     // Re-measure when a turn starts so a font-scale change is picked up even if
     // the composer box happened to keep the same size.
-  }, [active]);
+  }, [active, chatExecutionAnimationEnabled]);
+
+  if (!chatExecutionAnimationEnabled) return null;
 
   const orbitRadius = box ? Math.max(0, box.radius - 0.75) : 0;
 
@@ -82,13 +83,13 @@ export function ComposerActivity({ active, reduceMotion }: ComposerActivityProps
       aria-hidden="true"
       data-testid="composer-activity"
       data-active={active ? 'true' : 'false'}
-      data-motion={staticRing ? 'reduced' : 'orbit'}
+      data-motion={reduceMotion ? 'reduced' : 'orbit'}
       className={cn(
         'composer-orbit-mask pointer-events-none absolute -inset-px z-0',
         'transition-opacity duration-300 ease-[var(--ease-out-soft)]',
         active ? 'opacity-100' : 'opacity-0',
-        !staticRing && 'composer-orbit-animate',
-        staticRing && 'composer-orbit-static',
+        !reduceMotion && 'composer-orbit-animate',
+        reduceMotion && 'composer-orbit-static',
         !active && 'composer-orbit-paused',
       )}
     >

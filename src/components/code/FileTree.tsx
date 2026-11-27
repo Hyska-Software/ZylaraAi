@@ -1,13 +1,15 @@
 import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ChevronsDownUp,
+  ChevronsUpDown,
   CircleAlert,
   Folder,
   FolderOpen,
   Search,
   X,
 } from 'lucide-react';
-import { Input, Spinner } from '@/components/ui';
+import { IconButton, Input, Spinner, Tooltip } from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import type { WorkspaceFileEntry } from '@/lib/types';
@@ -30,6 +32,8 @@ export interface FileTreeProps {
   error?: string | null;
   /** Controlled selection; when omitted the tree keeps the last selection itself. */
   selectedPath?: string | null;
+  /** Expanded directory paths; an empty set (the default) collapses every folder. */
+  expandedPaths?: ReadonlySet<string>;
   /**
    * Total files in the workspace when the backend capped the listing ("mostrando
    * X de Y"). Ignored when smaller than the visible count.
@@ -38,6 +42,9 @@ export interface FileTreeProps {
   onSelectFile?: (path: string) => void;
   /** Fired when a directory is expanded/collapsed; the container may fetch children. */
   onToggleDir?: (path: string) => void;
+  /** Header actions; the container owns the persisted expanded state. */
+  onExpandAll?: () => void;
+  onCollapseAll?: () => void;
   /** Diretórios com filhos sendo carregados (lazy expansion); mostra spinner no lugar do chevron. */
   loadingPaths?: ReadonlySet<string>;
   className?: string;
@@ -85,21 +92,22 @@ function normalize(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-/** True when `row` is under any collapsed ancestor directory. */
-function isHiddenByCollapse(row: TreeRow, collapsed: ReadonlySet<string>): boolean {
-  return row.ancestors.some((path) => collapsed.has(path));
+/** True when any ancestor directory of `row` is not expanded. */
+function isHiddenByCollapse(row: TreeRow, expanded: ReadonlySet<string>): boolean {
+  return row.ancestors.some((path) => !expanded.has(path));
 }
 
 const SKELETON_ROWS = [0, 1, 2, 3, 4, 5];
+const EMPTY_EXPANDED_PATHS: ReadonlySet<string> = new Set();
 
 /**
  * Workspace file tree for the Code right panel (WORKBENCH §7.1/§15).
  *
  * Rendering is flattened (one DOM row per visible entry, no recursive markup),
  * which keeps thousands of entries cheap without adding a virtualization
- * dependency. Expansion is controlled by the container through `entries` +
- * `onToggleDir`; the component only tracks the user's collapsed set and the
- * roving focus, so keyboard navigation stays local. Full a11y contract:
+ * dependency. Expansion is controlled by the container through `expandedPaths`
+ * + `onToggleDir`; the component only tracks the roving focus, so keyboard
+ * navigation stays local. Directories start collapsed. Full a11y contract:
  * `role="tree"`/`treeitem`, `aria-expanded`, `aria-selected`, ↑/↓/←/→/Home/End/Enter.
  */
 export function FileTree({
@@ -107,54 +115,48 @@ export function FileTree({
   loading = false,
   error = null,
   selectedPath,
+  expandedPaths,
   totalCount,
   onSelectFile,
   onToggleDir,
+  onExpandAll,
+  onCollapseAll,
   loadingPaths,
   className,
 }: FileTreeProps) {
   const { t } = useTranslation('code');
   const [query, setQuery] = useState('');
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [uncontrolledSelected, setUncontrolledSelected] = useState<string | null>(null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
   const allRows = useMemo(() => flatten(entries), [entries]);
+  const hasDirs = useMemo(() => allRows.some((row) => row.entry.isDir), [allRows]);
   const selected = selectedPath !== undefined ? selectedPath : uncontrolledSelected;
   const normalizedQuery = normalize(query.trim());
+  const expanded = expandedPaths ?? EMPTY_EXPANDED_PATHS;
 
   const visibleRows = useMemo(() => {
-    const expandedRows = allRows.filter((row) => !isHiddenByCollapse(row, collapsed));
+    // A filter searches the whole loaded tree: matches under collapsed folders
+    // stay reachable without changing the persisted expansion state.
+    const expandedRows = normalizedQuery
+      ? allRows
+      : allRows.filter((row) => !isHiddenByCollapse(row, expanded));
     if (!normalizedQuery) return expandedRows;
     return expandedRows.filter(
       (row) =>
         normalize(row.entry.name).includes(normalizedQuery) ||
         normalize(row.entry.path).includes(normalizedQuery),
     );
-  }, [allRows, collapsed, normalizedQuery]);
+  }, [allRows, expanded, normalizedQuery]);
 
   const setFocused = (path: string | null) => {
     setFocusedPath(path);
     if (path) rowRefs.current.get(path)?.focus();
   };
 
-  /**
-   * Expande/colapsa de verdade apenas quando o diretório já tem filhos
-   * carregados; sem filhos (árvore lazy), o clique só pede o carregamento ao
-   * container — antes o clique marcava "colapsado" e o diretório nunca abria.
-   */
-  const toggleDirectory = (path: string, hasChildren: boolean) => {
-    if (!hasChildren) {
-      onToggleDir?.(path);
-      return;
-    }
-    setCollapsed((current) => {
-      const next = new Set(current);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
+  /** The container owns expansion (and its persistence); a click requests a toggle. */
+  const toggleDirectory = (path: string) => {
     onToggleDir?.(path);
   };
 
@@ -173,7 +175,7 @@ export function FileTree({
     // Let the copy/clear buttons inside the header and nested controls win.
     if (event.defaultPrevented) return;
     setFocusedPath(row.entry.path);
-    if (row.entry.isDir) toggleDirectory(row.entry.path, !!row.entry.children?.length);
+    if (row.entry.isDir) toggleDirectory(row.entry.path);
     else selectFile(row.entry.path);
   };
 
@@ -205,7 +207,7 @@ export function FileTree({
       case 'ArrowRight': {
         if (!current) return;
         if (current.entry.isDir) {
-          if (collapsed.has(current.entry.path)) toggleDirectory(current.entry.path, true);
+          if (!expanded.has(current.entry.path)) toggleDirectory(current.entry.path);
           else if (index + 1 < visibleRows.length && visibleRows[index + 1].depth > current.depth) {
             focusRow(index + 1);
           }
@@ -214,8 +216,8 @@ export function FileTree({
       }
       case 'ArrowLeft': {
         if (!current) return;
-        if (current.entry.isDir && !collapsed.has(current.entry.path)) {
-          toggleDirectory(current.entry.path, !!current.entry.children?.length);
+        if (current.entry.isDir && expanded.has(current.entry.path)) {
+          toggleDirectory(current.entry.path);
         } else if (current.depth > 0) {
           /* Focus the nearest ancestor row. */
           for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
@@ -230,7 +232,7 @@ export function FileTree({
       case 'Enter':
       case ' ': {
         if (!current) return;
-        if (current.entry.isDir) toggleDirectory(current.entry.path, !!current.entry.children?.length);
+        if (current.entry.isDir) toggleDirectory(current.entry.path);
         else selectFile(current.entry.path);
         break;
       }
@@ -247,8 +249,10 @@ export function FileTree({
   };
 
   const visibleFileCount = visibleRows.length;
-  const total = totalCount != null && totalCount > 0 ? totalCount : allRows.length;
-  const showCount = total > 0 && (normalizedQuery.length > 0 || visibleFileCount < total);
+  // Collapsed folders are not truncation: only show the counter for an active
+  // filter or a backend that reported more entries than it returned.
+  const total = totalCount != null && totalCount > allRows.length ? totalCount : allRows.length;
+  const showCount = normalizedQuery.length > 0 || total > allRows.length;
 
   return (
     <div className={cn('flex h-full min-h-0 flex-col', className)}>
@@ -277,6 +281,34 @@ export function FileTree({
             </button>
           ) : null}
         </div>
+        {onExpandAll || onCollapseAll ? (
+          <div className="flex shrink-0 items-center gap-0.5">
+            {onExpandAll ? (
+              <Tooltip content={t('code:tree.expandAll')} side="bottom">
+                <IconButton
+                  label={t('code:tree.expandAll')}
+                  size="sm"
+                  disabled={!hasDirs}
+                  onClick={onExpandAll}
+                >
+                  <ChevronsUpDown aria-hidden className="size-3.5" strokeWidth={1.75} />
+                </IconButton>
+              </Tooltip>
+            ) : null}
+            {onCollapseAll ? (
+              <Tooltip content={t('code:tree.collapseAll')} side="bottom">
+                <IconButton
+                  label={t('code:tree.collapseAll')}
+                  size="sm"
+                  disabled={!hasDirs}
+                  onClick={onCollapseAll}
+                >
+                  <ChevronsDownUp aria-hidden className="size-3.5" strokeWidth={1.75} />
+                </IconButton>
+              </Tooltip>
+            ) : null}
+          </div>
+        ) : null}
         {loading ? <Spinner size="xs" label={t('code:tree.loading')} /> : null}
       </div>
 
@@ -320,8 +352,8 @@ export function FileTree({
         >
           {visibleRows.map((row) => {
             const { entry, depth } = row;
-            const expanded = entry.isDir && !!entry.children?.length && !collapsed.has(entry.path);
             const hasChildren = !!entry.children?.length;
+            const isExpanded = entry.isDir && hasChildren && expanded.has(entry.path);
             const isSelected = !entry.isDir && selected === entry.path;
             const badge = entry.gitStatus ? gitBadge(entry.gitStatus) : null;
             return (
@@ -334,7 +366,7 @@ export function FileTree({
                 role="treeitem"
                 aria-level={depth + 1}
                 aria-selected={isSelected}
-                aria-expanded={entry.isDir ? hasChildren && expanded : undefined}
+                aria-expanded={entry.isDir ? hasChildren && isExpanded : undefined}
                 tabIndex={treeTabIndex(entry.path)}
                 onClick={(event) => handleRowClick(event, row)}
                 onFocus={() => setFocusedPath(entry.path)}
@@ -358,7 +390,7 @@ export function FileTree({
                       aria-hidden
                       className={cn(
                         'flex size-3.5 shrink-0 items-center justify-center text-foreground-subtle transition-transform duration-150 motion-reduce:transition-none',
-                        expanded && 'rotate-90',
+                        isExpanded && 'rotate-90',
                       )}
                     >
                       <svg viewBox="0 0 16 16" fill="none" className="size-3">
@@ -370,7 +402,7 @@ export function FileTree({
                   <span aria-hidden className="w-3.5 shrink-0" />
                 )}
                 {entry.isDir ? (
-                  expanded ? (
+                  isExpanded ? (
                     <FolderOpen aria-hidden className="size-4 shrink-0 text-accent" strokeWidth={1.75} />
                   ) : (
                     <Folder aria-hidden className="size-4 shrink-0 text-accent" strokeWidth={1.75} />

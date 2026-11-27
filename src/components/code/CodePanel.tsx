@@ -115,6 +115,16 @@ function findTreeEntry(
   return null;
 }
 
+/** Every directory path present in the loaded tree (for the Expand all action). */
+function collectDirPaths(entries: WorkspaceFileEntry[], paths: string[] = []): string[] {
+  for (const entry of entries) {
+    if (!entry.isDir) continue;
+    paths.push(entry.path);
+    if (entry.children?.length) collectDirPaths(entry.children, paths);
+  }
+  return paths;
+}
+
 interface EmptyStateProps {
   icon: LucideIcon;
   title: string;
@@ -201,6 +211,9 @@ export function CodePanel() {
   const openCodeCommits = useUiStore((state) => state.openCodeCommits);
   const openCodeFile = useUiStore((state) => state.openCodeFile);
   const codeFileTab = useUiStore((state) => state.codeFileTab);
+  const expandedPathsByWorkspace = useUiStore((state) => state.codeFileTreeExpandedByWorkspace);
+  const toggleFileTreePath = useUiStore((state) => state.toggleCodeFileTreePath);
+  const setCodeFileTreeExpanded = useUiStore((state) => state.setCodeFileTreeExpanded);
   // Padrão de fábrica: diff abre como aba do chat; pode ser trocado em
   // Configurações → Ferramentas (Settings.diffOpenMode).
   const diffOpenMode = useAppStore((state) => state.settings.diffOpenMode ?? 'tab');
@@ -215,6 +228,10 @@ export function CodePanel() {
     state.conversations.find((entry) => entry.id === state.activeId),
   );
   const workspaceId = conversation?.workspaceId ?? null;
+  const expandedPaths = useMemo(
+    () => new Set(workspaceId ? (expandedPathsByWorkspace[workspaceId] ?? []) : []),
+    [expandedPathsByWorkspace, workspaceId],
+  );
   const panel = useWorkspacePanel(workspaceId);
   const { workspaces, refreshContext } = useWorkspaces();
   const workspace = workspaces.find((entry) => entry.id === workspaceId) ?? null;
@@ -257,6 +274,8 @@ export function CodePanel() {
      mais profundos carregam os filhos quando o usuário abre. */
   const [lazyChildren, setLazyChildren] = useState<Record<string, WorkspaceFileEntry[]>>({});
   const [lazyLoading, setLazyLoading] = useState<ReadonlySet<string>>(() => new Set());
+  /** One hydration pass per workspace; expanding a folder must not re-fetch it. */
+  const restoredWorkspaceRef = useRef<string | null>(null);
 
   useEffect(() => {
     setLazyChildren({});
@@ -288,6 +307,27 @@ export function CodePanel() {
     () => withLazyChildren(panel.files, lazyChildren),
     [panel.files, lazyChildren],
   );
+
+  const handleExpandAll = useCallback(() => {
+    if (!workspaceId) return;
+    const paths = collectDirPaths(treeEntries);
+    setCodeFileTreeExpanded(workspaceId, paths);
+    // Load children of lazy directories too, but bound the bulk work on huge
+    // workspaces; deeper directories can be expanded on demand afterwards.
+    let requested = 0;
+    for (const path of paths) {
+      if (requested >= 32) break;
+      if (lazyChildren[path] !== undefined || findTreeEntry(treeEntries, path)?.children?.length) {
+        continue;
+      }
+      requested += 1;
+      void loadDirectory(path);
+    }
+  }, [workspaceId, treeEntries, lazyChildren, loadDirectory, setCodeFileTreeExpanded]);
+
+  const handleCollapseAll = useCallback(() => {
+    if (workspaceId) setCodeFileTreeExpanded(workspaceId, []);
+  }, [workspaceId, setCodeFileTreeExpanded]);
 
   const layout = useMemo(
     () =>
@@ -323,6 +363,32 @@ export function CodePanel() {
     },
     [],
   );
+
+  /* Restores the children of directories the user had expanded before leaving
+     the workspace. One snapshot covers every saved path; the root tree is
+     loaded by useWorkspacePanel and is left untouched. */
+  useEffect(() => {
+    if (!workspaceId || restoredWorkspaceRef.current === workspaceId) return;
+    restoredWorkspaceRef.current = workspaceId;
+    const paths = (
+      useUiStore.getState().codeFileTreeExpandedByWorkspace[workspaceId] ?? []
+    ).slice(0, 32);
+    if (paths.length === 0) return;
+    let cancelled = false;
+    void api
+      .refreshWorkspaceTree(workspaceId, paths)
+      .then((snapshot) => {
+        if (!cancelled) applySnapshotDirs(snapshot, paths);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          toast.error(t('code:panel.toast.openFolderError'), { description: String(error) });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, applySnapshotDirs]);
 
   const refreshAll = useCallback(async () => {
     // Preserva a expansão: a raiz e cada diretório carregado sob demanda vêm
@@ -711,12 +777,16 @@ export function CodePanel() {
             loading={panel.filesLoading}
             error={panel.filesError}
             selectedPath={selectedFilePath}
+            expandedPaths={expandedPaths}
             totalCount={panel.files.length}
             loadingPaths={lazyLoading}
             onSelectFile={(path) => {
               if (workspaceId) openCodeFile({ workspaceId, path });
             }}
             onToggleDir={(path) => {
+              const wasExpanded = expandedPaths.has(path);
+              if (workspaceId) toggleFileTreePath(workspaceId, path);
+              if (wasExpanded) return;
               // Só busca quando o diretório ainda não tem filhos carregados;
               // abrir/colapsar diretórios já carregados é só estado local.
               if (lazyChildren[path] !== undefined) return;
@@ -724,6 +794,8 @@ export function CodePanel() {
               if (!node || node.children?.length) return;
               void loadDirectory(path);
             }}
+            onExpandAll={handleExpandAll}
+            onCollapseAll={handleCollapseAll}
             className="min-h-0 flex-1"
           />
         )}

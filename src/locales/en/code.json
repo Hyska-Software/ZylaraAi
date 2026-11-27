@@ -749,6 +749,8 @@
     "filterPlaceholder": "Filter files…",
     "filterAria": "Filter files",
     "clearFilter": "Clear filter",
+    "expandAll": "Expand all folders",
+    "collapseAll": "Collapse all folders",
     "loading": "Loading files",
     "loadingTree": "Loading the tree",
     "loadingDir": "Loading {{name}}",

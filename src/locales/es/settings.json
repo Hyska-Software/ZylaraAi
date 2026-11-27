@@ -104,7 +104,7 @@
     },
     "chatExecutionAnimation": {
       "title": "Animación de ejecución del chat",
-      "description": "Desactívala para mantener el indicador de ejecución estático mientras se transmite la respuesta. El estado sigue visible sin el resplandor orbital.",
+      "description": "Desactívala para eliminar por completo el indicador de ejecución. El compositor se ve igual que en reposo.",
       "label": "Animar mientras responde",
       "aria": "Alternar animación de ejecución del chat"
     },

@@ -104,7 +104,7 @@
     },
     "chatExecutionAnimation": {
       "title": "Animação de execução do chat",
-      "description": "Desative para manter o indicador de execução estático durante a resposta. O status continua visível, sem o destaque orbitando.",
+      "description": "Desative para remover completamente o indicador de execução. O composer fica igual ao estado parado.",
       "label": "Animar durante a resposta",
       "aria": "Alternar animação de execução do chat"
     },

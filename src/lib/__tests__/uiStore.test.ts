@@ -789,3 +789,66 @@ describe('uiStore — ordem das abas do Code', () => {
     });
   });
 });
+
+describe('useUiStore Code sidebar expansion', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useUiStore.setState({
+      codeWorkspaceCollapsedById: {},
+      codeUnassignedCollapsed: false,
+      codeSessionPagesByWorkspace: {},
+    });
+  });
+
+  it('persists collapsed groups and revealed pages in the UI storage', () => {
+    useUiStore.getState().toggleCodeWorkspaceCollapsed('ws-1');
+    useUiStore.getState().setCodeUnassignedCollapsed(true);
+    useUiStore.getState().loadMoreCodeSessions('ws-1');
+
+    const stored = JSON.parse(window.localStorage.getItem('zylara.ui') ?? '{}') as {
+      state?: {
+        codeWorkspaceCollapsedById?: Record<string, boolean>;
+        codeUnassignedCollapsed?: boolean;
+        codeSessionPagesByWorkspace?: Record<string, number>;
+      };
+    };
+    expect(stored.state?.codeWorkspaceCollapsedById).toEqual({ 'ws-1': true });
+    expect(stored.state?.codeUnassignedCollapsed).toBe(true);
+    expect(stored.state?.codeSessionPagesByWorkspace).toEqual({ 'ws-1': 2 });
+  });
+
+  it('toggles a workspace back to expanded', () => {
+    useUiStore.getState().toggleCodeWorkspaceCollapsed('ws-1');
+    useUiStore.getState().toggleCodeWorkspaceCollapsed('ws-1');
+
+    expect(useUiStore.getState().codeWorkspaceCollapsedById['ws-1']).toBeUndefined();
+  });
+
+  it('sanitizes corrupted persisted expansion state while rehydrating', async () => {
+    window.localStorage.setItem(
+      'zylara.ui',
+      JSON.stringify({
+        version: 0,
+        state: {
+          codeWorkspaceCollapsedById: { 'ws-ok': true, '': true, 'ws-bad': 'yes', ' ': true },
+          codeUnassignedCollapsed: 'yes',
+          codeSessionPagesByWorkspace: {
+            'ws-ok': 3,
+            'ws-zero': 0,
+            'ws-nan': 'x',
+            'ws-max': 9999,
+          },
+        },
+      }),
+    );
+
+    await useUiStore.persist.rehydrate();
+
+    expect(useUiStore.getState().codeWorkspaceCollapsedById).toEqual({ 'ws-ok': true });
+    expect(useUiStore.getState().codeUnassignedCollapsed).toBe(false);
+    expect(useUiStore.getState().codeSessionPagesByWorkspace).toEqual({
+      'ws-ok': 3,
+      'ws-max': 100,
+    });
+  });
+});

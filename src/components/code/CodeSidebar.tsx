@@ -815,8 +815,9 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     refreshContext,
   } = useWorkspaces();
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const [unassignedCollapsed, setUnassignedCollapsed] = useState(false);
+  const codeWorkspaceCollapsedById = useUiStore((state) => state.codeWorkspaceCollapsedById);
+  const codeUnassignedCollapsed = useUiStore((state) => state.codeUnassignedCollapsed);
+  const codeSessionPagesByWorkspace = useUiStore((state) => state.codeSessionPagesByWorkspace);
   const [openingFolder, setOpeningFolder] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [workspaceQuery, setWorkspaceQuery] = useState('');
@@ -832,8 +833,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
   const [renameSessionBusy, setRenameSessionBusy] = useState(false);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<Conversation | null>(null);
   const [deleteSessionBusy, setDeleteSessionBusy] = useState(false);
-  /** Extra session pages revealed per workspace ("show more" under the group). */
-  const [sessionPages, setSessionPages] = useState<Record<string, number>>({});
 
   /* Ações da sessão (mesmo menu das conversas no layout Chat). */
   const handleSessionPin = (conversation: Conversation) => {
@@ -893,10 +892,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
   };
 
   const handleLoadMoreSessions = (workspaceId: string) => {
-    setSessionPages((current) => ({
-      ...current,
-      [workspaceId]: (current[workspaceId] ?? 1) + 1,
-    }));
+    useUiStore.getState().loadMoreCodeSessions(workspaceId);
   };
 
   const codeConversations = useMemo(
@@ -979,15 +975,10 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     setWorkspaceSearchOpen(false);
   };
 
-  const isExpanded = (workspaceId: string) => !collapsed.has(workspaceId);
+  const isExpanded = (workspaceId: string) => !codeWorkspaceCollapsedById[workspaceId];
 
   const toggleWorkspace = (workspaceId: string) => {
-    setCollapsed((previous) => {
-      const next = new Set(previous);
-      if (next.has(workspaceId)) next.delete(workspaceId);
-      else next.add(workspaceId);
-      return next;
-    });
+    useUiStore.getState().toggleCodeWorkspaceCollapsed(workspaceId);
   };
 
   const openConversation = (conversation: Conversation) => {
@@ -1051,7 +1042,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
     setCreatingSession(true);
     try {
       const conversationId = await startSession(null);
-      if (conversationId) setUnassignedCollapsed(false);
+      if (conversationId) useUiStore.getState().setCodeUnassignedCollapsed(false);
     } finally {
       setCreatingSession(false);
     }
@@ -1069,7 +1060,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
 
   const handleSelectWorkspace = (workspace: Workspace) => {
     setActiveWorkspace(workspace.id);
-    if (collapsed.has(workspace.id)) toggleWorkspace(workspace.id);
+    if (codeWorkspaceCollapsedById[workspace.id]) toggleWorkspace(workspace.id);
   };
 
   const handleOpenExplorer = async (workspace: Workspace) => {
@@ -1370,7 +1361,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
                         sessionLimit={
                           normalizedQuery
                             ? Number.POSITIVE_INFINITY
-                            : (sessionPages[workspace.id] ?? 1) * SESSIONS_PAGE_SIZE
+                            : (codeSessionPagesByWorkspace[workspace.id] ?? 1) * SESSIONS_PAGE_SIZE
                         }
                         onLoadMore={() => handleLoadMoreSessions(workspace.id)}
                         sortable={sortable}
@@ -1413,20 +1404,22 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
               <button
                 type="button"
                 aria-label={
-                  unassignedCollapsed
+                  codeUnassignedCollapsed
                     ? t('code:sidebar.expandUnassigned')
                     : t('code:sidebar.collapseUnassigned')
                 }
-                aria-expanded={!unassignedCollapsed}
+                aria-expanded={!codeUnassignedCollapsed}
                 aria-controls="code-unassigned-sessions"
-                onClick={() => setUnassignedCollapsed((current) => !current)}
+                onClick={() =>
+                  useUiStore.getState().setCodeUnassignedCollapsed(!codeUnassignedCollapsed)
+                }
                 className={cn(
                   'flex size-6 shrink-0 items-center justify-center rounded-md text-foreground-subtle',
                   'transition-colors duration-150 hover:bg-surface-hover hover:text-foreground',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
                 )}
               >
-                {unassignedCollapsed ? (
+                {codeUnassignedCollapsed ? (
                   <ChevronRight aria-hidden className="size-3.5" strokeWidth={1.75} />
                 ) : (
                   <ChevronDown aria-hidden className="size-3.5" strokeWidth={1.75} />
@@ -1448,7 +1441,7 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
             </div>
             <div
               id="code-unassigned-sessions"
-              hidden={unassignedCollapsed}
+              hidden={codeUnassignedCollapsed}
               className="mt-1 max-h-44 overflow-y-auto overscroll-contain pb-1"
             >
               <SortableList

@@ -749,6 +749,8 @@
     "filterPlaceholder": "Filtrar archivos…",
     "filterAria": "Filtrar archivos",
     "clearFilter": "Limpiar filtro",
+    "expandAll": "Expandir todas las carpetas",
+    "collapseAll": "Contraer todas las carpetas",
     "loading": "Cargando archivos",
     "loadingTree": "Cargando el árbol",
     "loadingDir": "Cargando {{name}}",

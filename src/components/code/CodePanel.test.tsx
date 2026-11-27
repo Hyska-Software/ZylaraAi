@@ -63,7 +63,7 @@ import {
 import { EMPTY_PREFS, usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { setPluginUiState } from '@/lib/plugins/ui/registry';
 import type { PanelTabSpec, SlotContribution } from '@/lib/plugins/ui/types';
-import type { Conversation, Workspace, WorkspaceGitStatus } from '@/lib/types';
+import type { Conversation, Workspace, WorkspaceFileEntry, WorkspaceGitStatus } from '@/lib/types';
 import { __resetWorkspacesForTests } from './useWorkspaces';
 import { CodePanel } from './CodePanel';
 
@@ -92,6 +92,7 @@ function resetPanelState(): void {
     sidebarWidth: 272,
     codeView: 'session',
     codeFileTab: null,
+    codeFileTreeExpandedByWorkspace: {},
     pluginDockTab: { chat: null, code: null, agent: null },
   });
 }
@@ -301,6 +302,8 @@ describe('CodePanel — abas Arquivos / Alterações', () => {
 
     render(<CodePanel />);
 
+    // Directories start collapsed; open the parent before using the file.
+    fireEvent.click(await screen.findByRole('treeitem', { name: 'src' }));
     expect(await screen.findByText('app.ts')).toBeTruthy();
     fireEvent.click(screen.getByText('app.ts'));
 
@@ -356,6 +359,7 @@ describe('CodePanel — abas Arquivos / Alterações', () => {
 
     render(<CodePanel />);
 
+    fireEvent.click(await screen.findByRole('treeitem', { name: 'src' }));
     const selected = await screen.findByRole('treeitem', { name: 'main.ts' });
     expect(selected.getAttribute('aria-selected')).toBe('true');
     expect(screen.getByRole('treeitem', { name: 'app.ts' }).getAttribute('aria-selected')).toBe(
@@ -810,6 +814,9 @@ describe('CodePanel — árvore lazy (3º nível)', () => {
 
     render(<CodePanel />);
 
+    // Only the root level opens by default: expand both ancestors first.
+    fireEvent.click(await screen.findByRole('treeitem', { name: 'apps' }));
+    fireEvent.click(await screen.findByRole('treeitem', { name: 'desktop' }));
     expect(await screen.findByRole('treeitem', { name: 'public' })).toBeTruthy();
     fireEvent.click(screen.getByRole('treeitem', { name: 'public' }));
 
@@ -827,6 +834,144 @@ describe('CodePanel — árvore lazy (3º nível)', () => {
       (call) => call[1] === 'apps/desktop/public',
     );
     expect(publicCalls).toHaveLength(1);
+  });
+});
+
+describe('CodePanel — persistência da árvore de arquivos', () => {
+  const rootTree = [
+    {
+      path: 'src',
+      name: 'src',
+      isDir: true,
+      depth: 0,
+      children: [
+        { path: 'src/app.ts', name: 'app.ts', isDir: false, depth: 1, size: 20 },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    useChatStore.setState({
+      conversations: [conversation({ workspaceId: 'ws-1' })],
+      activeId: 'conv-1',
+    });
+    apiMock.listWorkspaces.mockResolvedValue([workspace()]);
+    apiMock.refreshWorkspaceTree.mockResolvedValue({
+      files: rootTree,
+      dirs: {},
+      gitStatus: notRepoStatus(),
+    });
+    useUiStore.setState({ codePanelTab: 'files' });
+  });
+
+  it('abre as pastas fechadas e restaura a expansão ao reabrir a aba', async () => {
+    const { unmount } = render(<CodePanel />);
+
+    expect(await screen.findByRole('treeitem', { name: 'src' })).toBeTruthy();
+    expect(screen.queryByRole('treeitem', { name: 'app.ts' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('treeitem', { name: 'src' }));
+    expect(await screen.findByRole('treeitem', { name: 'app.ts' })).toBeTruthy();
+    expect(useUiStore.getState().codeFileTreeExpandedByWorkspace['ws-1']).toEqual(['src']);
+
+    unmount();
+    render(<CodePanel />);
+    expect(await screen.findByRole('treeitem', { name: 'app.ts' })).toBeTruthy();
+  });
+
+  it('persiste o fechamento de uma pasta já aberta', async () => {
+    useUiStore.setState({ codeFileTreeExpandedByWorkspace: { 'ws-1': ['src'] } });
+    const { unmount } = render(<CodePanel />);
+
+    expect(await screen.findByRole('treeitem', { name: 'app.ts' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('treeitem', { name: 'src' }));
+    expect(screen.queryByRole('treeitem', { name: 'app.ts' })).toBeNull();
+    expect(useUiStore.getState().codeFileTreeExpandedByWorkspace).toEqual({});
+
+    unmount();
+    render(<CodePanel />);
+    expect(await screen.findByRole('treeitem', { name: 'src' })).toBeTruthy();
+    expect(screen.queryByRole('treeitem', { name: 'app.ts' })).toBeNull();
+  });
+
+  it('expands and collapses the whole tree from the header actions', async () => {
+    apiMock.refreshWorkspaceTree.mockResolvedValue({
+      files: [
+        {
+          path: 'src',
+          name: 'src',
+          isDir: true,
+          depth: 0,
+          children: [
+            {
+              path: 'src/components',
+              name: 'components',
+              isDir: true,
+              depth: 1,
+              children: [
+                { path: 'src/components/Button.tsx', name: 'Button.tsx', isDir: false, depth: 2 },
+              ],
+            },
+          ],
+        },
+      ],
+      dirs: {},
+      gitStatus: notRepoStatus(),
+    });
+    render(<CodePanel />);
+
+    expect(await screen.findByRole('treeitem', { name: 'src' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir todas as pastas' }));
+    expect(await screen.findByRole('treeitem', { name: 'Button.tsx' })).toBeTruthy();
+    expect(useUiStore.getState().codeFileTreeExpandedByWorkspace['ws-1']).toEqual([
+      'src',
+      'src/components',
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recolher todas as pastas' }));
+    expect(screen.queryByRole('treeitem', { name: 'Button.tsx' })).toBeNull();
+    expect(useUiStore.getState().codeFileTreeExpandedByWorkspace).toEqual({});
+    expect(apiMock.listWorkspaceFiles).not.toHaveBeenCalled();
+  });
+
+  it('restores the children of deep directories saved in a previous session', async () => {
+    const deepTree = [
+      {
+        path: 'apps',
+        name: 'apps',
+        isDir: true,
+        depth: 0,
+        children: [
+          {
+            path: 'apps/desktop',
+            name: 'desktop',
+            isDir: true,
+            depth: 1,
+            children: [
+              { path: 'apps/desktop/public', name: 'public', isDir: true, depth: 2, children: [] },
+            ],
+          },
+        ],
+      },
+    ];
+    const savedPaths = ['apps', 'apps/desktop', 'apps/desktop/public'];
+    apiMock.refreshWorkspaceTree.mockImplementation(async (_workspaceId, extraDirs = []) => {
+      const dirs: Record<string, WorkspaceFileEntry[]> = {};
+      if (extraDirs.includes('apps/desktop/public')) {
+        dirs['apps/desktop/public'] = [
+          { path: 'apps/desktop/public/logo.svg', name: 'logo.svg', isDir: false, depth: 0 },
+        ];
+      }
+      return { files: deepTree, dirs, gitStatus: notRepoStatus() };
+    });
+    useUiStore.setState({ codeFileTreeExpandedByWorkspace: { 'ws-1': savedPaths } });
+
+    render(<CodePanel />);
+
+    expect(await screen.findByRole('treeitem', { name: 'public' })).toBeTruthy();
+    expect(await screen.findByRole('treeitem', { name: 'logo.svg' })).toBeTruthy();
+    expect(apiMock.refreshWorkspaceTree).toHaveBeenCalledWith('ws-1', savedPaths);
+    expect(apiMock.listWorkspaceFiles).not.toHaveBeenCalled();
   });
 });
 

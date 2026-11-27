@@ -214,6 +214,9 @@ beforeEach(() => {
     codePanelTab: 'changes',
     activeWorkspaceId: null,
     openSessionsByWorkspace: {},
+    codeWorkspaceCollapsedById: {},
+    codeUnassignedCollapsed: false,
+    codeSessionPagesByWorkspace: {},
     commandPaletteOpen: false,
     settingsOpen: false,
   });
@@ -932,5 +935,70 @@ describe('CodeSidebar — reordenação por teclado', () => {
     });
 
     expect(mocks.reorderWorkspaces).not.toHaveBeenCalled();
+  });
+});
+
+describe('CodeSidebar — estado de expansão persistido', () => {
+  it('mantém o grupo do workspace recolhido depois de reabrir o app', async () => {
+    mocks.listWorkspaces.mockResolvedValue([workspace()]);
+    useChatStore.setState({
+      conversations: [conversation({ id: 'c-1', title: 'Corrigir o build', workspaceId: 'ws-1' })],
+    });
+    const view = renderSidebar();
+
+    expect(await screen.findByRole('button', { name: 'Corrigir o build' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Recolher sessões de zylara-core' }));
+
+    const stored = JSON.parse(window.localStorage.getItem('zylara.ui') ?? '{}') as {
+      state?: { codeWorkspaceCollapsedById?: Record<string, boolean> };
+    };
+    expect(stored.state?.codeWorkspaceCollapsedById?.['ws-1']).toBe(true);
+
+    await useUiStore.persist.rehydrate();
+    view.unmount();
+    renderSidebar();
+
+    expect(
+      await screen.findByRole('button', { name: 'Expandir sessões de zylara-core' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Corrigir o build' })).toBeNull();
+  });
+
+  it('mantém o grupo "Sem workspace" recolhido depois de reabrir o app', async () => {
+    mocks.listWorkspaces.mockResolvedValue([workspace()]);
+    useChatStore.setState({
+      conversations: [conversation({ id: 'c-1', title: 'Sessão órfã', workspaceId: null })],
+    });
+    const view = renderSidebar();
+
+    expect(await screen.findByRole('button', { name: 'Sessão órfã' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Recolher sessões sem workspace' }));
+
+    await useUiStore.persist.rehydrate();
+    view.unmount();
+    renderSidebar();
+
+    const expand = await screen.findByRole('button', {
+      name: 'Expandir sessões sem workspace',
+    });
+    expect(expand.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('button', { name: 'Sessão órfã' })).toBeNull();
+  });
+
+  it('restaura as sessões reveladas pelo "mostrar mais" depois de reabrir o app', async () => {
+    mocks.listWorkspaces.mockResolvedValue([workspace()]);
+    useChatStore.setState({ conversations: codeSessions(14) });
+    const view = renderSidebar();
+
+    expect(await screen.findByRole('button', { name: 'Sessão 1' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar mais 4 sessões' }));
+    expect(screen.queryAllByRole('button', { name: /^Sessão \d+$/ })).toHaveLength(14);
+
+    await useUiStore.persist.rehydrate();
+    view.unmount();
+    renderSidebar();
+
+    expect(await screen.findByRole('button', { name: 'Sessão 14' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Mostrar mais/ })).toBeNull();
   });
 });
