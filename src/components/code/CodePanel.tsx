@@ -33,6 +33,8 @@ import {
 } from '@/components/ui';
 import { PanelResizer } from '@/components/layout/PanelResizer';
 import { AnimatedSidePanel } from '@/components/layout/AnimatedSidePanel';
+import { useChromeCornerReserve } from '@/components/layout/ChromeCorner';
+import { DRAG_ROW_CLASS, useWindowDragProps } from '@/components/layout/windowChrome';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
@@ -690,6 +692,8 @@ export function CodePanel() {
   // Icon-only tabs below this width keep the three labels + actions from
   // colliding at the minimum docked panel width (360–430px).
   const compactTabs = layout.width < 430;
+  const reserve = useChromeCornerReserve('dock');
+  const drag = useWindowDragProps();
 
   return (
     <AnimatedSidePanel
@@ -698,7 +702,14 @@ export function CodePanel() {
       label={t('code:panel.aria')}
       resizing={previewWidth !== null}
     >
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
+      <div
+        {...drag}
+        className={cn(
+          'flex h-10 shrink-0 items-center gap-1 border-b border-border pl-2',
+          DRAG_ROW_CLASS,
+          reserve,
+        )}
+      >
         <SortableList
           ids={visibleTabIds}
           label={t('code:panel.tablist')}

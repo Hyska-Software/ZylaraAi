@@ -9,7 +9,7 @@ export interface BrandMarkProps {
   /** Height of the mark in pixels. The `tile` variant is square. */
   size?: number;
   /**
-   * `mark` — official symbol without background, for inline use (titlebar,
+   * `mark` — official symbol without background, for inline use (chrome row,
    * avatar, welcome, splash, About) and for the Windows/Linux icons. `tile` —
    * icon with the light graphite tile, for the favicon, the installer UI and
    * the macOS icon.

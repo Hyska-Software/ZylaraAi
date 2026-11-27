@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { clampSidebarWidth, SIDEBAR_WIDTH_DEFAULT, useUiStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
-import { TitleBar } from './TitleBar';
+import { ChromeCorner, ChromeCornerProvider } from './ChromeCorner';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
 import { Sidebar } from './Sidebar';
 import { SidebarResizer } from './SidebarResizer';
@@ -130,9 +130,10 @@ export function AppShell({
   const transition = { duration: reduceMotion ? 0 : 0.22, ease: EASE_OUT_SOFT };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface text-foreground">
-        <ComponentSlot name="layout.titlebar" fallback={TitleBar} />
-
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-surface text-foreground">
+      {/* The title bar is gone: each layout paints its own 40px chrome row and
+          the window controls float in the corner owned by this shell. */}
+      <ChromeCornerProvider docked={rightPanelOpen}>
         <div className="relative flex min-h-0 flex-1">
           {!isCompact ? (
             <motion.div
@@ -160,9 +161,9 @@ export function AppShell({
             </div>
           ) : null}
 
-          {/* The chat is a rounded pane over the chrome (DESIGN §5): the topbar,
-              sidebar and docked right panel share the `surface` background and
-              no divider lines, so only the top corner radii separate the
+          {/* The chat is a rounded pane over the chrome (DESIGN §5): the chrome
+              rows, sidebar and docked right panel share the `surface` background
+              and no divider lines, so only the top corner radii separate the
               surfaces. The right radius only exists while that panel is open;
               otherwise the chat runs to the window edge. */}
           <main
@@ -212,7 +213,10 @@ export function AppShell({
             : null}
         </AnimatePresence>
 
-        {overlays}
+        <ChromeCorner />
+      </ChromeCornerProvider>
+
+      {overlays}
     </div>
   );
 }

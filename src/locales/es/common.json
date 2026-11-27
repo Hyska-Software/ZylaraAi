@@ -136,12 +136,6 @@
       "restore": "Restaurar",
       "maximize": "Maximizar"
     },
-    "plan": {
-      "title": "Plan de ChatGPT",
-      "tooltip": "Las peticiones usan el límite de tu plan de ChatGPT",
-      "manageAria": "Gestionar uso del plan de ChatGPT",
-      "manage": "Gestionar uso"
-    },
     "update": {
       "popoverAria": "Actualización de Zylara",
       "available": "v{{version}} disponible",

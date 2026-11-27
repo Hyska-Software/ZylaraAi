@@ -337,6 +337,7 @@ pub static RESERVED_COMPONENT_IDS: &[&str] = &[
     "chat.message.tool-row",
     "chat.composer.input",
     "code.tab.strip",
+    "layout.titlebar",
     "agent.tab.strip",
     "agent.channel.view",
     "agent.channel.message",

@@ -98,7 +98,7 @@ describe('UpdateChip', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('shows the available version in the title bar and opens the panel', async () => {
+  it('shows the available version in the chrome row and opens the panel', async () => {
     seed({ info: releaseInfo(), phase: 'available' });
     render(<UpdateChip />);
 

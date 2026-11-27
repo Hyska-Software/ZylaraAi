@@ -50,8 +50,8 @@ não há grant persistente. Sem canal de aprovação a tool falha fechada
   encerra a sessão. Comandos: `list_computer_actions`,
   `list_computer_sessions`, `list_active_computer_sessions`,
   `stop_computer_session`, `stop_all_computer_sessions`.
-- Enquanto há sessão ativa, o topbar da thread do agente mostra o aviso
-  compacto e **Parar** para aquela conversa. Fora do topbar (outros layouts ou
+- Enquanto há sessão ativa, o header da thread do agente mostra o aviso
+  compacto e **Parar** para aquela conversa. Fora dele (outros layouts ou
   sessões em outras threads), `ComputerControlBanner` continua como fail-safe,
   mostrando agente/thread/backend e **Parar tudo** (encerra as sessões e os
   turnos).

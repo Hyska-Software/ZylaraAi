@@ -173,6 +173,13 @@ Slots disponíveis (catálogo em `data/plugin-contract.json`):
 `plugins.detail.actions`, `artifact.preview.toolbar`, além de
 `sidebar.nav.before`/`sidebar.nav.after` nos três layouts.
 
+`titlebar.actions` e `app.titlebar.brand` continuam montados, mas o app não tem
+mais uma title bar dedicada: `titlebar.actions` aparece no fim da linha de chrome
+de cada layout (ao lado do pill de atualização) e `app.titlebar.brand` é apenas o
+**ícone** na linha de chrome da sidebar (ou na linha do centro, quando a sidebar
+está recolhida/compacta). O componente `layout.titlebar` foi aposentado e está em
+`reservedComponents`.
+
 ### Como habilitar uma superfície reservada
 
 `reservedSlots` e `reservedComponents` listam as superfícies declaradas que este
@@ -471,8 +478,8 @@ de temas de plugin; desabilitar ou desinstalar o plugin remove o tema e volta
 o seletor para o tema ativo padrão.
 
 O painel/views de plugins ocupam o centro/painel direito; slots aparecem na
-titlebar, sidebar, composer e detalhe. Templates/shapes são os componentes do
-design system (nenhum CSS solto na UI do host).
+linha de chrome do layout, sidebar, composer e detalhe. Templates/shapes são os
+componentes do design system (nenhum CSS solto na UI do host).
 
 Instalação por arquivo (`.zplugin`, picker ou drag & drop), URL inspecionada e
 deep link (`zylara://plugin/install?url=https%3A%2F%2F…` ou

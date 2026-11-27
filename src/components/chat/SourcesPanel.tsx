@@ -14,6 +14,7 @@ import {
 } from '@/lib/store';
 import type { Citation } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useChromeCornerReserve } from '@/components/layout/ChromeCorner';
 import { openExternalUrl } from './external';
 
 /** One source row: domain + truncated title; the whole row opens the browser. */
@@ -79,6 +80,8 @@ export function SourcesPanel() {
   const sources = useMemo(() => conversationCitations(messages), [messages]);
   const panelRef = useRef<HTMLElement | null>(null);
   const { layout, mode, setMode, onResize, onResizeEnd, onReset } = useSidePanelResize();
+  // Rightmost surface: the header clears the window-controls corner.
+  const chromeReserve = useChromeCornerReserve('dock');
 
   /** Source count label: only `1` is singular (0 reads as plural). */
   const sourceCount = (count: number) =>
@@ -138,7 +141,12 @@ export function SourcesPanel() {
       }}
       className={asideClassName}
     >
-      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+      <header
+        className={cn(
+          'flex shrink-0 items-center gap-2 border-b border-border py-2 pl-3',
+          chromeReserve,
+        )}
+      >
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
           <Globe aria-hidden className="size-4" strokeWidth={1.9} />
         </span>

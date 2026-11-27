@@ -44,12 +44,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  IconButton,
   Input,
   SortableList,
   sortableDropClass,
 } from '@/components/ui';
 import type { SortableListApi } from '@/components/ui';
+import { SidebarChromeRow } from '@/components/layout/SidebarChromeRow';
 import { api } from '@/lib/api';
 import { localeLowerCase } from '@/lib/i18n/format';
 import { usePluginUi } from '@/lib/plugins/ui/registry';
@@ -1110,7 +1110,9 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
       aria-label={t('code:sidebar.aria')}
       className={cn('flex h-full w-full min-w-0 flex-col bg-surface', className)}
     >
-      <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-3">
+      <SidebarChromeRow onClose={onClose} />
+
+      <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-2">
         <Button
           variant="secondary"
           size="md"
@@ -1121,11 +1123,6 @@ export function CodeSidebar({ className, onClose }: CodeSidebarProps) {
         >
           {t('code:sidebar.newSession')}
         </Button>
-        {onClose ? (
-          <IconButton label={t('code:sidebar.close')} size="sm" onClick={onClose}>
-            <X className="size-4" />
-          </IconButton>
-        ) : null}
       </div>
 
       <Slot name="code.sidebar.header" owner={{ layout: 'code' }} />

@@ -158,6 +158,33 @@ afterEach(() => {
   useCodeStore.setState({ byConversation: {} });
 });
 
+describe('ChatView — linha de chrome do layout Chat', () => {
+  it('mostra o título da conversa na linha de chrome, não como overlay', () => {
+    seed();
+    render(<ChatView />);
+
+    const title = screen.getByTitle('Conversa');
+    expect(title.textContent).toBe('Conversa');
+
+    // The Chat layout owns the top band: the header is a 40px in-flow drag row.
+    const row = title.closest('div.h-10');
+    expect(row).not.toBeNull();
+    expect(row?.getAttribute('data-tauri-drag-region')).toBe('true');
+    expect(row?.className).not.toContain('absolute');
+  });
+
+  it('mantém o header flutuante nos layouts Code e Agentes', () => {
+    useUiStore.setState({ layoutMode: 'agent' });
+    seed();
+    render(<ChatView />);
+
+    // Those layouts bring their own chrome row; the chat header stays a
+    // pointer-events-none overlay above the transcript.
+    expect(screen.queryByTitle('Conversa')).toBeNull();
+    expect(document.querySelector('div.h-10')).toBeNull();
+  });
+});
+
 describe('ChatView — tela vazia', () => {
   function seedEmpty(): void {
     useChatStore.setState({

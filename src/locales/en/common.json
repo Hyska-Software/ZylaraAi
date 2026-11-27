@@ -136,12 +136,6 @@
       "restore": "Restore",
       "maximize": "Maximize"
     },
-    "plan": {
-      "title": "ChatGPT plan",
-      "tooltip": "Requests use your ChatGPT plan limit",
-      "manageAria": "Manage ChatGPT plan usage",
-      "manage": "Manage usage"
-    },
     "update": {
       "popoverAria": "Zylara update",
       "available": "v{{version}} available",

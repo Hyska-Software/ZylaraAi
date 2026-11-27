@@ -55,8 +55,8 @@
     "motion": ["none", "fade", "slide"]
   },
   "slots": [
-    { "id": "titlebar.actions", "title": "Title bar actions", "kind": "list", "scope": "root", "props": [], "layouts": ["chat", "code", "agent"], "modes": ["declarative", "sandbox", "trusted"], "replacement": false, "description": "Actions in the window title bar." },
-    { "id": "app.titlebar.brand", "title": "Title bar brand", "kind": "single", "scope": "root", "props": [], "layouts": ["chat", "code", "agent"], "modes": ["trusted"], "replacement": true, "description": "Brand block in the title bar." },
+    { "id": "titlebar.actions", "title": "App chrome actions", "kind": "list", "scope": "root", "props": [], "layouts": ["chat", "code", "agent"], "modes": ["declarative", "sandbox", "trusted"], "replacement": false, "description": "Actions at the end of the layout's top chrome row." },
+    { "id": "app.titlebar.brand", "title": "App chrome brand", "kind": "single", "scope": "root", "props": [], "layouts": ["chat", "code", "agent"], "modes": ["trusted"], "replacement": true, "description": "App icon in the chrome (icon only, no wordmark)." },
     { "id": "app.overlay", "title": "Application overlay", "kind": "list", "scope": "root", "props": [], "layouts": ["chat", "code", "agent"], "modes": ["declarative", "sandbox", "trusted"], "replacement": false, "description": "Floating layer above the shell." },
     { "id": "chat.sidebar.header", "title": "Chat sidebar header", "kind": "list", "scope": "layout", "props": [], "layouts": ["chat"], "modes": ["declarative", "sandbox", "trusted"], "replacement": false, "description": "Header of the chat sidebar." },
     { "id": "chat.sidebar.footer", "title": "Chat sidebar footer", "kind": "list", "scope": "layout", "props": [], "layouts": ["chat"], "modes": ["declarative", "sandbox", "trusted"], "replacement": false, "description": "Footer of the chat sidebar." },
@@ -140,7 +140,7 @@
   ],
   "components": [
     { "id": "layout.shell", "title": "Application shell", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": ["children", "sidebar", "sidebarLabel", "rightPanel", "rightPanelOpen"], "variants": [], "risk": "critical", "description": "Whole application frame." },
-    { "id": "layout.titlebar", "title": "Title bar", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": [], "variants": [], "risk": "high", "description": "Window title bar." },
+    { "id": "layout.titlebar", "title": "Title bar (retired)", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": [], "variants": [], "risk": "high", "description": "Retired: the app has no dedicated title bar; each layout renders its own chrome row. The id stays reserved so old manifests keep validating." },
     { "id": "layout.sidebar", "title": "Layout sidebar", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": ["layout", "onClose"], "variants": [], "risk": "high", "description": "Sidebar container for a layout." },
     { "id": "layout.center", "title": "Center workspace", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": [], "variants": [], "risk": "high", "description": "Center column." },
     { "id": "layout.right-panel", "title": "Right panel", "kind": "single", "lanes": ["trusted"], "layouts": ["chat", "code", "agent"], "props": ["layout"], "variants": ["default", "flush", "card"], "builtinRecipes": {
@@ -241,6 +241,7 @@
     "chat.message.tool-group", "chat.message.tool-row",
     "chat.composer.input",
     "code.tab.strip",
+    "layout.titlebar",
     "agent.tab.strip", "agent.channel.view",
     "agent.channel.message", "agent.channel.composer"
   ],

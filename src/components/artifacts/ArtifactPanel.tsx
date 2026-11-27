@@ -23,6 +23,7 @@ import { t as translate } from '@/lib/i18n';
 import { formatDateTime } from '@/lib/i18n/format';
 import type { ArtifactContent } from '@/lib/types';
 import { cn, formatBytes } from '@/lib/utils';
+import { useChromeCornerReserve } from '@/components/layout/ChromeCorner';
 import {
   SIDE_PANEL_WIDTH_MIN,
   SIDE_PANEL_WIDTH_STEP,
@@ -102,6 +103,9 @@ export function ArtifactPanel() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const panelRef = useRef<HTMLElement | null>(null);
+  // Docked/overlay panel: it is the rightmost surface, so its header clears the
+  // window-controls corner owned by AppShell.
+  const chromeReserve = useChromeCornerReserve('dock');
 
   const artifact = artifacts.find((entry) => entry.id === activeId) ?? null;
   const meta = artifact ? artifactKindMeta(artifact.kind) : null;
@@ -234,7 +238,12 @@ export function ArtifactPanel() {
       <Slot name="right.panel.body.frame" owner={{ open: open }}>
       {mode === 'preview' && artifact && meta ? (
         <>
-          <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+          <header
+            className={cn(
+              'flex shrink-0 items-center gap-2 border-b border-border py-2 pl-3',
+              chromeReserve,
+            )}
+          >
             <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', meta.tone)}>
               <ArtifactIcon aria-hidden className="size-4" strokeWidth={1.9} />
             </span>
@@ -417,7 +426,12 @@ export function ArtifactPanel() {
         </>
       ) : (
         <>
-          <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+          <header
+            className={cn(
+              'flex shrink-0 items-center gap-2 border-b border-border py-2 pl-3',
+              chromeReserve,
+            )}
+          >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-hover text-foreground-muted">
               <Files aria-hidden className="size-4" strokeWidth={1.9} />
             </span>

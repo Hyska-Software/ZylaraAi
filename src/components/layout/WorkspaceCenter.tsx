@@ -29,6 +29,7 @@ import { PluginPageHost } from '@/components/plugins/ui/PluginPageHost';
 import { SkillsView } from '@/components/skills';
 import { useChatStore, useUiStore } from '@/lib/store';
 import { usePluginRegistry } from '@/lib/plugins/registry';
+import { LayoutTopRow } from './LayoutTopRow';
 import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { ComponentSlot } from '@/components/plugins/ui/Slot';
 import type { PluginComponent } from '@/lib/plugins/ui/types';
@@ -123,7 +124,16 @@ export function WorkspaceCenter() {
 
   const codePluginPage = layoutMode === 'code' ? pluginPage : null;
   if (pluginPage && layoutMode !== 'code') {
-    return <PluginPageHost layout={layoutMode} target={pluginPage} />;
+    // Pages that replace the chat column still get the layout chrome row, so the
+    // app icon, the global actions and the window-controls corner never vanish.
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <LayoutTopRow />
+        <div className="min-h-0 flex-1">
+          <PluginPageHost layout={layoutMode} target={pluginPage} />
+        </div>
+      </div>
+    );
   }
 
   if (layoutMode === 'agent') {
@@ -134,10 +144,15 @@ export function WorkspaceCenter() {
       activeId === null
     ) {
       return (
-        <ComponentSlot
-          name="plugins.view"
-          fallback={PluginsView as unknown as PluginComponent}
-        />
+        <div className="flex h-full min-h-0 flex-col">
+          <LayoutTopRow />
+          <div className="min-h-0 flex-1">
+            <ComponentSlot
+              name="plugins.view"
+              fallback={PluginsView as unknown as PluginComponent}
+            />
+          </div>
+        </div>
       );
     }
     return (
@@ -204,6 +219,11 @@ export function WorkspaceCenter() {
 
   const body = (
     <>
+      {/* Pages that replace the conversation column (Biblioteca, Skills, Plugins
+          e páginas de plugin) still need the layout chrome row. */}
+      {isCode ? (showHeader ? null : <LayoutTopRow />) : showPlugins || showSkills || showLibrary ? (
+        <LayoutTopRow />
+      ) : null}
       {/* Stable wrapper: the conversation below keeps its DOM position across
           layout switches (see `aria-controls` of the Code session tabs). The
           header stays mounted while the Code Skills page is open so the open

@@ -26,8 +26,8 @@ Reserved slots are not mounted by this host version; a manifest that targets one
 
 | Slot | Kind | Scope | Layouts | Modes | Props | Description |
 | --- | --- | --- | --- | --- | --- | --- |
-| `titlebar.actions` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Actions in the window title bar. |
-| `app.titlebar.brand` | single | root | chat, code, agent | trusted | — | Brand block in the title bar. |
+| `titlebar.actions` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Actions at the end of the layout's top chrome row. |
+| `app.titlebar.brand` | single | root | chat, code, agent | trusted | — | App icon in the chrome (icon only, no wordmark). |
 | `app.overlay` | list | root | chat, code, agent | declarative, sandbox, trusted | — | Floating layer above the shell. |
 | `chat.sidebar.header` | list | layout | chat | declarative, sandbox, trusted | — | Header of the chat sidebar. |
 | `chat.sidebar.footer` | list | layout | chat | declarative, sandbox, trusted | — | Footer of the chat sidebar. |
@@ -114,7 +114,7 @@ Components marked `reserved` still support variants/presets but cannot be replac
 | Component | Override | Layouts | Variants | Props | Built-in recipes |
 | --- | --- | --- | --- | --- | --- |
 | `layout.shell` | available | chat, code, agent | — | children, sidebar, sidebarLabel, rightPanel, rightPanelOpen | — |
-| `layout.titlebar` | available | chat, code, agent | — | — | — |
+| `layout.titlebar` | reserved | chat, code, agent | — | — | — |
 | `layout.sidebar` | available | chat, code, agent | — | layout, onClose | — |
 | `layout.center` | available | chat, code, agent | — | — | — |
 | `layout.right-panel` | available | chat, code, agent | default, flush, card | layout | default, flush, card |

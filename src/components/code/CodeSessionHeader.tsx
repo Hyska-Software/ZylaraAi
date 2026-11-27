@@ -47,6 +47,7 @@ import {
 } from '@/components/ui';
 import { PluginSlot } from '@/components/plugins/PluginHosts';
 import { Slot } from '@/components/plugins/ui/Slot';
+import { LayoutTopRow } from '@/components/layout/LayoutTopRow';
 import { RecipeDiv } from '@/lib/plugins/ui/recipe';
 import type { SortableListApi } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -1361,43 +1362,51 @@ export function CodeSessionHeader() {
   return (
     <Slot name="code.session.header.frame" owner={{ layout: 'code' }}>
     <header className="flex shrink-0 flex-col bg-background">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        <h2
-          className="min-w-0 truncate text-[13px] font-semibold tracking-tight text-foreground"
-          title={title}
-        >
-          {title}
-        </h2>
+      {/* Row 1 is the layout's chrome row: title/chips on the left, the session
+          actions before the app chrome cluster (global actions + window
+          controls) on the right. The old title bar's height is gone. */}
+      <LayoutTopRow
+        className="border-b border-border px-3"
+        leading={
+          <div className="flex min-w-0 items-center gap-2">
+            <h2
+              className="min-w-0 truncate text-[13px] font-semibold tracking-tight text-foreground"
+              title={title}
+            >
+              {title}
+            </h2>
 
-        {pendingApprovals > 0 ? (
-          <Badge
-            variant="warning"
-            title={t('code:header.pendingApproval', { count: pendingApprovals })}
-          >
-            {t('code:header.pendingApprovalBadge')}
-          </Badge>
-        ) : null}
+            {pendingApprovals > 0 ? (
+              <Badge
+                variant="warning"
+                title={t('code:header.pendingApproval', { count: pendingApprovals })}
+              >
+                {t('code:header.pendingApprovalBadge')}
+              </Badge>
+            ) : null}
 
-        {activeGoal && activeGoal.status !== 'completed' ? (
-          <GoalBadge
-            goal={activeGoal}
-            running={goalRunning}
-            onOpen={() => useUiStore.getState().openCodeGoal()}
-          />
-        ) : null}
+            {activeGoal && activeGoal.status !== 'completed' ? (
+              <GoalBadge
+                goal={activeGoal}
+                running={goalRunning}
+                onOpen={() => useUiStore.getState().openCodeGoal()}
+              />
+            ) : null}
 
-        <WorkspaceChip
-          workspace={workspace}
-          busy={trustBusy}
-          onRefresh={() => workspace && void refreshContext(workspace.id)}
-          onOpenExplorer={() => workspace && void api.openWorkspaceInExplorer(workspace.id)}
-          onCopyPath={() => void handleCopyPath()}
-          onOpenFolder={handleOpenFolder}
-          onBind={(workspaceId) => void handleBindWorkspace(workspaceId)}
-          onToggleTrust={handleTrustToggle}
-        />
-
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+            <WorkspaceChip
+              workspace={workspace}
+              busy={trustBusy}
+              onRefresh={() => workspace && void refreshContext(workspace.id)}
+              onOpenExplorer={() => workspace && void api.openWorkspaceInExplorer(workspace.id)}
+              onCopyPath={() => void handleCopyPath()}
+              onOpenFolder={handleOpenFolder}
+              onBind={(workspaceId) => void handleBindWorkspace(workspaceId)}
+              onToggleTrust={handleTrustToggle}
+            />
+          </div>
+        }
+      >
+        <div className="flex shrink-0 items-center gap-2">
           <PluginSlot
             slot="code.header.actions"
             context={{
@@ -1422,7 +1431,7 @@ export function CodeSessionHeader() {
             </Tooltip>
           )}
         </div>
-      </div>
+      </LayoutTopRow>
 
       <div className="flex h-10 shrink-0 items-center gap-1 px-2">
         <Slot name="code.tabs.before" owner={{ layout: 'code', workspaceId: workspace?.id ?? null }} />

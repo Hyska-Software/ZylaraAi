@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArchiveRestore, ArrowLeft, MessagesSquare } from 'lucide-react';
 
@@ -10,6 +10,7 @@ import { AgentPanelOpener } from './AgentPanelToggle';
 import { AgentRoutinesView } from './AgentRoutinesView';
 import { AgentStatsView } from './AgentStatsView';
 import { AgentThreadHeader } from './AgentThreadHeader';
+import { AgentTopBar } from './AgentTopBar';
 import { TeamView } from './TeamView';
 import { ChatView } from '@/components/chat/ChatView';
 import {
@@ -136,7 +137,22 @@ function AgentCodeViewHeader({ title, onBack }: { title: string; onBack: () => v
   );
 }
 
+/**
+ * Adds the layout's chrome row above an agent surface. Every Agentes state goes
+ * through it so the brand, the global actions and the reserved window-controls
+ * corner are always present.
+ */
+function AgentSurface({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <AgentTopBar title={title} />
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+    </div>
+  );
+}
+
 export function AgentWorkspace() {
+  const { t } = useTranslation('agents');
   const activeAgentId = useUiStore((state) => state.activeAgentId);
   const activeChannelId = useUiStore((state) => state.activeChannelId);
   const agentView = useUiStore((state) => state.agentView);
@@ -176,6 +192,18 @@ export function AgentWorkspace() {
       (codeView === 'commits' && codeCommitsTab !== null) ||
       codeView === 'goal');
 
+  /* Title of the layout's chrome row (AgentTopBar): the agent/thread identity,
+     or the name of the open view when no persona is selected. */
+  const chromeTitle = activeChannelId
+    ? undefined
+    : agent
+      ? agent.name
+      : agentView === 'stats'
+        ? t('team.stats')
+        : agentView === 'routines'
+          ? t('panel.tabs.routines')
+          : t('team.title');
+
   // A layout switch can leave the Chat/Code active id around for one paint. It
   // must never leak into the Agentes composer as an invisible send target.
   useEffect(() => {
@@ -197,7 +225,7 @@ export function AgentWorkspace() {
 
   if (channelsEnabled && activeChannelId) {
     return (
-      <>
+      <AgentSurface title={chromeTitle}>
         <AgentChannelView
           key={`${activeChannelId}-${channelRevision}`}
           channelId={activeChannelId}
@@ -220,13 +248,13 @@ export function AgentWorkspace() {
           }}
         />
         <AgentEditorDialog />
-      </>
+      </AgentSurface>
     );
   }
 
   if (!agent) {
     return (
-      <>
+      <AgentSurface title={chromeTitle}>
         {agentView === 'stats' ? (
           <AgentStatsView />
         ) : agentView === 'routines' ? (
@@ -235,16 +263,18 @@ export function AgentWorkspace() {
           <TeamView />
         )}
         <AgentEditorDialog />
-      </>
+      </AgentSurface>
     );
   }
   if (agent.archivedAt !== null) {
     return (
-      <div className="relative h-full min-h-0">
-        <ArchivedAgentHome agent={agent} />
-        <AgentPanelOpener />
-        <AgentEditorDialog />
-      </div>
+      <AgentSurface title={chromeTitle}>
+        <div className="relative min-h-0 flex-1">
+          <ArchivedAgentHome agent={agent} />
+          <AgentPanelOpener />
+          <AgentEditorDialog />
+        </div>
+      </AgentSurface>
     );
   }
 
@@ -256,7 +286,7 @@ export function AgentWorkspace() {
     );
   if (isThread && activeConversation && showCodeCenter) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <AgentSurface title={chromeTitle}>
         <AgentThreadHeader
           agent={agent}
           conversation={activeConversation}
@@ -266,13 +296,13 @@ export function AgentWorkspace() {
           <AgentCodeView conversationId={activeConversation.id} />
         </div>
         <AgentEditorDialog />
-      </div>
+      </AgentSurface>
     );
   }
 
   if (isThread && activeConversation) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <AgentSurface title={chromeTitle}>
         <AgentThreadHeader
           agent={agent}
           conversation={activeConversation}
@@ -295,15 +325,17 @@ export function AgentWorkspace() {
           />
         </div>
         <AgentEditorDialog />
-      </div>
+      </AgentSurface>
     );
   }
 
   return (
-    <div className="relative h-full min-h-0">
-      <AgentHome agent={agent} />
-      <AgentPanelOpener />
-      <AgentEditorDialog />
-    </div>
+    <AgentSurface title={chromeTitle}>
+      <div className="relative min-h-0 flex-1">
+        <AgentHome agent={agent} />
+        <AgentPanelOpener />
+        <AgentEditorDialog />
+      </div>
+    </AgentSurface>
   );
 }

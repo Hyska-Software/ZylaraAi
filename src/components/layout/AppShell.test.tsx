@@ -2,7 +2,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
-vi.mock('./TitleBar', () => ({ TitleBar: () => <div data-testid="title-bar" /> }));
+vi.mock('./ChromeCorner', () => ({
+  ChromeCorner: () => <div data-testid="chrome-corner" />,
+  ChromeCornerProvider: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  useChromeCornerReserve: () => '',
+}));
 vi.mock('./Sidebar', () => ({ Sidebar: () => <div data-testid="sidebar" /> }));
 vi.mock('@/lib/api', () => ({ api: {} }));
 
@@ -147,7 +151,7 @@ describe('AppShell — sidebar redimensionável', () => {
 });
 
 describe('AppShell — chrome contínuo e painel do chat', () => {
-  it('separa o chat do topbar/sidebar por um painel arredondado, sem bordas', () => {
+  it('separa o chat do chrome por um painel arredondado, sem bordas', () => {
     renderShell();
 
     const main = screen.getByTestId('content').closest('main');
@@ -159,8 +163,27 @@ describe('AppShell — chrome contínuo e painel do chat', () => {
     expect(mainClass).toContain('bg-background');
     expect(mainClass).not.toContain('border');
 
-    // O chrome (TitleBar + Sidebar) compartilha a superfície contínua.
+    // O chrome (linha de chrome do layout + Sidebar) compartilha a superfície contínua.
     expect(main?.parentElement?.parentElement?.className).toContain('bg-surface');
+  });
+});
+
+describe('AppShell — sem topbar dedicada', () => {
+  it('não renderiza linha de título e monta o canto dos controles da janela', () => {
+    renderShell();
+
+    expect(screen.queryByRole('banner')).toBeNull();
+    expect(screen.queryByTestId('title-bar')).toBeNull();
+    expect(screen.getByTestId('chrome-corner')).toBeTruthy();
+  });
+
+  it('a linha de conteúdo começa no topo do shell (cada layout traz sua chrome row)', () => {
+    renderShell();
+
+    const main = screen.getByTestId('content').closest('main');
+    const row = main?.parentElement;
+    // The content row is the first flex child: no row consumes height above it.
+    expect(row?.parentElement?.firstElementChild).toBe(row);
   });
 });
 

@@ -47,7 +47,8 @@ O renderer tem três layouts (`uiStore.layoutMode`): **Chat** (sidebar de conver
 Skills, painéis de artefatos/fontes), **Code** (sidebar de workspaces/sessões, cabeçalho/abas de
 agente, painel Arquivos/Alterações/commit; sem Biblioteca) e **Agentes** (sidebar de personas,
 canais e threads; home/thread do agente com memória, workspace opcional, fila e rotinas). Os três
-compartilham a mesma instância de `ChatView` e o mesmo `TitleBar` com o seletor. **As sessões são
+compartilham a mesma instância de `ChatView` e a mesma banda de chrome de 40px cada
+(o app não tem title bar dedicada; o seletor de layout vive no rodapé das sidebars). **As sessões são
 separadas por layout** (`conversations.mode`): uma sessão do Chat nunca aparece no Code/Agentes e
 vice-versa; uma sessão do Chat pode ser marcada como compartilhada com o Code (`code_linked`). O
 contrato do layout Agentes (memória, capabilities, workspace, fila, rotinas, canais e portabilidade)
@@ -1008,7 +1009,7 @@ modo uninstall, com dados preservados por padrão. macOS usa DMG e Linux usa
 `/releases/latest/download/release.json` (sem rate limit; fallback para a API do
 GitHub), compara SemVer e guarda o resultado em `<app-data>/updates.json`. O
 renderer agenda a checagem ao abrir e a cada 60 min (`useUpdateCheck`), mostra o
-chip na title bar e o popover com notas/progresso. O download vai para
+chip na linha de chrome do layout e o popover com notas/progresso. O download vai para
 `<app-data>/updates/<versão>/`, com SHA-256 conferido durante o stream e de novo
 antes de instalar. No Windows a instalação abre o wizard Zylara existente e
 encerra o app em seguida; não há execução silenciosa. No Linux x64 e no macOS arm64, uma instalação feita pelo

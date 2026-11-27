@@ -18,6 +18,8 @@ import { AgentPanelScreen } from './AgentPanelScreen';
 import { AgentActivityDialog } from './AgentActivityDialog';
 import { PanelResizer } from '@/components/layout/PanelResizer';
 import { AnimatedSidePanel } from '@/components/layout/AnimatedSidePanel';
+import { useChromeCornerReserve } from '@/components/layout/ChromeCorner';
+import { DRAG_ROW_CLASS, useWindowDragProps } from '@/components/layout/windowChrome';
 import { Slot } from '@/components/plugins/ui/Slot';
 import { PluginDockTabHost } from '@/components/plugins/ui/PluginDockTabHost';
 import { PluginDockTabStrip } from '@/components/plugins/ui/PluginDockTabStrip';
@@ -251,6 +253,9 @@ export function AgentPanel() {
       }
     : null;
 
+  const reserve = useChromeCornerReserve('dock');
+  const drag = useWindowDragProps();
+
   return (
     <AnimatedSidePanel
       open={open && Boolean(agent || channel)}
@@ -260,7 +265,14 @@ export function AgentPanel() {
       resizing={previewWidth !== null}
       onDismiss={() => setOpen(false)}
     >
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
+      <div
+        {...drag}
+        className={cn(
+          'flex h-10 shrink-0 items-center gap-1 border-b border-border pl-2',
+          DRAG_ROW_CLASS,
+          reserve,
+        )}
+      >
         <SortableList
           ids={visibleTabs.map((entry) => entry.id)}
           label={t('panel.tabsAria')}

@@ -80,7 +80,7 @@ export function AgentThreadHeader({
   const agentPanelActive = panelOpen && rightPanel === 'agent';
   const workspacePanelActive = codePanelOpen && rightPanel === 'workspace';
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 px-3">
+    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border/70 px-3">
       <IconButton label={t('threadHeader.back')} size="sm" variant="ghost" onClick={onBack}>
         <ArrowLeft className="size-4" />
       </IconButton>
@@ -162,10 +162,12 @@ export function AgentThreadHeader({
       <Button
         size="sm"
         variant="ghost"
+        aria-label={t('threadHeader.editAgent')}
+        title={t('threadHeader.editAgent')}
         onClick={() => openEditor({ mode: 'edit', agentId: agent.id })}
       >
-        <Pencil className="mr-1.5 size-3.5" />
-        {t('threadHeader.editAgent')}
+        <Pencil className="size-3.5 xl:mr-1.5" />
+        <span className="hidden xl:inline">{t('threadHeader.editAgent')}</span>
       </Button>
     </header>
   );

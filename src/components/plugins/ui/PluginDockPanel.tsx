@@ -20,6 +20,7 @@ import { usePluginUiPrefs } from '@/lib/plugins/ui/prefs';
 import { cn } from '@/lib/utils';
 import { IconButton, Tooltip } from '@/components/ui';
 import { PanelResizer } from '@/components/layout/PanelResizer';
+import { useChromeCornerReserve } from '@/components/layout/ChromeCorner';
 import { PluginPageHeader } from '../PluginHosts';
 import { PluginDockTabHost } from './PluginDockTabHost';
 import { PluginDockTabStrip } from './PluginDockTabStrip';
@@ -38,6 +39,8 @@ export function PluginDockPanel({ layout, tabKey, takeover = false, className }:
   const ui = usePluginUi();
   const prefs = usePluginUiPrefs();
   const { layout: dock, onResize, onResizeEnd, onReset } = useSidePanelResize();
+  // Rightmost surface: the dock header clears the window-controls corner.
+  const chromeReserve = useChromeCornerReserve('dock');
   const tab = ui.panelTabs.find((entry) => entry.key === tabKey);
   const tabs = useMemo(
     () => dockTabsForLayout(ui.panelTabs, layout, prefs.disabled),
@@ -68,7 +71,12 @@ export function PluginDockPanel({ layout, tabKey, takeover = false, className }:
       data-plugin-dock={tab.key}
     >
       {hostTab ? (
-        <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
+        <div
+          className={cn(
+            'flex h-10 shrink-0 items-center gap-1 border-b border-border pl-2',
+            chromeReserve,
+          )}
+        >
           <div
             role="tablist"
             aria-label={t('host.dockTabs')}

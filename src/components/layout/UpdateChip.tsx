@@ -1,6 +1,6 @@
 /**
- * Title-bar update indicator (DESIGN §5): a compact pill anchored to the top-right
- * corner, immediately before the native window controls.
+ * Update indicator of the app chrome (DESIGN §5): a compact pill at the end of
+ * the layout's 40px chrome row, immediately before the window controls.
  *
  * It is the always-visible surface for an available release and also carries
  * live feedback while the download runs. Clicking it opens the full panel with

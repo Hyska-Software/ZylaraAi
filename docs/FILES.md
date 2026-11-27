@@ -570,7 +570,7 @@ Atualizações (v1.12, `docs/INSTALLER.md` §9):
   `src-tauri/src/commands/update.rs`; estado gerenciado no `lib.rs`.
 - **Renderer** (Lead): `src/lib/store/updateStore.ts` (fases
   `idle|checking|available|downloading|verifying|ready|installing|error|up-to-date`),
-  `src/components/layout/UpdateChip.tsx` (pill da title bar),
+  `src/components/layout/UpdateChip.tsx` (pill da linha de chrome),
   `src/components/layout/UpdatePanel.tsx` (popover + ações compartilhadas),
   `src/components/layout/useUpdateCheck.ts` (start + 60 min + foco) e
   `src/components/settings/UpdateSection.tsx` (Configurações → Sobre). Contratos

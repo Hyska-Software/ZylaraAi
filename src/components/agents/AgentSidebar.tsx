@@ -92,6 +92,7 @@ import {
 } from '@/lib/store';
 import type { Agent, AgentChannel, Conversation } from '@/lib/types';
 import { cn, compareConversationOrder, createSerialRunner } from '@/lib/utils';
+import { SidebarChromeRow } from '@/components/layout/SidebarChromeRow';
 
 const runChannelReorder = createSerialRunner();
 
@@ -983,7 +984,8 @@ export function AgentSidebar({ className, onClose }: AgentSidebarProps) {
 
   return (
     <aside className={cn('flex h-full min-h-0 flex-col bg-surface', className)}>
-      <div className="flex h-12 shrink-0 items-center justify-between px-3">
+      <SidebarChromeRow onClose={onClose} />
+      <div className="flex h-9 shrink-0 items-center justify-between px-3">
         <span className="text-[12px] font-semibold uppercase tracking-wide text-foreground-subtle">
           {t('sidebar.header')}
         </span>

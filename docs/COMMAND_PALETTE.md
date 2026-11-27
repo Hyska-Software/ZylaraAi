@@ -45,7 +45,7 @@ e sem mudanças no backend.
 | Item | Status | Evidência / observação |
 | --- | --- | --- |
 | Abrir/fechar com ⌘K/Ctrl+K | ✅ | `App.tsx` (listener global alterna `commandPaletteOpen`) |
-| Abrir pelos botões do TitleBar/Sidebar | ✅ | `TitleBar.tsx`, `Sidebar.tsx` chamam `setCommandPaletteOpen(true)` |
+| Abrir pelos botões da Sidebar | ✅ | `Sidebar.tsx` chama `setCommandPaletteOpen(true)` |
 | Fechar com Esc | ✅ | `CommandPalette.tsx` (`preventDefault` + `setOpen(false)`) — mas sempre fecha |
 | Focus trap / aria-modal | ✅ | Radix `Dialog` |
 | Navegação ↑/↓/Enter | ✅ | `handleKeyDown`; seleção limitada ao tamanho da lista |

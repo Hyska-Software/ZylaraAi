@@ -13,7 +13,6 @@ import {
   SquarePen,
   Trash,
   Unlink,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -42,6 +41,7 @@ import {
 import { useChatStore, useUiStore } from '@/lib/store';
 import type { Conversation } from '@/lib/types';
 import { cn, groupConversations, modKey } from '@/lib/utils';
+import { SidebarChromeRow } from './SidebarChromeRow';
 import {
   Button,
   Dialog,
@@ -50,7 +50,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  IconButton,
   Kbd,
   SortableList,
   sortableDropClass,
@@ -378,7 +377,9 @@ export function Sidebar({ className, onClose }: SidebarProps) {
       aria-label={t('shell.sidebar.aria')}
       className={cn('flex h-full w-full min-w-0 flex-col bg-surface', className)}
     >
-      <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-3">
+      <SidebarChromeRow onClose={onClose} />
+
+      <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-2">
         <Button
           variant="secondary"
           size="md"
@@ -388,11 +389,6 @@ export function Sidebar({ className, onClose }: SidebarProps) {
         >
           {t('shell.sidebar.newChat')}
         </Button>
-        {onClose ? (
-          <IconButton label={t('shell.sidebar.close')} size="sm" onClick={onClose}>
-            <X className="size-4" />
-          </IconButton>
-        ) : null}
       </div>
 
       {/* Order comes from the plugin navigation registry (host entries first). */}

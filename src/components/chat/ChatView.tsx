@@ -16,6 +16,7 @@ import { TurnErrorBanner } from './TurnErrorBanner';
 import { planUsageUrl } from './turnError';
 import { WelcomeScreen } from './WelcomeScreen';
 import { ComponentSlot, Slot } from '@/components/plugins/ui/Slot';
+import { LayoutTopRow } from '@/components/layout/LayoutTopRow';
 import { useStyleRecipe } from '@/lib/plugins/ui/recipe';
 import { usePluginRegistry } from '@/lib/plugins/registry';
 import type { PluginComponent } from '@/lib/plugins/ui/types';
@@ -38,12 +39,51 @@ function lastAssistantFailed(messages: ChatMessage[]): boolean {
   return false;
 }
 
+/** Default classes of the floating chat header (code/agent layouts). */
+const FLOATING_HEADER =
+  'pointer-events-none absolute inset-x-0 top-1 z-10 flex items-center gap-2 px-3';
+
+/**
+ * Chat header host. In the Chat layout it is the layout's 40px chrome row
+ * (conversation title + `chat.header.*` slots + the app chrome on the right);
+ * in Code/Agents it stays the floating overlay above the transcript, because
+ * those layouts bring their own header rows.
+ */
 function ChatHeaderHost({ conversationId }: Record<string, unknown>) {
-  const owner = { conversationId: (conversationId as string | null | undefined) ?? null };
-  const header = useStyleRecipe(
-    'chat.header',
-    'pointer-events-none absolute inset-x-0 top-1 z-10 flex items-center gap-2 px-3',
+  const layoutMode = useUiStore((state) => state.layoutMode);
+  const id = (conversationId as string | null | undefined) ?? null;
+  const title = useChatStore((state) =>
+    id ? (state.conversations.find((conversation) => conversation.id === id)?.title ?? null) : null,
   );
+  const owner = { conversationId: id };
+  const header = useStyleRecipe('chat.header', FLOATING_HEADER);
+
+  if (layoutMode === 'chat') {
+    return (
+      <LayoutTopRow
+        leading={
+          <div
+            className="flex min-w-0 items-center gap-2"
+            data-variant={header.variantId ?? undefined}
+          >
+            <Slot name="chat.header.leading" owner={owner} />
+            {title ? (
+              <span
+                title={title}
+                className="min-w-0 truncate text-[13px] font-medium tracking-tight text-foreground"
+              >
+                {title}
+              </span>
+            ) : null}
+          </div>
+        }
+      >
+        <Slot name="chat.header.actions" owner={owner} compact className="pointer-events-auto" />
+        <Slot name="chat.header.trailing" owner={owner} />
+      </LayoutTopRow>
+    );
+  }
+
   return (
     <div className={header.className} data-variant={header.variantId ?? undefined}>
       <Slot name="chat.header.leading" owner={owner} />
