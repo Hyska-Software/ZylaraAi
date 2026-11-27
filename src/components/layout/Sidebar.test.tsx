@@ -40,6 +40,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
     theme: 'system',
     themeId: 'zylara',
     borderRadiusEnabled: true,
+    chatExecutionAnimationEnabled: true,
     locale: 'pt-BR',
     defaultProvider: 'opencode-go',
     defaultModel: 'deepseek-v4.1-flash',
@@ -445,6 +446,8 @@ describe('Sidebar — mais informações nas linhas de conversa', () => {
     expect(row.textContent).toContain('Concluída');
     expect(row.textContent).toContain('17:56');
     expect(within(row).getByTitle('DeepSeek V4.1 Flash')).toBeTruthy();
+    expect(row.className).not.toContain('pr-8');
+    expect(row.parentElement?.querySelector('.bg-linear-to-l')).toBeTruthy();
   });
 
   it('mostra a ferramenta ativa e o status em execução durante um turno', () => {

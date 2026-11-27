@@ -64,6 +64,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
     theme: 'system',
     themeId: 'zylara',
     borderRadiusEnabled: true,
+    chatExecutionAnimationEnabled: true,
     locale: 'pt-BR',
     defaultProvider: 'opencode-go',
     defaultModel: 'deepseek-v4.1-flash',
@@ -422,6 +423,8 @@ describe('CodeSidebar — Workspaces reais', () => {
     expect(within(row).getByText('Concluída')).toBeTruthy();
     expect(within(row).getByText('17:56')).toBeTruthy();
     expect(within(row).getByTitle('DeepSeek V4.1 Flash')).toBeTruthy();
+    expect(row.className).not.toContain('pr-8');
+    expect(row.parentElement?.querySelector('.bg-linear-to-l')).toBeTruthy();
   });
 
   it('mostra a ferramenta ativa na linha de atividade da sessão', async () => {

@@ -102,6 +102,12 @@
       "label": "Bordes redondeados",
       "aria": "Alternar bordes redondeados"
     },
+    "chatExecutionAnimation": {
+      "title": "Animación de ejecución del chat",
+      "description": "Desactívala para mantener el indicador de ejecución estático mientras se transmite la respuesta. El estado sigue visible sin el resplandor orbital.",
+      "label": "Animar mientras responde",
+      "aria": "Alternar animación de ejecución del chat"
+    },
     "library": {
       "title": "Temas instalados",
       "description": "Cada tema aporta su propia paleta, radios, fuentes y fondo de pantalla. Instala un paquete .zip con un manifiesto theme.json."

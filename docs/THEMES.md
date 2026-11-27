@@ -122,6 +122,8 @@ Opcionais:
 - Raios (comprimentos `px`, `rem` ou `em`): `radius-xs`, `radius-sm`, `radius-md`, `radius-lg`, `radius-xl`, `radius-2xl`, `radius-3xl`. O app os consome via `--theme-radius-*`, o que permite trocar o arredondamento sem rebuildar o CSS.
 - O interruptor **Configurações → Temas → Bordas arredondadas** desliga todos os raios da interface, inclusive os definidos pelo tema; ao religá-lo, os raios do tema voltam sem reiniciar o app. A preferência fica em `settings.json` como `borderRadiusEnabled`.
 
+O interruptor **Configurações → Temas → Animar durante a resposta** desliga a órbita do indicador de execução do composer; o contorno estático continua mostrando que o turno está em andamento. A preferência fica em `settings.json` como `chatExecutionAnimationEnabled` (padrão `true`).
+
 Formatos de cor aceitos: `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `transparent` e funções `rgb()`, `rgba()`, `hsl()`, `hsla()`, `oklch()`, `oklab()`, `lab()`, `lch()`, `color(...)`.
 
 Tokens ausentes e opcionais preservam o valor embutido correspondente ao modo ativo.

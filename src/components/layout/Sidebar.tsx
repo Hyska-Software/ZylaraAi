@@ -174,7 +174,7 @@ function ConversationRow({
         aria-label={conversation.title}
         title={conversation.title}
         className={cn(
-          'flex min-h-[52px] w-full min-w-0 flex-col gap-1 rounded-lg px-2 py-1.5 pr-8 text-left',
+          'flex min-h-[52px] w-full min-w-0 flex-col gap-1 rounded-lg px-2 py-1.5 pr-2 text-left',
           'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
           !sortable.disabled && 'cursor-grab active:cursor-grabbing',
           active
@@ -200,6 +200,15 @@ function ConversationRow({
         </span>
       </button>
 
+      <span
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-y-1 right-0 z-0 w-11 rounded-lg bg-linear-to-l to-transparent transition-opacity duration-150',
+          'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 lg:group-has-[[data-state=open]]:opacity-100',
+          active ? 'from-surface-active' : 'from-surface group-hover:from-surface-hover',
+        )}
+      />
+
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <button
@@ -207,7 +216,7 @@ function ConversationRow({
             aria-label={t('shell.sidebar.optionsAria')}
             onClick={(event) => event.stopPropagation()}
             className={cn(
-              'absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md',
+              'absolute right-1 top-1/2 z-10 flex size-6 -translate-y-1/2 items-center justify-center rounded-md',
               'text-foreground-subtle transition-colors duration-150 hover:bg-surface-active hover:text-foreground',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
               'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 lg:data-[state=open]:opacity-100',

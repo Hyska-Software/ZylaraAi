@@ -2392,6 +2392,8 @@ export interface Settings {
   themeId: string;
   /** False disables every corner radius app-wide, regardless of theme tokens. */
   borderRadiusEnabled: boolean;
+  /** False keeps the composer's running indicator static instead of orbiting. */
+  chatExecutionAnimationEnabled: boolean;
   locale: AppLocale;
   defaultProvider: string;
   defaultModel: string;

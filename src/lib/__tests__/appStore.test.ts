@@ -39,6 +39,7 @@ const settings: Settings = {
   theme: 'system',
   themeId: 'zylara',
   borderRadiusEnabled: true,
+  chatExecutionAnimationEnabled: true,
   locale: 'pt-BR',
   defaultProvider: 'openai',
   defaultModel: 'gpt-6.1-sol',

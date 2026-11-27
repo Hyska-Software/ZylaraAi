@@ -2078,6 +2078,7 @@ pub async fn run_turn(
                 if payload.turn_kind == TurnKind::User && !payload.options.regenerate {
                     return persist_route_failure(
                         &deps,
+                        &settings,
                         &payload,
                         &conversation,
                         &turn_id,
@@ -2101,6 +2102,7 @@ pub async fn run_turn(
                     if payload.turn_kind == TurnKind::User && !payload.options.regenerate {
                         return persist_route_failure(
                             &deps,
+                            &settings,
                             &payload,
                             &conversation,
                             &turn_id,
@@ -2293,6 +2295,16 @@ pub async fn run_turn(
             user_message_id: user_message.id.clone(),
             assistant_message_id: assistant_message.id.clone(),
         },
+    );
+    // Title the conversation at send time, before any provider request.
+    maybe_auto_title(
+        &deps,
+        &settings,
+        &payload,
+        &conversation,
+        &user_message,
+        &on_event,
+        false,
     );
     // Rodada aberta: a UI recebe o snapshot autoritativo (`rounds` já contado)
     // logo depois do `turn_started` (PLAN §7.2 passo 6).
@@ -4332,37 +4344,17 @@ pub async fn run_turn(
         },
     );
 
-    // Auto title: only when the conversation still has a placeholder title.
-    // Rodada de objetivo nunca gera título (PLAN §8.4). A checagem relê o DB
-    // porque a tool `goal` (fluxo `/goal`) pode ter renomeado o placeholder
-    // durante o turno — o `conversation` em memória tem o título do início.
-    if settings.auto_title
-        && payload.turn_kind == TurnKind::User
-        && conversation_needs_auto_title(&deps.db, &conversation)
-    {
-        let source = if user_message.content.trim().is_empty() {
-            user_message
-                .attachments
-                .first()
-                .map(|attachment| attachment.name.clone())
-                .unwrap_or_default()
-        } else {
-            user_message.content.clone()
-        };
-        if let Some(title) = derive_title(&source) {
-            if let Err(error) = deps.db.rename_conversation(&conversation.id, &title) {
-                eprintln!("zylara: falha ao renomear conversa: {error:#}");
-            } else {
-                emit(
-                    &on_event,
-                    TurnEvent::TitleUpdated {
-                        conversation_id: conversation.id.clone(),
-                        title,
-                    },
-                );
-            }
-        }
-    }
+    // Fallback for `/goal` turns: the goal tool may have named the conversation
+    // during the turn. The live-title check keeps an explicit title intact.
+    maybe_auto_title(
+        &deps,
+        &settings,
+        &payload,
+        &conversation,
+        &user_message,
+        &on_event,
+        true,
+    );
     let _ = deps.db.touch_conversation(&conversation.id);
 
     let updated_conversation = deps
@@ -4546,6 +4538,7 @@ fn route_failure(error: &anyhow::Error) -> TurnFailure {
 /// the same next action as a mid-stream failure.
 fn persist_route_failure(
     deps: &HarnessDeps,
+    settings: &Settings,
     payload: &TurnPayload,
     conversation: &Conversation,
     turn_id: &str,
@@ -4579,6 +4572,15 @@ fn persist_route_failure(
             user_message_id: user_message.id.clone(),
             assistant_message_id: assistant_message.id.clone(),
         },
+    );
+    maybe_auto_title(
+        deps,
+        settings,
+        payload,
+        conversation,
+        &user_message,
+        on_event,
+        true,
     );
     emit(
         on_event,
@@ -6134,6 +6136,52 @@ fn conversation_needs_auto_title(db: &Db, conversation: &Conversation) -> bool {
     should_auto_title(&live_title)
 }
 
+/// Names a conversation from its first user message as soon as that message is
+/// persisted. The end-of-turn call is a fallback for `/goal` turns, where the
+/// goal tool owns the title until the turn ends.
+fn maybe_auto_title(
+    deps: &HarnessDeps,
+    settings: &Settings,
+    payload: &TurnPayload,
+    conversation: &Conversation,
+    user_message: &ChatMessage,
+    on_event: &Arc<dyn EventEmitter>,
+    at_turn_end: bool,
+) {
+    if !settings.auto_title || payload.turn_kind != TurnKind::User {
+        return;
+    }
+    if !at_turn_end && payload.goal_request {
+        return;
+    }
+    if !conversation_needs_auto_title(&deps.db, conversation) {
+        return;
+    }
+    let source = if user_message.content.trim().is_empty() {
+        user_message
+            .attachments
+            .first()
+            .map(|attachment| attachment.name.clone())
+            .unwrap_or_default()
+    } else {
+        user_message.content.clone()
+    };
+    let Some(title) = derive_title(&source) else {
+        return;
+    };
+    if let Err(error) = deps.db.rename_conversation(&conversation.id, &title) {
+        eprintln!("zylara: failed to rename conversation: {error:#}");
+    } else {
+        emit(
+            on_event,
+            TurnEvent::TitleUpdated {
+                conversation_id: conversation.id.clone(),
+                title,
+            },
+        );
+    }
+}
+
 fn derive_title(text: &str) -> Option<String> {
     let mut cleaned = String::new();
     let mut in_fence = false;
@@ -6947,6 +6995,31 @@ mod agent_loop_tests {
         }
     }
 
+    /// Captures the persisted title before the agent starts and keeps event order.
+    struct TitleAtFirstStep {
+        db: Arc<Db>,
+        conversation_id: String,
+        title: Arc<Mutex<Option<String>>>,
+        events: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl EventEmitter for TitleAtFirstStep {
+        fn emit(&self, event: TurnEvent) {
+            if matches!(&event, TurnEvent::StepStarted { .. }) {
+                let title = self
+                    .db
+                    .get_conversation(&self.conversation_id)
+                    .ok()
+                    .flatten()
+                    .map(|conversation| conversation.title);
+                *self.title.lock().expect("title lock") = title;
+            }
+            if let Ok(json) = serde_json::to_string(&event) {
+                self.events.lock().expect("events lock").push(json);
+            }
+        }
+    }
+
     fn channel() -> (Arc<dyn EventEmitter>, Arc<Mutex<Vec<String>>>) {
         let events: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
         let emitter = CollectEvents {
@@ -7599,6 +7672,123 @@ mod agent_loop_tests {
             .expect("conversation query")
             .expect("conversation exists");
         assert_eq!(reloaded.title, "Explique MCP em duas frases", "auto title");
+    }
+
+    #[tokio::test]
+    async fn auto_title_is_persisted_before_agent_runs() {
+        let temp = TempDb::new();
+        let conversation = temp
+            .db
+            .create_conversation("Nova conversa", "opencode-go", "deepseek-v4.1-flash")
+            .expect("conversation");
+        let title_at_first_step = Arc::new(Mutex::new(None));
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let emitter = Arc::new(TitleAtFirstStep {
+            db: temp.db.clone(),
+            conversation_id: conversation.id.clone(),
+            title: title_at_first_step.clone(),
+            events: events.clone(),
+        });
+
+        run_turn(
+            deps(
+                temp.db.clone(),
+                capturing_streamer(Arc::new(Mutex::new(Vec::new())), "Resposta."),
+            ),
+            payload(&conversation, 2),
+            Settings::default(),
+            emitter,
+            CancellationToken::new(),
+        )
+        .await
+        .expect("turn");
+
+        assert_eq!(
+            title_at_first_step.lock().expect("title lock").as_deref(),
+            Some("Explique MCP em duas frases"),
+            "title must be persisted before the agent starts"
+        );
+        let ordered = events.lock().expect("events lock").clone();
+        let index = |kind: &str| {
+            ordered
+                .iter()
+                .position(|json| json.contains(&format!("\"type\":\"{kind}\"")))
+                .unwrap_or_else(|| panic!("missing {kind} event"))
+        };
+        assert!(index("turn_started") < index("title_updated"));
+        assert!(index("title_updated") < index("step_started"));
+        assert!(index("title_updated") < index("done"));
+    }
+
+    #[tokio::test]
+    async fn auto_title_can_be_disabled() {
+        let temp = TempDb::new();
+        let conversation = temp
+            .db
+            .create_conversation("Nova conversa", "opencode-go", "deepseek-v4.1-flash")
+            .expect("conversation");
+        let title_at_first_step = Arc::new(Mutex::new(None));
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let emitter = Arc::new(TitleAtFirstStep {
+            db: temp.db.clone(),
+            conversation_id: conversation.id.clone(),
+            title: title_at_first_step.clone(),
+            events: events.clone(),
+        });
+        let mut settings = Settings::default();
+        settings.auto_title = false;
+
+        run_turn(
+            deps(
+                temp.db.clone(),
+                capturing_streamer(Arc::new(Mutex::new(Vec::new())), "Resposta."),
+            ),
+            payload(&conversation, 2),
+            settings,
+            emitter,
+            CancellationToken::new(),
+        )
+        .await
+        .expect("turn");
+
+        assert_eq!(
+            title_at_first_step.lock().expect("title lock").as_deref(),
+            Some("Nova conversa")
+        );
+        assert!(!has_event(&events, "title_updated"));
+    }
+
+    #[tokio::test]
+    async fn auto_title_survives_a_route_failure() {
+        let temp = TempDb::new();
+        let conversation = temp
+            .db
+            .create_conversation("Nova conversa", "opencode-go", "deepseek-v4.1-flash")
+            .expect("conversation");
+        let mut invalid = payload(&conversation, 2);
+        invalid.provider_id = "missing-provider".to_string();
+        invalid.model_id = "missing-model".to_string();
+
+        let result = run_turn(
+            deps(
+                temp.db.clone(),
+                capturing_streamer(Arc::new(Mutex::new(Vec::new())), "Resposta."),
+            ),
+            invalid,
+            Settings::default(),
+            channel().0,
+            CancellationToken::new(),
+        )
+        .await
+        .expect("turn");
+
+        assert!(result.error.is_some(), "route failure must be persisted");
+        let reloaded = temp
+            .db
+            .get_conversation(&conversation.id)
+            .expect("conversation query")
+            .expect("conversation exists");
+        assert_eq!(reloaded.title, "Explique MCP em duas frases");
     }
 
     #[tokio::test]
@@ -15230,6 +15420,14 @@ mod agent_loop_tests {
             .expect("resetar título");
         let mut human = code_payload(&conversation);
         human.content = "Explique a estrutura do projeto em uma frase.".to_string();
+        let human_title_at_first_step = Arc::new(Mutex::new(None));
+        let human_events = Arc::new(Mutex::new(Vec::new()));
+        let human_emitter = Arc::new(TitleAtFirstStep {
+            db: temp.db.clone(),
+            conversation_id: conversation.id.clone(),
+            title: human_title_at_first_step.clone(),
+            events: human_events.clone(),
+        });
         run_turn(
             deps(
                 temp.db.clone(),
@@ -15237,11 +15435,16 @@ mod agent_loop_tests {
             ),
             human,
             Settings::default(),
-            channel().0,
+            human_emitter,
             CancellationToken::new(),
         )
         .await
         .expect("turno humano");
+        assert_eq!(
+            human_title_at_first_step.lock().expect("title lock").as_deref(),
+            Some("Explique a estrutura do projeto em uma frase."),
+            "turno humano do Code titula antes de executar"
+        );
         let after_human = temp
             .db
             .get_conversation(&conversation.id)

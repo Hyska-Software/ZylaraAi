@@ -41,6 +41,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
     theme: 'light',
     themeId: 'zylara',
     borderRadiusEnabled: true,
+    chatExecutionAnimationEnabled: true,
     locale: 'pt-BR',
     defaultProvider: 'opencode-go',
     defaultModel: 'deepseek-v4.1-flash',

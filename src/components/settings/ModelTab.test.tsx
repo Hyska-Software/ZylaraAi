@@ -27,6 +27,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
     theme: 'system',
     themeId: 'zylara',
     borderRadiusEnabled: true,
+    chatExecutionAnimationEnabled: true,
     locale: 'pt-BR',
     defaultProvider: GO,
     defaultModel: 'glm-5.3-flash',

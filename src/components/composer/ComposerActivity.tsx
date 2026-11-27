@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 export interface ComposerActivityProps {
@@ -29,6 +30,10 @@ const DEFAULT_RADIUS = 32;
 export function ComposerActivity({ active, reduceMotion }: ComposerActivityProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState<Box | null>(null);
+  const chatExecutionAnimationEnabled = useAppStore(
+    (state) => state.settings.chatExecutionAnimationEnabled,
+  );
+  const staticRing = reduceMotion || !chatExecutionAnimationEnabled;
 
   useLayoutEffect(() => {
     const host = hostRef.current;
@@ -77,13 +82,13 @@ export function ComposerActivity({ active, reduceMotion }: ComposerActivityProps
       aria-hidden="true"
       data-testid="composer-activity"
       data-active={active ? 'true' : 'false'}
-      data-motion={reduceMotion ? 'reduced' : 'orbit'}
+      data-motion={staticRing ? 'reduced' : 'orbit'}
       className={cn(
         'composer-orbit-mask pointer-events-none absolute -inset-px z-0',
         'transition-opacity duration-300 ease-[var(--ease-out-soft)]',
         active ? 'opacity-100' : 'opacity-0',
-        !reduceMotion && 'composer-orbit-animate',
-        reduceMotion && 'composer-orbit-static',
+        !staticRing && 'composer-orbit-animate',
+        staticRing && 'composer-orbit-static',
         !active && 'composer-orbit-paused',
       )}
     >

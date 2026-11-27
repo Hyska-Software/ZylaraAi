@@ -102,6 +102,12 @@
       "label": "Bordas arredondadas",
       "aria": "Alternar bordas arredondadas"
     },
+    "chatExecutionAnimation": {
+      "title": "Animação de execução do chat",
+      "description": "Desative para manter o indicador de execução estático durante a resposta. O status continua visível, sem o destaque orbitando.",
+      "label": "Animar durante a resposta",
+      "aria": "Alternar animação de execução do chat"
+    },
     "library": {
       "title": "Temas instalados",
       "description": "Cada tema traz paleta, raios, fontes e papel de parede próprios. Instale um pacote .zip com um manifesto theme.json."

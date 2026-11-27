@@ -33,6 +33,9 @@ export function ThemesTab() {
   const setTheme = useUiStore((state) => state.setTheme);
   const saveSettings = useAppStore((state) => state.saveSettings);
   const borderRadiusEnabled = useAppStore((state) => state.settings.borderRadiusEnabled);
+  const chatExecutionAnimationEnabled = useAppStore(
+    (state) => state.settings.chatExecutionAnimationEnabled,
+  );
   const [installing, setInstalling] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -149,6 +152,21 @@ export function ThemesTab() {
             checked={borderRadiusEnabled}
             onCheckedChange={(checked) => void saveSettings({ borderRadiusEnabled: checked })}
             aria-label={t('themes.radius.aria')}
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection
+        title={t('themes.chatExecutionAnimation.title')}
+        description={t('themes.chatExecutionAnimation.description')}
+      >
+        <SettingRow label={t('themes.chatExecutionAnimation.label')}>
+          <Switch
+            checked={chatExecutionAnimationEnabled}
+            onCheckedChange={(checked) =>
+              void saveSettings({ chatExecutionAnimationEnabled: checked })
+            }
+            aria-label={t('themes.chatExecutionAnimation.aria')}
           />
         </SettingRow>
       </SettingsSection>

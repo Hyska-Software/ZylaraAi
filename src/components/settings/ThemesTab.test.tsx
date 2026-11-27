@@ -191,6 +191,19 @@ describe('ThemesTab', () => {
     );
   });
 
+  it('disables the chat execution animation and persists the preference', async () => {
+    const user = userEvent.setup();
+    render(<ThemesTab />);
+
+    const control = screen.getByRole('switch', { name: 'Alternar animação de execução do chat' });
+    expect(control.getAttribute('aria-checked')).toBe('true');
+    await user.click(control);
+
+    expect(mocks.saveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ chatExecutionAnimationEnabled: false }),
+    );
+  });
+
   it('installs a package through the file dialog', async () => {
     const user = userEvent.setup();
     mocks.open.mockResolvedValue('C:/tmp/ocean.zip');

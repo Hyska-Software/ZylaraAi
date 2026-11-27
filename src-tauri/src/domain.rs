@@ -1452,6 +1452,8 @@ pub struct Settings {
     pub theme_id: String,
     /// When false, every corner is square regardless of the active theme radii.
     pub border_radius_enabled: bool,
+    /// When false, the composer keeps a static accent ring instead of orbiting while a turn runs.
+    pub chat_execution_animation_enabled: bool,
     pub locale: String,
     pub default_provider: String,
     pub default_model: String,
@@ -1648,6 +1650,7 @@ impl Default for Settings {
             theme: "system".into(),
             theme_id: crate::themes::BUILTIN_THEME_ID.into(),
             border_radius_enabled: true,
+            chat_execution_animation_enabled: true,
             locale: "en".into(),
             default_provider: "opencode-go".into(),
             default_model: "deepseek-v4.1-flash".into(),
@@ -3059,6 +3062,19 @@ mod tests {
 
         let json = serde_json::to_value(&disabled).expect("serialize settings");
         assert_eq!(json["borderRadiusEnabled"], false);
+    }
+
+    #[test]
+    fn settings_chat_execution_animation_enabled_defaults_to_true_and_uses_camel_case() {
+        let settings: Settings = serde_json::from_str("{}").expect("Settings com defaults");
+        assert!(settings.chat_execution_animation_enabled);
+
+        let disabled: Settings = serde_json::from_str(r#"{"chatExecutionAnimationEnabled":false}"#)
+            .expect("disable chat execution animation");
+        assert!(!disabled.chat_execution_animation_enabled);
+
+        let json = serde_json::to_value(&disabled).expect("serialize settings");
+        assert_eq!(json["chatExecutionAnimationEnabled"], false);
     }
 
     /// Auth-status DTOs are renderer-facing: they may carry account labels and

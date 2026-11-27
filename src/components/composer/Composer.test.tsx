@@ -253,7 +253,11 @@ afterEach(() => {
   useChatStore.setState({ activeId: null, conversations: [] });
   useCodeStore.setState({ byConversation: {} });
   useAppStore.setState((state) => ({
-    settings: { ...state.settings, reduceMotion: false },
+    settings: {
+      ...state.settings,
+      reduceMotion: false,
+      chatExecutionAnimationEnabled: true,
+    },
   }));
 });
 
@@ -468,6 +472,17 @@ describe('Composer — indicador de execução', () => {
   it('mantém o indicador estático quando reduceMotion está ativo', () => {
     useAppStore.setState((state) => ({
       settings: { ...state.settings, reduceMotion: true },
+    }));
+    useChatStore.setState({ streaming: streamingState() });
+    render(<Composer />);
+
+    expect(composerActivity().getAttribute('data-active')).toBe('true');
+    expect(composerActivity().getAttribute('data-motion')).toBe('reduced');
+  });
+
+  it('mantém o indicador estático quando a animação de execução é desativada', () => {
+    useAppStore.setState((state) => ({
+      settings: { ...state.settings, chatExecutionAnimationEnabled: false },
     }));
     useChatStore.setState({ streaming: streamingState() });
     render(<Composer />);
