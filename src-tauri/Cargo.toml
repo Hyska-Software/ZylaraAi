@@ -99,7 +99,7 @@ tempfile = "3"
 dunce = "1"
 # Terminal PTY do layout Code (ConPTY no Windows).
 portable-pty = "0.8"
-# Árvore/busca do workspace respeitando .gitignore (mesmo motor do ripgrep).
+# Workspace walker: the Files tree lists every path; search still respects ignore rules.
 ignore = "0.4"
 globset = "0.4"
 # Recursive filesystem watcher for the Code panel (RDCW/FSEvents/inotify).

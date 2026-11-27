@@ -427,11 +427,13 @@ fn build_tree(entries: &[(String, bool, u64)], root_label: &str) -> Vec<Workspac
     roots
 }
 
-/// Lista a árvore do workspace a partir de um diretório relativo.
+/// Lists the workspace tree from a relative directory.
 ///
-/// A resolução usa `Access::ReadDir` (o root "." é um diretório válido); a
-/// classificação `Read` continua reservada para arquivos. Regressão coberta por
-/// `lists_the_workspace_tree_from_the_root_and_subdirectories`.
+/// The Files tab shows every entry: hidden paths, gitignore/exclude matches and
+/// `.ignore` rules are all included. The resolution uses `Access::ReadDir` (the
+/// root "." is a valid directory); `Read` is reserved for files. Regression
+/// covered by `lists_the_workspace_tree_from_the_root_and_subdirectories` and
+/// `lists_hidden_and_ignored_files_in_the_files_tab`.
 fn list_tree(
     root: &std::path::Path,
     relative: &str,
@@ -440,12 +442,15 @@ fn list_tree(
     let base = safe_path::resolve(root, relative, Access::ReadDir).map_err(map_err)?;
     let depth = depth.clamp(1, 6);
     let mut entries: Vec<(String, bool, u64)> = Vec::new();
+    // The Files tab never hides entries: disable every filter the walker applies.
     let walker = ignore::WalkBuilder::new(&base)
         .max_depth(Some(depth as usize + 1))
-        .hidden(true)
-        .git_ignore(true)
+        .hidden(false)
+        .git_ignore(false)
         .git_global(false)
-        .git_exclude(true)
+        .git_exclude(false)
+        .ignore(false)
+        .parents(false)
         .follow_links(false)
         .build();
     for entry in walker.flatten() {
@@ -953,6 +958,45 @@ mod tests {
         assert!(file_as_dir.contains("FS_NOT_A_FILE"), "{file_as_dir}");
         let outside = list_tree(dir.path(), "../", 1).expect_err("fora");
         assert!(outside.contains("FS_OUTSIDE_WORKSPACE"), "{outside}");
+    }
+
+    #[test]
+    fn lists_hidden_and_ignored_files_in_the_files_tab() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("README.md"), "ok").expect("readme");
+        std::fs::write(dir.path().join(".env"), "SECRET=1").expect("hidden env");
+        std::fs::write(dir.path().join(".gitignore"), "dist/\nsecret.log\n").expect("gitignore");
+        std::fs::create_dir(dir.path().join("dist")).expect("dist dir");
+        std::fs::write(dir.path().join("dist").join("bundle.js"), "x").expect("bundle");
+        std::fs::write(dir.path().join("secret.log"), "x").expect("ignored log");
+        std::fs::write(dir.path().join(".ignore"), "cache.txt\n").expect("ignore file");
+        std::fs::write(dir.path().join("cache.txt"), "x").expect("ignore-crate entry");
+        std::fs::create_dir(dir.path().join(".git")).expect("git dir");
+        std::fs::write(dir.path().join(".git").join("HEAD"), "ref: refs/heads/main\n")
+            .expect("git HEAD");
+
+        fn paths_of(entries: &[WorkspaceFileEntry], out: &mut Vec<String>) {
+            for entry in entries {
+                out.push(entry.path.clone());
+                paths_of(&entry.children, out);
+            }
+        }
+
+        let tree = list_tree(dir.path(), ".", 2).expect("list tree");
+        let mut paths = Vec::new();
+        paths_of(&tree, &mut paths);
+        for expected in [
+            "README.md",
+            ".env",
+            ".gitignore",
+            "dist/bundle.js",
+            "secret.log",
+            ".ignore",
+            "cache.txt",
+            ".git/HEAD",
+        ] {
+            assert!(paths.contains(&expected.to_string()), "missing {expected} in {paths:?}");
+        }
     }
 
     #[test]

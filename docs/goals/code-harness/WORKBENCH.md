@@ -301,8 +301,8 @@ acima das abas: `⎇ main ▾` (lista de branches, criar/trocar), `+N −M`, bot
 ### 7.1 Arquivos
 
 - Árvore do workspace (`role="tree"`, virtualizada): pastas expandíveis, ícones por tipo, filtro
-  incremental no topo, **badges de estado git** (`M`, `A`, `D`, `U`, `!`), arquivos ignorados
-  ocultos por padrão (toggle "mostrar ignorados").
+  incremental no topo, **badges de estado git** (`M`, `A`, `D`, `U`, `!`). A árvore **mostra
+  sempre todos os arquivos**, inclusive ocultos e ignorados pelo Git — sem toggle.
 - Clique curto → abre o arquivo em uma **aba central** (a mesma faixa de abas das sessões, como o
   diff de Alterações): **cada arquivo aberto tem a sua própria aba** (ícone do tipo + nome truncado
   + X para fechar), na ordem de abertura; clicar num arquivo já aberto apenas ativa a aba dele
@@ -339,8 +339,8 @@ normalmente. Um path untracked/não indexado ignorado pelas regras atuais do Git
 lista em todas as origens (status, journal, último turno, eventos ao vivo e replay). Paths
 tracked, staged/force-added, conflitados e suas deleções permanecem visíveis mesmo quando o nome
 combina com um padrão de ignore — o painel não pode esconder o que o índice commitaria. Fora de
-um repositório ou se o Git falhar, o histórico é preservado (fail open). A aba Arquivos mantém
-sua política própria e continua escondendo hidden/ignorados.
+um repositório ou se o Git falhar, o histórico é preservado (fail open). A aba Arquivos segue
+política própria e mostra todos os arquivos, inclusive hidden/ignorados.
 
 Agrupamentos: `Staged` / `Não staged` / `Novos` (`Untracked`); modo de visualização "somente
 sessão" × "todos" (default todos, com a origem como badge). Cada linha: ícone, caminho relativo,
