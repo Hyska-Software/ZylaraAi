@@ -48,6 +48,8 @@ export interface FileTreeProps {
    * X de Y"). Ignored when smaller than the visible count.
    */
   totalCount?: number;
+  /** Backend reported a truncated scan; keeps the count visible even when equal. */
+  truncated?: boolean;
   onSelectFile?: (path: string) => void;
   /** Fired when a directory is expanded/collapsed; the container may fetch children. */
   onToggleDir?: (path: string) => void;
@@ -128,6 +130,7 @@ export function FileTree({
   selectedPath,
   expandedPaths,
   totalCount,
+  truncated = false,
   onSelectFile,
   onToggleDir,
   onExpandAll,
@@ -278,7 +281,7 @@ export function FileTree({
   // Collapsed folders are not truncation: only show the counter for an active
   // filter or a backend that reported more entries than it returned.
   const total = totalCount != null && totalCount > allRows.length ? totalCount : allRows.length;
-  const showCount = normalizedQuery.length > 0 || total > allRows.length;
+  const showCount = normalizedQuery.length > 0 || truncated || total > allRows.length;
 
   return (
     <div className={cn('flex h-full min-h-0 flex-col', className)}>

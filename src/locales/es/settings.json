@@ -133,8 +133,74 @@
     },
     "wrap": {
       "label": "Ajuste de línea",
-      "description": "Ajustar líneas largas en vez de desplazarse horizontalmente. También disponible en la barra del visor.",
+      "description": "Ajustar líneas largas en vez de desplazarse horizontalmente. También disponible en la barra del editor.",
       "aria": "Ajustar líneas largas en las vistas de archivo"
+    },
+    "fontLigatures": {
+      "label": "Ligaduras de la fuente",
+      "description": "Usar las ligaduras de programación de la fuente elegida (por ejemplo fi y ->).",
+      "aria": "Activar ligaduras de la fuente en el editor"
+    },
+    "highlight": {
+      "label": "Resaltado de sintaxis",
+      "description": "Colorear el código por lenguaje. Desactívalo para texto plano, que es más rápido en archivos muy grandes.",
+      "aria": "Resaltar la sintaxis en el editor"
+    },
+    "indentation": {
+      "title": "Sangría",
+      "description": "Cómo el editor indenta y continúa las líneas mientras escribes."
+    },
+    "insertSpaces": {
+      "label": "Insertar espacios",
+      "description": "Indentar con espacios en lugar de tabulaciones.",
+      "aria": "Indentar con espacios"
+    },
+    "detectIndentation": {
+      "label": "Detectar sangría",
+      "description": "Leer la sangría que ya usa el archivo y respetarla en esa pestaña.",
+      "aria": "Detectar la sangría de cada archivo"
+    },
+    "autoIndent": {
+      "label": "Sangría automática",
+      "description": "Mantener la sangría de la línea anterior al pulsar Enter.",
+      "aria": "Mantener la sangría en las líneas nuevas"
+    },
+    "autoCloseBrackets": {
+      "label": "Cerrar corchetes automáticamente",
+      "description": "Cerrar corchetes y comillas mientras escribes y avanzar sobre el carácter de cierre.",
+      "aria": "Cerrar corchetes y comillas automáticamente"
+    },
+    "saving": {
+      "title": "Guardado",
+      "description": "Cuándo y cómo el editor escribe los archivos en el disco."
+    },
+    "autoSave": {
+      "label": "Guardar automáticamente",
+      "description": "Guardar el archivo solo tras una pausa o cuando la ventana pierde el foco.",
+      "aria": "Modo de guardado automático",
+      "off": "Desactivado",
+      "delay": "Tras una pausa",
+      "blur": "Al perder el foco"
+    },
+    "autoSaveDelay": {
+      "label": "Retardo del guardado automático",
+      "description": "Tiempo de inactividad antes de un guardado automático.",
+      "aria": "Retardo del guardado automático"
+    },
+    "trimTrailingWhitespace": {
+      "label": "Quitar espacios finales",
+      "description": "Eliminar espacios y tabulaciones al final de cada línea al guardar.",
+      "aria": "Quitar espacios finales al guardar"
+    },
+    "insertFinalNewline": {
+      "label": "Línea final",
+      "description": "Asegurar que el archivo guardado termine con una línea nueva.",
+      "aria": "Insertar una línea nueva final al guardar"
+    },
+    "restore": {
+      "title": "Restablecer",
+      "description": "Volver todas las preferencias del editor a su valor predeterminado.",
+      "action": "Restablecer el editor"
     }
   },
   "trayPrompt": {

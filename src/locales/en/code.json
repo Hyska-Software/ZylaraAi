@@ -876,6 +876,80 @@
     "reload": "Reload file",
     "openExternal": "Open in external editor"
   },
+  "editor": {
+    "content": "Contents of {{path}}",
+    "header": {
+      "saved": "Saved",
+      "unsaved": "Unsaved",
+      "saving": "Saving…",
+      "saveFailed": "Save failed",
+      "dirty": "Unsaved changes",
+      "position": "Ln {{line}}, Col {{column}}",
+      "tabDirty": "{{name}} (unsaved)"
+    },
+    "actions": {
+      "save": "Save",
+      "saveAs": "Save as",
+      "saveAll": "Save all",
+      "reload": "Reload from disk",
+      "revert": "Discard changes",
+      "find": "Find",
+      "replace": "Replace",
+      "goToLine": "Go to line",
+      "viewDiff": "View changes",
+      "reveal": "Reveal in file manager",
+      "more": "More editor actions"
+    },
+    "find": {
+      "label": "Find in file",
+      "replaceLabel": "Find and replace in file",
+      "findPlaceholder": "Find",
+      "replacePlaceholder": "Replace with",
+      "next": "Next match",
+      "previous": "Previous match",
+      "close": "Close find",
+      "caseSensitive": "Match case",
+      "wholeWord": "Match whole word",
+      "regex": "Use regular expression",
+      "matchCount": "{{current}} of {{total}}",
+      "noMatches": "No results",
+      "limited": "Showing the first 10000 results",
+      "invalid": "Invalid expression",
+      "replaceOne": "Replace",
+      "replaceAll": "Replace all"
+    },
+    "goto": {
+      "label": "Go to line",
+      "placeholder": "Line"
+    },
+    "conflict": {
+      "title": "File changed on disk",
+      "description": "The file was modified outside the editor. Reload to get the new version or keep your edits and overwrite it.",
+      "reload": "Reload from disk",
+      "keepMine": "Keep my version"
+    },
+    "saveAs": {
+      "title": "Save as",
+      "description": "Name for the copy of {{path}}. It is created inside the workspace and the tab follows it.",
+      "exists": "A file already exists at {{path}}"
+    },
+    "close": {
+      "title": "Unsaved changes",
+      "description": "{{path}} has unsaved changes.",
+      "descriptionMany": "{{files}} files have unsaved changes.",
+      "warning": "Discarding loses the edits permanently.",
+      "save": "Save and close",
+      "discard": "Discard and close",
+      "cancel": "Cancel"
+    },
+    "errors": {
+      "load": "Could not open the file",
+      "save": "Could not save the file",
+      "saveAs": "Could not save the copy",
+      "saveBanner": "The last save failed"
+    },
+    "highlighting": "Colorizing large file…"
+  },
   "image": {
     "controls": "Image controls",
     "dimensionsTitle": "Image dimensions in pixels",

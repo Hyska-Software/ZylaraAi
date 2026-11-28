@@ -51,9 +51,11 @@ import {
   useAppStore,
   useChatStore,
   useCodeStore,
+  useEditorStore,
   useUiStore,
   type CodePanelTab,
 } from '@/lib/store';
+import { editorPreferences } from '@/lib/editorSettings';
 import { resolveSidePanelLayout, useViewportWidth } from '@/lib/sidePanel';
 import type {
   WorkspaceChangedEvent,
@@ -68,6 +70,7 @@ import type { FileAction } from './FileActionsMenu';
 import { FileNameDialog, type FileNameDialogMode } from './FileNameDialog';
 import { FileTree } from './FileTree';
 import { GitActionsMenu } from './GitActionsMenu';
+import { saveEditorBuffer } from './saveBuffer';
 import { TerminalPanel } from './TerminalPanel';
 import { useWorkspacePanel } from './useWorkspacePanel';
 import { dirsAffectedBy, useWorkspaceWatch } from './useWorkspaceWatch';
@@ -513,17 +516,35 @@ export function CodePanel() {
         if (nameDialog.mode === 'rename') {
           const oldPath = nameDialog.parent;
           const parent = oldPath.split('/').slice(0, -1).join('/');
+          /* A rename closes the affected tabs: persist local edits first so the
+             user's work follows the file instead of disappearing with the tab. */
+          const preferences = editorPreferences(useAppStore.getState().settings);
+          const dirty = Object.values(useEditorStore.getState().buffers).filter(
+            (buffer) =>
+              buffer.workspaceId === workspaceId &&
+              (buffer.path === oldPath || buffer.path.startsWith(`${oldPath}/`)) &&
+              buffer.text !== buffer.savedText,
+          );
+          for (const buffer of dirty) {
+            if (!(await saveEditorBuffer(buffer, preferences))) return;
+          }
           await api.renameWorkspaceEntry(workspaceId, oldPath, joinEntryPath(parent, name));
           const affected = (tab: { workspaceId: string; path: string }) =>
             tab.workspaceId === workspaceId &&
             (tab.path === oldPath || tab.path.startsWith(`${oldPath}/`));
           for (const tab of codeFileTabs) if (affected(tab)) closeCodeFile(tab);
           if (secondaryCodeFileTab && affected(secondaryCodeFileTab)) closeSecondaryCodeFile();
+          useEditorStore.getState().dropUnder(workspaceId, oldPath);
           toast.success(t('code:tree.toast.renamed', { name }));
         } else {
           const target = joinEntryPath(nameDialog.parent, name);
-          if (nameDialog.mode === 'createFile') await api.createWorkspaceFile(workspaceId, target);
-          else await api.createWorkspaceDir(workspaceId, target);
+          if (nameDialog.mode === 'createFile') {
+            await api.createWorkspaceFile(workspaceId, target);
+            // Open the new file so the user can start typing immediately.
+            openCodeFile({ workspaceId, path: target });
+          } else {
+            await api.createWorkspaceDir(workspaceId, target);
+          }
           toast.success(t('code:tree.toast.created', { name }));
         }
         setNameDialog(null);
@@ -541,6 +562,7 @@ export function CodePanel() {
       closeSecondaryCodeFile,
       codeFileTabs,
       nameDialog,
+      openCodeFile,
       refreshAll,
       secondaryCodeFileTab,
       t,
@@ -561,6 +583,7 @@ export function CodePanel() {
       if (secondaryCodeFileTab?.workspaceId === workspaceId && affected(secondaryCodeFileTab.path)) {
         closeSecondaryCodeFile();
       }
+      useEditorStore.getState().dropUnder(workspaceId, deleteTarget.path);
       setDeleteTarget(null);
       toast.success(t('code:tree.toast.deleted', { name: deleteTarget.name }));
       await refreshAll();
@@ -965,7 +988,8 @@ export function CodePanel() {
             error={panel.filesError}
             selectedPath={selectedFilePath}
             expandedPaths={expandedPaths}
-            totalCount={panel.files.length}
+            totalCount={panel.fileTotal ?? panel.files.length}
+            truncated={panel.filesTruncated}
             loadingPaths={lazyLoading}
             onSelectFile={(path) => {
               if (workspaceId) openCodeFile({ workspaceId, path });

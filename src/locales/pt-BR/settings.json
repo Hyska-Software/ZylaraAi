@@ -133,8 +133,74 @@
     },
     "wrap": {
       "label": "Quebra de linha",
-      "description": "Quebrar linhas longas em vez de rolar horizontalmente. Também disponível na barra do visualizador.",
+      "description": "Quebrar linhas longas em vez de rolar horizontalmente. Também disponível na barra do editor.",
       "aria": "Quebrar linhas longas nas visualizações de arquivo"
+    },
+    "fontLigatures": {
+      "label": "Ligaduras da fonte",
+      "description": "Usar as ligaduras de programação da fonte escolhida (por exemplo fi e ->).",
+      "aria": "Ativar ligaduras da fonte no editor"
+    },
+    "highlight": {
+      "label": "Realce de sintaxe",
+      "description": "Colorir o código por linguagem. Desligue para texto puro, que é mais rápido em arquivos muito grandes.",
+      "aria": "Realçar a sintaxe no editor"
+    },
+    "indentation": {
+      "title": "Indentação",
+      "description": "Como o editor indenta e continua as linhas enquanto você digita."
+    },
+    "insertSpaces": {
+      "label": "Inserir espaços",
+      "description": "Indentar com espaços em vez de tabulações.",
+      "aria": "Indentar com espaços"
+    },
+    "detectIndentation": {
+      "label": "Detectar indentação",
+      "description": "Ler a indentação já usada pelo arquivo e respeitá-la nesta aba.",
+      "aria": "Detectar a indentação de cada arquivo"
+    },
+    "autoIndent": {
+      "label": "Indentação automática",
+      "description": "Manter a indentação da linha anterior ao pressionar Enter.",
+      "aria": "Manter a indentação em novas linhas"
+    },
+    "autoCloseBrackets": {
+      "label": "Fechar colchetes automaticamente",
+      "description": "Fechar colchetes e aspas enquanto você digita e avançar sobre o caractere de fechamento.",
+      "aria": "Fechar colchetes e aspas automaticamente"
+    },
+    "saving": {
+      "title": "Salvamento",
+      "description": "Quando e como o editor grava os arquivos no disco."
+    },
+    "autoSave": {
+      "label": "Salvar automaticamente",
+      "description": "Gravar o arquivo sozinho depois de uma pausa ou quando a janela perde o foco.",
+      "aria": "Modo de salvamento automático",
+      "off": "Desligado",
+      "delay": "Após uma pausa",
+      "blur": "Ao perder o foco"
+    },
+    "autoSaveDelay": {
+      "label": "Atraso do salvamento automático",
+      "description": "Tempo de inatividade antes de uma gravação automática.",
+      "aria": "Atraso do salvamento automático"
+    },
+    "trimTrailingWhitespace": {
+      "label": "Remover espaços ao final",
+      "description": "Remover espaços e tabulações no fim de cada linha ao salvar.",
+      "aria": "Remover espaços ao final ao salvar"
+    },
+    "insertFinalNewline": {
+      "label": "Nova linha final",
+      "description": "Garantir que o arquivo salvo termine com uma nova linha.",
+      "aria": "Inserir uma nova linha final ao salvar"
+    },
+    "restore": {
+      "title": "Restaurar",
+      "description": "Voltar todas as preferências do editor ao valor padrão.",
+      "action": "Restaurar padrões do editor"
     }
   },
   "trayPrompt": {

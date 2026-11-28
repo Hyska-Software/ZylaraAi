@@ -164,4 +164,87 @@ describe('EditorTab — file viewer preferences', () => {
     });
     expect(useUiStore.getState().codeFileWrap).toBe(true);
   });
+
+  it('saves the indentation preferences', async () => {
+    render(<EditorTab />);
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Indentar com espaços' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Fechar colchetes e aspas automaticamente' }));
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ editorInsertSpaces: false }),
+      );
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ editorAutoCloseBrackets: false }),
+      );
+    });
+  });
+
+  it('saves the auto save mode and its delay', async () => {
+    render(<EditorTab />);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Após uma pausa' }));
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ editorAutoSave: 'delay' }),
+      );
+    });
+
+    fireEvent.change(slider('Atraso do salvamento automático'), { target: { value: '1500' } });
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ editorAutoSaveDelay: 1500 }),
+      );
+    });
+  });
+
+  it('saves the formatting switches and the highlight preferences', async () => {
+    render(<EditorTab />);
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Remover espaços ao final ao salvar' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Inserir uma nova linha final ao salvar' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Realçar a sintaxe no editor' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Ativar ligaduras da fonte no editor' }));
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ editorTrimTrailingWhitespace: true }),
+      );
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ editorInsertFinalNewline: false }),
+      );
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ editorHighlight: false }),
+      );
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ editorFontLigatures: true }),
+      );
+    });
+  });
+
+  it('restores the editor defaults', async () => {
+    useAppStore.setState({
+      settings: settings({
+        editorAutoSave: 'blur',
+        editorTrimTrailingWhitespace: true,
+        editorHighlight: false,
+      }),
+    });
+    render(<EditorTab />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar padrões do editor' }));
+
+    await waitFor(() => {
+      expect(mocks.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          editorAutoSave: 'off',
+          editorTrimTrailingWhitespace: false,
+          editorHighlight: true,
+        }),
+      );
+    });
+  });
 });

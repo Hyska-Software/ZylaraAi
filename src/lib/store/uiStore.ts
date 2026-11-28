@@ -517,6 +517,11 @@ interface UiState {
    * ativa a vizinha; sem abas restantes, o centro volta para a sessão.
    */
   closeCodeFile: (target?: CodeFileTab) => void;
+  /**
+   * Moves an open file tab to a new path (Save As), keeping its position and
+   * the active tab. The editor buffer is retargeted by the caller.
+   */
+  retargetCodeFile: (from: CodeFileTab, to: CodeFileTab) => void;
   /** Opens a file in the right-hand pane of the Code split editor. */
   openCodeFileToSide: (target: CodeFileTab) => void;
   /** Closes the right-hand pane of the Code split editor. */
@@ -853,6 +858,22 @@ export const useUiStore = create<UiState>()(
             codeFileTab: neighbor,
             secondaryCodeFileTab: null,
             codeView: neighbor === null && state.codeView === 'file' ? 'session' : state.codeView,
+          };
+        }),
+      retargetCodeFile: (from, to) =>
+        set((state) => {
+          const fromKey = codeFileTabKey(from);
+          const toKey = codeFileTabKey(to);
+          const tabs = state.codeFileTabs
+            .filter((tab) => codeFileTabKey(tab) !== toKey || codeFileTabKey(tab) === fromKey)
+            .map((tab) => (codeFileTabKey(tab) === fromKey ? to : tab));
+          const active = state.codeFileTab;
+          const secondary = state.secondaryCodeFileTab;
+          return {
+            codeFileTabs: tabs,
+            codeFileTab: active && codeFileTabKey(active) === fromKey ? to : active,
+            secondaryCodeFileTab:
+              secondary && codeFileTabKey(secondary) === fromKey ? to : secondary,
           };
         }),
       openCodeFileToSide: (target) =>

@@ -305,18 +305,74 @@ acima das abas: `⎇ main ▾` (lista de branches, criar/trocar), `+N −M`, bot
   sempre todos os arquivos**, inclusive ocultos e ignorados pelo Git — sem toggle.
 - Clique curto → abre o arquivo em uma **aba central** (a mesma faixa de abas das sessões, como o
   diff de Alterações): **cada arquivo aberto tem a sua própria aba** (ícone do tipo + nome truncado
-  + X para fechar), na ordem de abertura; clicar num arquivo já aberto apenas ativa a aba dele
-  (sem duplicar). O conteúdo da aba ativa ocupa o centro, read-only, com **syntax highlight e
-  números de linha** (Prism), **imagem** com zoom/ajuste à janela, **PDF via pdf.js** (páginas +
-  zoom) e estados honestos para binário, truncado e encoding; "Abrir no Explorer", "Recarregar" e
-  o botão de **quebra de linha** vivem no header. A quebra de linha é **global e persistida**: vale
-  para todos os arquivos (inclusive os que forem abertos depois) e sobrevive ao reinício do app;
-  desligada, linhas longas rolam na horizontal. Arquivos **Markdown** (`.md`/`.markdown`/`.mdx`)
-  abrem por padrão como **documento renderizado** (mesmo pipeline GFM/KaTeX + sanitização do chat,
-  largura de leitura centrada) e o header oferece a alternância **Documento ⇄ Código** para ver o
-  fonte com o mesmo highlight/linhas/wrap — a escolha é local da aba e volta ao documento ao trocar
-  de arquivo. Acima do limite inline (24 MiB) imagem/PDF viram cartão com o tamanho e a orientação
-  de abrir fora do app.
+  + X para fechar, com **ponto de não salvo** quando há edições), na ordem de abertura; clicar num
+  arquivo já aberto apenas ativa a aba dele (sem duplicar).
+- **Editor de texto** (v0.17): arquivos UTF-8 até 512 KiB abrem no editor próprio do app —
+  `CodeEditor` (textarea nativa transparente sobre a camada Prism, sem CodeMirror/Monaco) — com
+  digitação, seleção, undo/redo, Tab/Shift+Tab, indentação automática, fechamento de colchetes e
+  aspas, comentar linha (`Ctrl+/`), mover/duplicar/excluir linha, localizar/substituir
+  (`Ctrl+F`/`Ctrl+H`, caso/palavra inteira/regex), ir para a linha (`Ctrl+G`), salvar (`Ctrl+S`),
+  salvar como (`Ctrl+Shift+S`), salvar tudo, descartar e recarregar do disco. O documento (texto,
+  seleção, scroll e histórico) vive em `editorStore` por `workspace+path` e sobrevive à troca de
+  abas e às duas metades do editor dividido. O save é **compare-and-swap por sha256**
+  (`write_workspace_file`): se o arquivo mudou no disco desde a leitura, a gravação é recusada com
+  `FS_STALE_VERSION` e o header mostra **Arquivo alterado no disco** (Recarregar / Manter minha
+  versão); alteração externa em buffer limpo é adotada silenciosamente. `Salvar como` cria o novo
+  arquivo no workspace e move a aba; renomear salva antes de mover; excluir descarta o buffer.
+  Fechar uma aba com edições abre **Salvar / Descartar / Cancelar**. Salvamento automático
+  configurável (desligado / após pausa / ao perder o foco), remoção de espaços finais e nova linha
+  final no save.
+- **Geometria da camada pintada**: o `<textarea>` é a fonte da verdade da origem do texto
+  (`padding-left` = 56px com números, 16px sem eles). Com **wrap desligado** os números são uma
+  coluna *overlay* sticky (`data-editor-gutter-column`) e a camada Prism leva o mesmo `padding-left`;
+  com **wrap ligado** o número é uma célula *no fluxo* de cada linha e a camada Prism **não** soma
+  `padding-left` (somar os dois deslocava o texto 56px à direita do caret — bug corrigido, regressão
+  em `CodeEditor.test.tsx`). Com wrap, camada e wrapper usam `width: 100%` (nunca `max-content`) para
+  quebrar exatamente na coluna do textarea.
+- **Métricas idênticas nas duas camadas**: o caret, o clique e a seleção são calculados pelo layout
+  do próprio `<textarea>`, então ele precisa da **mesma fonte** da camada pintada — `font-mono` nos
+  dois (ou o `editorFontFamily` aplicado inline nos dois). Antes o textarea herdava a fonte de UI
+  (Inter) e o caret derivava progressivamente para a esquerda conforme a coluna crescia (segundo bug
+  do caret; regressão em `CodeEditor.test.tsx`). Tamanho, `line-height`, `letter-spacing`,
+  `tab-size` e ligaduras também vêm do mesmo `metrics`.
+- **Arquivos grandes (pintura em janela + highlight em tiles)**: o custo nunca pode ser O(documento)
+  por tecla nem por evento de scroll — os dois travavam com arquivos de milhares de linhas. Regras:
+  1. **wrap desligado** pinta só a janela de linhas visível ± 40 (`visibleLineWindow`), com
+     `paddingTop/paddingBottom` reservando o resto da altura (o textarea continua sendo o único
+     scroller, então o documento tem sempre a altura exata);
+  2. **wrap ligado** pinta todas as linhas (só o browser conhece as alturas quebradas), mas cada
+     linha é `React.memo` e o scroll não re-renderiza — **sem cap de linhas**: arquivos grandes
+     continuam coloridos;
+  3. **highlight em tiles** (`src/lib/editor/highlightCache.ts`, `useBackgroundHighlight.ts`):
+     o documento é dividido em tiles de 200 linhas, cada um tokenizado com 120 linhas de contexto
+     (para preservar comentários/strings multilinha). A janela visível é tokenizada na renderização;
+     os demais tiles são preenchidos em *idle callbacks* com orçamento de 6 ms, priorizados pela
+     distância até o viewport. A assinatura do tile (FNV do texto + idioma) evita re-tokenizar o que
+     não mudou após uma tecla. Linhas ainda não tokenizadas aparecem em texto puro por uma fração de
+     segundo e recebem cor automaticamente; um chip discreto mostra o progresso. Linhas patológicas
+     (milhares de caracteres repetidos) são limitadas a 2 000 caracteres na tokenização — o restante
+     da linha fica sem cor, mas o arquivo inteiro continua colorido e a UI não trava;
+  4. **scroll fora do React**: o handler escreve `transform` nos refs da camada e do gutter; a janela
+     só muda com histerese (meia tela de margem) e o `scrollTop` vai para o store debounced (400 ms/
+     unmount), nunca por evento;
+  5. **camada pintada memoizada** (`PaintedRows`/`PaintedRow`): mover o caret, salvar ou trocar o
+     estado não reconcilia os glifos; o `find` só varre o documento em ação explícita e recalcula a
+     contagem depois de 160 ms de pausa.
+  Regressões: `CodeEditor.test.tsx` (janela limitada, janela acompanha o scroll, transform sem
+  escrita no store, cores em arquivo minificado e em linhas fora da viewport) e
+  `virtualize.test.ts`/`tokenWindow.test.ts`/`highlightCache.test.ts`.
+- **Visualizador read-only** (o que não é editável): texto com **syntax highlight**, números de
+  linha, contagem e **marcas inline do diff**, **imagem** com zoom/ajuste à janela, **PDF via
+  pdf.js** (páginas + zoom) e estados honestos para binário, truncado, encoding não-UTF-8 e
+  arquivo acima do limite de edição; "Abrir no Explorer", "Recarregar" e o botão de **quebra de
+  linha** vivem no header. A quebra de linha é **global e persistida**: vale para todos os arquivos
+  (inclusive os que forem abertos depois) e sobrevive ao reinício do app; desligada, linhas longas
+  rolam na horizontal. Arquivos **Markdown** (`.md`/`.markdown`/`.mdx`) abrem por padrão como
+  **documento renderizado** (mesmo pipeline GFM/KaTeX + sanitização do chat, largura de leitura
+  centrada) e o header oferece a alternância **Documento ⇄ Código** para ver o fonte com o mesmo
+  highlight/linhas/wrap — a escolha é local da aba e volta ao documento ao trocar de arquivo. Acima
+  do limite inline (24 MiB) imagem/PDF viram cartão com o tamanho e a orientação de abrir fora do
+  app.
 - A antiga prévia inline do painel foi removida: a árvore ocupa o painel inteiro e o arquivo ativo
   fica destacado nela. Fechar a aba ativa (X) ativa a vizinha (direita, depois esquerda); fechar a
   última volta para a conversa; fechar uma aba em segundo plano não muda o centro. O gutter dos
@@ -567,11 +623,18 @@ Microcopy-chave:
 | `chatStore` | aplicação de eventos novos (aprov/plan/todo/changes/context/job), `presentation` persistida (não renderizada no transcript), tolerância a eventos desconhecidos |
 | `CodeTurnSummary` | agregação das edições por path e totais, singular/plural, recolher/expandir (4 linhas), só no layout Code e com o turno encerrado, clique abre o diff na aba central (com `knownDiff` ou fallback `get_file_diff`) |
 | `uiStore` | workspace ativo, abas por workspace, painel/aba, persistência e merge |
+| `CodeEditor` / `EditorHeader` | editor da aba central: digitação, undo/redo, Tab/indentação, auto-close, comentários, find/replace, goto line, dirty dot, salvar/salvar como/salvar tudo, descartar, recarregar, conflito disco↔buffer |
+| `useFileEditor` | leitura, save CAS por hash, save as (retarget da aba), save all, autosave (delay/blur), detecção de alteração externa, guarda `beforeunload` |
+| `editorStore` | buffers por `workspace+path` (texto, seleção, scroll, histórico, versão base, conflito) e evicção de buffers limpos |
+| `src/lib/editor/**` | núcleo puro: posições/linhas (UTF-16), histórico com coalescência, edições, find/replace, formatação no save e comentários/indentação por linguagem |
 
 ## 16. Não-objetivos desta fase (registrados)
 
-- Editor de código completo dentro do app (a edição é do agente; o painel é prévia/diff). Abrir no
-  editor externo é o caminho.
+- ~~Editor de código completo dentro do app~~ **entregue na v0.17**: a aba central de arquivo é um
+  editor próprio (`CodeEditor`, sem CodeMirror/Monaco) com undo/redo, find/replace, indentação,
+  comentários, autosave, salvar/salvar como/salvar tudo, descartar/recarregar, CAS por hash no save
+  (conflito com o agente nunca sobrescreve) e Settings → Editor. Continuam fora: LSP/autocomplete,
+  minimapa, multi-cursor, folding e edição de binários/não-UTF-8/>512 KiB (read-only com motivo).
 - Revisão por hunk com aceitar/rejeitar antes de aplicar (o modelo é "aplicar + reverter"; v2 pode
   introduzir staging de edições).
 - Browser embutido, plugins, múltiplos clientes (daemon/mobile) e voz — escopo do Paseo, não do

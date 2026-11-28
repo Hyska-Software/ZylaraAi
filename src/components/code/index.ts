@@ -25,6 +25,26 @@ export type { CodeDiffViewProps } from './CodeDiffView';
 export { CodeFileView } from './CodeFileView';
 export type { CodeFileViewProps } from './CodeFileView';
 
+export { CodeEditor } from './CodeEditor';
+export type { CodeEditorProps, CodeEditorHandle } from './CodeEditor';
+
+export { EditorFindBar } from './EditorFindBar';
+export type { EditorFindBarProps } from './EditorFindBar';
+
+export { EditorHeader } from './EditorHeader';
+export type { EditorHeaderProps } from './EditorHeader';
+
+export { UnsavedChangesDialog } from './UnsavedChangesDialog';
+export type { UnsavedChangesDialogProps } from './UnsavedChangesDialog';
+
+export { useFileEditor } from './useFileEditor';
+export type { FileEditorApi, UseFileEditorOptions } from './useFileEditor';
+
+export { useCodeFileClose } from './useCodeFileClose';
+export type { FileCloseController, PendingFileClose } from './useCodeFileClose';
+
+export { saveEditorBuffer } from './saveBuffer';
+
 export { CodeFileSplitView } from './CodeFileSplitView';
 export type { CodeFileSplitViewProps } from './CodeFileSplitView';
 

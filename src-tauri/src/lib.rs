@@ -447,6 +447,7 @@ fn run_app(context: tauri::Context<tauri::Wry>) {
             commands::workspace::unwatch_workspace,
             commands::workspace::search_workspace_files,
             commands::workspace::read_workspace_file,
+            commands::workspace::write_workspace_file,
             commands::workspace::create_workspace_file,
             commands::workspace::create_workspace_dir,
             commands::workspace::rename_workspace_entry,

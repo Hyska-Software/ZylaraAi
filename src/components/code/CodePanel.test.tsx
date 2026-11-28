@@ -793,6 +793,31 @@ describe('CodePanel — árvore lazy', () => {
     );
     expect(apiMock.readWorkspaceFile).not.toHaveBeenCalled();
   });
+
+  it('mostra a contagem real quando o backend trunca a listagem', async () => {
+    useChatStore.setState({
+      conversations: [conversation({ id: 'conv-1', workspaceId: 'ws-1' })],
+      activeId: 'conv-1',
+    });
+    apiMock.listWorkspaces.mockResolvedValue([workspace()]);
+    apiMock.refreshWorkspaceTree.mockResolvedValue({
+      files: [{ path: 'README.md', name: 'README.md', isDir: false, depth: 0 }],
+      dirs: {},
+      gitStatus: notRepoStatus(),
+      totalCount: 5000,
+      truncated: true,
+    });
+    useUiStore.setState({ codePanelTab: 'files' });
+
+    render(<CodePanel />);
+
+    expect(await screen.findByRole('treeitem', { name: 'README.md' })).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole('status')
+        .some((node) => node.textContent?.includes('Mostrando 1 de 5000')),
+    ).toBe(true);
+  });
 });
 describe('CodePanel — árvore lazy (3º nível)', () => {
   it('abre diretório de 3º nível carregando os filhos e mostra os arquivos', async () => {

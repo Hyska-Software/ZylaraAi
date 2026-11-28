@@ -60,18 +60,22 @@ import {
   codeSubagentTabKey,
   useChatStore,
   useCodeStore,
+  useEditorStore,
   useUiStore,
   type CodeFileTab,
   type CodeIssueTab,
   type CodePullRequestTab,
   type CodeSubagentTab,
 } from '@/lib/store';
+import { editorBufferKey } from '@/lib/store/editorStore';
 import type { Conversation, GoalView, Workspace } from '@/lib/types';
 import { SIDE_PANEL_DOCK_MIN_VIEWPORT, useViewportWidth } from '@/lib/sidePanel';
 import { cn, copyText, sortStableByOrder } from '@/lib/utils';
 import { WorkspaceTrustDialog } from './WorkspaceTrustDialog';
 import { CodeContextMeterChip } from './CodeAgentWidgets';
 import { FileIcon } from './FileIcon';
+import { UnsavedChangesDialog } from './UnsavedChangesDialog';
+import { useCodeFileClose } from './useCodeFileClose';
 import { terminalManager, terminalTabLabel, type TerminalTabInfo } from './terminalManager';
 import { openTerminal } from './terminalOpen';
 import { useHorizontalWheelScroll } from './useHorizontalWheelScroll';
@@ -414,7 +418,19 @@ export function CodeSessionHeader() {
   const closeCodeSubagent = useUiStore((state) => state.closeCodeSubagent);
   const codeGoalOpen = useUiStore((state) => state.codeGoalOpen);
   const codeFileTab = useUiStore((state) => state.codeFileTab);
-  const closeCodeFile = useUiStore((state) => state.closeCodeFile);
+  /**
+   * Dirty markers of the file tabs. Subscribed as a joined string (value
+   * equality) so typing inside a buffer re-renders the strip only when a dirty
+   * flag actually flips, not on every keystroke.
+   */
+  const dirtyKeys = useEditorStore((state) =>
+    Object.values(state.buffers)
+      .filter((buffer) => buffer.text !== buffer.savedText)
+      .map((buffer) => editorBufferKey(buffer.workspaceId, buffer.path))
+      .sort()
+      .join('\n'),
+  );
+  const fileClose = useCodeFileClose();
   const codePullRequestsTab = useUiStore((state) => state.codePullRequestsTab);
   const closeCodePullRequests = useUiStore((state) => state.closeCodePullRequests);
   const codePullRequestTabs = useUiStore((state) => state.codePullRequestTabs);
@@ -674,7 +690,8 @@ export function CodeSessionHeader() {
     if (id.startsWith(CODE_FILE_TAB_PREFIX)) {
       const fileTarget = findCodeFileTab(id);
       if (!fileTarget) return;
-      closeCodeFile(fileTarget);
+      /* Editor tabs guard unsaved edits: the dialog decides before closing. */
+      fileClose.requestClose(fileTarget);
       /* Devolve o foco: nova aba ativa (a vizinha, quando a fechada era ativa),
          senão a aba da sessão ativa, senão o botão "+" (padrão de `focusTab`). */
       const nextFileTab = useUiStore.getState().codeFileTab;
@@ -1214,11 +1231,14 @@ export function CodeSessionHeader() {
       const target = findCodeFileTab(id);
       if (!target) return null;
       const name = codeFileTabName(target);
+      const dirty = dirtyKeys.includes(editorBufferKey(target.workspaceId, target.path));
       const selected =
         codeView === 'file' &&
         codeFileTab !== null &&
         codeFileTabKey(codeFileTab) === codeFileTabKey(target);
-      const label = t('code:header.fileTab', { path: target.path });
+      const label = dirty
+        ? t('code:editor.header.tabDirty', { name })
+        : t('code:header.fileTab', { path: target.path });
       return shell({
         id,
         label,
@@ -1226,7 +1246,18 @@ export function CodeSessionHeader() {
         selected,
         ariaControls: 'code-file-panel',
         icon: <FileIcon path={target.path} className="size-3.5" />,
-        content: <span className="truncate">{name}</span>,
+        content: (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate">{name}</span>
+            {dirty ? (
+              <span
+                aria-hidden
+                data-dirty="true"
+                className="size-1.5 shrink-0 rounded-full bg-accent"
+              />
+            ) : null}
+          </span>
+        ),
       });
     }
 
@@ -1528,6 +1559,16 @@ export function CodeSessionHeader() {
         onConfirm={() => void handleResolveTrust(true)}
         onReadOnly={() => void handleResolveTrust(false)}
         onCancel={() => void handleCancelTrust()}
+      />
+
+      {/* Unsaved editor buffers block the tab close until the user decides. */}
+      <UnsavedChangesDialog
+        open={fileClose.pending !== null}
+        paths={fileClose.pending?.paths ?? []}
+        busy={fileClose.busy}
+        onSave={fileClose.saveAndClose}
+        onDiscard={fileClose.discardAndClose}
+        onCancel={fileClose.cancel}
       />
     </header>
     </Slot>

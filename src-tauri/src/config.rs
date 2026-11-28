@@ -76,6 +76,10 @@ pub const EDITOR_LINE_HEIGHT_MIN: f32 = 1.2;
 pub const EDITOR_LINE_HEIGHT_MAX: f32 = 2.2;
 pub const EDITOR_TAB_SIZE_MIN: u32 = 1;
 pub const EDITOR_TAB_SIZE_MAX: u32 = 8;
+/// Auto save idle delay bounds (ms) for the in-app editor; mirrored by
+/// `src/lib/editorSettings.ts`.
+pub const EDITOR_AUTO_SAVE_DELAY_MIN_MS: u32 = 200;
+pub const EDITOR_AUTO_SAVE_DELAY_MAX_MS: u32 = 10_000;
 /// Longest accepted custom file-viewer font-family string.
 pub const EDITOR_FONT_FAMILY_MAX_CHARS: usize = 200;
 
@@ -193,6 +197,15 @@ fn normalize_settings(mut settings: Settings) -> Settings {
     settings.editor_tab_size = settings
         .editor_tab_size
         .clamp(EDITOR_TAB_SIZE_MIN, EDITOR_TAB_SIZE_MAX);
+    // Editor behavior (Settings › Editor). The booleans are user preferences
+    // and are preserved as they arrive; the auto save mode is an enum and the
+    // delay is clamped.
+    if !matches!(settings.editor_auto_save.as_str(), "off" | "delay" | "blur") {
+        settings.editor_auto_save = defaults.editor_auto_save;
+    }
+    settings.editor_auto_save_delay = settings
+        .editor_auto_save_delay
+        .clamp(EDITOR_AUTO_SAVE_DELAY_MIN_MS, EDITOR_AUTO_SAVE_DELAY_MAX_MS);
 
     if !matches!(settings.theme.as_str(), "light" | "dark" | "system") {
         settings.theme = defaults.theme;
@@ -2104,6 +2117,45 @@ mod tests {
         assert_eq!(settings.editor_line_height, 1.7);
         assert_eq!(settings.editor_tab_size, 2);
         assert!(settings.editor_line_numbers);
+        assert_eq!(settings.editor_auto_save, "off");
+        assert_eq!(settings.editor_auto_save_delay, 800);
+        assert!(settings.editor_insert_spaces);
+        assert!(settings.editor_detect_indentation);
+        assert!(settings.editor_auto_indent);
+        assert!(settings.editor_auto_close_brackets);
+        assert!(!settings.editor_trim_trailing_whitespace);
+        assert!(settings.editor_insert_final_newline);
+        assert!(settings.editor_highlight);
+        assert!(!settings.editor_font_ligatures);
+    }
+
+    #[test]
+    fn normalizes_editor_behavior_settings() {
+        let settings = Settings {
+            editor_auto_save: "sometimes".into(),
+            editor_auto_save_delay: 99_999,
+            ..Settings::default()
+        };
+        let normalized = normalize_settings(settings);
+        assert_eq!(normalized.editor_auto_save, "off");
+        assert_eq!(normalized.editor_auto_save_delay, EDITOR_AUTO_SAVE_DELAY_MAX_MS);
+
+        let parsed = parse_settings_json(
+            r#"{"editorAutoSave":"blur","editorAutoSaveDelay":10,"editorTrimTrailingWhitespace":true,"editorFontLigatures":true}"#,
+        )
+        .expect("parse editor behavior settings");
+        let normalized = normalize_settings(parsed);
+        assert_eq!(normalized.editor_auto_save, "blur");
+        assert_eq!(normalized.editor_auto_save_delay, EDITOR_AUTO_SAVE_DELAY_MIN_MS);
+        assert!(normalized.editor_trim_trailing_whitespace);
+        assert!(normalized.editor_font_ligatures);
+
+        let raw = serialize_settings_json(&normalized).expect("serialize settings");
+        let value: serde_json::Value = serde_json::from_str(&raw).expect("json");
+        assert_eq!(value["editorAutoSave"], "blur");
+        assert_eq!(value["editorAutoSaveDelay"], u64::from(EDITOR_AUTO_SAVE_DELAY_MIN_MS));
+        assert_eq!(value["editorTrimTrailingWhitespace"], true);
+        assert_eq!(value["editorFontLigatures"], true);
     }
 
     #[test]

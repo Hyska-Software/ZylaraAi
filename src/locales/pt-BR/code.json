@@ -876,6 +876,80 @@
     "reload": "Recarregar arquivo",
     "openExternal": "Abrir no editor externo"
   },
+  "editor": {
+    "content": "Conteúdo de {{path}}",
+    "header": {
+      "saved": "Salvo",
+      "unsaved": "Não salvo",
+      "saving": "Salvando…",
+      "saveFailed": "Falha ao salvar",
+      "dirty": "Alterações não salvas",
+      "position": "Ln {{line}}, Col {{column}}",
+      "tabDirty": "{{name}} (não salvo)"
+    },
+    "actions": {
+      "save": "Salvar",
+      "saveAs": "Salvar como",
+      "saveAll": "Salvar tudo",
+      "reload": "Recarregar do disco",
+      "revert": "Descartar alterações",
+      "find": "Localizar",
+      "replace": "Substituir",
+      "goToLine": "Ir para a linha",
+      "viewDiff": "Ver alterações",
+      "reveal": "Mostrar no gerenciador de arquivos",
+      "more": "Mais ações do editor"
+    },
+    "find": {
+      "label": "Localizar no arquivo",
+      "replaceLabel": "Localizar e substituir no arquivo",
+      "findPlaceholder": "Localizar",
+      "replacePlaceholder": "Substituir por",
+      "next": "Próxima ocorrência",
+      "previous": "Ocorrência anterior",
+      "close": "Fechar localização",
+      "caseSensitive": "Diferenciar maiúsculas",
+      "wholeWord": "Palavra inteira",
+      "regex": "Usar expressão regular",
+      "matchCount": "{{current}} de {{total}}",
+      "noMatches": "Nenhum resultado",
+      "limited": "Mostrando os primeiros 10000 resultados",
+      "invalid": "Expressão inválida",
+      "replaceOne": "Substituir",
+      "replaceAll": "Substituir tudo"
+    },
+    "goto": {
+      "label": "Ir para a linha",
+      "placeholder": "Linha"
+    },
+    "conflict": {
+      "title": "Arquivo alterado no disco",
+      "description": "O arquivo foi modificado fora do editor. Recarregue para obter a nova versão ou mantenha suas edições e sobrescreva.",
+      "reload": "Recarregar do disco",
+      "keepMine": "Manter minha versão"
+    },
+    "saveAs": {
+      "title": "Salvar como",
+      "description": "Nome da cópia de {{path}}. Ela é criada dentro do workspace e a aba passa a apontar para ela.",
+      "exists": "Já existe um arquivo em {{path}}"
+    },
+    "close": {
+      "title": "Alterações não salvas",
+      "description": "{{path}} tem alterações não salvas.",
+      "descriptionMany": "{{files}} arquivos têm alterações não salvas.",
+      "warning": "Descartar perde as edições permanentemente.",
+      "save": "Salvar e fechar",
+      "discard": "Descartar e fechar",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "load": "Não foi possível abrir o arquivo",
+      "save": "Não foi possível salvar o arquivo",
+      "saveAs": "Não foi possível salvar a cópia",
+      "saveBanner": "A última gravação falhou"
+    },
+    "highlighting": "Colorindo arquivo grande…"
+  },
   "image": {
     "controls": "Controles da imagem",
     "dimensionsTitle": "Dimensões da imagem em pixels",

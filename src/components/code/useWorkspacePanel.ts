@@ -35,6 +35,10 @@ export interface WorkspacePanelRefreshOptions {
 export interface UseWorkspacePanelResult {
   workspaceId: string | null;
   files: WorkspaceFileEntry[];
+  /** Total entries found by the backend before its budget cut; `null` when unknown. */
+  fileTotal: number | null;
+  /** True when the backend truncated the tree listing. */
+  filesTruncated: boolean;
   gitStatus: WorkspaceGitStatus | null;
   commits: WorkspaceGitCommit[];
   /** True while files or git status are being (re)loaded. */
@@ -87,6 +91,8 @@ export function useWorkspacePanel(
 ): UseWorkspacePanelResult {
   const { commitLimit = 20 } = options;
   const [files, setFiles] = useState<WorkspaceFileEntry[]>([]);
+  const [fileTotal, setFileTotal] = useState<number | null>(null);
+  const [filesTruncated, setFilesTruncated] = useState(false);
   const [gitStatus, setGitStatus] = useState<WorkspaceGitStatus | null>(null);
   const [commits, setCommits] = useState<WorkspaceGitCommit[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
@@ -110,6 +116,8 @@ export function useWorkspacePanel(
 
       if (!workspaceId) {
         setFiles([]);
+        setFileTotal(null);
+        setFilesTruncated(false);
         setGitStatus(null);
         setCommits([]);
         setFilesLoading(false);
@@ -135,6 +143,8 @@ export function useWorkspacePanel(
         if (run !== loadRun.current) return null;
         const message = describeError(error, t('code:panelData.filesError'));
         setFiles([]);
+        setFileTotal(null);
+        setFilesTruncated(false);
         setFilesError(message);
         setGitStatus(null);
         setGitError(message);
@@ -148,6 +158,8 @@ export function useWorkspacePanel(
       if (run !== loadRun.current) return null;
 
       setFiles(snapshot.files ?? []);
+      setFileTotal(snapshot.totalCount ?? null);
+      setFilesTruncated(snapshot.truncated ?? false);
       setFilesLoading(false);
       setGitStatus(snapshot.gitStatus);
       setGitError(null);
@@ -245,6 +257,8 @@ export function useWorkspacePanel(
   return {
     workspaceId: workspaceId ?? null,
     files,
+    fileTotal,
+    filesTruncated,
     gitStatus,
     commits,
     loading: filesLoading || gitLoading,

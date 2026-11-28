@@ -1,11 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+import { TriangleAlert } from 'lucide-react';
 
+import { Button } from '@/components/ui';
 import { api } from '@/lib/api';
+import { editorPreferences } from '@/lib/editorSettings';
 import { t } from '@/lib/i18n';
-import type { CodeFileTab } from '@/lib/store';
-import type { WorkspaceFileContent } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { FilePreview } from './FilePreview';
+import {
+  useAppStore,
+  useEditorStore,
+  useUiStore,
+  type CodeFileTab,
+} from '@/lib/store';
+import { cn, copyText } from '@/lib/utils';
+import { CodeEditor, type CodeEditorHandle } from './CodeEditor';
+import { EditorHeader } from './EditorHeader';
+import { FileNameDialog } from './FileNameDialog';
+import { FilePreview, languageForPath } from './FilePreview';
+import { useFileEditor } from './useFileEditor';
 
 export interface CodeFileViewProps {
   /** Arquivo aberto na aba central (workspace + caminho relativo). */
@@ -19,85 +31,234 @@ function describeError(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function parentPath(path: string): string {
+  const index = path.lastIndexOf('/');
+  return index < 0 ? '.' : path.slice(0, index);
+}
+
+function fileName(path: string): string {
+  const index = path.lastIndexOf('/');
+  return index < 0 ? path : path.slice(index + 1);
+}
+
 /**
  * Aba central de arquivo do layout Code (WORKBENCH §7.1).
  *
- * O clique na árvore do painel Arquivos chama `openCodeFile` e o `uiStore`
- * guarda o alvo; esta view carrega o conteúdo com `api.readWorkspaceFile` e o
- * diff contra HEAD com `api.getFileDiffHead` em paralelo, e entrega os dois ao
- * `FilePreview` (código com highlight e marcas inline, imagem real ou PDF via
- * pdf.js). O carregamento ignora respostas velhas: cada requisição recebe um
- * token e só a mais recente escreve no estado — trocar de arquivo com uma
- * resposta em voo nunca sobrescreve o arquivo atual. Falha no diff nunca
- * derruba o conteúdo: o arquivo continua legível e só o aviso aparece.
+ * Editable text files open in the in-app editor (`CodeEditor`): typing, undo,
+ * find/replace, autosave and save variants all operate on a per-tab buffer that
+ * survives switching tabs. Everything the backend cannot round-trip (binary,
+ * image, PDF, truncated preview, non-UTF-8, oversized) keeps the read-only
+ * `FilePreview` with inline diff marks, so no file is silently lossy.
+ *
+ * The diff against HEAD is only loaded for read-only previews; the editor
+ * offers "View diff" instead of painting stale marks under editable text.
  */
 export function CodeFileView({ target, className }: CodeFileViewProps) {
   const { workspaceId, path } = target;
-  const [content, setContent] = useState<WorkspaceFileContent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { t: translate } = useTranslation('code');
+  const settings = useAppStore((state) => state.settings);
+  const preferences = useMemo(() => editorPreferences(settings), [settings]);
+  const codeFileWrap = useUiStore((state) => state.codeFileWrap);
+  const setCodeFileWrap = useUiStore((state) => state.setCodeFileWrap);
+  const openCodeDiff = useUiStore((state) => state.openCodeDiff);
+  const retargetCodeFile = useUiStore((state) => state.retargetCodeFile);
+  const editorRef = useRef<CodeEditorHandle | null>(null);
+
+  const {
+    content,
+    buffer,
+    loading,
+    error,
+    readOnlyReason,
+    save,
+    saveAs,
+    saveAll,
+    reload,
+    revert,
+    keepMine,
+  } = useFileEditor({ workspaceId, path, preferences });
+
+  const hasDirtyBuffers = useEditorStore((state) =>
+    Object.values(state.buffers).some(
+      (entry) => entry.workspaceId === workspaceId && entry.text !== entry.savedText,
+    ),
+  );
+
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsBusy, setSaveAsBusy] = useState(false);
   const [diff, setDiff] = useState<string | null>(null);
   const [diffLoading, setDiffLoading] = useState(true);
   const [diffError, setDiffError] = useState<string | null>(null);
-  /** Token da requisição mais recente (respostas de tokens antigos são descartadas). */
-  const requestRef = useRef(0);
 
-  const load = useCallback(async () => {
-    const requestId = requestRef.current + 1;
-    requestRef.current = requestId;
-    setLoading(true);
-    setError(null);
-    setDiff(null);
-    setDiffError(null);
+  const editable = readOnlyReason === null && buffer !== null;
+  const language = useMemo(() => languageForPath(path), [path]);
+
+  /* Diff marks belong to the read-only preview; the editor shows a badge/an
+     action instead (marks would drift as soon as the text changes). */
+  const loadDiff = useCallback(async () => {
+    if (!content || readOnlyReason === null) return;
     setDiffLoading(true);
-
-    const contentTask = (async () => {
-      try {
-        const next = await api.readWorkspaceFile(workspaceId, path);
-        if (requestRef.current === requestId) setContent(next);
-      } catch (loadError) {
-        if (requestRef.current === requestId) {
-          setContent(null);
-          setError(describeError(loadError, t('code:codeFile.readError')));
-        }
-      } finally {
-        if (requestRef.current === requestId) setLoading(false);
-      }
-    })();
-
-    const diffTask = (async () => {
-      try {
-        const next = await api.getFileDiffHead(workspaceId, path);
-        if (requestRef.current === requestId) setDiff(next);
-      } catch (loadError) {
-        if (requestRef.current === requestId) {
-          setDiff(null);
-          setDiffError(describeError(loadError, t('code:preview.diff.error')));
-        }
-      } finally {
-        if (requestRef.current === requestId) setDiffLoading(false);
-      }
-    })();
-
-    await Promise.allSettled([contentTask, diffTask]);
-  }, [workspaceId, path]);
+    setDiffError(null);
+    try {
+      setDiff(await api.getFileDiffHead(workspaceId, path));
+    } catch (loadError) {
+      setDiff(null);
+      setDiffError(describeError(loadError, t('code:preview.diff.error')));
+    } finally {
+      setDiffLoading(false);
+    }
+  }, [content, path, readOnlyReason, workspaceId]);
 
   useEffect(() => {
-    setContent(null);
-    setError(null);
-    void load();
-    return () => {
-      /* Invalida a resposta em voo ao trocar de arquivo ou desmontar a aba. */
-      requestRef.current += 1;
-    };
-  }, [load]);
+    if (readOnlyReason === null) {
+      setDiff(null);
+      setDiffLoading(false);
+      return;
+    }
+    void loadDiff();
+  }, [loadDiff, readOnlyReason]);
 
   const openExternal = useCallback(() => {
     void api.openWorkspaceInExplorer(workspaceId);
   }, [workspaceId]);
 
+  const revealFile = useCallback(() => {
+    void api.revealWorkspaceEntry(workspaceId, path);
+  }, [path, workspaceId]);
+
+  const copyPath = useCallback(() => {
+    void copyText(path);
+  }, [path]);
+
+  const viewDiff = useCallback(() => {
+    openCodeDiff({ workspaceId, path, staged: false });
+  }, [openCodeDiff, path, workspaceId]);
+
+  const handleSaveAs = useCallback(
+    async (name: string) => {
+      const parent = parentPath(path);
+      const nextPath = [parent === '.' ? '' : parent, name].filter(Boolean).join('/');
+      setSaveAsBusy(true);
+      try {
+        const written = await saveAs(nextPath);
+        if (written) {
+          retargetCodeFile({ workspaceId, path }, { workspaceId, path: written });
+          setSaveAsOpen(false);
+        }
+      } finally {
+        setSaveAsBusy(false);
+      }
+    },
+    [path, retargetCodeFile, saveAs, workspaceId],
+  );
+
+  /* Ctrl+S / Ctrl+Shift+S keep working when the focus is on the header bar. */
+  const handleContainerKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented) return;
+    const mod = event.metaKey || event.ctrlKey;
+    if (!mod || event.key.toLowerCase() !== 's' || !editable) return;
+    event.preventDefault();
+    if (event.shiftKey) setSaveAsOpen(true);
+    else void save();
+  };
+
+  const currentName = fileName(path);
+
+  if (editable && buffer) {
+    return (
+      <div
+        className={cn('flex min-h-0 flex-1 flex-col', className)}
+        onKeyDown={handleContainerKeyDown}
+      >
+        <EditorHeader
+          buffer={buffer}
+          language={language}
+          wrap={codeFileWrap}
+          hasDirtyBuffers={hasDirtyBuffers}
+          onToggleWrap={() => setCodeFileWrap(!codeFileWrap)}
+          onSave={() => void save()}
+          onSaveAs={() => setSaveAsOpen(true)}
+          onSaveAll={() => void saveAll()}
+          onReload={() => void reload()}
+          onRevert={revert}
+          onFind={(mode) => editorRef.current?.openFind(mode)}
+          onGoToLine={() => editorRef.current?.openGoToLine()}
+          onViewDiff={viewDiff}
+          onReveal={revealFile}
+          onCopyPath={copyPath}
+        />
+
+        {buffer.conflict ? (
+          <div
+            role="alert"
+            className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warning/30 bg-warning-soft px-3 py-1.5 text-[11.5px] text-warning"
+          >
+            <TriangleAlert aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="font-medium">{translate('code:editor.conflict.title')}</span>
+            <span className="text-foreground-muted">
+              {translate('code:editor.conflict.description')}
+            </span>
+            <span className="ml-auto flex items-center gap-1">
+              <Button size="sm" variant="ghost" onClick={() => void reload()}>
+                {translate('code:editor.conflict.reload')}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => void keepMine()}>
+                {translate('code:editor.conflict.keepMine')}
+              </Button>
+            </span>
+          </div>
+        ) : buffer.status === 'error' && buffer.error ? (
+          <div
+            role="alert"
+            className="flex shrink-0 items-center gap-2 border-b border-danger/30 bg-danger-soft px-3 py-1.5 text-[11.5px] text-danger"
+          >
+            <TriangleAlert aria-hidden className="size-3.5 shrink-0" strokeWidth={1.75} />
+            <span className="min-w-0 truncate" title={buffer.error}>
+              {translate('code:editor.errors.saveBanner')}
+            </span>
+            <span className="min-w-0 truncate text-foreground-muted">{buffer.error}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto"
+              onClick={() => void save()}
+            >
+              {translate('common:actions.retry')}
+            </Button>
+          </div>
+        ) : null}
+
+        <CodeEditor
+          ref={editorRef}
+          buffer={buffer}
+          preferences={preferences}
+          language={language}
+          wrap={codeFileWrap}
+          onSave={() => void save()}
+          onSaveAs={() => setSaveAsOpen(true)}
+        />
+
+        <FileNameDialog
+          open={saveAsOpen}
+          mode="saveAs"
+          path={path}
+          initialName={currentName}
+          busy={saveAsBusy}
+          title={translate('code:editor.saveAs.title')}
+          description={translate('code:editor.saveAs.description', { path })}
+          submitLabel={translate('code:editor.actions.saveAs')}
+          onClose={() => setSaveAsOpen(false)}
+          onSubmit={(name) => void handleSaveAs(name)}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className={cn('flex min-h-0 flex-1 flex-col', className)}>
+    <div
+      className={cn('flex min-h-0 flex-1 flex-col', className)}
+      onKeyDown={handleContainerKeyDown}
+    >
       <FilePreview
         content={content}
         loading={loading}
@@ -105,7 +266,7 @@ export function CodeFileView({ target, className }: CodeFileViewProps) {
         diff={diff}
         diffLoading={diffLoading}
         diffError={diffError}
-        onReload={() => void load()}
+        onReload={() => void reload()}
         onOpenExternal={openExternal}
         className="min-h-0 flex-1"
       />

@@ -133,8 +133,74 @@
     },
     "wrap": {
       "label": "Word wrap",
-      "description": "Wrap long lines instead of scrolling horizontally. Also available in the viewer toolbar.",
+      "description": "Wrap long lines instead of scrolling horizontally. Also available in the editor toolbar.",
       "aria": "Wrap long lines in file views"
+    },
+    "fontLigatures": {
+      "label": "Font ligatures",
+      "description": "Use the programming ligatures of the selected font (for example fi and ->).",
+      "aria": "Enable font ligatures in the editor"
+    },
+    "highlight": {
+      "label": "Syntax highlight",
+      "description": "Color the source by language. Turn it off for plain text, which is faster on very large files.",
+      "aria": "Highlight syntax in the editor"
+    },
+    "indentation": {
+      "title": "Indentation",
+      "description": "How the editor indents and continues lines while you type."
+    },
+    "insertSpaces": {
+      "label": "Insert spaces",
+      "description": "Indent with spaces instead of tab characters.",
+      "aria": "Indent with spaces"
+    },
+    "detectIndentation": {
+      "label": "Detect indentation",
+      "description": "Read the indentation already used by the file and honor it in that tab.",
+      "aria": "Detect the indentation of each file"
+    },
+    "autoIndent": {
+      "label": "Auto indent",
+      "description": "Keep the previous line's indentation when pressing Enter.",
+      "aria": "Keep the indentation on new lines"
+    },
+    "autoCloseBrackets": {
+      "label": "Auto close brackets",
+      "description": "Close brackets and quotes as you type and step over the closing character.",
+      "aria": "Auto close brackets and quotes"
+    },
+    "saving": {
+      "title": "Saving",
+      "description": "When and how the editor writes files back to disk."
+    },
+    "autoSave": {
+      "label": "Auto save",
+      "description": "Write the file automatically after a pause or when the window loses focus.",
+      "aria": "Auto save mode",
+      "off": "Off",
+      "delay": "After a pause",
+      "blur": "On focus loss"
+    },
+    "autoSaveDelay": {
+      "label": "Auto save delay",
+      "description": "Idle time before an auto save runs.",
+      "aria": "Auto save delay"
+    },
+    "trimTrailingWhitespace": {
+      "label": "Trim trailing whitespace",
+      "description": "Remove spaces and tabs at the end of every line when saving.",
+      "aria": "Trim trailing whitespace on save"
+    },
+    "insertFinalNewline": {
+      "label": "Insert final newline",
+      "description": "Ensure the saved file ends with a newline.",
+      "aria": "Insert a final newline on save"
+    },
+    "restore": {
+      "title": "Reset",
+      "description": "Restore every editor preference to its default value.",
+      "action": "Restore editor defaults"
     }
   },
   "trayPrompt": {

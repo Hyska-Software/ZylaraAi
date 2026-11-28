@@ -876,6 +876,80 @@
     "reload": "Recargar archivo",
     "openExternal": "Abrir en editor externo"
   },
+  "editor": {
+    "content": "Contenido de {{path}}",
+    "header": {
+      "saved": "Guardado",
+      "unsaved": "Sin guardar",
+      "saving": "Guardando…",
+      "saveFailed": "Error al guardar",
+      "dirty": "Cambios sin guardar",
+      "position": "Ln {{line}}, Col {{column}}",
+      "tabDirty": "{{name}} (sin guardar)"
+    },
+    "actions": {
+      "save": "Guardar",
+      "saveAs": "Guardar como",
+      "saveAll": "Guardar todo",
+      "reload": "Recargar desde el disco",
+      "revert": "Descartar cambios",
+      "find": "Buscar",
+      "replace": "Reemplazar",
+      "goToLine": "Ir a la línea",
+      "viewDiff": "Ver cambios",
+      "reveal": "Mostrar en el gestor de archivos",
+      "more": "Más acciones del editor"
+    },
+    "find": {
+      "label": "Buscar en el archivo",
+      "replaceLabel": "Buscar y reemplazar en el archivo",
+      "findPlaceholder": "Buscar",
+      "replacePlaceholder": "Reemplazar por",
+      "next": "Siguiente coincidencia",
+      "previous": "Coincidencia anterior",
+      "close": "Cerrar búsqueda",
+      "caseSensitive": "Distinguir mayúsculas",
+      "wholeWord": "Palabra completa",
+      "regex": "Usar expresión regular",
+      "matchCount": "{{current}} de {{total}}",
+      "noMatches": "Sin resultados",
+      "limited": "Mostrando los primeros 10000 resultados",
+      "invalid": "Expresión no válida",
+      "replaceOne": "Reemplazar",
+      "replaceAll": "Reemplazar todo"
+    },
+    "goto": {
+      "label": "Ir a la línea",
+      "placeholder": "Línea"
+    },
+    "conflict": {
+      "title": "Archivo modificado en el disco",
+      "description": "El archivo se modificó fuera del editor. Recarga para obtener la nueva versión o conserva tus cambios y sobrescríbelo.",
+      "reload": "Recargar desde el disco",
+      "keepMine": "Conservar mi versión"
+    },
+    "saveAs": {
+      "title": "Guardar como",
+      "description": "Nombre de la copia de {{path}}. Se crea dentro del espacio de trabajo y la pestaña pasa a apuntar a ella.",
+      "exists": "Ya existe un archivo en {{path}}"
+    },
+    "close": {
+      "title": "Cambios sin guardar",
+      "description": "{{path}} tiene cambios sin guardar.",
+      "descriptionMany": "{{files}} archivos tienen cambios sin guardar.",
+      "warning": "Descartar pierde los cambios de forma permanente.",
+      "save": "Guardar y cerrar",
+      "discard": "Descartar y cerrar",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "load": "No se pudo abrir el archivo",
+      "save": "No se pudo guardar el archivo",
+      "saveAs": "No se pudo guardar la copia",
+      "saveBanner": "La última grabación falló"
+    },
+    "highlighting": "Coloreando archivo grande…"
+  },
   "image": {
     "controls": "Controles de la imagen",
     "dimensionsTitle": "Dimensiones de la imagen en píxeles",

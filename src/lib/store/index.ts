@@ -23,6 +23,21 @@ export {
 export { useCodeStore, emptyCodeSession, applyCodeEvent, isCodeEvent } from './codeStore';
 export type { CodeSessionUi } from './codeStore';
 export {
+  useEditorStore,
+  editorBufferKey,
+  isBufferDirty,
+  dirtyBuffers,
+  MAX_EDITOR_BUFFERS,
+  MAX_EDITOR_BUFFER_CHARS,
+} from './editorStore';
+export type {
+  EditorBuffer,
+  EditorBufferInit,
+  EditorStoreState,
+  DiskVersion,
+  BufferIndentation,
+} from './editorStore';
+export {
   useGitHubStore,
   gitHubListKey,
   gitHubItemKey,

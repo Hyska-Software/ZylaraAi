@@ -14,6 +14,7 @@
 
 pub mod access;
 pub mod docker;
+pub mod editor;
 pub mod exec;
 pub mod git;
 pub mod journal;

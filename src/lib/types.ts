@@ -775,6 +775,25 @@ export interface WorkspaceFileContent {
   dataBase64?: string | null;
   /** Payload binário omitido por exceder o limite de prévia inline. */
   previewOmitted?: boolean;
+  /**
+   * sha256 hex do conteúdo no disco. Presente só quando o texto veio inteiro
+   * (arquivo textual não truncado); é a versão base do editor para detectar
+   * alteração externa antes de gravar.
+   */
+  hash?: string | null;
+  /** Line ending detectado no arquivo (`lf` ou `crlf`). */
+  eol?: 'lf' | 'crlf' | null;
+}
+
+/** Resultado de uma gravação do editor na aba central. */
+export interface WorkspaceFileWrite {
+  path: string;
+  /** Tamanho gravado em bytes. */
+  size: number;
+  /** sha256 hex do conteúdo gravado (próxima versão base do buffer). */
+  hash: string;
+  /** Line ending aplicado na gravação. */
+  eol: 'lf' | 'crlf';
 }
 
 /** Entrada para criar/editar uma regra de aprovação. */
@@ -849,6 +868,10 @@ export interface WorkspaceTreeSnapshot {
   /** Filhos frescos dos diretórios carregados sob demanda (chave = path relativo). */
   dirs: Record<string, WorkspaceFileEntry[]>;
   gitStatus: WorkspaceGitStatus;
+  /** Total entries found by the depth-limited root scan, before the budget cut. */
+  totalCount?: number;
+  /** True when the backend scan hit its entry budget or safety limit. */
+  truncated?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2438,6 +2461,26 @@ export interface Settings {
   editorTabSize?: number;
   /** Show the line-number gutter in file/diff viewers. */
   editorLineNumbers?: boolean;
+  /** Auto save strategy of the in-app editor: `off`, `delay` or `blur`. */
+  editorAutoSave?: 'off' | 'delay' | 'blur';
+  /** Idle delay (ms) before an auto save runs in `delay` mode (200–10000). */
+  editorAutoSaveDelay?: number;
+  /** Indent with spaces instead of tab characters (default true). */
+  editorInsertSpaces?: boolean;
+  /** Use the file's own indentation when it is available (default true). */
+  editorDetectIndentation?: boolean;
+  /** Keep the previous line's indentation on Enter (default true). */
+  editorAutoIndent?: boolean;
+  /** Close brackets/quotes automatically (default true). */
+  editorAutoCloseBrackets?: boolean;
+  /** Strip trailing whitespace on save (default false). */
+  editorTrimTrailingWhitespace?: boolean;
+  /** Ensure the saved file ends with a newline (default true). */
+  editorInsertFinalNewline?: boolean;
+  /** Paint syntax highlight in the editor (default true). */
+  editorHighlight?: boolean;
+  /** Enable programming font ligatures (default false). */
+  editorFontLigatures?: boolean;
   includeAttachments: boolean;
   autoTitle: boolean;
   /** Opt-in: permite ao agente executar código (`run_code`). */

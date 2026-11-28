@@ -1490,6 +1490,26 @@ pub struct Settings {
     pub editor_tab_size: u32,
     /// Show the line-number gutter in file/diff viewers.
     pub editor_line_numbers: bool,
+    /// Auto save mode of the in-app editor: `off`, `delay` or `blur`.
+    pub editor_auto_save: String,
+    /// Idle delay (ms) before an auto save runs in `delay` mode.
+    pub editor_auto_save_delay: u32,
+    /// Insert spaces instead of tab characters when indenting.
+    pub editor_insert_spaces: bool,
+    /// Use the file's own indentation instead of the configured tab size.
+    pub editor_detect_indentation: bool,
+    /// Keep the previous line's indentation when pressing Enter.
+    pub editor_auto_indent: bool,
+    /// Close brackets/quotes automatically and move over the closing character.
+    pub editor_auto_close_brackets: bool,
+    /// Strip trailing whitespace from every line before saving.
+    pub editor_trim_trailing_whitespace: bool,
+    /// Ensure the saved file ends with a newline.
+    pub editor_insert_final_newline: bool,
+    /// Paint syntax highlight in the editor (off = plain text, faster on big files).
+    pub editor_highlight: bool,
+    /// Enable programming font ligatures (`calt`/`liga`) in the editor.
+    pub editor_font_ligatures: bool,
     pub include_attachments: bool,
     pub auto_title: bool,
     /// Opt-in: permite ao agente executar código (`run_code`) no computador.
@@ -1688,6 +1708,16 @@ impl Default for Settings {
             editor_line_height: 1.7,
             editor_tab_size: 2,
             editor_line_numbers: true,
+            editor_auto_save: "off".into(),
+            editor_auto_save_delay: 800,
+            editor_insert_spaces: true,
+            editor_detect_indentation: true,
+            editor_auto_indent: true,
+            editor_auto_close_brackets: true,
+            editor_trim_trailing_whitespace: false,
+            editor_insert_final_newline: true,
+            editor_highlight: true,
+            editor_font_ligatures: false,
             include_attachments: true,
             auto_title: true,
             code_execution_enabled: false,
@@ -2604,6 +2634,25 @@ pub struct WorkspaceFileContent {
     /// Payload binário omitido por exceder o limite de prévia inline.
     #[serde(default)]
     pub preview_omitted: bool,
+    /// sha256 hex do arquivo no disco. Só existe quando o texto veio inteiro
+    /// (textual não truncado); o editor usa como versão base do buffer.
+    #[serde(default)]
+    pub hash: Option<String>,
+    /// Line ending detectado (`lf` | `crlf`).
+    #[serde(default)]
+    pub eol: Option<String>,
+}
+
+/// Resultado de uma gravação do editor na aba central.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceFileWrite {
+    pub path: String,
+    pub size: u64,
+    /// sha256 hex do conteúdo gravado (a próxima versão base do buffer).
+    pub hash: String,
+    /// Line ending aplicado na gravação (`lf` | `crlf`).
+    pub eol: String,
 }
 
 /// Arquivo no status do git (painel Alterações).

@@ -179,6 +179,11 @@ describe('FileTree', () => {
     expect(screen.getByRole('treeitem', { name: /README\.md/ })).toBeTruthy();
   });
 
+  it('reports backend truncation without an active filter', () => {
+    renderTree({ totalCount: 5000, truncated: true });
+    expect(screen.getByRole('status').textContent).toContain('Mostrando 10 de 5000');
+  });
+
   it('finds nested files under collapsed folders without changing expansion', () => {
     const props = renderTree({ totalCount: 5000 }, []);
     fireEvent.change(screen.getByRole('textbox', { name: 'Filtrar arquivos' }), {

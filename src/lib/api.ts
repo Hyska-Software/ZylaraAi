@@ -123,6 +123,7 @@ import type {
   WorkspaceContext,
   WorkspaceFileContent,
   WorkspaceFileEntry,
+  WorkspaceFileWrite,
   WorkspaceGitCommit,
   WorkspaceGitCompare,
   WorkspaceGitBranches,
@@ -594,6 +595,24 @@ export const api = {
     invoke<string[]>('search_workspace_files', { workspaceId, query, limit }),
   readWorkspaceFile: (workspaceId: string, path: string) =>
     invoke<WorkspaceFileContent>('read_workspace_file', { workspaceId, path }),
+  /**
+   * Saves the editor buffer. `expectedHash` is the compare-and-swap base
+   * version: the backend refuses the write with `FS_STALE_VERSION` when the file
+   * changed on disk. `null` creates the file (Save As) or overwrites on purpose.
+   */
+  writeWorkspaceFile: (
+    workspaceId: string,
+    path: string,
+    text: string,
+    options: { expectedHash?: string | null; eol?: 'lf' | 'crlf' | null } = {},
+  ) =>
+    invoke<WorkspaceFileWrite>('write_workspace_file', {
+      workspaceId,
+      path,
+      text,
+      expectedHash: options.expectedHash ?? null,
+      eol: options.eol ?? null,
+    }),
   /** Files tab actions — all are explicit user gestures, never agent tools. */
   createWorkspaceFile: (workspaceId: string, path: string) =>
     invoke<string>('create_workspace_file', { workspaceId, path }),

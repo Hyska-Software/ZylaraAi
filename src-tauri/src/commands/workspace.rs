@@ -13,15 +13,18 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::domain::{
     Conversation, GitInfo, ProjectCheckInfo, ProjectInfo, Workspace, WorkspaceContext,
-    WorkspaceFileContent, WorkspaceFileEntry, WorkspaceGitStatus,
+    WorkspaceFileContent, WorkspaceFileEntry, WorkspaceFileWrite, WorkspaceGitStatus,
 };
 use crate::state::AppState;
-use crate::workspace::{access, mutations, project, safe_path, safe_path::Access};
+use crate::workspace::{access, editor, mutations, project, safe_path, safe_path::Access};
 use tokio_util::sync::CancellationToken;
 
 /// Limite de entradas devolvidas por `list_workspace_files` (a UI avisa quando
 /// trunca; o usuário refina a busca).
 const MAX_TREE_ENTRIES: usize = 6_000;
+/// Safety ceiling for the scan before the budget is applied; keeps huge
+/// workspaces from exhausting memory while the entries are being collected.
+const MAX_SCAN_ENTRIES: usize = 100_000;
 /// Limite de texto devolvido pela prévia de arquivo.
 const MAX_PREVIEW_BYTES: usize = 512 * 1024;
 /// Teto do payload base64 inline de imagem/PDF (24 MiB) — o mesmo teto de
@@ -428,6 +431,14 @@ fn build_tree(entries: &[(String, bool, u64)], root_label: &str) -> Vec<Workspac
     roots
 }
 
+/// Result of a bounded tree listing: the entries actually returned, the total
+/// number of entries discovered at this depth and whether the budget cut it.
+struct TreeListing {
+    entries: Vec<WorkspaceFileEntry>,
+    total: usize,
+    truncated: bool,
+}
+
 /// Lists the workspace tree from a relative directory.
 ///
 /// The Files tab shows every entry: hidden paths, gitignore/exclude matches and
@@ -440,9 +451,23 @@ fn list_tree(
     relative: &str,
     depth: u32,
 ) -> Result<Vec<WorkspaceFileEntry>, String> {
+    Ok(list_tree_with_budget(root, relative, depth, MAX_TREE_ENTRIES)?.entries)
+}
+
+/// Bounded variant of [`list_tree`], used by the snapshot (which also reports
+/// the total/truncated state) and by the regression tests (small budget).
+fn list_tree_with_budget(
+    root: &std::path::Path,
+    relative: &str,
+    depth: u32,
+    budget: usize,
+) -> Result<TreeListing, String> {
     let base = safe_path::resolve(root, relative, Access::ReadDir).map_err(map_err)?;
     let depth = depth.clamp(1, 6);
-    let mut entries: Vec<(String, bool, u64)> = Vec::new();
+    // Budget by depth, not by walk order: a large subtree early in readdir order
+    // must never hide sibling files/directories of the requested directory.
+    let mut scanned: Vec<(u32, String, bool, u64)> = Vec::new();
+    let mut scan_limit_hit = false;
     // The Files tab never hides entries: disable every filter the walker applies.
     let walker = ignore::WalkBuilder::new(&base)
         .max_depth(Some(depth as usize + 1))
@@ -455,7 +480,8 @@ fn list_tree(
         .follow_links(false)
         .build();
     for entry in walker.flatten() {
-        if entries.len() >= MAX_TREE_ENTRIES {
+        if scanned.len() >= MAX_SCAN_ENTRIES {
+            scan_limit_hit = true;
             break;
         }
         let entry_path = entry.path();
@@ -465,15 +491,25 @@ fn list_tree(
         let Ok(relative_path) = entry_path.strip_prefix(root) else {
             continue;
         };
+        let relative_path = relative_path.to_string_lossy().replace('\\', "/");
+        let level = relative_path.matches('/').count() as u32;
         let is_dir = entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false);
         let size = entry.metadata().map(|meta| meta.len()).unwrap_or(0);
-        entries.push((
-            relative_path.to_string_lossy().replace('\\', "/"),
-            is_dir,
-            size,
-        ));
+        scanned.push((level, relative_path, is_dir, size));
     }
-    Ok(build_tree(&entries, relative))
+    let total = scanned.len();
+    // Stable sort: every direct child of the listed directory survives first.
+    scanned.sort_by_key(|(level, _, _, _)| *level);
+    scanned.truncate(budget);
+    let entries: Vec<(String, bool, u64)> = scanned
+        .into_iter()
+        .map(|(_, path, is_dir, size)| (path, is_dir, size))
+        .collect();
+    Ok(TreeListing {
+        entries: build_tree(&entries, relative),
+        total,
+        truncated: scan_limit_hit || total > budget,
+    })
 }
 
 /// Git badge (`M`/`A`/`D`/`U`/`!`) per workspace-relative path.
@@ -546,6 +582,10 @@ fn mutation_error(error: mutations::MutationError) -> String {
         "FS_EMPTY_PATH" | "FS_INVALID_PATH" | "FS_NOT_A_FILE" => {
             "workspace.errors.invalidEntry"
         }
+        "EDITOR_TOO_LARGE" => "workspace.errors.editorTooLarge",
+        "EDITOR_ENCODING_UNSUPPORTED" => "workspace.errors.editorEncoding",
+        "EDITOR_BINARY" => "workspace.errors.editorBinary",
+        "FS_STALE_VERSION" => "workspace.errors.editorStale",
         _ => "workspace.errors.operationFailed",
     };
     crate::i18n::t_args(key, &[("error", &error.message)])
@@ -731,19 +771,38 @@ pub fn save_workspace_file(
 /// Root tree (depth 2) plus the fresh children of the directories the panel
 /// expanded lazily. A directory removed from disk yields an empty list (the
 /// renderer treats it as lazy again), never an error.
-fn tree_snapshot(
-    root: &Path,
-    extra_dirs: &[String],
-) -> Result<(Vec<WorkspaceFileEntry>, HashMap<String, Vec<WorkspaceFileEntry>>), String> {
-    let files = list_tree(root, ".", 2)?;
+struct TreeSnapshotData {
+    files: Vec<WorkspaceFileEntry>,
+    dirs: HashMap<String, Vec<WorkspaceFileEntry>>,
+    total_count: usize,
+    truncated: bool,
+}
+
+fn tree_snapshot(root: &Path, extra_dirs: &[String]) -> Result<TreeSnapshotData, String> {
+    let root_listing = list_tree_with_budget(root, ".", 2, MAX_TREE_ENTRIES)?;
+    let total_count = root_listing.total;
+    let mut truncated = root_listing.truncated;
     let mut dirs: HashMap<String, Vec<WorkspaceFileEntry>> = HashMap::new();
     for dir in extra_dirs.iter().take(MAX_WATCH_DIRS) {
         if dir.is_empty() || dir == "." || dirs.contains_key(dir) {
             continue;
         }
-        dirs.insert(dir.clone(), list_tree(root, dir, 2).unwrap_or_default());
+        match list_tree_with_budget(root, dir, 2, MAX_TREE_ENTRIES) {
+            Ok(listing) => {
+                truncated |= listing.truncated;
+                dirs.insert(dir.clone(), listing.entries);
+            }
+            Err(_) => {
+                dirs.insert(dir.clone(), Vec::new());
+            }
+        }
     }
-    Ok((files, dirs))
+    Ok(TreeSnapshotData {
+        files: root_listing.entries,
+        dirs,
+        total_count,
+        truncated,
+    })
 }
 
 /// Single snapshot consumed by the Files/Changes panel: one `git status` feeds
@@ -755,6 +814,10 @@ pub struct WorkspaceTreeSnapshot {
     pub files: Vec<WorkspaceFileEntry>,
     pub dirs: HashMap<String, Vec<WorkspaceFileEntry>>,
     pub git_status: WorkspaceGitStatus,
+    /// Entries discovered by the depth-limited root scan (before the budget).
+    pub total_count: usize,
+    /// True when the scan hit its budget or its safety limit.
+    pub truncated: bool,
 }
 
 #[tauri::command]
@@ -766,17 +829,19 @@ pub async fn refresh_workspace_tree(
     let root = workspace_path(&state, &workspace_id)?;
     let status = crate::workspace::git::detect(&root).await;
     let badges = git_badges(&status);
-    let (mut files, mut dirs) = tree_snapshot(&root, &extra_dirs.unwrap_or_default())?;
+    let mut snapshot = tree_snapshot(&root, &extra_dirs.unwrap_or_default())?;
     if !badges.is_empty() {
-        apply_badges(&mut files, &badges);
-        for entries in dirs.values_mut() {
+        apply_badges(&mut snapshot.files, &badges);
+        for entries in snapshot.dirs.values_mut() {
             apply_badges(entries, &badges);
         }
     }
     Ok(WorkspaceTreeSnapshot {
-        files,
-        dirs,
+        files: snapshot.files,
+        dirs: snapshot.dirs,
         git_status: crate::commands::git::to_status(status),
+        total_count: snapshot.total_count,
+        truncated: snapshot.truncated,
     })
 }
 
@@ -942,6 +1007,8 @@ fn build_preview_content(
         mime_type: Some(mime_type.to_string()),
         data_base64: payload.map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes)),
         preview_omitted: payload.is_none(),
+        hash: None,
+        eol: None,
     }
 }
 
@@ -963,6 +1030,8 @@ fn build_binary_content(
         mime_type: mime_type.map(str::to_string),
         data_base64: None,
         preview_omitted: false,
+        hash: None,
+        eol: None,
     }
 }
 
@@ -1040,6 +1109,15 @@ fn read_file_content(root: &Path, requested: &str) -> Result<WorkspaceFileConten
     } else {
         text
     };
+    // Editor base version: the hash only exists when the whole file was read.
+    // A truncated preview cannot be saved back (the tail would be lost), so the
+    // renderer keeps those files read-only.
+    let hash = if truncated {
+        None
+    } else {
+        Some(crate::harness::code::observed::hash_bytes(&bytes))
+    };
+    let eol = Some(editor::detect_eol(&bytes).as_str().to_string());
     Ok(WorkspaceFileContent {
         path: relative,
         text,
@@ -1050,6 +1128,8 @@ fn read_file_content(root: &Path, requested: &str) -> Result<WorkspaceFileConten
         mime_type: None,
         data_base64: None,
         preview_omitted: false,
+        hash,
+        eol,
     })
 }
 
@@ -1062,6 +1142,39 @@ pub async fn read_workspace_file(
 ) -> Result<WorkspaceFileContent, String> {
     let root = workspace_path(&state, &workspace_id)?;
     read_file_content(&root, &path)
+}
+
+/// Grava o conteúdo editado de um arquivo textual (editor da aba central).
+///
+/// `expected_hash` é o CAS da versão que o buffer carregou: `Some` recusa a
+/// gravação quando o disco mudou desde a leitura (`FS_STALE_VERSION`), `None`
+/// cria o arquivo ou sobrescreve de propósito (Salvar como, ou "manter minha
+/// versão" depois de um conflito).
+#[tauri::command]
+pub async fn write_workspace_file(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+    text: String,
+    expected_hash: Option<String>,
+    eol: Option<String>,
+) -> Result<WorkspaceFileWrite, String> {
+    with_mutation_root(&state, &workspace_id, |root| {
+        let outcome = editor::write_text(
+            root,
+            &path,
+            &text,
+            expected_hash.as_deref(),
+            eol.as_deref(),
+        )?;
+        Ok(WorkspaceFileWrite {
+            path: outcome.relative,
+            size: outcome.size,
+            hash: outcome.hash,
+            eol: outcome.eol.as_str().to_string(),
+        })
+    })
+    .await
 }
 
 #[cfg(test)]
@@ -1196,6 +1309,40 @@ mod tests {
         ] {
             assert!(paths.contains(&expected.to_string()), "missing {expected} in {paths:?}");
         }
+    }
+
+    #[test]
+    fn budget_keeps_root_entries_when_an_early_subtree_is_large() {
+        // A large early subtree must never eat the budget of later root siblings.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let heavy = dir.path().join("node_modules");
+        std::fs::create_dir(&heavy).expect("node_modules");
+        for index in 0..30 {
+            std::fs::write(heavy.join(format!("pkg-{index}.js")), "x").expect("package file");
+        }
+        std::fs::create_dir(dir.path().join("src")).expect("src dir");
+        std::fs::write(dir.path().join("src").join("app.ts"), "export {}").expect("app");
+        std::fs::write(dir.path().join("README.md"), "ok").expect("readme");
+
+        fn flatten_paths(entries: &[WorkspaceFileEntry], out: &mut Vec<String>) {
+            for entry in entries {
+                out.push(entry.path.clone());
+                flatten_paths(&entry.children, out);
+            }
+        }
+
+        let listing = list_tree_with_budget(dir.path(), ".", 2, 20).expect("list tree");
+        let mut paths = Vec::new();
+        flatten_paths(&listing.entries, &mut paths);
+        for expected in ["node_modules", "src", "README.md"] {
+            assert!(
+                paths.iter().any(|path| path == expected),
+                "missing {expected} in {paths:?}"
+            );
+        }
+        assert!(listing.total > 20, "expected truncation, got {}", listing.total);
+        assert!(listing.truncated);
+        assert!(paths.len() <= 20, "budget exceeded: {}", paths.len());
     }
 
     #[test]
@@ -1421,13 +1568,14 @@ mod tests {
         std::fs::write(root.join("src").join("app.ts"), "export {}").expect("criar app");
         std::fs::write(root.join("deep").join("inner").join("view.ts"), "x").expect("criar view");
 
-        let (files, dirs) =
-            tree_snapshot(&root, &["deep".to_string(), "nao-existe".to_string()])
-                .expect("snapshot da árvore");
-        let src = files.iter().find(|entry| entry.path == "src").expect("src na raiz");
+        let snapshot = tree_snapshot(&root, &["deep".to_string(), "nao-existe".to_string()])
+            .expect("snapshot da árvore");
+        let src = snapshot.files.iter().find(|entry| entry.path == "src").expect("src na raiz");
         assert!(src.children.iter().any(|child| child.path == "src/app.ts"));
-        let deep = dirs.get("deep").expect("deep recarregado");
+        let deep = snapshot.dirs.get("deep").expect("deep recarregado");
         assert!(deep.iter().any(|entry| entry.path == "deep/inner" && entry.is_dir));
-        assert!(dirs.get("nao-existe").expect("entrada pedida").is_empty());
+        assert!(snapshot.dirs.get("nao-existe").expect("entrada pedida").is_empty());
+        assert!(snapshot.total_count >= 5, "unexpected total {}", snapshot.total_count);
+        assert!(!snapshot.truncated);
     }
 }

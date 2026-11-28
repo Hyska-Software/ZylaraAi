@@ -11,26 +11,33 @@ import {
   Input,
 } from '@/components/ui';
 
-export type FileNameDialogMode = 'createFile' | 'createDir' | 'rename';
+export type FileNameDialogMode = 'createFile' | 'createDir' | 'rename' | 'saveAs';
 
 export interface FileNameDialogProps {
   open: boolean;
   mode: FileNameDialogMode;
-  /** Parent path for creation, current path for rename. */
+  /** Parent path for creation, current path for rename/Save As. */
   path: string;
   initialName?: string;
   busy?: boolean;
+  /** Forces the trailing extension to stay (Save As keeps the file's own). */
+  title?: string;
+  description?: string;
+  submitLabel?: string;
   onClose: () => void;
   onSubmit: (name: string) => void;
 }
 
-/** Shared name prompt for the Files tab create and rename actions. */
+/** Shared name prompt for the Files tab actions and the editor's Save As. */
 export function FileNameDialog({
   open,
   mode,
   path,
   initialName = '',
   busy = false,
+  title,
+  description,
+  submitLabel,
   onClose,
   onSubmit,
 }: FileNameDialogProps) {
@@ -47,7 +54,20 @@ export function FileNameDialog({
       ? 'code:tree.dialog.newFileTitle'
       : mode === 'createDir'
         ? 'code:tree.dialog.newFolderTitle'
-        : 'code:tree.dialog.renameTitle';
+        : mode === 'saveAs'
+          ? 'code:editor.saveAs.title'
+          : 'code:tree.dialog.renameTitle';
+  const resolvedTitle = title ?? t(titleKey);
+  const resolvedDescription =
+    description ??
+    t(mode === 'saveAs' ? 'code:editor.saveAs.description' : 'code:tree.dialog.inLabel', { path });
+  const resolvedSubmit =
+    submitLabel ??
+    (mode === 'rename'
+      ? t('code:tree.dialog.renameAction')
+      : mode === 'saveAs'
+        ? t('code:editor.actions.saveAs')
+        : t('code:tree.dialog.create'));
   const invalid = name.trim().length === 0 || /[\\/]/.test(name.trim());
 
   const submit = (event: FormEvent) => {
@@ -66,8 +86,8 @@ export function FileNameDialog({
       <DialogContent size="sm">
         <form onSubmit={submit} className="flex flex-col">
           <DialogHeader>
-            <DialogTitle>{t(titleKey)}</DialogTitle>
-            <DialogDescription>{t('code:tree.dialog.inLabel', { path })}</DialogDescription>
+            <DialogTitle>{resolvedTitle}</DialogTitle>
+            <DialogDescription>{resolvedDescription}</DialogDescription>
           </DialogHeader>
           <div className="px-6 pb-4 pt-2">
             <label htmlFor={inputId} className="mb-1.5 block text-[12px] font-medium text-foreground-muted">
@@ -93,9 +113,7 @@ export function FileNameDialog({
               {t('code:tree.dialog.cancel')}
             </Button>
             <Button type="submit" size="sm" loading={busy} disabled={invalid}>
-              {mode === 'rename'
-                ? t('code:tree.dialog.renameAction')
-                : t('code:tree.dialog.create')}
+              {resolvedSubmit}
             </Button>
           </DialogFooter>
         </form>
