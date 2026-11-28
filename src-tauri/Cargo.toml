@@ -1,6 +1,6 @@
 [package]
 name = "zylara"
-version = "0.16.2"
+version = "0.17.0"
 description = "Zylara — desktop AI chat harness (OpenCode Go / Zen / OpenAI ChatGPT plan)"
 authors = ["Zylara"]
 edition = "2021"

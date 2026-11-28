@@ -5,4 +5,4 @@
  * This constant only covers the loading/error path and is kept in sync with the
  * other version sources by `scripts/bump-version.ps1` / `pnpm version:set`.
  */
-export const APP_VERSION_FALLBACK = '0.16.2';
+export const APP_VERSION_FALLBACK = '0.17.0';
