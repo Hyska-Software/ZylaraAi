@@ -69,6 +69,8 @@ import {
 } from '@/lib/store';
 import { editorBufferKey } from '@/lib/store/editorStore';
 import type { Conversation, GoalView, Workspace } from '@/lib/types';
+import { deriveGitFileState, gitStatusPresentation } from './codeGitStatus';
+import { useCodeFileGitStatus } from './useCodeFileGitStatus';
 import { SIDE_PANEL_DOCK_MIN_VIEWPORT, useViewportWidth } from '@/lib/sidePanel';
 import { cn, copyText, sortStableByOrder } from '@/lib/utils';
 import { WorkspaceTrustDialog } from './WorkspaceTrustDialog';
@@ -418,6 +420,12 @@ export function CodeSessionHeader() {
   const closeCodeSubagent = useUiStore((state) => state.closeCodeSubagent);
   const codeGoalOpen = useUiStore((state) => state.codeGoalOpen);
   const codeFileTab = useUiStore((state) => state.codeFileTab);
+  /* The tab strip is mounted even when the Changes panel is closed, so it owns
+     its own lightweight git status read instead of the panel's data hook. */
+  const gitWorkspaceId = useChatStore(
+    (state) => state.conversations.find((entry) => entry.id === activeId)?.workspaceId ?? null,
+  );
+  const { status: gitStatus } = useCodeFileGitStatus(gitWorkspaceId);
   /**
    * Dirty markers of the file tabs. Subscribed as a joined string (value
    * equality) so typing inside a buffer re-renders the strip only when a dirty
@@ -1236,9 +1244,26 @@ export function CodeSessionHeader() {
         codeView === 'file' &&
         codeFileTab !== null &&
         codeFileTabKey(codeFileTab) === codeFileTabKey(target);
-      const label = dirty
-        ? t('code:editor.header.tabDirty', { name })
-        : t('code:header.fileTab', { path: target.path });
+      const git = deriveGitFileState(gitStatus, target.path);
+      const presentation = git ? gitStatusPresentation(git.kind) : null;
+      const gitLabel = git
+        ? t('code:header.fileTabGit', {
+            status: t(presentation?.labelKey ?? 'code:tree.badge.modified'),
+            staged: git.staged && git.unstaged
+              ? t('code:gitStatus.stagedAndUnstaged')
+              : git.staged
+                ? t('code:gitStatus.staged')
+                : '',
+          })
+        : null;
+      const label = [
+        dirty
+          ? t('code:editor.header.tabDirty', { name })
+          : t('code:header.fileTab', { path: target.path }),
+        gitLabel,
+      ]
+        .filter(Boolean)
+        .join(' — ');
       return shell({
         id,
         label,
@@ -1249,6 +1274,19 @@ export function CodeSessionHeader() {
         content: (
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate">{name}</span>
+            {git && presentation ? (
+              <span
+                aria-hidden
+                data-git-status={git.code}
+                title={gitLabel ?? undefined}
+                className={cn(
+                  'shrink-0 font-mono text-[10px] font-semibold leading-none',
+                  presentation.className,
+                )}
+              >
+                {presentation.glyph}
+              </span>
+            ) : null}
             {dirty ? (
               <span
                 aria-hidden

@@ -81,6 +81,7 @@ import { setPluginUiState } from '@/lib/plugins/ui/registry';
 import type { PanelTabSpec, SlotContribution } from '@/lib/plugins/ui/types';
 import type { Conversation, Workspace, WorkspaceFileEntry, WorkspaceGitStatus } from '@/lib/types';
 import { __resetWorkspacesForTests } from './useWorkspaces';
+import { CODE_GIT_REFRESH_EVENT } from './useCodeFileGitStatus';
 import { CodePanel } from './CodePanel';
 
 const apiMock = vi.mocked(api);
@@ -214,6 +215,22 @@ describe('CodePanel — visibilidade', () => {
     expect(aside.className).toContain('bg-surface');
     expect(aside.className).not.toContain('bg-surface-raised');
     expect(screen.getByRole('tablist', { name: 'Conteúdo do painel' })).toBeTruthy();
+  });
+
+  it('notifica as abas de arquivo após atualizar o painel', async () => {
+    useChatStore.setState({
+      conversations: [conversation({ workspaceId: 'ws-1' })],
+      activeId: 'conv-1',
+    });
+    const onRefresh = vi.fn();
+    window.addEventListener(CODE_GIT_REFRESH_EVENT, onRefresh);
+    render(<CodePanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar painel' }));
+
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1));
+    expect((onRefresh.mock.calls[0][0] as CustomEvent<string>).detail).toBe('ws-1');
+    window.removeEventListener(CODE_GIT_REFRESH_EVENT, onRefresh);
   });
 
   it('aplica a variante de design na barra de abas', () => {

@@ -120,8 +120,8 @@ describe('CodeFileView — editor', () => {
     expect(screen.getByText('src/app.ts')).toBeTruthy();
     expect(screen.getByText('TypeScript')).toBeTruthy();
     expect(textarea().value).toBe('const total = 1;\nexport default total;\n');
-    // The editor does not need the HEAD diff; it offers "view changes" instead.
-    expect(mocks.getFileDiffHead).not.toHaveBeenCalled();
+    // The editor paints gutter decorations from the saved file's HEAD diff.
+    await waitFor(() => expect(mocks.getFileDiffHead).toHaveBeenCalledWith('ws-1', 'src/app.ts'));
   });
 
   it('marks the buffer dirty and saves with the loaded version as base', async () => {
@@ -233,6 +233,42 @@ describe('CodeFileView — editor', () => {
     expect(mocks.readWorkspaceFile).toHaveBeenCalledTimes(2);
     expect(screen.queryByLabelText('Conteúdo de src/velho.ts')).toBeNull();
     expect(screen.getByLabelText('Conteúdo de src/novo.ts')).toBeTruthy();
+  });
+
+  it('paints gutter marks from the saved diff in the editable file', async () => {
+    mocks.getFileDiffHead.mockResolvedValue('@@ -1 +1 @@\n-a\n+const total = 1;');
+    render(<CodeFileView target={target} />);
+
+    expect(await screen.findByTestId('code-editor-textarea')).toBeTruthy();
+    const mark = await waitFor(() => {
+      const found = document.querySelector('[data-editor-diff-tone="modified"]');
+      expect(found).toBeTruthy();
+      return found as HTMLElement;
+    });
+    expect(mark.getAttribute('title')).toBe('Linha modificada');
+  });
+
+  it('hides stale marks while the buffer is dirty and restores them after saving', async () => {
+    mocks.getFileDiffHead.mockResolvedValue('@@ -1 +1 @@\n-a\n+const total = 1;');
+    render(<CodeFileView target={target} />);
+    await screen.findByTestId('code-editor-textarea');
+    await waitFor(() => expect(document.querySelector('[data-editor-diff-tone]')).toBeTruthy());
+
+    fireEvent.change(textarea(), { target: { value: 'const total = 9;\n' } });
+    await waitFor(() => expect(document.querySelector('[data-editor-diff-tone]')).toBeNull());
+
+    fireEvent.keyDown(textarea(), { key: 's', ctrlKey: true });
+    await waitFor(() => expect(mocks.writeWorkspaceFile).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(document.querySelector('[data-editor-diff-tone]')).toBeTruthy());
+  });
+
+  it('keeps the editor clean when the diff request fails', async () => {
+    mocks.getFileDiffHead.mockRejectedValueOnce(new Error('git failed'));
+    render(<CodeFileView target={target} />);
+    await screen.findByTestId('code-editor-textarea');
+
+    await waitFor(() => expect(mocks.getFileDiffHead).toHaveBeenCalledTimes(1));
+    expect(document.querySelector('[data-editor-diff-tone]')).toBeNull();
   });
 });
 

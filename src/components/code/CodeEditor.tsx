@@ -50,6 +50,8 @@ import {
   type TokenLine,
 } from '@/lib/editor';
 import type { EditorPreferences } from '@/lib/editorSettings';
+import type { InlineDiffTone } from '@/lib/diff';
+import { t } from '@/lib/i18n';
 import { prism, SYNTAX_THEME } from '@/lib/highlight';
 import { useEditorStore, type EditorBuffer } from '@/lib/store';
 import { editorThemeStyle } from '@/lib/theme/editorTheme';
@@ -99,9 +101,18 @@ export interface CodeEditorProps {
   language: string;
   /** Persisted wrap preference of the workbench. */
   wrap: boolean;
+  /** Line decorations of the saved file against HEAD; omitted outside a diff. */
+  diffMarks?: EditorDiffMarks;
   onSave: () => void;
   onSaveAs: () => void;
   className?: string;
+}
+
+export interface EditorDiffMarks {
+  /** 1-based line → added/modified. */
+  lineTones: ReadonlyMap<number, InlineDiffTone>;
+  /** 1-based line before which lines were removed → count. */
+  deletions: ReadonlyMap<number, number>;
 }
 
 interface FindState {
@@ -140,15 +151,62 @@ function tokenStyle(types: string[]): CSSProperties {
   return style;
 }
 
-function GutterNumber({ value }: { value: number }) {
+const TONE_BAR_CLASS: Record<InlineDiffTone, string> = {
+  added: 'bg-success',
+  modified: 'bg-warning',
+};
+
+/** Thin gutter bar of one changed line; deletion points get a short red tick. */
+function DiffMarkBar({ tone, deleted }: { tone?: InlineDiffTone; deleted?: number }) {
+  return (
+    <>
+      {tone ? (
+        <span
+          aria-hidden
+          data-editor-diff-tone={tone}
+          title={
+            tone === 'added'
+              ? t('code:gitStatus.gutterAdded')
+              : t('code:gitStatus.gutterModified')
+          }
+          className={cn(
+            'pointer-events-none absolute inset-y-0 left-0 w-[3px]',
+            TONE_BAR_CLASS[tone],
+          )}
+        />
+      ) : null}
+      {deleted ? (
+        <span
+          aria-hidden
+          data-editor-diff-deleted={deleted}
+          title={t('code:gitStatus.gutterDeleted')}
+          className="pointer-events-none absolute left-0 top-0 h-[3px] w-2 bg-danger"
+        />
+      ) : null}
+    </>
+  );
+}
+
+function GutterNumber({
+  value,
+  tone,
+  deleted,
+  showNumber,
+}: {
+  value: number;
+  tone?: InlineDiffTone;
+  deleted?: number;
+  showNumber: boolean;
+}) {
   return (
     <span
       data-editor-gutter="true"
-      className="shrink-0 select-none pr-3 text-right font-mono text-[10.5px] tabular-nums text-foreground-subtle"
+      className="relative shrink-0 select-none pr-3 text-right font-mono text-[10.5px] tabular-nums text-foreground-subtle"
       // The width must match the textarea's left padding (GUTTER_WIDTH).
       style={{ width: GUTTER_WIDTH }}
     >
-      {value}
+      {showNumber ? value : null}
+      <DiffMarkBar tone={tone} deleted={deleted} />
     </span>
   );
 }
@@ -159,6 +217,9 @@ interface PaintedRowProps {
   lineNumber: number;
   wrap: boolean;
   lineNumbers: boolean;
+  showGutter: boolean;
+  tone?: InlineDiffTone;
+  deleted?: number;
   lineHeightPx: number;
 }
 
@@ -167,11 +228,16 @@ const PaintedRow = memo(function PaintedRow({
   lineNumber,
   wrap,
   lineNumbers,
+  showGutter,
+  tone,
+  deleted,
   lineHeightPx,
 }: PaintedRowProps) {
   return (
     <div className="flex min-h-[20px] items-start" style={{ minHeight: lineHeightPx }}>
-      {lineNumbers && wrap ? <GutterNumber value={lineNumber} /> : null}
+      {showGutter && wrap ? (
+        <GutterNumber value={lineNumber} tone={tone} deleted={deleted} showNumber={lineNumbers} />
+      ) : null}
       <span
         className="min-w-0 flex-1"
         style={{
@@ -204,6 +270,8 @@ interface PaintedRowsProps {
   lines: (TokenLine[] | string)[];
   wrap: boolean;
   lineNumbers: boolean;
+  showGutter: boolean;
+  marks?: EditorDiffMarks;
   lineHeightPx: number;
   /** 0-based line of the first painted row (gutter numbers in wrap mode). */
   startLine: number;
@@ -222,6 +290,8 @@ const PaintedRows = memo(function PaintedRows({
   lines,
   wrap,
   lineNumbers,
+  showGutter,
+  marks,
   lineHeightPx,
   startLine,
   paddingTop,
@@ -245,16 +315,22 @@ const PaintedRows = memo(function PaintedRows({
     [metrics, paddingTop, paddingBottom, paddingLeft, paddingRight, wrap],
   );
 
-  const row = (line: TokenLine[] | string, index: number): ReactNode => (
-    <PaintedRow
-      key={startLine + index}
-      line={line}
-      lineNumber={startLine + index + 1}
-      wrap={wrap}
-      lineNumbers={lineNumbers}
-      lineHeightPx={lineHeightPx}
-    />
-  );
+  const row = (line: TokenLine[] | string, index: number): ReactNode => {
+    const lineNumber = startLine + index + 1;
+    return (
+      <PaintedRow
+        key={startLine + index}
+        line={line}
+        lineNumber={lineNumber}
+        wrap={wrap}
+        lineNumbers={lineNumbers}
+        showGutter={showGutter}
+        tone={marks?.lineTones.get(lineNumber)}
+        deleted={marks?.deletions.get(lineNumber)}
+        lineHeightPx={lineHeightPx}
+      />
+    );
+  };
 
   return (
     <pre aria-hidden className="m-0 min-w-full py-0 font-mono" style={style}>
@@ -295,7 +371,7 @@ function sameWindow(left: LineWindow, right: LineWindow): boolean {
  * - the painted layer is memoized, so caret/status updates skip it entirely.
  */
 export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function CodeEditor(
-  { buffer, preferences, language, wrap, onSave, onSaveAs, className },
+  { buffer, preferences, language, wrap, diffMarks, onSave, onSaveAs, className },
   ref,
 ) {
   const { t } = useTranslation('code');
@@ -322,17 +398,20 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     [activeTheme, preferences.theme],
   );
 
+  const lineNumbers = preferences.lineNumbers;
+  const hasDiffMarks = !!diffMarks && (diffMarks.lineTones.size > 0 || diffMarks.deletions.size > 0);
+  /* Diff decorations keep the gutter alive even when line numbers are hidden. */
+  const showGutter = lineNumbers || hasDiffMarks;
   /** Left inset where the text starts: the gutter column, or a small pad without it. */
-  const textInset = preferences.lineNumbers ? GUTTER_WIDTH : GUTTERLESS_PADDING;
+  const textInset = showGutter ? GUTTER_WIDTH : GUTTERLESS_PADDING;
   /**
    * With wrap, the gutter is an in-flow cell at the start of every highlighted
    * row, so the highlight layer must **not** add its own left padding — that
    * doubled the inset and painted the text ~56px away from the caret.
    */
-  const inlineGutter = preferences.lineNumbers && wrap;
+  const inlineGutter = showGutter && wrap;
   const highlightInset = inlineGutter ? 0 : textInset;
   const lineBoxHeight = preferences.fontSize * preferences.lineHeight;
-  const lineNumbers = preferences.lineNumbers;
 
   const starts = useMemo(() => lineIndexFor(buffer.text), [buffer.text]);
   const lineCount = starts.length;
@@ -435,13 +514,17 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   ]);
 
   const gutterText = useMemo(() => {
-    if (wrap || !lineNumbers || paint.count <= 0) return '';
+    if (wrap || paint.count <= 0) return '';
+    if (!lineNumbers) {
+      // Keep the numberless column height in sync with the diff lane rows.
+      return hasDiffMarks ? new Array<string>(paint.count).fill(' ').join('\n') : '';
+    }
     const numbers: string[] = new Array<string>(paint.count);
     for (let index = 0; index < paint.count; index += 1) {
       numbers[index] = String(paint.start + index + 1);
     }
     return numbers.join('\n');
-  }, [wrap, lineNumbers, paint.start, paint.count]);
+  }, [wrap, lineNumbers, hasDiffMarks, paint.start, paint.count]);
 
   /* ------------------------------------------------------------------ */
   /* Imperative scroll (never a React state update per event)            */
@@ -939,7 +1022,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       data-testid="code-editor"
     >
       {/* Line-number gutter (unwrapped text): a windowed column, translated vertically. */}
-      {lineNumbers && !wrap ? (
+      {showGutter && !wrap ? (
         <div
           aria-hidden
           data-editor-gutter-column="true"
@@ -953,16 +1036,37 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
               paddingBottom: VERTICAL_PADDING + paint.padBottom,
             }}
           >
-            <pre
-              className="m-0 font-mono text-[10.5px] tabular-nums text-foreground-subtle"
-              style={{
-                lineHeight: `${lineBoxHeight}px`,
-                textAlign: 'right',
-                paddingRight: GUTTER_PADDING_RIGHT,
-              }}
-            >
-              {gutterText}
-            </pre>
+            <div className="relative">
+              <pre
+                className="m-0 font-mono text-[10.5px] tabular-nums text-foreground-subtle"
+                style={{
+                  lineHeight: `${lineBoxHeight}px`,
+                  textAlign: 'right',
+                  paddingRight: GUTTER_PADDING_RIGHT,
+                }}
+              >
+                {gutterText}
+              </pre>
+              {hasDiffMarks ? (
+                <div data-editor-diff-gutter className="pointer-events-none absolute inset-0">
+                  {Array.from({ length: paint.count }, (_, index) => {
+                    const lineNumber = paint.start + index + 1;
+                    return (
+                      <div
+                        key={lineNumber}
+                        className="relative"
+                        style={{ height: lineBoxHeight }}
+                      >
+                        <DiffMarkBar
+                          tone={diffMarks?.lineTones.get(lineNumber)}
+                          deleted={diffMarks?.deletions.get(lineNumber)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
@@ -978,6 +1082,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
             lines={paintLines}
             wrap={wrap}
             lineNumbers={lineNumbers}
+            showGutter={showGutter}
+            marks={diffMarks}
             lineHeightPx={lineBoxHeight}
             startLine={paint.start}
             paddingTop={VERTICAL_PADDING + paint.padTop}

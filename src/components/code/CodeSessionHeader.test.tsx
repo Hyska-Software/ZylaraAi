@@ -8,6 +8,7 @@ import type {
   GoalView,
   Settings,
   Workspace,
+  WorkspaceGitStatus,
 } from '@/lib/types';
 
 const mocks = vi.hoisted(() => ({
@@ -26,9 +27,21 @@ const mocks = vi.hoisted(() => ({
   listConversations: vi.fn(),
   getConversation: vi.fn(),
   listArtifacts: vi.fn(),
+  gitStatus: vi.fn(),
 }));
 
 vi.mock('@/lib/api', () => ({ api: mocks }));
+
+const gitListeners: Array<(event: { payload: { workspaceId: string } }) => void> = [];
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn(async (_name: string, handler: (event: { payload: { workspaceId: string } }) => void) => {
+    gitListeners.push(handler);
+    return () => {
+      const index = gitListeners.indexOf(handler);
+      if (index >= 0) gitListeners.splice(index, 1);
+    };
+  }),
+}));
 
 const terminalMock = vi.hoisted(() => {
   type TerminalTab = {
@@ -234,7 +247,15 @@ async function chooseMenuItem(name: RegExp): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  gitListeners.length = 0;
   terminalMock.reset();
+  mocks.gitStatus.mockResolvedValue({
+    isRepo: false,
+    staged: [],
+    unstaged: [],
+    untracked: [],
+    conflicted: [],
+  } satisfies WorkspaceGitStatus);
   __resetWorkspacesForTests();
   window.matchMedia = matchMediaReturning(false);
   setViewport(1440);
@@ -1208,9 +1229,20 @@ describe('CodeSessionHeader — aba central de arquivo', () => {
     });
   }
 
+  function setGitStatus(overrides: Partial<WorkspaceGitStatus>): void {
+    mocks.gitStatus.mockResolvedValue({
+      isRepo: true,
+      staged: [],
+      unstaged: [],
+      untracked: [],
+      conflicted: [],
+      ...overrides,
+    } satisfies WorkspaceGitStatus);
+  }
+
   beforeEach(() => {
     useChatStore.setState({
-      conversations: [conversation({ id: 'c-1', title: 'Sessão aberta' })],
+      conversations: [conversation({ id: 'c-1', title: 'Sessão aberta', workspaceId: 'ws-1' })],
       activeId: 'c-1',
     });
   });
@@ -1406,6 +1438,79 @@ describe('CodeSessionHeader — aba central de arquivo', () => {
     expect(document.activeElement).toBe(second);
     fireEvent.keyDown(second, { key: 'ArrowRight' });
     expect(document.activeElement).toBe(diff);
+  });
+
+  it('mostra o estado do git na aba do arquivo modificado', async () => {
+    setGitStatus({ unstaged: [{ path: 'src/app.ts', status: 'M' }] });
+    render(<CodeSessionHeader />);
+    await waitFor(() => expect(tab('Sessão aberta')).toBeTruthy());
+
+    openFile('src/app.ts');
+
+    const fileTab = await screen.findByRole('tab', { name: 'Arquivo src/app.ts — Modificado' });
+    const badge = fileTab.querySelector('[data-git-status="M"]');
+    expect(badge?.textContent).toBe('M');
+    expect(badge?.className).toContain('text-warning');
+    expect(fileTab.getAttribute('title')).toBe('Arquivo src/app.ts — Modificado');
+  });
+
+  it('cobre todos os estados: novo, removido, renomeado, conflito, não rastreado e tipo', async () => {
+    setGitStatus({
+      staged: [
+        { path: 'new.ts', status: 'A' },
+        { path: 'src/renamed.ts', status: 'R' },
+      ],
+      unstaged: [
+        { path: 'src/gone.ts', status: 'D' },
+        { path: 'src/typed.ts', status: 'T' },
+      ],
+      untracked: ['src/untracked.ts'],
+      conflicted: ['src/conflict.ts'],
+    });
+    render(<CodeSessionHeader />);
+    await waitFor(() => expect(tab('Sessão aberta')).toBeTruthy());
+
+    const cases: Array<[string, string, string]> = [
+      ['new.ts', 'A', 'Adicionado · no índice'],
+      ['src/gone.ts', 'D', 'Removido'],
+      ['src/renamed.ts', 'R', 'Renomeado · no índice'],
+      ['src/typed.ts', 'T', 'Tipo alterado'],
+      ['src/untracked.ts', '?', 'Não rastreado'],
+      ['src/conflict.ts', 'U', 'Com conflito'],
+    ];
+    for (const [path, code, label] of cases) {
+      openFile(path);
+      const fileTab = await screen.findByRole('tab', { name: `Arquivo ${path} — ${label}` });
+      expect(fileTab.querySelector(`[data-git-status="${code}"]`)?.textContent).toBe(code);
+    }
+  });
+
+  it('não mostra badge fora de um repositório', async () => {
+    render(<CodeSessionHeader />);
+    await waitFor(() => expect(tab('Sessão aberta')).toBeTruthy());
+
+    openFile('src/app.ts');
+
+    const fileTab = await screen.findByRole('tab', { name: 'Arquivo src/app.ts' });
+    expect(fileTab.querySelector('[data-git-status]')).toBeNull();
+  });
+
+  it('atualiza o badge quando o status do git muda', async () => {
+    setGitStatus({ unstaged: [{ path: 'src/app.ts', status: 'M' }] });
+    render(<CodeSessionHeader />);
+    await waitFor(() => expect(tab('Sessão aberta')).toBeTruthy());
+    openFile('src/app.ts');
+    await screen.findByRole('tab', { name: 'Arquivo src/app.ts — Modificado' });
+
+    setGitStatus({ unstaged: [{ path: 'src/app.ts', status: 'D' }] });
+    await act(async () => {
+      for (const handler of [...gitListeners]) {
+        handler({ payload: { workspaceId: 'ws-1' } });
+      }
+    });
+
+    const fileTab = await screen.findByRole('tab', { name: 'Arquivo src/app.ts — Removido' });
+    expect(fileTab.querySelector('[data-git-status="D"]')).toBeTruthy();
   });
 });
 function goal(overrides: Partial<GoalView> = {}): GoalView {

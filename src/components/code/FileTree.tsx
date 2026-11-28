@@ -21,6 +21,7 @@ import {
 import { t } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import type { WorkspaceFileEntry } from '@/lib/types';
+import { gitCodePresentation } from './codeGitStatus';
 import { FileActionItems, FileActionsMenuButton, type FileAction } from './FileActionsMenu';
 import { FileIcon } from './FileIcon';
 
@@ -61,29 +62,6 @@ export interface FileTreeProps {
   /** Files tab action from the header or a row context menu (`null` = root). */
   onAction?: (action: FileAction, entry: WorkspaceFileEntry | null) => void;
   className?: string;
-}
-
-function gitBadge(status: string): { label: string; className: string } | null {
-  switch (status) {
-    case 'M':
-      return { label: t('code:tree.badge.modified'), className: 'text-warning' };
-    case 'A':
-      return { label: t('code:tree.badge.added'), className: 'text-success' };
-    case 'D':
-      return { label: t('code:tree.badge.deleted'), className: 'text-danger' };
-    case 'R':
-      return { label: t('code:tree.badge.renamed'), className: 'text-accent' };
-    case 'C':
-      return { label: t('code:tree.badge.copied'), className: 'text-accent' };
-    case 'U':
-      return { label: t('code:tree.badge.conflicted'), className: 'text-danger' };
-    case '?':
-      return { label: t('code:tree.badge.untracked'), className: 'text-foreground-subtle' };
-    case '!':
-      return { label: t('code:tree.badge.ignored'), className: 'text-foreground-subtle' };
-    default:
-      return null;
-  }
 }
 
 /** Recursively flattens the tree into rows; handles nested `children` and flat depth lists. */
@@ -385,7 +363,7 @@ export function FileTree({
             const hasChildren = !!entry.children?.length;
             const isExpanded = entry.isDir && hasChildren && expanded.has(entry.path);
             const isSelected = !entry.isDir && selected === entry.path;
-            const badge = entry.gitStatus ? gitBadge(entry.gitStatus) : null;
+            const badge = entry.gitStatus ? gitCodePresentation(entry.gitStatus) : null;
             return (
               <DropdownMenu
                 key={entry.path}
@@ -456,8 +434,8 @@ export function FileTree({
                 <span className="min-w-0 flex-1 truncate">{entry.name}</span>
                 {badge ? (
                   <span
-                    aria-label={t('code:tree.gitStatus', { status: badge.label })}
-                    title={t('code:tree.gitStatus', { status: badge.label })}
+                    aria-label={t('code:tree.gitStatus', { status: t(badge.labelKey) })}
+                    title={t('code:tree.gitStatus', { status: t(badge.labelKey) })}
                     className={cn('shrink-0 font-mono text-[11px] font-semibold', badge.className)}
                   >
                     {entry.gitStatus}

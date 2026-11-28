@@ -4,6 +4,7 @@ import { TriangleAlert } from 'lucide-react';
 
 import { Button } from '@/components/ui';
 import { api } from '@/lib/api';
+import { buildInlineDiff } from '@/lib/diff';
 import { editorPreferences } from '@/lib/editorSettings';
 import { t } from '@/lib/i18n';
 import {
@@ -12,8 +13,9 @@ import {
   useUiStore,
   type CodeFileTab,
 } from '@/lib/store';
+import { isBufferDirty } from '@/lib/store/editorStore';
 import { cn, copyText } from '@/lib/utils';
-import { CodeEditor, type CodeEditorHandle } from './CodeEditor';
+import { CodeEditor, type CodeEditorHandle, type EditorDiffMarks } from './CodeEditor';
 import { EditorHeader } from './EditorHeader';
 import { FileNameDialog } from './FileNameDialog';
 import { FilePreview, languageForPath } from './FilePreview';
@@ -50,8 +52,10 @@ function fileName(path: string): string {
  * image, PDF, truncated preview, non-UTF-8, oversized) keeps the read-only
  * `FilePreview` with inline diff marks, so no file is silently lossy.
  *
- * The diff against HEAD is only loaded for read-only previews; the editor
- * offers "View diff" instead of painting stale marks under editable text.
+ * The diff against HEAD is loaded for both surfaces: read-only previews paint
+ * inline marks, while the editor paints thin gutter bars derived from the saved
+ * text. Marks are hidden while the buffer is dirty, because an unsaved buffer
+ * has no backend diff and line positions would drift.
  */
 export function CodeFileView({ target, className }: CodeFileViewProps) {
   const { workspaceId, path } = target;
@@ -93,8 +97,7 @@ export function CodeFileView({ target, className }: CodeFileViewProps) {
   const editable = readOnlyReason === null && buffer !== null;
   const language = useMemo(() => languageForPath(path), [path]);
 
-  /* Diff marks belong to the read-only preview; the editor shows a badge/an
-     action instead (marks would drift as soon as the text changes). */
+  /* The read-only preview owns its inline marks and error/summary header. */
   const loadDiff = useCallback(async () => {
     if (!content || readOnlyReason === null) return;
     setDiffLoading(true);
@@ -117,6 +120,41 @@ export function CodeFileView({ target, className }: CodeFileViewProps) {
     }
     void loadDiff();
   }, [loadDiff, readOnlyReason]);
+
+  const [editorDiff, setEditorDiff] = useState<string | null>(null);
+  const editorDiffRun = useRef(0);
+  const savedText = buffer?.savedText ?? null;
+  const savedHash = buffer?.savedHash ?? null;
+
+  /* The editable gutter uses the saved file's HEAD diff. A save or a clean
+     reload changes `savedHash` and refreshes it; a stale request is discarded. */
+  useEffect(() => {
+    if (!editable) {
+      setEditorDiff(null);
+      return undefined;
+    }
+    const run = editorDiffRun.current + 1;
+    editorDiffRun.current = run;
+    setEditorDiff(null);
+    let disposed = false;
+    void api
+      .getFileDiffHead(workspaceId, path)
+      .then((text) => {
+        if (!disposed && run === editorDiffRun.current) setEditorDiff(text ?? '');
+      })
+      .catch(() => {
+        if (!disposed && run === editorDiffRun.current) setEditorDiff(null);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [editable, workspaceId, path, savedHash]);
+
+  const diffMarks = useMemo<EditorDiffMarks | null>(() => {
+    if (!editorDiff || !savedText || isBufferDirty(buffer)) return null;
+    const inline = buildInlineDiff(editorDiff, savedText.split('\n').length);
+    return { lineTones: inline.lineTones, deletions: inline.deletions };
+  }, [editorDiff, savedText, buffer]);
 
   const openExternal = useCallback(() => {
     void api.openWorkspaceInExplorer(workspaceId);
@@ -234,6 +272,7 @@ export function CodeFileView({ target, className }: CodeFileViewProps) {
           preferences={preferences}
           language={language}
           wrap={codeFileWrap}
+          diffMarks={diffMarks ?? undefined}
           onSave={() => void save()}
           onSaveAs={() => setSaveAsOpen(true)}
         />

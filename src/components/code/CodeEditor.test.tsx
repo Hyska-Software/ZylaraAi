@@ -6,7 +6,7 @@ import { editorPreferences } from '@/lib/editorSettings';
 import { useEditorStore } from '@/lib/store';
 import type { Settings } from '@/lib/types';
 import { editorBufferKey } from '@/lib/store/editorStore';
-import { CodeEditor } from './CodeEditor';
+import { CodeEditor, type EditorDiffMarks } from './CodeEditor';
 
 const preferences = editorPreferences({ locale: 'pt-BR' } as Settings);
 const bufferInit = {
@@ -19,16 +19,26 @@ const bufferInit = {
 };
 const key = editorBufferKey(bufferInit.workspaceId, bufferInit.path);
 
+const marks: EditorDiffMarks = {
+  lineTones: new Map([
+    [2, 'modified'],
+    [3, 'added'],
+  ]),
+  deletions: new Map([[4, 2]]),
+};
+
 function Harness({
   onSave = vi.fn(),
   onSaveAs = vi.fn(),
   wrap = false,
   editorPreferences: prefs = preferences,
+  diffMarks,
 }: {
   onSave?: () => void;
   onSaveAs?: () => void;
   wrap?: boolean;
   editorPreferences?: typeof preferences;
+  diffMarks?: EditorDiffMarks;
 }) {
   const buffer = useEditorStore((state) => state.buffers[key]);
   if (!buffer) return null;
@@ -38,6 +48,7 @@ function Harness({
       preferences={prefs}
       language="typescript"
       wrap={wrap}
+      diffMarks={diffMarks}
       onSave={onSave}
       onSaveAs={onSaveAs}
     />
@@ -293,5 +304,56 @@ describe('CodeEditor — performance guards', () => {
     const spans = painted.querySelectorAll('span span');
     expect(spans.length).toBeGreaterThan(2_400);
     expect(painted.querySelectorAll(':scope > div')[2_300].querySelectorAll('span span').length).toBeGreaterThan(0);
+  });
+
+  it('paints diff marks in the wrapped gutter cells', () => {
+    useEditorStore.getState().setText(key, 'a\nb\nc\nd\n');
+    render(<Harness wrap diffMarks={marks} />);
+
+    const modified = document.querySelector('[data-editor-diff-tone="modified"]');
+    const added = document.querySelector('[data-editor-diff-tone="added"]');
+    const deletion = document.querySelector('[data-editor-diff-deleted="2"]');
+    expect(modified?.textContent).toBe('');
+    expect(modified?.className).toContain('bg-warning');
+    expect(modified?.getAttribute('title')).toBe('Linha modificada');
+    expect(added?.className).toContain('bg-success');
+    expect(deletion?.className).toContain('bg-danger');
+    expect(document.querySelectorAll('[data-editor-gutter] [data-editor-diff-tone]')).toHaveLength(2);
+  });
+
+  it('paints window-aligned diff marks in the unwrapped gutter', () => {
+    useEditorStore.getState().setText(key, 'a\nb\nc\nd\n');
+    render(<Harness diffMarks={marks} />);
+
+    const column = document.querySelector('[data-editor-gutter-column]') as HTMLElement;
+    const lane = column.querySelector('[data-editor-diff-gutter]') as HTMLElement;
+    expect(lane).toBeTruthy();
+    expect(lane.querySelectorAll(':scope > div')).toHaveLength(5);
+    expect(lane.querySelector('[data-editor-diff-tone="modified"]')).toBeTruthy();
+    expect(lane.querySelector('[data-editor-diff-tone="added"]')).toBeTruthy();
+    expect(lane.querySelector('[data-editor-diff-deleted="2"]')).toBeTruthy();
+
+    textarea().scrollTop = 20;
+    fireEvent.scroll(textarea());
+    expect((column.firstElementChild as HTMLElement).style.transform).toBe('translateY(-20px)');
+  });
+
+  it('keeps diff marks when line numbers are hidden and omits them without marks', () => {
+    useEditorStore.getState().setText(key, 'a\nb\nc\nd\n');
+    const { rerender } = render(
+      <Harness
+        editorPreferences={{ ...preferences, lineNumbers: false }}
+        diffMarks={marks}
+      />,
+    );
+
+    expect(document.querySelector('[data-editor-gutter-column]')).toBeTruthy();
+    expect(document.querySelector('[data-editor-diff-tone="modified"]')).toBeTruthy();
+    expect(textarea().style.paddingLeft).toBe('56px');
+
+    rerender(<Harness editorPreferences={{ ...preferences, lineNumbers: false }} />);
+    expect(document.querySelector('[data-editor-gutter-column]')).toBeNull();
+    expect(document.querySelector('[data-editor-diff-tone]')).toBeNull();
+    expect(textarea().style.paddingLeft).toBe('16px');
   });
 });

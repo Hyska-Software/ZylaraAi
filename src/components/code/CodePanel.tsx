@@ -71,6 +71,7 @@ import { FileNameDialog, type FileNameDialogMode } from './FileNameDialog';
 import { FileTree } from './FileTree';
 import { GitActionsMenu } from './GitActionsMenu';
 import { saveEditorBuffer } from './saveBuffer';
+import { notifyCodeGitRefresh } from './useCodeFileGitStatus';
 import { TerminalPanel } from './TerminalPanel';
 import { useWorkspacePanel } from './useWorkspacePanel';
 import { dirsAffectedBy, useWorkspaceWatch } from './useWorkspaceWatch';
@@ -432,7 +433,8 @@ export function CodePanel() {
     const snapshot = await panel.refresh({ dirs });
     if (snapshot) applySnapshotDirs(snapshot, dirs);
     if (activeId) void refreshSession(activeId);
-  }, [lazyChildren, panel, activeId, refreshSession, applySnapshotDirs]);
+    notifyCodeGitRefresh(workspaceId);
+  }, [lazyChildren, panel, activeId, refreshSession, applySnapshotDirs, workspaceId]);
 
   const joinEntryPath = (parent: string, name: string) => (parent ? `${parent}/${name}` : name);
 

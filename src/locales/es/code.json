@@ -668,6 +668,7 @@
       "tabLabel": "Subagente {{description}}"
     },
     "fileTab": "Archivo {{path}}",
+    "fileTabGit": "{{status}}{{staged}}",
     "planTab": {
       "label": "Plan aprobado de la sesión",
       "visible": "Plan",
@@ -812,6 +813,14 @@
       "untracked": "Sin seguimiento",
       "ignored": "Ignorado"
     }
+  },
+  "gitStatus": {
+    "typeChanged": "Tipo cambiado",
+    "staged": " · en el índice",
+    "stagedAndUnstaged": " · en el índice y en el árbol de trabajo",
+    "gutterAdded": "Línea añadida",
+    "gutterModified": "Línea modificada",
+    "gutterDeleted": "Líneas eliminadas aquí"
   },
   "diff": {
     "loading": "Cargando diff",

@@ -668,6 +668,7 @@
       "tabLabel": "Subagent {{description}}"
     },
     "fileTab": "File {{path}}",
+    "fileTabGit": "{{status}}{{staged}}",
     "planTab": {
       "label": "Approved plan of the session",
       "visible": "Plan",
@@ -812,6 +813,14 @@
       "untracked": "Untracked",
       "ignored": "Ignored"
     }
+  },
+  "gitStatus": {
+    "typeChanged": "Type changed",
+    "staged": " · staged",
+    "stagedAndUnstaged": " · staged and unstaged",
+    "gutterAdded": "Added line",
+    "gutterModified": "Modified line",
+    "gutterDeleted": "Removed lines here"
   },
   "diff": {
     "loading": "Loading diff",
